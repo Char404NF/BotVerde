@@ -48,6 +48,13 @@ var (
 
 func (s *estado) status(t string) { s.l.OnStatus(t) }
 
+// dsnSesion arma la dirección de la base de la sesión. En Android no existe /tmp: sin temp_store=MEMORY,
+// SQLite falla con "disk I/O error (6410)" al necesitar un archivo temporal (se vio al sincronizar el estado de la app).
+func dsnSesion(dataDir string) string {
+	return "file:" + filepath.Join(dataDir, "sesion.db") +
+		"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=temp_store(2)"
+}
+
 // Start abre (o crea) la sesión guardada en dataDir. Si ya está vinculada, se conecta sola.
 func Start(dataDir string, l Listener) error {
 	if l == nil {
@@ -63,7 +70,7 @@ func Start(dataDir string, l Listener) error {
 	}
 	lg := &registro{l: l}
 	ctx := context.Background()
-	dsn := "file:" + filepath.Join(dataDir, "sesion.db") + "?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
+	dsn := dsnSesion(dataDir)
 	cont, err := sqlstore.New(ctx, "sqlite", dsn, lg.Sub("DB"))
 	if err != nil {
 		return fmt.Errorf("no se pudo abrir la base: %w", err)

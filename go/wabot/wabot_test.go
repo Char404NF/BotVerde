@@ -1,6 +1,7 @@
 package wabot
 
 import (
+	"strings"
 	"sync"
 	"testing"
 )
@@ -41,5 +42,11 @@ func TestStartPairStop(t *testing.T) {
 	}
 	if err := Pair("525512345678"); err == nil {
 		t.Fatal("después de Stop, Pair debía fallar")
+	}
+}
+
+func TestDsnUsaMemoriaParaTemporales(t *testing.T) {
+	if d := dsnSesion("/datos/bot"); !strings.Contains(d, "temp_store(2)") || !strings.HasPrefix(d, "file:/datos/bot/sesion.db?") {
+		t.Fatalf("dsn inesperado: %s", d)
 	}
 }
