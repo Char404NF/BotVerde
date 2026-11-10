@@ -62,6 +62,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.flow.first
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -94,30 +97,6 @@ import com.botchat.app.medios.CacheImagenes
 import com.botchat.app.medios.PortadaVideo
 import com.botchat.app.medios.TipoArchivo
 import com.botchat.app.medios.ReproductorAudio
-
-private sealed interface Elem {
-    data class Dia(val ts: Long) : Elem
-    data class SinLeer(val cuantos: Int) : Elem
-    data class Burbuja(val m: Msg, val mostrarRemitente: Boolean, val ultimoDelGrupo: Boolean) : Elem
-}
-
-/** Arma la lista visual (del más nuevo al más viejo, para una lista invertida) con separadores de día, agrupación por remitente y la línea de "sin leer". */
-private fun elementos(msgs: List<Msg>, esGrupo: Boolean, vistoAntes: Long = Long.MAX_VALUE): List<Elem> {
-    val out = ArrayList<Elem>(msgs.size + 8)
-    val noLeidos = msgs.count { !it.esMio && it.ts > vistoAntes }
-    val primerNoLeido = if (noLeidos > 0) msgs.lastOrNull { !it.esMio && it.ts > vistoAntes }?.id else null
-    for (i in msgs.indices) {
-        val m = msgs[i]
-        val mas = msgs.getOrNull(i + 1)      // el mensaje anterior en el tiempo
-        val menos = msgs.getOrNull(i - 1)    // el siguiente en el tiempo
-        val mismoAnterior = mas != null && mismoDia(mas.ts, m.ts) && mas.remitenteId == m.remitenteId && m.ts - mas.ts < 300
-        val mismoSiguiente = menos != null && mismoDia(menos.ts, m.ts) && menos.remitenteId == m.remitenteId && menos.ts - m.ts < 300
-        out += Elem.Burbuja(m, mostrarRemitente = esGrupo && !m.esMio && !mismoAnterior, ultimoDelGrupo = !mismoSiguiente)
-        if (m.id == primerNoLeido) out += Elem.SinLeer(noLeidos)
-        if (mas == null || !mismoDia(mas.ts, m.ts)) out += Elem.Dia(m.ts)
-    }
-    return out
-}
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -194,13 +173,15 @@ fun PantallaChat(
     }
     LaunchedEffect(vm.editando) { vm.editando?.let { texto = TextFieldValue(it.texto, TextRange(it.texto.length)) } }
 
-    val items = remember(msgs, chat?.esGrupo) { if (msgs == null) emptyList() else elementos(msgs, chat?.esGrupo == true, vm.vistoAntes) }
+    val colorEnlace = MaterialTheme.colorScheme.primary
+    SideEffect { vm.colorTexto = colorEnlace }
+    val items = vm.elementos
     var resaltado by remember { mutableStateOf("") }
 
     suspend fun irAMensaje(id: String) {
         if (!vm.cargarHasta(id)) { Toast.makeText(ctx, "Ese mensaje ya no está en este teléfono", Toast.LENGTH_SHORT).show(); return }
         kotlinx.coroutines.delay(60)
-        val idx = elementos(vm.mensajes ?: return, chat?.esGrupo == true, vm.vistoAntes).indexOfFirst { it is Elem.Burbuja && it.m.id == id }
+        val idx = vm.elementos.indexOfFirst { it is Elem.Burbuja && it.m.id == id }
         if (idx >= 0) {
             estadoLista.animateScrollToItem(idx)
             resaltado = id
@@ -227,6 +208,22 @@ fun PantallaChat(
     val llegandoAlFinal by remember { derivedStateOf { val u = estadoLista.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0; u >= items.size - 6 } }
     LaunchedEffect(llegandoAlFinal, items.size) { if (llegandoAlFinal) vm.cargarMas() }
     val lejosDelFinal by remember { derivedStateOf { estadoLista.firstVisibleItemIndex > 4 } }
+    // Avanzado → Medir rendimiento → Abrir chat: esta pantalla reporta cuándo se vio el primer contenido y cuándo estuvo todo.
+    if (MedidorChat.mide(jid)) {
+        LaunchedEffect(Unit) {
+            snapshotFlow { estadoLista.layoutInfo.visibleItemsInfo.size }.first { it > 0 }
+            MedidorChat.primerContenido()
+        }
+        LaunchedEffect(vm.diferidoListo) {
+            if (!vm.diferidoListo) return@LaunchedEffect
+            snapshotFlow { estadoLista.layoutInfo.visibleItemsInfo.size }.first { it > 0 }
+            var calmas = 0
+            while (calmas < 3) { kotlinx.coroutines.delay(60); if (MedidorChat.imagenesPendientes() == 0) calmas++ else calmas = 0 }
+            MedidorChat.contenidoCompleto()
+            kotlinx.coroutines.delay(400)
+            alVolver()
+        }
+    }
 
     val elegidos = remember(msgs, seleccion) { msgs?.filter { it.id in seleccion } ?: emptyList() }
     val unico = elegidos.singleOrNull()
@@ -382,12 +379,18 @@ fun PantallaChat(
                         Modifier.fillMaxSize().testTag("lista_chat"), state = estadoLista, reverseLayout = true,
                         contentPadding = PaddingValues(horizontal = Esp.m, vertical = Esp.s), verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        items(items, key = { e -> when (e) { is Elem.Dia -> "dia-${e.ts}"; is Elem.SinLeer -> "sinleer"; is Elem.Burbuja -> "m-${e.m.id}" } }) { e ->
+                        items(
+                            items,
+                            key = { e -> when (e) { is Elem.Dia -> "dia-${e.ts}"; is Elem.SinLeer -> "sinleer"; is Elem.Burbuja -> "m-${e.m.id}" } },
+                            contentType = { e -> when (e) { is Elem.Dia -> "dia"; is Elem.SinLeer -> "sinleer"; is Elem.Burbuja -> "b-${e.m.categoria}" } },
+                        ) { e ->
+                            // Sin desvanecido al entrar: las burbujas que ya estaban no se animan (solo lo que se mueve de lugar).
+                            val anima = Modifier.animateItem(fadeInSpec = null)
                             when (e) {
-                                is Elem.Dia -> SeparadorDia(e.ts, Modifier.animateItem())
-                                is Elem.SinLeer -> SeparadorSinLeer(e.cuantos, Modifier.animateItem())
+                                is Elem.Dia -> SeparadorDia(e.ts, anima)
+                                is Elem.SinLeer -> SeparadorSinLeer(e.cuantos, anima)
                                 is Elem.Burbuja -> Burbuja(
-                                    e, vm, alAbrirVisor, alAbrirDocumento, Modifier.animateItem().apareceDesdeAbajo(vm.esNueva(e.m.id)), alAbrirUnaVez,
+                                    e, vm, alAbrirVisor, alAbrirDocumento, anima.apareceDesdeAbajo(vm.esNueva(e.m.id)), alAbrirUnaVez,
                                     resaltar = resaltado == e.m.id, seleccionado = e.m.id in seleccion, enSeleccion = seleccion.isNotEmpty(),
                                     alAlternar = { seleccion = if (e.m.id in seleccion) seleccion - e.m.id else seleccion + e.m.id },
                                     alResponder = { if (escribirActivo) vm.citando = e.m },
@@ -651,18 +654,25 @@ private fun MiniaturaMedia(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit) {
     val relacion = if (m.ancho > 0 && m.alto > 0) (m.ancho.toFloat() / m.alto).coerceIn(0.6f, 1.8f) else 1.33f
     var miniatura by remember(m.miniatura) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     var imagen by remember(m.ruta, m.descargado) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
-    val px = with(densidad) { 300.dp.roundToPx() }
+    val px = with(densidad) { 280.dp.roundToPx() }.coerceAtMost(720)
     // Primero la miniatura (llega al instante), después la imagen reducida; todo se decodifica fuera del hilo principal.
     LaunchedEffect(m.miniatura) {
-        miniatura = if (m.miniatura.isEmpty()) null else CacheImagenes.cargar(ctx, Repo.archivo(m.miniatura), 320)?.asImageBitmap()
+        MedidorChat.empieza()
+        try { miniatura = if (m.miniatura.isEmpty()) null else CacheImagenes.cargar(ctx, Repo.archivo(m.miniatura), 320)?.asImageBitmap() } finally { MedidorChat.termina() }
     }
+    // La imagen más nítida se prepara solo si la burbuja sigue a la vista un instante (en un desplazamiento rápido se cancela)
+    // y a lo que cabe en la burbuja, no a tamaño completo; la foto entera se abre en el visor.
     LaunchedEffect(m.ruta, m.descargado) {
-        imagen = when {
-            !m.descargado -> null
-            // Videos: un cuadro real del video (la miniatura de WhatsApp es diminuta y se ve borrosa al ampliarla).
-            m.categoria == "video" -> PortadaVideo.cargar(ctx, Repo.archivo(m.ruta), px * 2, m.dur * 1000L)?.asImageBitmap()
-            else -> CacheImagenes.cargar(ctx, Repo.archivo(m.ruta), px)?.asImageBitmap()
-        }
+        if (!m.descargado) { imagen = null; return@LaunchedEffect }
+        kotlinx.coroutines.delay(if (m.miniatura.isNotEmpty()) 140L else 0L)
+        MedidorChat.empieza()
+        try {
+            imagen = when {
+                // Videos: un cuadro real del video (la miniatura de WhatsApp es diminuta y se ve borrosa al ampliarla).
+                m.categoria == "video" -> PortadaVideo.cargar(ctx, Repo.archivo(m.ruta), px, m.dur * 1000L)?.asImageBitmap()
+                else -> CacheImagenes.cargar(ctx, Repo.archivo(m.ruta), px)?.asImageBitmap()
+            }
+        } finally { MedidorChat.termina() }
     }
     val ruta = if (m.descargado) m.ruta else m.miniatura
     val haptica = rememberHaptica()
@@ -810,8 +820,8 @@ fun FotoGrandeDialogo(botId: Long, chat: String, nombre: String, alCerrar: () ->
 @Composable
 private fun TextoMensaje(m: Msg, grande: Boolean = true) {
     val esquema = MaterialTheme.colorScheme
-    val formateado = remember(m.texto, m.menciones, esquema.primary) { FormatoWhatsApp.construir(m.texto, m.menciones, esquema.primary, esquema.primary) }
-    val soloEmojis = grande && m.citaId.isEmpty() && FormatoWhatsApp.esSoloEmojis(m.texto)
+    val formateado = CacheTexto.formateado(m.texto, m.menciones, esquema.primary) // casi siempre ya está listo (se prepara fuera de la composición)
+    val soloEmojis = grande && m.citaId.isEmpty() && CacheTexto.soloEmojis(m.texto)
     Text(formateado, Modifier.testTag("texto_${m.id}"), style = if (soloEmojis) MaterialTheme.typography.displaySmall else MaterialTheme.typography.bodyLarge)
 }
 

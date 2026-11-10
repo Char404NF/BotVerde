@@ -108,6 +108,9 @@ fun etiquetaDia(ts: Long, hoy: LocalDate = LocalDate.now()): String {
 
 fun mismoDia(a: Long, b: Long) = fecha(a) == fecha(b)
 
+/** Número de día (en la zona del teléfono) de una hora; sirve para comparar días sin crear fechas por cada comparación. */
+fun diaDe(ts: Long): Long = fecha(ts).toEpochDay()
+
 fun duracion(seg: Int): String = "%d:%02d".format(seg / 60, seg % 60)
 
 // ---------- avatar ----------

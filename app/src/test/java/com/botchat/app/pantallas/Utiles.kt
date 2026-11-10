@@ -1,5 +1,7 @@
 package com.botchat.app.pantallas
 
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.printToString
@@ -25,4 +27,11 @@ fun ComposeContentTestRule.onAllNodesWithTextSafe(texto: String, substring: Bool
 
 fun ComposeContentTestRule.esperaEtiqueta(etiqueta: String) {
     espera { onAllNodes(androidx.compose.ui.test.hasTestTag(etiqueta), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+}
+
+/** Baja la lista del chat hasta ese renglón; espera a que la lista ya tenga tantos renglones (la primera medida puede ser parcial). */
+fun ComposeContentTestRule.desplazaLista(indice: Int, etiqueta: String = "lista_chat") {
+    espera {
+        try { onNodeWithTag(etiqueta).performScrollToIndex(indice); true } catch (e: IllegalArgumentException) { false }
+    }
 }

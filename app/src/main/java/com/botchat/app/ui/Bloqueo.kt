@@ -76,6 +76,8 @@ object EstadoBloqueo {
     fun bloquear(ctx: android.content.Context) {
         bloqueado.value = true
         CacheImagenes.vaciar()
+        CacheTexto.vaciar()
+        CachePaginas.vaciar()
         Temporales.borrarTodo(ctx)
         ReproductorAudio.detener()
     }

@@ -53,7 +53,10 @@ fun Modifier.entradaEscalonada(indice: Int): Modifier = composed {
 }
 
 /** Una burbuja nueva se desliza desde abajo y se desvanece hacia adentro. */
-fun Modifier.apareceDesdeAbajo(activo: Boolean): Modifier = composed {
+fun Modifier.apareceDesdeAbajo(activo: Boolean): Modifier = if (!activo) this else apareceDesdeAbajoAnimado()
+
+private fun Modifier.apareceDesdeAbajoAnimado(): Modifier = composed {
+    val activo = true
     val reducir = LocalReducirMovimiento.current
     val animar = remember { activo && !reducir }
     val avance = remember { Animatable(if (animar) 0f else 1f) }

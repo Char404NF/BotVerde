@@ -293,7 +293,8 @@ class ChatEscribirUiTest {
         pantalla()
         regla.esperaEtiqueta("lista_chat")
         regla.esperaEtiqueta("sin_leer")
-        regla.onNodeWithText("80 mensajes sin leer", useUnmergedTree = true).assertIsDisplayed()
+        // la primera página es de 40: la línea cuenta lo cargado
+        regla.onNodeWithText("40 mensajes sin leer", useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test fun conEscribirDesdeLaAppApagadoNoHayCajaDeMensaje() {
@@ -336,7 +337,7 @@ class ChatEscribirUiTest {
         pantalla()
         regla.esperaEtiqueta("lista_chat")
         assertFalse(hay("bajar_al_final"))
-        regla.onNodeWithTag("lista_chat").performScrollToIndex(30)
+        regla.desplazaLista(30)
         regla.esperaEtiqueta("bajar_al_final")
         assertEquals(true, hay("bajar_al_final"))
     }

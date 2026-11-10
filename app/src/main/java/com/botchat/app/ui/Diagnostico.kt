@@ -30,6 +30,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.Alignment
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -89,7 +94,7 @@ private const val OBJ_VIDEO_MS = 1000
  */
 @OptIn(UnstableApi::class)
 @Composable
-fun PantallaDiagnostico(alVolver: () -> Unit) {
+fun PantallaDiagnostico(alVolver: () -> Unit, alAbrirChat: (String) -> Unit = {}) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var lineas by remember { mutableStateOf(listOf<String>()) }
@@ -101,8 +106,14 @@ fun PantallaDiagnostico(alVolver: () -> Unit) {
 
     fun anota(s: String) { lineas = lineas + s }
 
-    Scaffold(topBar = { TopAppBar(navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text("Medir rendimiento") }) }) { relleno ->
-        Column(Modifier.fillMaxSize().padding(relleno).padding(Esp.l), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Esp.m)) {
+    // "Abrir chat": la medición corre fuera de esta pantalla (el chat se abre de verdad y vuelve solo).
+    val medidos by MedidorChat.lineas.collectAsState()
+    val midiendoChat by MedidorChat.corriendo.collectAsState()
+    var toquesTitulo by remember { mutableStateOf(0) }
+    var compararAnterior by remember { mutableStateOf(false) }
+
+    Scaffold(topBar = { TopAppBar(navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text("Medir rendimiento", Modifier.clickable { toquesTitulo++ }) }) }) { relleno ->
+        Column(Modifier.fillMaxSize().padding(relleno).verticalScroll(rememberScrollState()).padding(Esp.l), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Esp.m)) {
             Text("Usa archivos de prueba creados aquí mismo (no toca tus mensajes). Tarda cerca de un minuto. Déjalo en pantalla mientras corre.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Esp.s)) {
                 Button(enabled = !corriendo, onClick = {
@@ -125,6 +136,26 @@ fun PantallaDiagnostico(alVolver: () -> Unit) {
                 }) { Text("Copiar resultados") }
             }
             if (corriendo) LinearProgressIndicator(progress = { progreso }, Modifier.fillMaxWidth())
+            HorizontalDivider()
+            Text("Abrir chat: crea un chat de prueba de ${MedidorChat.MENSAJES} mensajes, lo abre solo 3 veces y lo borra al terminar. No toca tus mensajes ni escribe a nadie.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (toquesTitulo >= 5) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Esp.s)) {
+                    androidx.compose.material3.Switch(compararAnterior, { compararAnterior = it }, Modifier.testTag("comparar_anterior"))
+                    Text("Medir con carga anterior (0.4.0), para comparar antes y después", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Esp.s)) {
+                Button(enabled = !midiendoChat && !corriendo, onClick = { MedidorChat.medir(ctx, compararAnterior, alAbrirChat) }, modifier = Modifier.testTag("medir_abrir_chat")) {
+                    Text(if (midiendoChat) "Midiendo…" else "Medir abrir chat")
+                }
+                OutlinedButton(enabled = medidos.isNotEmpty(), onClick = {
+                    ctx.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("rendimiento", medidos.joinToString("\n")))
+                    Toast.makeText(ctx, "Resultados copiados", Toast.LENGTH_SHORT).show()
+                }) { Text("Copiar") }
+            }
+            if (medidos.isNotEmpty()) Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                Text(medidos.joinToString("\n"), Modifier.padding(10.dp).testTag("resultado_abrir_chat"), fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 17.sp)
+            }
             Surface(Modifier.fillMaxWidth().height(if (modoDesplazar) 360.dp else 200.dp), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 if (modoDesplazar) {
                     LazyColumn(state = estadoLista, modifier = Modifier.fillMaxSize()) {

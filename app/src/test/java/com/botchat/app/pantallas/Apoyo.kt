@@ -37,10 +37,31 @@ class MotorFalso : Motor {
         return JSONArray().also { a -> for (i in 0 until todos.length()) if (todos.getJSONObject(i).getString("nombre").lowercase().contains(q)) a.put(todos.get(i)) }.toString()
     }
     override fun obtenerChat(bot: Long, chat: String) = this.chat
+    val limites = mutableListOf<Long>()
     override fun listarMensajes(bot: Long, chat: String, antesTs: Long, antesId: String, limite: Long): String {
         llamadas += "mensajes:$chat:$antesTs"
-        return if (antesTs > 0) "[]" else mensajes
+        limites += limite
+        val todos = JSONArray(mensajes)
+        val out = JSONArray()
+        var n = 0
+        for (i in 0 until todos.length()) {
+            val o = todos.getJSONObject(i)
+            val ts = o.getLong("ts")
+            if (antesTs > 0 && !(ts < antesTs || (ts == antesTs && o.getString("id") < antesId))) continue
+            if (n++ >= limite) break
+            out.put(o)
+        }
+        return out.toString()
     }
+    var porId = mutableMapOf<String, String>() // id → JSON del mensaje (lo que devolvería mensajesPorId)
+    override fun mensajesPorId(bot: Long, chat: String, idsJson: String): String {
+        llamadas += "porId:$chat:$idsJson"
+        val ids = JSONArray(idsJson)
+        return JSONArray().also { a -> for (i in 0 until ids.length()) porId[ids.getString(i)]?.let { a.put(JSONObject(it)) } }.toString()
+    }
+    var cargaAnteriorActiva = false
+    override fun cargaAnterior(si: Boolean) { cargaAnteriorActiva = si }
+    override fun crearChatPrueba(bot: Long, cuantos: Long): String { llamadas += "crearPrueba:$cuantos"; return "120363999999999999@g.us" }
     override fun listarArchivos(bot: Long, chat: String, categoria: String, soloDescargados: Boolean, limite: Long, desde: Long): String {
         val a = JSONArray(archivos)
         if (categoria.isEmpty()) return a.toString()

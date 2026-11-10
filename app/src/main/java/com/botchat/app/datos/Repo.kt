@@ -20,7 +20,7 @@ object Repo {
     private lateinit var raiz: File
     private val cambiosInternos = MutableSharedFlow<List<String>>(extraBufferCapacity = 64)
 
-    /** Eventos en vivo: "chats", "chat:<jid>", "archivo:<jid>:<id>" y "espacio". */
+    /** Eventos en vivo: "chats", "chat:<jid>", "msg:<jid>:<id>" (cambió ese mensaje), "archivo:<jid>:<id>" y "espacio". */
     val cambios: SharedFlow<List<String>> = cambiosInternos.asSharedFlow()
 
     /** Mensaje de error si no se pudo abrir el almacén (por ejemplo, la llave de datos no está disponible). */
@@ -78,6 +78,14 @@ object Repo {
     /** Del más nuevo al más viejo. Para la página siguiente se pasan hora e id del último recibido. */
     suspend fun mensajes(bot: Long, chat: String, antesTs: Long = 0, antesId: String = "", limite: Int = 60) =
         io { Json.mensajes(motor.listarMensajes(bot, chat, antesTs, antesId, limite.toLong())) }
+
+    /** Pide solo estos mensajes (una consulta por lote): sirve para refrescar los ya cargados. Los que ya no existen no vuelven. */
+    suspend fun mensajesPorId(bot: Long, chat: String, ids: List<String>) =
+        io { Json.mensajes(motor.mensajesPorId(bot, chat, JSONArray(ids).toString())) }
+
+    /** Solo para medir: carga los mensajes como en la 0.4.0 (nombres uno por uno, sin caché). */
+    suspend fun cargaAnterior(si: Boolean) = io { motor.cargaAnterior(si) }
+    suspend fun crearChatPrueba(bot: Long, cuantos: Int) = io { motor.crearChatPrueba(bot, cuantos.toLong()) }
 
     suspend fun archivos(bot: Long, chat: String, categoria: String, soloDescargados: Boolean, limite: Int = 300, desde: Int = 0) =
         io { Json.mensajes(motor.listarArchivos(bot, chat, categoria, soloDescargados, limite.toLong(), desde.toLong())) }

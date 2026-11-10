@@ -248,7 +248,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 }
                 composable("bot") { PantallaBot(vm, conPermiso, alVolver = { nav.popBackStack() }, alAbrirAvanzado = { nav.navigate("avanzado") }, alAbrirAyuda = { nav.navigate("ayuda") }) }
                 composable("ayuda") { AyudaBateria(alVolver = { nav.popBackStack() }) }
-                composable("diagnostico") { PantallaDiagnostico(alVolver = { nav.popBackStack() }) }
+                composable("diagnostico") { PantallaDiagnostico(alVolver = { nav.popBackStack() }, alAbrirChat = { nav.navigate("chat/${enc(it)}") }) }
             }
         }
     }

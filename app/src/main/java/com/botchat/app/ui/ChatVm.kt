@@ -12,6 +12,7 @@ import com.botchat.app.datos.ChatItem
 import com.botchat.app.datos.EstadoChat
 import com.botchat.app.datos.InfoMsg
 import com.botchat.app.datos.Json
+import com.botchat.app.datos.ModoCarga
 import com.botchat.app.datos.Msg
 import com.botchat.app.datos.Participante
 import com.botchat.app.datos.PresenciaChat
@@ -20,11 +21,20 @@ import com.botchat.app.medios.AdjuntoListo
 import com.botchat.app.medios.GrabadorVoz
 import com.botchat.app.medios.Grabadores
 import com.botchat.app.medios.PrepararAdjunto
+import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** Qué chat está abierto en pantalla ahora (para no avisar con notificación de lo que ya se está viendo). */
+/** Lo que dura la animación de entrada de la pantalla (con un margen): hasta entonces no se hace trabajo que no se vea. */
+const val ENTRADA_MS = 380L
+
 object ChatAbierto {
     @Volatile var jid: String = ""
 }
@@ -83,20 +93,61 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
     private var tecleo: Job? = null
     private var borradorJob: Job? = null
     private var leidoJob: Job? = null
-    private val pagina = 60
+
+    /** Con "Medir con carga anterior" se reproduce la forma de abrir de la 0.4.0 (páginas de 60 y recarga completa) para comparar. */
+    private val antiguo = ModoCarga.anterior
+    private val pagina = if (antiguo) 60 else 40
 
     private val ajustes = Ajustes.get(app)
+
+    /** Lo que se dibuja: la lista armada (separadores de día, agrupación, "sin leer"), calculada fuera del hilo principal. */
+    internal var elementos by mutableStateOf<List<Elem>>(emptyList())
+        private set
+
+    /** Color de los enlaces del tema, para dejar el texto formateado listo antes de dibujar. */
+    @Volatile var colorTexto: Color = Color.Unspecified
+
+    /** Se completa cuando termina la animación de entrada: hasta entonces solo se carga lo que se ve. */
+    private val entrada = CompletableDeferred<Unit>()
+
+    /** Verdadero cuando ya corrió el trabajo diferido (leído, presencia, participantes, extras). */
+    var diferidoListo by mutableStateOf(false)
+        private set
+
+    private val candado = Mutex()
+    private val idsPendientes = LinkedHashSet<String>() // ids de mensajes que cambiaron (solo en el hilo principal)
 
     init {
         vistoAntes = ajustes.visto(jid)
         ajustes.marcarVisto(jid)
-        recargar()
-        cargarExtras()
+        if (antiguo) {
+            entrada.complete(Unit)
+            recargarAntiguo()
+            cargarExtras(conBorrador = true)
+            diferidoListo = true
+        } else {
+            abrir()
+            viewModelScope.launch { delay(ENTRADA_MS); entrada.complete(Unit); diferidos() }
+        }
         viewModelScope.launch {
             Repo.cambios.collect { evs ->
-                if (evs.any { it == "chat:$jid" || it.startsWith("archivo:$jid:") || it == "chats" }) {
-                    trabajo?.cancel()
-                    trabajo = launch { delay(80); recargar() }
+                val pref = "msg:$jid:"
+                val prefArchivo = "archivo:$jid:"
+                val tocados = evs.filter { it.startsWith(pref) || it.startsWith(prefArchivo) }
+                    .map { it.removePrefix(if (it.startsWith(pref)) pref else prefArchivo) }
+                if (antiguo) {
+                    if (evs.any { it == "chat:$jid" || it.startsWith(prefArchivo) || it == "chats" }) {
+                        trabajo?.cancel()
+                        trabajo = launch { delay(80); recargarAntiguo() }
+                    }
+                } else {
+                    val nuevos = evs.any { it == "chat:$jid" }
+                    if (tocados.isNotEmpty() || nuevos) {
+                        idsPendientes.addAll(tocados)
+                        trabajo?.cancel()
+                        trabajo = launch { delay(80); refrescar() }
+                    }
+                    if (evs.any { it == "chats" }) launch { refrescarEncabezado() }
                 }
                 if (evs.any { it == "presencia:$jid" }) actualizarPresencia()
                 if (evs.any { it == "sesiones" || it == "chat:$jid" }) actualizarEtiqueta()
@@ -108,26 +159,140 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
         viewModelScope.launch { etiquetasMenu = runCatching { Repo.etiquetaChat(botId, jid) }.getOrDefault(emptyList()) }
     }
 
-    private fun cargarExtras() {
+    private fun cargarExtras(conBorrador: Boolean) {
         actualizarEtiqueta()
         viewModelScope.launch {
-            borradorInicial = runCatching { Repo.borrador(botId, jid) }.getOrDefault("")
+            if (conBorrador) borradorInicial = runCatching { Repo.borrador(botId, jid) }.getOrDefault("")
             estadoChat = runCatching { Repo.estadoChat(botId, jid) }.getOrDefault(EstadoChat())
             plazoEdicionSeg = runCatching { Repo.plazoEdicionSeg() }.getOrDefault(1200L).takeIf { it > 0 } ?: 1200L
         }
     }
 
-    private suspend fun cargar(cuantos: Int) {
-        val c = runCatching { Repo.chat(botId, jid) }.getOrNull()
-        chat = c
-        runCatching { Repo.estadoChat(botId, jid) }.onSuccess { estadoChat = it }
-        val m = Repo.mensajes(botId, jid, limite = cuantos)
-        if (iniciales == null) iniciales = m.mapTo(HashSet()) { it.id }
-        mensajes = m
-        hayMas = m.size >= cuantos
-        ajustes.marcarVisto(jid) // el chat está abierto: lo que llega ahora ya se ve
-        if (c?.esGrupo == true && participantes.isEmpty()) cargarParticipantes()
+    // ---------- carga ----------
+
+    /**
+     * Abre el chat: lo último que se vio de él (si ya se abrió) aparece al instante, y la primera página pequeña llega de la base.
+     * La animación de entrada no espera nada de esto; el contenido aparece encima.
+     */
+    private fun abrir() {
+        viewModelScope.launch {
+            CachePaginas.obtener(botId, jid)?.takeIf { it.isNotEmpty() }?.let { enCache ->
+                if (iniciales == null) iniciales = enCache.mapTo(HashSet()) { it.id }
+                hayMas = true
+                actualizar { enCache }
+            }
+        }
+        viewModelScope.launch { chat = runCatching { Repo.chat(botId, jid) }.getOrNull(); recalcularElementos() }
+        viewModelScope.launch { borradorInicial = runCatching { Repo.borrador(botId, jid) }.getOrDefault("") }
+        viewModelScope.launch {
+            try {
+                val m = Repo.mensajes(botId, jid, limite = pagina)
+                CachePaginas.guardar(botId, jid, m)
+                if (iniciales == null) iniciales = m.mapTo(HashSet()) { it.id }
+                hayMas = m.size >= pagina
+                actualizar { MezclaMensajes.mezclar(it ?: emptyList(), m, pagina) }
+            } catch (e: Exception) {
+                if (mensajes == null) { mensajes = emptyList(); elementos = emptyList() }
+                aviso = e.message
+            }
+        }
+    }
+
+    /** Lo que se puede hacer después de que termina la animación: extras del encabezado, participantes y marcar como leído. */
+    private fun diferidos() {
+        cargarExtras(conBorrador = false)
+        if (chat?.esGrupo == true && participantes.isEmpty()) cargarParticipantes()
         programarLeido()
+        diferidoListo = true
+    }
+
+    /**
+     * Aplica un cambio a la lista: la mezcla y el armado de renglones corren en un hilo de fondo, de uno en uno, y el resultado
+     * (la lista y los renglones juntos) se publica de golpe. Si nada cambió, no se toca nada.
+     */
+    private suspend fun actualizar(cambio: (List<Msg>?) -> List<Msg>) {
+        candado.withLock {
+            val antes = mensajes
+            val esGrupo = chat?.esGrupo == true
+            val color = colorTexto
+            val (despues, el) = withContext(Dispatchers.Default) {
+                val d = cambio(antes)
+                if (d === antes && antes != null) return@withContext d to null
+                CacheTexto.precalentar(d, color)
+                d to elementos(d, esGrupo, vistoAntes)
+            }
+            if (el == null) return
+            mensajes = despues
+            elementos = el
+        }
+    }
+
+    private suspend fun recalcularElementos() {
+        candado.withLock {
+            val ms = mensajes ?: return
+            val esGrupo = chat?.esGrupo == true
+            elementos = withContext(Dispatchers.Default) { elementos(ms, esGrupo, vistoAntes) }
+        }
+    }
+
+    private suspend fun refrescarEncabezado() {
+        val c = runCatching { Repo.chat(botId, jid) }.getOrNull()
+        val cambioGrupo = c?.esGrupo != chat?.esGrupo
+        chat = c
+        if (cambioGrupo) recalcularElementos()
+    }
+
+    /**
+     * Un cambio en el chat: se vuelve a leer SOLO la primera página (mensajes nuevos) y, por id y en un solo lote, los mensajes ya
+     * cargados más viejos que cambiaron (recibos, reacciones, ediciones, eliminados, estado de envío, descargas). Se mezcla sin duplicados y en orden.
+     */
+    private suspend fun refrescar() {
+        val pedidos = idsPendientes.toList()
+        idsPendientes.clear()
+        try {
+            val primera = Repo.mensajes(botId, jid, limite = pagina)
+            val enPrimera = primera.mapTo(HashSet()) { it.id }
+            val cargados = mensajes?.mapTo(HashSet()) { it.id } ?: emptySet<String>()
+            val viejos = pedidos.filter { it !in enPrimera && it in cargados }.distinct()
+            val porId = if (viejos.isEmpty()) emptyList() else Repo.mensajesPorId(botId, jid, viejos)
+            CachePaginas.guardar(botId, jid, primera)
+            actualizar { MezclaMensajes.mezclar(it ?: emptyList(), primera, pagina, porId, viejos.toSet()) }
+            if (mensajes == null) mensajes = emptyList()
+            ajustes.marcarVisto(jid) // el chat está abierto: lo que llega ahora ya se ve
+            runCatching { Repo.estadoChat(botId, jid) }.onSuccess { estadoChat = it }
+            runCatching { Repo.chat(botId, jid) }.getOrNull()?.let { chat = it }
+            programarLeido()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            idsPendientes.addAll(pedidos)
+            throw e
+        } catch (e: Exception) {
+            idsPendientes.addAll(pedidos)
+            aviso = e.message
+        }
+    }
+
+    // ---- ruta antigua (0.4.0), solo para comparar al medir ----
+
+    private fun recargarAntiguo() {
+        viewModelScope.launch {
+            try {
+                val cuantos = maxOf(pagina, mensajes?.size ?: 0)
+                val c = runCatching { Repo.chat(botId, jid) }.getOrNull()
+                chat = c
+                runCatching { Repo.estadoChat(botId, jid) }.onSuccess { estadoChat = it }
+                val m = Repo.mensajes(botId, jid, limite = cuantos)
+                if (iniciales == null) iniciales = m.mapTo(HashSet()) { it.id }
+                mensajes = m
+                elementos = elementos(m, c?.esGrupo == true, vistoAntes)
+                hayMas = m.size >= cuantos
+                ajustes.marcarVisto(jid)
+                if (c?.esGrupo == true && participantes.isEmpty()) cargarParticipantes()
+                programarLeido()
+            } catch (e: Exception) {
+                mensajes = mensajes ?: emptyList()
+                aviso = e.message
+            }
+        }
     }
 
     private var iniciales: Set<String>? = null
@@ -144,14 +309,7 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
     }
 
     fun recargar() {
-        viewModelScope.launch {
-            try {
-                cargar(maxOf(pagina, mensajes?.size ?: 0))
-            } catch (e: Exception) {
-                mensajes = mensajes ?: emptyList()
-                aviso = e.message
-            }
-        }
+        if (antiguo) recargarAntiguo() else { trabajo?.cancel(); trabajo = viewModelScope.launch { refrescar() } }
     }
 
     fun cargarMas() {
@@ -162,7 +320,7 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
             try {
                 val u = actuales.last()
                 val mas = Repo.mensajes(botId, jid, u.ts, u.id, pagina)
-                mensajes = actuales + mas
+                actualizar { MezclaMensajes.agregar(it ?: emptyList(), mas) }
                 hayMas = mas.size >= pagina
             } catch (e: Exception) {
                 aviso = e.message
@@ -180,7 +338,7 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
             if (!hayMas || actuales.isEmpty() || vueltas++ > 200) return false
             val u = actuales.last()
             val mas = runCatching { Repo.mensajes(botId, jid, u.ts, u.id, pagina) }.getOrNull() ?: return false
-            mensajes = actuales + mas
+            actualizar { MezclaMensajes.agregar(it ?: emptyList(), mas) }
             hayMas = mas.size >= pagina
         }
         return true
@@ -415,6 +573,7 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
         ChatAbierto.jid = jid
         com.botchat.app.Notificador.quitar(getApplication(), jid)
         viewModelScope.launch {
+            entrada.await() // presencia y "en línea" esperan a que termine la animación de entrada
             if (mostrarEnLinea) {
                 runCatching { Repo.enLinea(botId, true) }
                 runCatching { Repo.suscribirPresencia(botId, jid) }
@@ -431,7 +590,7 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
     }
 
     private fun programarLeido() {
-        if (!ajustes.marcarLeidoAlAbrir.value || ChatAbierto.jid != jid) return
+        if (!entrada.isCompleted || !ajustes.marcarLeidoAlAbrir.value || ChatAbierto.jid != jid) return
         leidoJob?.cancel()
         leidoJob = viewModelScope.launch { delay(600); runCatching { Repo.marcarLeido(botId, jid) } }
     }

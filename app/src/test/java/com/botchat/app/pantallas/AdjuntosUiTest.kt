@@ -127,7 +127,7 @@ class AdjuntosUiTest {
         regla.onNodeWithTag("cancelar_adjuntos").performClick()
         regla.espera { !hay("panel_adjuntos") }
         assertFalse(llamo("medio:"))
-        assertEquals("las copias temporales se borran", 0, (com.botchat.app.medios.PrepararAdjunto.carpeta(ctx).listFiles() ?: emptyArray()).size)
+        regla.espera { (com.botchat.app.medios.PrepararAdjunto.carpeta(ctx).listFiles() ?: emptyArray()).isEmpty() } // las copias temporales se borran
     }
 
     @Test fun elMenuOfreceGaleriaCamaraDocumentoYAudio() {

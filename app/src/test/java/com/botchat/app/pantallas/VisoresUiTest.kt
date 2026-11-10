@@ -22,6 +22,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithTag
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -120,9 +122,17 @@ class VisoresUiTest {
     }
 
     @Test fun medicionDeRendimientoSePuedeAbrir() {
-        regla.setContent { BotChatTema { PantallaDiagnostico {} } }
+        regla.setContent { BotChatTema { PantallaDiagnostico(alVolver = {}) } }
         regla.onNodeWithText("Medir rendimiento").assertIsDisplayed()
         regla.onNodeWithText("Iniciar pruebas").assertIsDisplayed()
         regla.onNodeWithText("Copiar resultados").assertIsDisplayed()
+    }
+
+    @Test fun medirAbrirChatEstaYLaOpcionDeCargaAnteriorEstaOculta() {
+        regla.setContent { BotChatTema { PantallaDiagnostico(alVolver = {}) } }
+        regla.onNodeWithTag("medir_abrir_chat").assertIsDisplayed()
+        assertEquals(0, regla.onAllNodesWithTag("comparar_anterior").fetchSemanticsNodes().size)
+        repeat(5) { regla.onNodeWithText("Medir rendimiento").performClick() }
+        regla.espera { regla.onAllNodesWithTag("comparar_anterior").fetchSemanticsNodes().isNotEmpty() }
     }
 }

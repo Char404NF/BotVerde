@@ -1,0 +1,4 @@
+# Perfil base escrito a mano (no medido en un teléfono): marca como «caliente» todo el código de la app para que Android lo compile
+# por adelantado al instalar, en vez de interpretarlo/compilarlo al vuelo la primera vez. Compose y Media3 traen sus propios perfiles.
+HSPLcom/botchat/app/**;->**(**)**
+Lcom/botchat/app/**;
