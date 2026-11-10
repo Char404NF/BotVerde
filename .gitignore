@@ -1,0 +1,24 @@
+# Bases de datos y sesiones
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+# Llaves y secretos
+*.key
+*.pem
+*.jks
+*.keystore
+*.p12
+# Compilación
+local.properties
+build/
+.gradle/
+.cxx/
+.idea/
+*.aar
+*.apk
+salida/
+bind.log
+# Go
+go/**/*.test
+app/libs/
