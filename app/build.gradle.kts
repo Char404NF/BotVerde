@@ -15,10 +15,27 @@ android {
         applicationId = "com.botchat.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "0.4.0"
+        versionCode = 8
+        versionName = "0.4.1"
         ndk { abiFilters += "arm64-v8a" }
     }
+    // Dos variantes del MISMO app: mismo applicationId, mismo versionCode y la misma llave de firma (la de siempre), para poder
+    // instalar una encima de la otra en cualquier sentido sin desinstalar (desinstalar borraría la sesión de WhatsApp).
+    //  - debug: la de siempre (con símbolos de depuración, sin optimizar).
+    //  - rendimiento: no depurable, con R8 (código reducido y optimizado) y perfil base (baseline-prof.txt).
+    buildTypes {
+        create("rendimiento") {
+            initWith(getByName("debug"))
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "debug"
+        }
+    }
+    // Con -PpruebasRendimiento las pruebas unitarias corren contra la variante rendimiento (por defecto, contra debug).
+    if (project.hasProperty("pruebasRendimiento")) testBuildType = "rendimiento"
     buildFeatures { compose = true }
     packaging { jniLibs { useLegacyPackaging = true } } // comprime la librería nativa: APK mucho más liviano
     testOptions {
@@ -61,4 +78,6 @@ dependencies {
     testImplementation("androidx.test:core:1.7.0")
     testImplementation("androidx.test.ext:junit:1.3.0")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+    // Solo para correr las pruebas de pantallas contra la variante rendimiento (./gradlew -PpruebasRendimiento testRendimientoUnitTest); el APK no la lleva.
+    if (project.hasProperty("pruebasRendimiento")) "rendimientoImplementation"("androidx.compose.ui:ui-test-manifest")
 }
