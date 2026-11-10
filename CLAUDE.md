@@ -98,7 +98,7 @@ No verificado aquí: WhatsApp real, teléfono real, rendimiento real, Keystore, 
 - Nombre mostrado: agenda → nombre de perfil → negocio → número con formato; grupos = asunto; solo LID sin número → "Número no disponible". México: se oculta el 521 solo al mostrar. Al conocerse la relación LID↔teléfono se fusionan los chats.
 - Ver una vez: solo se guarda un registro `ver_una_vez` con texto fijo, estado `omitido`, sin miniatura, llaves ni rutas.
 - Descargas: fotos/audios/documentos ≤ 50 MB automático; videos solo con Wi‑Fi (salvo ajuste); mínimo 500 MB libres; 2 simultáneas y las > 8 MB de una en una; reintentos 10 s / 1 min / 5 min; 403/404/410 = `fallido` definitivo.
-- Seguridad: PIN (PBKDF2, bloqueos crecientes por intentos), huella opcional, bloqueo tras 1 min en segundo plano, FLAG_SECURE activado por defecto (se cambia en Avanzado). Copias descifradas temporales en `cache/tmp_descifrado/` se borran al bloquear y al abrir la app. "Guardar copia" va a Documents/BotChat/<chat>/ (MediaStore, Android 10+).
+- Seguridad: ver "Etapa 2.5" (el bloqueo ya es opcional y viene apagado). PIN con PBKDF2 y esperas crecientes por intentos fallidos. Copias descifradas temporales en `cache/tmp_descifrado/` se borran al bloquear y al abrir la app. "Guardar copia" va a Documents/BotChat/<chat>/ (MediaStore, Android 10+).
 - Logs: nunca llevan texto de mensajes, nombres ni nombres de archivos; los números van enmascarados.
 - Sin Google: ni Firebase ni Play Services (verificado en el APK). Lint: `UnsafeOptInUsageError` desactivado a propósito (Media3 UnstableApi, versión fija).
 
@@ -107,3 +107,40 @@ No verificado aquí: WhatsApp real, teléfono real, rendimiento real, Keystore, 
 - whatsmeow solo descarga a memoria: un archivo de ~50 MB sube la memoria de golpe; por eso las grandes van de una en una.
 - Rendimiento sin medir en teléfono real. Objetivos: foto ~5 MB < 200 ms, primer cuadro de video de ~50 MB < 1 s, desplazamiento de 200 chats fluido (≤ 5 % de cuadros caídos). Se mide en Avanzado → Medir rendimiento.
 - Solo arm64; APK debug firmado con la llave de este servidor (misma que la etapa 1, actualiza sin perder la sesión).
+
+## Estado: ETAPA 2.5 (2026-11-10) — versión 0.2.1 (versionCode 4)
+Hecho: bloqueo opcional, ícono nuevo, paleta y sistema de diseño, rediseño con barra superior y navegación inferior, animaciones, bienvenida y subida a GitHub. No se tocó la lógica del bot, el cifrado ni la base de mensajes.
+APK: `salida/BotChat-etapa2-5-debug.apk` (misma llave de firma que las etapas 1 y 2: actualiza encima y conserva la sesión).
+No verificado sin teléfono: cómo se ve el ícono en el lanzador (adaptable y temático), fluidez real de las animaciones y la huella (BiometricPrompt).
+
+### Bloqueo opcional (Ajustes → Seguridad)
+- Por defecto NO hay bloqueo: la app nunca exige PIN ni huella. `Ajustes.bloqueo` = `NINGUNO` | `PIN` | `HUELLA`. Quien venía de la 0.2.0 con PIN conserva su bloqueo (PIN o huella); sin PIN queda en `NINGUNO`.
+- Tiempo de bloqueo (solo con bloqueo activo): enseguida (0), 1 min (por defecto) o 5 min. Girar la pantalla no cuenta como salir.
+- Huella: Android 11+ con huella registrada usa el bloqueo del teléfono como respaldo (BIOMETRIC_STRONG | DEVICE_CREDENTIAL) y no pide PIN propio; si no, se crea un PIN de respaldo.
+- Quitar el bloqueo pide el PIN actual (o la huella si no hay PIN propio). "Olvidé mi PIN": confirma con el bloqueo del teléfono y lo quita; si el teléfono no tiene bloqueo, doble confirmación y aviso de que el PIN es solo una protección ligera.
+- Olvidar el PIN NO deja sin acceso a los mensajes: la llave de datos vive en el Keystore sin depender del PIN (`setUserAuthenticationRequired(false)`); el PIN solo decide quién abre la app. Solo se pierde el acceso con "borrar datos" o desinstalar.
+- "Evitar capturas de pantalla" (FLAG_SECURE) es un interruptor aparte, apagado por defecto.
+- Pruebas: `SeguridadUiTest`, `NavegacionUiTest`.
+
+### Ícono
+- Vector con viewBox 1024 (turquesa #2EC4CB, ámbar #F59E28, fondo #151A38). Archivos en `res/drawable`: `ic_launcher_foreground` (adaptable, el fondo es el color `ic_launcher_background`), `ic_launcher_monochrome` (Android 13 temático), `ic_stat_bot` (notificación, blanco, 24 dp) e `ic_logo` (logo dentro de la app, `LogoBot()`). `LogoDibujado` (Compose) dibuja el mismo logo por partes para el splash.
+
+### Paleta y sistema de diseño (`ui/Tema.kt`)
+- Oscuro: fondo #0F1330, superficie #151A38, variante #1F2547, primario #2EC4CB (sobre #003739, contenedor #00494D / #A0F1F5), ámbar #F59E28 (sobre #4A2A00, contenedor #6A3F00), texto #E3E5F5, contorno #8A90B5. Claro: fondo #F6F8FF, superficie #FBFCFF, primario #00727A, contenedor #9EF0F6, ámbar #8A5100 / #FFDCBA, texto #151A38.
+- Turquesa = acciones y "conectado"; ámbar solo como acento (avisos, "reconectando"). `LocalColoresApp` da esos dos colores de estado. Contraste mínimo AA verificado en pruebas (`TemaUiTest`).
+- Tema: Sistema/Claro/Oscuro (Avanzado → Aspecto). Color dinámico del sistema: opción apagada por defecto en Avanzado.
+- Espaciado en múltiplos de 4 dp (`Esp`), formas redondeadas (`Formas`), tipografía Material 3 con pesos propios, un solo conjunto de íconos (`Ico`).
+
+### Navegación y pantallas
+- Barra superior (logo + nombre + estado: Conectado / Reconectando / Desvinculado / Detenido) y navegación inferior Chats · Espacio · Ajustes en las pantallas principales; chats, visor, documentos y archivos compartidos van a pantalla completa. Ajustes: Seguridad, Descargas, Estado del bot y Avanzado (aspecto, mantenimiento, registro, eliminar bot).
+- Primer arranque: bienvenida de 3 pantallas con aviso de herramienta no oficial y casilla "Entiendo y acepto" obligatoria antes de vincular. Si ya había un bot (actualización), solo el aviso, una vez.
+- Contador de chats: mensajes recibidos desde que se abrió el chat (hasta "30+"), calculado en el teléfono con lo ya guardado; no toca la base de mensajes.
+
+### Animaciones (solo APIs de Compose, 150–300 ms)
+- Splash con el logo (< 1 s, no tapa toques; no sale con "Reducir animaciones"), transición entre pantallas y elemento compartido avatar/nombre, entrada escalonada de la lista (solo la primera vez), burbujas nuevas que se deslizan, miniaturas con desvanecido, punto de estado que pulsa o gira, escala al tocar chats, palomita animada al vincular. Respeta "quitar animaciones" de Android (escala 0) y el interruptor "Reducir animaciones" de Avanzado (`LocalReducirMovimiento`).
+
+### GitHub
+- Repositorio privado `Char404NF/BotVerde`, rama `main`, etiquetas `v0.2.0` y `v0.2.1`. No se suben APK (`salida/` está ignorada), bases de datos, archivos `.enc`, llaves ni `.env`.
+- Excepción a la regla global "No subas código a GitHub" (confirmada por Charly el 2026-11-10): vale SOLO para este repositorio y SOLO con su deploy key. El `CLAUDE.md global` global no se modifica.
+- Llave de despliegue: `~/.ssh/<llave>` (usuario `wabot`, sin contraseña, con permiso de escritura solo en BotVerde); alias SSH `github.com` en `~/.ssh/config`; la huella de github.com en `known_hosts` se verificó contra la documentación oficial de GitHub. Nunca copiar la llave privada fuera del servidor.
+- Subir cambios: `su - wabot -c 'cd ~/wabot-app && git push'`; versión nueva: `git tag -a vX.Y.Z -m "..." && git push origin vX.Y.Z`. Antes de subir: `git ls-files` y buscar secretos (keystore, password, token, .pem) en archivos e historial.
