@@ -83,6 +83,12 @@ var migraciones = [][]string{
 		`INSERT INTO stats_info(campo, valor) SELECT 'rowid_max', COALESCE(MAX(rowid),0) FROM messages`,
 		`INSERT INTO stats_info(campo, valor) VALUES('relleno', 0)`,
 	},
+	// 3: mensajes eliminados por su autor o por un admin: el contenido se conserva y solo se anota cuándo y quién (sin cifrar).
+	{
+		`ALTER TABLE messages ADD COLUMN eliminado_en INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE messages ADD COLUMN eliminado_por TEXT NOT NULL DEFAULT ''`,
+		`CREATE INDEX idx_mensajes_eliminados ON messages(bot_id, chat_jid, borrado, ts)`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

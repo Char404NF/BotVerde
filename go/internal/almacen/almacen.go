@@ -55,11 +55,12 @@ const TextoVerUnaVez = "[Ver una vez: ábrelo en tu teléfono]"
 
 // Almacen es la base de mensajes. Es seguro para uso concurrente.
 type Almacen struct {
-	db    *sql.DB
-	raiz  string
-	clave []byte
-	zona  atomic.Pointer[time.Location] // zona horaria del teléfono para agrupar por día (la fija la app)
-	mu    sync.Mutex                    // serializa lectura-modificación-escritura de chats
+	db        *sql.DB
+	raiz      string
+	clave     []byte
+	conservar atomic.Int32                  // 0 = por defecto (conservar), 1 = conservar, 2 = no conservar eliminados
+	zona      atomic.Pointer[time.Location] // zona horaria del teléfono para agrupar por día (la fija la app)
+	mu        sync.Mutex                    // serializa lectura-modificación-escritura de chats
 	// Cambio, si no es nil, se llama cuando algo cambia (sin bloquear la operación). Los eventos son:
 	// "chats", "chat:<jid>", "archivo:<jid>:<id>" y "espacio".
 	Cambio func(evento string)
@@ -430,16 +431,19 @@ type Mensaje struct {
 	Ancho, Alto     int
 	DuracionS       int
 	NotaVoz         bool
+	EliminadoEn     int64  // hora en que llegó la eliminación (0 = no se sabe)
+	EliminadoPor    string // JID de quien lo eliminó si no fue su autor (un admin); vacío si no se sabe o fue el autor
 }
 
-const colsMensaje = "id,chat_jid,bot_id,remitente_jid,remitente_nombre,es_mio,tipo,texto_cifrado,ts,borrado,editado,archivo_ruta,archivo_bytes,archivo_mime,archivo_estado,miniatura_ruta,archivo_nombre_cifrado,archivo_info_cifrado,ancho,alto,duracion_s,nota_voz"
+const colsInsertMensaje = "id,chat_jid,bot_id,remitente_jid,remitente_nombre,es_mio,tipo,texto_cifrado,ts,borrado,editado,archivo_ruta,archivo_bytes,archivo_mime,archivo_estado,miniatura_ruta,archivo_nombre_cifrado,archivo_info_cifrado,ancho,alto,duracion_s,nota_voz"
+const colsMensaje = colsInsertMensaje + ",eliminado_en,eliminado_por"
 
 func (a *Almacen) escanearMensaje(s interface{ Scan(...any) error }) (*Mensaje, error) {
 	var m Mensaje
 	var mio, borrado, editado, nota int
 	var texto, nombre, info []byte
 	if err := s.Scan(&m.ID, &m.ChatJID, &m.BotID, &m.RemitenteJID, &m.RemitenteNombre, &mio, &m.Tipo, &texto, &m.TS, &borrado, &editado,
-		&m.ArchivoRuta, &m.ArchivoBytes, &m.ArchivoMime, &m.ArchivoEstado, &m.MiniaturaRuta, &nombre, &info, &m.Ancho, &m.Alto, &m.DuracionS, &nota); err != nil {
+		&m.ArchivoRuta, &m.ArchivoBytes, &m.ArchivoMime, &m.ArchivoEstado, &m.MiniaturaRuta, &nombre, &info, &m.Ancho, &m.Alto, &m.DuracionS, &nota, &m.EliminadoEn, &m.EliminadoPor); err != nil {
 		return nil, err
 	}
 	m.EsMio, m.Borrado, m.Editado, m.NotaVoz = mio == 1, borrado == 1, editado == 1, nota == 1
@@ -476,7 +480,7 @@ func (a *Almacen) valoresMensaje(m *Mensaje) ([]any, error) {
 		m.ArchivoRuta, m.ArchivoBytes, m.ArchivoMime, estado, m.MiniaturaRuta, nombre, info, m.Ancho, m.Alto, m.DuracionS, b2i(m.NotaVoz)}, nil
 }
 
-const insertMensaje = "INSERT INTO messages(" + colsMensaje + ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id,chat_jid,bot_id) DO NOTHING"
+const insertMensaje = "INSERT INTO messages(" + colsInsertMensaje + ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id,chat_jid,bot_id) DO NOTHING"
 
 // GuardarMensajes guarda varios mensajes en una sola transacción. Los chats deben existir.
 // Devuelve cuáles eran nuevos (los repetidos se ignoran).
@@ -568,20 +572,6 @@ func (a *Almacen) EditarTexto(botID int64, chat, id, texto string) (bool, error)
 		return false, err
 	}
 	r, err := a.db.Exec("UPDATE messages SET texto_cifrado=?, editado=1 WHERE bot_id=? AND chat_jid=? AND id=?", sellado, botID, chat, id)
-	if err != nil {
-		return false, err
-	}
-	n, _ := r.RowsAffected()
-	if n > 0 {
-		a.avisa("chat:" + chat)
-		a.avisa("chats")
-	}
-	return n > 0, nil
-}
-
-// MarcarBorrado marca un mensaje como borrado por su autor. El contenido se conserva en la base.
-func (a *Almacen) MarcarBorrado(botID int64, chat, id string) (bool, error) {
-	r, err := a.db.Exec("UPDATE messages SET borrado=1 WHERE bot_id=? AND chat_jid=? AND id=?", botID, chat, id)
 	if err != nil {
 		return false, err
 	}

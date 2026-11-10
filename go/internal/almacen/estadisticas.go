@@ -172,14 +172,15 @@ type Quien struct {
 
 // ResumenChat es lo que muestra la pestaña "Resumen" de un chat.
 type ResumenChat struct {
-	Desde     int64        `json:"desde"` // hora del primer mensaje guardado
-	Listo     bool         `json:"listo"` // false mientras se cuentan los mensajes anteriores
-	Enviados  int64        `json:"enviados"`
-	Recibidos int64        `json:"recibidos"`
-	PorTipo   []TipoCuenta `json:"porTipo"`
-	PorHora   []int64      `json:"porHora"`      // 24 valores
-	PorSemana []int64      `json:"porDiaSemana"` // 7 valores: lunes a domingo
-	Quien     []Quien      `json:"quien"`        // solo grupos, los que más escriben
+	Desde      int64        `json:"desde"` // hora del primer mensaje guardado
+	Listo      bool         `json:"listo"` // false mientras se cuentan los mensajes anteriores
+	Enviados   int64        `json:"enviados"`
+	Recibidos  int64        `json:"recibidos"`
+	PorTipo    []TipoCuenta `json:"porTipo"`
+	PorHora    []int64      `json:"porHora"`      // 24 valores
+	PorSemana  []int64      `json:"porDiaSemana"` // 7 valores: lunes a domingo
+	Quien      []Quien      `json:"quien"`        // solo grupos, los que más escriben
+	Eliminados int64        `json:"eliminados"`   // mensajes eliminados por su autor o un admin (el contenido puede seguir guardado)
 }
 
 func semanaDe(dia string) int {
@@ -192,7 +193,7 @@ func semanaDe(dia string) int {
 
 // ResumenDeChat arma el resumen de un chat solo con los contadores.
 func (a *Almacen) ResumenDeChat(botID int64, chat string) (*ResumenChat, error) {
-	r := &ResumenChat{Desde: a.primerTS(botID, chat), Listo: a.rellenoListo(), PorHora: make([]int64, 24), PorSemana: make([]int64, 7), PorTipo: []TipoCuenta{}, Quien: []Quien{}}
+	r := &ResumenChat{Eliminados: a.Eliminados(botID, chat), Desde: a.primerTS(botID, chat), Listo: a.rellenoListo(), PorHora: make([]int64, 24), PorSemana: make([]int64, 7), PorTipo: []TipoCuenta{}, Quien: []Quien{}}
 	filas, err := a.db.Query(`SELECT sender,day,hora,tipo,count,bytes FROM daily_stats WHERE bot_id=? AND chat=?`, botID, chat)
 	if err != nil {
 		return nil, err

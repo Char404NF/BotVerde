@@ -252,7 +252,11 @@ func (g *Ingesta) preparar(ctx context.Context, evt *events.Message, historial b
 		g.Servicios.PedirAsunto(jid)
 	}
 	if c.Revocar != "" {
-		_, err := g.Alm.MarcarBorrado(g.BotID, jid, c.Revocar)
+		quien, _ := g.remitente(ctx, evt.Info, chat, esGrupo)
+		if evt.Info.IsFromMe {
+			quien = ""
+		}
+		_, err := g.Alm.MarcarEliminado(g.BotID, jid, c.Revocar, quien, evt.Info.Timestamp.Unix())
 		return nil, err
 	}
 	if c.Editar != nil {

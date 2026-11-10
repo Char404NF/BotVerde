@@ -26,6 +26,8 @@ var (
 	redAhora atomic.Int32
 	polMu    sync.RWMutex
 	pol      = ingesta.PoliticaPorDefecto()
+	// ajusteConservarApagado recuerda el ajuste aunque todavía no esté abierto el almacén (por defecto se conserva).
+	ajusteConservarApagado atomic.Bool
 )
 
 func politicaActual() ingesta.Politica {
@@ -54,6 +56,7 @@ func abrirAlmacenLocked(raiz string, clave []byte) error {
 		}
 	}
 	alm = a
+	a.FijarConservarEliminados(!ajusteConservarApagado.Load())
 	return nil
 }
 
@@ -351,4 +354,46 @@ func EstadisticasGlobales(botID int64, dias int) (string, error) {
 		return "", err
 	}
 	return js(a.ResumenDeTodo(botID, dias))
+}
+
+// ListarFiltrados devuelve (JSON {total, items}) los mensajes de un chat que cumplen un filtro (ver almacen.FiltroLista), del más nuevo al más viejo.
+// En la primera página (antesTS=0) trae también el total; las siguientes usan hora e id del último recibido.
+func ListarFiltrados(botID int64, chat, filtroJSON string, antesTS int64, antesID string, limite int) (string, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return "", err
+	}
+	f, err := almacen.ParseFiltro(filtroJSON)
+	if err != nil {
+		return "", err
+	}
+	return js(a.ListarFiltrados(botID, chat, f, antesTS, antesID, limite))
+}
+
+// PersonasChat devuelve (JSON) quién escribió en un chat, de quien más a quien menos.
+func PersonasChat(botID int64, chat string) (string, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return "", err
+	}
+	return js(a.PersonasDeChat(botID, chat))
+}
+
+// OlvidarMensaje borra para siempre el contenido y el archivo de un mensaje.
+func OlvidarMensaje(botID int64, chat, id string) error {
+	a, err := almacenAbierto()
+	if err != nil {
+		return err
+	}
+	_, err = a.OlvidarMensaje(botID, chat, id)
+	return err
+}
+
+// ConservarEliminados enciende o apaga conservar el contenido de los mensajes que otros eliminan.
+// Apagado: al llegar la eliminación se sobrescribe el contenido y se borra el archivo.
+func ConservarEliminados(si bool) {
+	ajusteConservarApagado.Store(!si)
+	if a, err := almacenAbierto(); err == nil {
+		a.FijarConservarEliminados(si)
+	}
 }

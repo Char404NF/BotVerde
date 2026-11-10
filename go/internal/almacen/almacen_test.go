@@ -164,7 +164,7 @@ func TestRepetidosYEdicionYBorrado(t *testing.T) {
 	if ok, _ := a.EditarTexto(1, c, "NOEXISTE", "x"); ok {
 		t.Fatal("no existe")
 	}
-	if ok, _ := a.MarcarBorrado(1, c, "A1"); !ok {
+	if ok, _ := a.MarcarEliminado(1, c, "A1", "", 1_700_000_500); !ok {
 		t.Fatal("debía marcar")
 	}
 	m, _ = a.ObtenerMensaje(1, c, "A1")

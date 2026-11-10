@@ -158,6 +158,8 @@ type MensajeVista struct {
 	DuracionS    int    `json:"dur"`
 	NotaVoz      bool   `json:"notaVoz"`
 	PuedeBajarse bool   `json:"puedeBajarse"`
+	EliminadoEn  int64  `json:"eliminadoEn"`
+	EliminadoPor string `json:"eliminadoPor"` // nombre de quien lo eliminó, solo si no fue su autor
 }
 
 func (a *Almacen) vista(m *Mensaje) MensajeVista {
@@ -165,6 +167,10 @@ func (a *Almacen) vista(m *Mensaje) MensajeVista {
 		ID: m.ID, Chat: m.ChatJID, RemitenteID: m.RemitenteJID, Remitente: m.RemitenteNombre, EsMio: m.EsMio, Tipo: m.Tipo, Texto: m.Texto,
 		TS: m.TS, Borrado: m.Borrado, Editado: m.Editado, Estado: m.ArchivoEstado, Bytes: m.ArchivoBytes, Mime: m.ArchivoMime,
 		Nombre: m.ArchivoNombre, Ruta: m.ArchivoRuta, Miniatura: m.MiniaturaRuta, Ancho: m.Ancho, Alto: m.Alto, DuracionS: m.DuracionS, NotaVoz: m.NotaVoz,
+	}
+	v.EliminadoEn = m.EliminadoEn
+	if m.EliminadoPor != "" && m.EliminadoPor != m.RemitenteJID {
+		v.EliminadoPor = a.nombreDe(m.BotID, m.ChatJID, m.EliminadoPor)
 	}
 	v.PuedeBajarse = CategoriaDe(m.Tipo) != "" && len(m.ArchivoInfo) > 0 &&
 		(m.ArchivoEstado == EstadoNinguno || m.ArchivoEstado == EstadoOmitido || m.ArchivoEstado == EstadoFallido)
