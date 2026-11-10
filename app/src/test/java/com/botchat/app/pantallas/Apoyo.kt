@@ -96,6 +96,16 @@ class MotorFalso : Motor {
     override fun estadoDelChat(bot: Long, chat: String) = estadoChat
     override fun plazoEdicionSeg() = plazo
     override fun configurarEnvio(pausaBotMin: Long) { llamadas += "configurarEnvio:$pausaBotMin" }
+    var verUnaVezJson = """{"ruta":"media/1/ab/vo.enc","tipo":"imagen","mime":"image/jpeg"}"""
+    var verUnaVezFalla: String? = null
+    override fun enviarMedio(bot: Long, chat: String, tipo: String, ruta: String, mime: String, nombre: String, pie: String, citaId: String, ancho: Long, alto: Long, durS: Long, notaVoz: Boolean, miniatura: ByteArray?, onda: ByteArray?): String {
+        llamadas += "medio:$tipo:$mime:$nombre:$pie:$citaId:$durS:$notaVoz:${miniatura?.size ?: 0}:${onda?.size ?: 0}"
+        falla(); return envioResultado
+    }
+    override fun abrirVerUnaVez(bot: Long, chat: String, id: String): String { llamadas += "abrirUnaVez:$id"; verUnaVezFalla?.let { throw IllegalStateException(it) }; return verUnaVezJson }
+    override fun cerrarVerUnaVez(bot: Long, chat: String, id: String) { llamadas += "cerrarUnaVez:$id" }
+    override fun barrerVerUnaVez(bot: Long): Long { llamadas += "barrer"; return 0 }
+    override fun configurarVerUnaVez(dias: Long) { llamadas += "verDias:$dias" }
     override fun olvidarMensaje(bot: Long, chat: String, id: String) { llamadas += "olvidar:$chat:$id" }
     override fun establecerZona(id: String) { zona = id }
     override fun estadisticasChat(bot: Long, chat: String) = resumenChat

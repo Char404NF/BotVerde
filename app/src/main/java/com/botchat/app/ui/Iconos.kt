@@ -221,4 +221,15 @@ object Ico {
         trazo(2f) { moveTo(12f, 3f); curveTo(17f, 3f, 21f, 7f, 21f, 12f); curveTo(21f, 17f, 17f, 21f, 12f, 21f); curveTo(7f, 21f, 3f, 17f, 3f, 12f); curveTo(3f, 7f, 7f, 3f, 12f, 3f) }
         trazo(2f) { moveTo(8.5f, 14f); curveTo(9.5f, 16f, 14.5f, 16f, 15.5f, 14f); moveTo(9f, 9.5f); lineTo(9f, 9.6f); moveTo(15f, 9.5f); lineTo(15f, 9.6f) }
     }
+
+    /** Clip: adjuntar. */
+    val Adjuntar = icono("adjuntar") {
+        trazo(2f) { moveTo(16.5f, 7f); lineTo(8.5f, 15f); curveTo(7.4f, 16.1f, 7.4f, 17.7f, 8.5f, 18.8f); curveTo(9.6f, 19.9f, 11.2f, 19.9f, 12.3f, 18.8f); lineTo(19f, 12.1f); curveTo(21f, 10.1f, 21f, 7.2f, 19f, 5.2f); curveTo(17f, 3.2f, 14.1f, 3.2f, 12.1f, 5.2f); lineTo(5.5f, 11.8f) }
+    }
+
+    /** Micrófono. */
+    val Microfono = icono("microfono") {
+        trazo(2f) { moveTo(9f, 5f); curveTo(9f, 3.3f, 10.3f, 2.5f, 12f, 2.5f); curveTo(13.7f, 2.5f, 15f, 3.3f, 15f, 5f); lineTo(15f, 11f); curveTo(15f, 12.7f, 13.7f, 13.5f, 12f, 13.5f); curveTo(10.3f, 13.5f, 9f, 12.7f, 9f, 11f); close() }
+        trazo(2f) { moveTo(5.5f, 10.5f); curveTo(5.5f, 14.2f, 8.2f, 16.5f, 12f, 16.5f); curveTo(15.8f, 16.5f, 18.5f, 14.2f, 18.5f, 10.5f); moveTo(12f, 16.5f); lineTo(12f, 21f) }
+    }
 }

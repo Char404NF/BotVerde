@@ -242,8 +242,8 @@ func TestEventoDeMensajeSeGuarda(t *testing.T) {
 		RawMessage: &waE2E.Message{Conversation: proto.String("hola grupo")}}
 	e.UnwrapRaw()
 	s.evento(e)
-	// ver una vez: solo el aviso
-	vo := &events.Message{Info: e.Info, RawMessage: &waE2E.Message{ImageMessage: &waE2E.ImageMessage{ViewOnce: proto.Bool(true), JPEGThumbnail: []byte("MINI"), MediaKey: []byte("k"), DirectPath: proto.String("/x")}}}
+	// ver una vez redactado (sin datos para descargar): solo el aviso
+	vo := &events.Message{Info: e.Info, RawMessage: &waE2E.Message{ImageMessage: &waE2E.ImageMessage{ViewOnce: proto.Bool(true), JPEGThumbnail: []byte("MINI")}}}
 	vo.Info.ID = "VO"
 	vo.UnwrapRaw()
 	s.evento(vo)

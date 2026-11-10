@@ -4,6 +4,8 @@ package com.botchat.app.ui
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material3.SmallFloatingActionButton
@@ -126,6 +128,7 @@ fun PantallaChat(
     alAbrirArchivos: () -> Unit,
     alAbrirInfo: () -> Unit = {},
     irA: String = "",
+    alAbrirUnaVez: (String) -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as android.app.Application
     val vm: ChatVm = viewModel(key = "chat-$jid", factory = viewModelFactory { initializer { ChatVm(app, jid) } })
@@ -149,6 +152,23 @@ fun PantallaChat(
     var infoCargada by remember { mutableStateOf<com.botchat.app.datos.InfoMsg?>(null) }
     var texto by remember { mutableStateOf(TextFieldValue("")) }
     val estadoLista = rememberLazyListState()
+
+    // ---- adjuntos y notas de voz ----
+    val galeria = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { vm.prepararUris(it) }
+    val documentos = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { vm.prepararUris(it) }
+    val audios = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { vm.prepararUris(it) }
+    var archivoCamara by remember { mutableStateOf<java.io.File?>(null) }
+    val camaraFoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok -> archivoCamara?.let { f -> if (ok) vm.prepararArchivo(f, "image/jpeg") else f.delete() }; archivoCamara = null }
+    val camaraVideo = rememberLauncherForActivityResult(ActivityResultContracts.CaptureVideo()) { ok -> archivoCamara?.let { f -> if (ok) vm.prepararArchivo(f, "video/mp4") else f.delete() }; archivoCamara = null }
+    val permisoMicrofono = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        if (!ok) Toast.makeText(ctx, "Sin permiso del micrófono no se pueden grabar notas de voz", Toast.LENGTH_LONG).show()
+    }
+    fun tomaDeCamara(video: Boolean) {
+        val f = java.io.File(com.botchat.app.medios.PrepararAdjunto.carpeta(ctx), "cam_${System.nanoTime()}." + if (video) "mp4" else "jpg")
+        archivoCamara = f
+        val uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.packageName + ".compartir", f)
+        try { if (video) camaraVideo.launch(uri) else camaraFoto.launch(uri) } catch (_: Exception) { Toast.makeText(ctx, "No hay una app de cámara", Toast.LENGTH_SHORT).show() }
+    }
 
     // Al salir del chat: se vacía la caché de imágenes y se detiene el audio.
     DisposableEffect(jid) {
@@ -297,6 +317,25 @@ fun PantallaChat(
                         alEnviar = { t, men ->
                             vm.enviar(t, men) { texto = TextFieldValue(""); scope.launch { estadoLista.animateScrollToItem(0) } }
                         },
+                        adjuntos = vm.adjuntos, preparandoAdjuntos = vm.preparandoAdjuntos, enviandoAdjuntos = vm.enviandoAdjuntos,
+                        alAdjuntar = { f ->
+                            when (f) {
+                                FuenteAdjunto.GALERIA -> galeria.launch(arrayOf("image/*", "video/*"))
+                                FuenteAdjunto.DOCUMENTO -> documentos.launch(arrayOf("*/*"))
+                                FuenteAdjunto.AUDIO -> audios.launch(arrayOf("audio/*"))
+                                FuenteAdjunto.CAMARA_FOTO -> tomaDeCamara(false)
+                                FuenteAdjunto.CAMARA_VIDEO -> tomaDeCamara(true)
+                            }
+                        },
+                        alQuitarAdjunto = { vm.quitarAdjunto(it) }, alCancelarAdjuntos = { vm.cancelarAdjuntos() },
+                        alEnviarAdjuntos = { pie -> vm.enviarAdjuntos(pie) { texto = TextFieldValue(""); scope.launch { estadoLista.animateScrollToItem(0) } } },
+                        grabando = vm.grabando, segundosGrabando = vm.segundosGrabando,
+                        alIniciarGrabacion = {
+                            if (androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                permisoMicrofono.launch(android.Manifest.permission.RECORD_AUDIO); false
+                            } else vm.iniciarGrabacion()
+                        },
+                        alTerminarGrabacion = { cancelado -> vm.terminarGrabacion(cancelado); if (!cancelado) scope.launch { estadoLista.animateScrollToItem(0) } },
                     )
                 }
             }
@@ -317,7 +356,7 @@ fun PantallaChat(
                                 is Elem.Dia -> SeparadorDia(e.ts, Modifier.animateItem())
                                 is Elem.SinLeer -> SeparadorSinLeer(e.cuantos, Modifier.animateItem())
                                 is Elem.Burbuja -> Burbuja(
-                                    e, vm, alAbrirVisor, alAbrirDocumento, Modifier.animateItem().apareceDesdeAbajo(vm.esNueva(e.m.id)),
+                                    e, vm, alAbrirVisor, alAbrirDocumento, Modifier.animateItem().apareceDesdeAbajo(vm.esNueva(e.m.id)), alAbrirUnaVez,
                                     resaltar = resaltado == e.m.id, seleccionado = e.m.id in seleccion, enSeleccion = seleccion.isNotEmpty(),
                                     alAlternar = { seleccion = if (e.m.id in seleccion) seleccion - e.m.id else seleccion + e.m.id },
                                     alResponder = { if (escribirActivo) vm.citando = e.m },
@@ -435,7 +474,7 @@ private fun SeparadorDia(ts: Long, modifier: Modifier) {
 @OptIn(UnstableApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun Burbuja(
-    e: Elem.Burbuja, vm: ChatVm, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit, modifier: Modifier,
+    e: Elem.Burbuja, vm: ChatVm, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit, modifier: Modifier, alAbrirUnaVez: (String) -> Unit,
     resaltar: Boolean = false, seleccionado: Boolean = false, enSeleccion: Boolean = false,
     alAlternar: () -> Unit = {}, alResponder: () -> Unit = {}, alIrACita: (String) -> Unit = {},
 ) {
@@ -474,7 +513,7 @@ private fun Burbuja(
                         }
                         if (m.reenviado) Text("Reenviado", Modifier.testTag("reenviado"), style = MaterialTheme.typography.labelSmall, fontStyle = FontStyle.Italic, color = tinta.copy(alpha = 0.65f))
                         if (m.citaId.isNotEmpty() && !m.borrado) BloqueCita(m, tinta) { alIrACita(m.citaId) }
-                        ContenidoMensaje(m, vm, alAbrirVisor, alAbrirDocumento)
+                        ContenidoMensaje(m, vm, alAbrirVisor, alAbrirDocumento, alAbrirUnaVez)
                         FilaReacciones(m.reacciones, Modifier.padding(top = 3.dp))
                         Row(Modifier.align(Alignment.End).padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (m.editado && !m.borrado) Text("(editado)  ", style = MaterialTheme.typography.labelSmall, color = tinta.copy(alpha = 0.65f))
@@ -503,8 +542,8 @@ private fun etiquetaBorrado(tipo: String) = when (tipo) {
 /** Un mensaje eliminado por su autor: se muestra el original con una etiqueta discreta; si no queda nada, se dice así. */
 @OptIn(UnstableApi::class)
 @Composable
-private fun ContenidoMensaje(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit) {
-    if (!m.borrado) { ContenidoBase(m, vm, alAbrirVisor, alAbrirDocumento); return }
+private fun ContenidoMensaje(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit, alAbrirUnaVez: (String) -> Unit) {
+    if (!m.borrado) { ContenidoBase(m, vm, alAbrirVisor, alAbrirDocumento, alAbrirUnaVez); return }
     val cursiva = FontStyle.Italic
     val sinArchivo = m.categoria.isNotEmpty() && !m.descargado
     val vacio = m.texto.isBlank() && (m.categoria.isEmpty() && m.tipo != "ver_una_vez" || m.estado == "borrado")
@@ -518,7 +557,7 @@ private fun ContenidoMensaje(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit,
             if (m.texto.isNotBlank()) Text(m.texto)
             EtiquetaEliminado(m)
         }
-        else -> { ContenidoBase(m, vm, alAbrirVisor, alAbrirDocumento); EtiquetaEliminado(m) }
+        else -> { ContenidoBase(m, vm, alAbrirVisor, alAbrirDocumento, alAbrirUnaVez); EtiquetaEliminado(m) }
     }
 }
 
@@ -548,13 +587,10 @@ private fun TarjetaSinDescargar(m: Msg) {
 
 @OptIn(UnstableApi::class)
 @Composable
-private fun ContenidoBase(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit) {
+private fun ContenidoBase(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit, alAbrirUnaVez: (String) -> Unit) {
     val cursiva = FontStyle.Italic
     when {
-        m.tipo == "ver_una_vez" -> Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Ico.Candado, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp))
-            Column { Text("Ver una vez", fontWeight = FontWeight.SemiBold); Text("Ábrelo en tu teléfono", style = MaterialTheme.typography.bodySmall, color = LocalContentColorSuave()) }
-        }
+        m.tipo == "ver_una_vez" -> TarjetaVerUnaVez(m, alAbrirUnaVez)
         m.categoria.isNotEmpty() && m.estado == "borrado" -> {
             Text(etiquetaBorrado(m.tipo), fontStyle = cursiva, color = LocalContentColorSuave())
             if (m.texto.isNotBlank()) Text(m.texto)
@@ -746,4 +782,25 @@ private fun TextoMensaje(m: Msg, grande: Boolean = true) {
     val formateado = remember(m.texto, m.menciones, esquema.primary) { FormatoWhatsApp.construir(m.texto, m.menciones, esquema.primary, esquema.primary) }
     val soloEmojis = grande && m.citaId.isEmpty() && FormatoWhatsApp.esSoloEmojis(m.texto)
     Text(formateado, Modifier.testTag("texto_${m.id}"), style = if (soloEmojis) MaterialTheme.typography.displaySmall else MaterialTheme.typography.bodyLarge)
+}
+
+
+/** "Ver una vez": con contenido se abre una sola vez; redactado, avisa que hay que abrirlo en el teléfono. */
+@Composable
+private fun TarjetaVerUnaVez(m: Msg, alAbrir: (String) -> Unit) {
+    val haptica = rememberHaptica()
+    val (titulo, detalle, abrible) = when {
+        m.borrado -> Triple("Ver una vez", "El remitente lo eliminó", false)
+        m.verEstado == "pendiente" && m.descargado -> Triple("Ver una vez", "Toca para abrir. Solo se puede ver una vez.", true)
+        m.verEstado == "pendiente" && m.estado == "pendiente" -> Triple("Ver una vez", "Descargando…", false)
+        m.verEstado == "pendiente" -> Triple("Ver una vez", "No se pudo descargar; ábrelo en tu teléfono", false)
+        m.verEstado == "abierto" -> Triple("Ver una vez", "Abierto", false)
+        m.verEstado == "visto" -> Triple("Ver una vez", "Ya visto", false)
+        m.verEstado == "expirado" -> Triple("Ver una vez", "Expiró", false)
+        else -> Triple("Ver una vez", "Ábrelo en tu teléfono", false)
+    }
+    Row(Modifier.widthIn(min = 220.dp).clip(RoundedCornerShape(12.dp)).then(if (abrible) Modifier.clickable { haptica(Toque.Suave); alAbrir(m.id) } else Modifier).padding(vertical = 4.dp).testTag("tarjeta_ver_una_vez"), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Ico.Candado, null, Modifier.size(24.dp)); Spacer(Modifier.width(10.dp))
+        Column { Text(titulo, fontWeight = FontWeight.SemiBold); Text(detalle, style = MaterialTheme.typography.bodySmall, color = LocalContentColorSuave()) }
+    }
 }

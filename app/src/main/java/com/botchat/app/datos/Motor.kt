@@ -49,6 +49,11 @@ interface Motor {
     fun estadoDelChat(bot: Long, chat: String): String
     fun plazoEdicionSeg(): Long
     fun configurarEnvio(pausaBotMin: Long)
+    fun enviarMedio(bot: Long, chat: String, tipo: String, ruta: String, mime: String, nombre: String, pie: String, citaId: String, ancho: Long, alto: Long, durS: Long, notaVoz: Boolean, miniatura: ByteArray?, onda: ByteArray?): String
+    fun abrirVerUnaVez(bot: Long, chat: String, id: String): String
+    fun cerrarVerUnaVez(bot: Long, chat: String, id: String)
+    fun barrerVerUnaVez(bot: Long): Long
+    fun configurarVerUnaVez(dias: Long)
 }
 
 /** El módulo Go de verdad (whatsmeow + almacén cifrado). */
@@ -97,4 +102,10 @@ object MotorGo : Motor {
     override fun estadoDelChat(bot: Long, chat: String) = Wabot.estadoDelChat(bot, chat)
     override fun plazoEdicionSeg() = Wabot.plazoEdicionSeg().toLong()
     override fun configurarEnvio(pausaBotMin: Long) = Wabot.configurarEnvio(pausaBotMin)
+    override fun enviarMedio(bot: Long, chat: String, tipo: String, ruta: String, mime: String, nombre: String, pie: String, citaId: String, ancho: Long, alto: Long, durS: Long, notaVoz: Boolean, miniatura: ByteArray?, onda: ByteArray?) =
+        Wabot.enviarMedio(bot, chat, tipo, ruta, mime, nombre, pie, citaId, ancho, alto, durS, notaVoz, miniatura, onda)
+    override fun abrirVerUnaVez(bot: Long, chat: String, id: String) = Wabot.abrirVerUnaVez(bot, chat, id)
+    override fun cerrarVerUnaVez(bot: Long, chat: String, id: String) = Wabot.cerrarVerUnaVez(bot, chat, id)
+    override fun barrerVerUnaVez(bot: Long) = Wabot.barrerVerUnaVez(bot).toLong()
+    override fun configurarVerUnaVez(dias: Long) = Wabot.configurarVerUnaVez(dias)
 }

@@ -108,6 +108,7 @@ func (s *Servicio) EnviarMedio(ctx context.Context, chat string, a Adjunto, cita
 	}
 	s.RegistrarEnvio(m.ID)
 	s.pausarBot(chat)
+	s.Alm.RegistrarActividad(s.BotID, almacen.ActManual, "", chat, a.Tipo)
 	return s.transmitirMedio(ctx, j, m, a.Onda)
 }
 

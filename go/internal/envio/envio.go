@@ -348,6 +348,16 @@ func mensajeTexto(texto string, ci *waE2E.ContextInfo) *waE2E.Message {
 // EnviarTexto escribe un mensaje en un chat. Si citaID no está vacío, responde a ese mensaje; menciones son JIDs (grupos).
 // Siempre se guarda primero en el teléfono (se ve de inmediato); si el envío falla queda como "fallido" y se puede reintentar.
 func (s *Servicio) EnviarTexto(ctx context.Context, chat, texto, citaID string, menciones []string) (Resultado, error) {
+	return s.enviarTexto(ctx, chat, texto, citaID, menciones, true)
+}
+
+// EnviarAuto manda una respuesta del bot automático: igual que EnviarTexto, pero no usa el tope de envíos manuales,
+// no pausa al bot en ese chat y se registra como automática (no como manual).
+func (s *Servicio) EnviarAuto(ctx context.Context, chat, texto, citaID string, menciones []string) (Resultado, error) {
+	return s.enviarTexto(ctx, chat, texto, citaID, menciones, false)
+}
+
+func (s *Servicio) enviarTexto(ctx context.Context, chat, texto, citaID string, menciones []string, manual bool) (Resultado, error) {
 	texto = strings.TrimSpace(texto)
 	if texto == "" {
 		return Resultado{}, ErrMensajeVacio
@@ -362,7 +372,7 @@ func (s *Servicio) EnviarTexto(ctx context.Context, chat, texto, citaID string, 
 	if c, _ := s.Alm.ObtenerChat(s.BotID, chat); c == nil {
 		return Resultado{}, ErrChatDesconoci
 	}
-	if !s.tomarFicha() {
+	if manual && !s.tomarFicha() {
 		return Resultado{}, ErrDemasiados
 	}
 	m := &almacen.Mensaje{
@@ -384,12 +394,16 @@ func (s *Servicio) EnviarTexto(ctx context.Context, chat, texto, citaID string, 
 		return Resultado{}, err
 	}
 	s.RegistrarEnvio(m.ID)
-	s.pausarBot(chat)
-	return s.transmitir(ctx, j, m)
+	if manual {
+		s.pausarBot(chat)
+		s.Alm.RegistrarActividad(s.BotID, almacen.ActManual, "", chat, "texto")
+		return s.transmitir(ctx, j, m, "manual")
+	}
+	return s.transmitir(ctx, j, m, "automático")
 }
 
 // transmitir manda un mensaje de texto ya guardado y actualiza su estado.
-func (s *Servicio) transmitir(ctx context.Context, j types.JID, m *almacen.Mensaje) (Resultado, error) {
+func (s *Servicio) transmitir(ctx context.Context, j types.JID, m *almacen.Mensaje, origen string) (Resultado, error) {
 	res := Resultado{ID: m.ID, Estado: "fallido", TS: m.TS}
 	if !s.Cli.Conectado() {
 		_ = s.Alm.EstadoDeEnvio(s.BotID, m.ChatJID, m.ID, "fallido")
@@ -412,7 +426,7 @@ func (s *Servicio) transmitir(ctx context.Context, j types.JID, m *almacen.Mensa
 		return res, err
 	}
 	_ = s.Alm.EstadoDeEnvio(s.BotID, m.ChatJID, m.ID, "enviado")
-	s.Log("Mensaje enviado desde la app (manual) al chat …" + sufijo(m.ChatJID) + ".")
+	s.Log("Mensaje enviado (" + origen + ") al chat …" + sufijo(m.ChatJID) + ".")
 	res.Estado = "enviado"
 	return res, nil
 }
@@ -449,7 +463,7 @@ func (s *Servicio) Reintentar(ctx context.Context, chat, id string) (Resultado, 
 	if m.Tipo != almacen.TipoTexto {
 		return s.transmitirMedio(ctx, j, m, nil)
 	}
-	return s.transmitir(ctx, j, m)
+	return s.transmitir(ctx, j, m, "manual")
 }
 
 // Reaccionar pone (o quita, con emoji vacío) mi reacción a un mensaje.
@@ -625,7 +639,7 @@ func (s *Servicio) ReenviarTexto(ctx context.Context, origen string, ids, destin
 			}
 			s.RegistrarEnvio(m.ID)
 			s.pausarBot(d)
-			if res, err := s.transmitir(ctx, j, m); err != nil || res.Estado != "enviado" {
+			if res, err := s.transmitir(ctx, j, m, "manual"); err != nil || res.Estado != "enviado" {
 				r.Fallidos++
 			} else {
 				r.Enviados++

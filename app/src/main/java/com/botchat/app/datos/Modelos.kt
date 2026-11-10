@@ -53,6 +53,9 @@ data class Msg(
     val menciones: List<Mencion> = emptyList(),
     val reenviado: Boolean = false,
     val reacciones: List<Reaccion> = emptyList(),
+    val verEstado: String = "",
+    val verTipo: String = "",
+    val verExpira: Long = 0,
 ) {
     val categoria: String get() = categoriaDe(tipo)
     val descargado: Boolean get() = estado == "descargado" && ruta.isNotEmpty()
@@ -66,6 +69,7 @@ data class Reaccion(val emoji: String, val cantidad: Int, val mia: Boolean)
 data class Participante(val jid: String, val usuario: String, val nombre: String, val telefono: String, val esAdmin: Boolean)
 data class AcuseDe(val jid: String, val nombre: String, val entregado: Long, val leido: Long, val reproducido: Long)
 data class InfoMsg(val enviado: Long, val estado: String, val esGrupo: Boolean, val personas: List<AcuseDe>, val editado: Boolean, val reenviado: Boolean)
+data class VerUnaVezAbierto(val ruta: String, val tipo: String, val mime: String)
 data class ResultadoEnvio(val id: String, val estado: String, val ts: Long)
 data class PresenciaChat(val escribiendo: Boolean = false, val enLinea: Boolean = false, val ultimaVez: Long = 0)
 data class ReenvioResultado(val enviados: Int, val omitidos: Int, val fallidos: Int)
@@ -244,9 +248,11 @@ object Json {
             it.optJSONArray("menciones").let { a -> List(a?.length() ?: 0) { i -> a!!.getJSONObject(i).let { m -> Mencion(m.optString("usuario"), m.optString("nombre")) } } },
             it.optBoolean("reenviado"),
             it.optJSONArray("reacciones").let { a -> List(a?.length() ?: 0) { i -> a!!.getJSONObject(i).let { r -> Reaccion(r.optString("emoji"), r.optInt("cantidad"), r.optBoolean("mia")) } } },
+            it.optString("verEstado"), it.optString("verTipo"), it.optLong("verExpira"),
         )
     }
 
+    fun verUnaVez(json: String): VerUnaVezAbierto { val o = JSONObject(json); return VerUnaVezAbierto(o.optString("ruta"), o.optString("tipo"), o.optString("mime")) }
     fun envio(json: String): ResultadoEnvio { val o = JSONObject(json); return ResultadoEnvio(o.optString("id"), o.optString("estado"), o.optLong("ts")) }
     fun presencia(json: String): PresenciaChat = runCatching { JSONObject(json).let { PresenciaChat(it.optBoolean("escribiendo"), it.optBoolean("enLinea"), it.optLong("ultimaVez")) } }.getOrDefault(PresenciaChat())
     fun reenvio(json: String): ReenvioResultado { val o = JSONObject(json); return ReenvioResultado(o.optInt("enviados"), o.optInt("omitidos"), o.optInt("fallidos")) }

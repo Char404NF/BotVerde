@@ -132,6 +132,28 @@ var migraciones = [][]string{
 		`ALTER TABLE messages ADD COLUMN ver_tipo TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE messages ADD COLUMN ver_expira INTEGER NOT NULL DEFAULT 0`,
 	},
+	// 6: motor de respuestas: mensajes ya vistos (para no contestar dos veces) y registro de actividad sin textos ni nombres.
+	{
+		`CREATE TABLE dedupe (
+			bot_id INTEGER NOT NULL,
+			chat_jid TEXT NOT NULL,
+			msg_id TEXT NOT NULL,
+			ts INTEGER NOT NULL,
+			PRIMARY KEY (bot_id, chat_jid, msg_id)
+		) WITHOUT ROWID`,
+		`CREATE INDEX idx_dedupe_ts ON dedupe(ts)`,
+		`CREATE TABLE actividad (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			ts INTEGER NOT NULL,
+			evento TEXT NOT NULL,
+			motivo TEXT NOT NULL DEFAULT '',
+			chat TEXT NOT NULL DEFAULT '',
+			detalle TEXT NOT NULL DEFAULT ''
+		)`,
+		`CREATE INDEX idx_actividad_ts ON actividad(bot_id, ts)`,
+		`ALTER TABLE chat_estado ADD COLUMN pausa_humano INTEGER NOT NULL DEFAULT 0`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

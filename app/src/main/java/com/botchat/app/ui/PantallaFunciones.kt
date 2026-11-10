@@ -46,6 +46,7 @@ fun PantallaFunciones(ajustes: Ajustes, alVolver: () -> Unit) {
     val enLinea by ajustes.mostrarEnLinea.collectAsState()
     val leido by ajustes.marcarLeidoAlAbrir.collectAsState()
     val pausa by ajustes.pausaBotMin.collectAsState()
+    val verDias by ajustes.verUnaVezDias.collectAsState()
     Scaffold(
         modifier = Modifier.nestedScroll(barra.nestedScrollConnection),
         topBar = { LargeTopAppBar(scrollBehavior = barra, navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text("Funciones") }) },
@@ -63,6 +64,7 @@ fun PantallaFunciones(ajustes: Ajustes, alVolver: () -> Unit) {
                 Interruptor("Conservar eliminados", "Guardar lo que otros eliminan para poder verlo", conservar, true, Ico.Candado) { haptica(Toque.Suave); ajustes.fijarConservarEliminados(it) }
                 Interruptor("Marcar como leído al abrir", "Al abrir un chat se avisa “leído”. Si en WhatsApp tienes desactivadas las confirmaciones de lectura, nunca se envían.", leido, true, Ico.Listo) { haptica(Toque.Suave); ajustes.fijarMarcarLeidoAlAbrir(it) }
                 Deslizador("Pausa del bot cuando escribo yo", if (pausa == 0) "Nunca" else "$pausa min", pausa.toFloat(), 0f..120f, 7, "Si escribes en un chat (desde la app o desde el teléfono), el bot calla ahí este tiempo.") { ajustes.fijarPausaBotMin((it / 10f).toInt() * 10) }
+                Deslizador("Días para abrir un “ver una vez”", if (verDias == 1) "1 día" else "$verDias días", verDias.toFloat(), 1f..30f, 28, "Si no lo abres a tiempo, se borra y queda como “Expiró”.") { ajustes.fijarVerUnaVezDias(it.toInt().coerceIn(1, 30)) }
                 Interruptor("Mostrar en línea", "Con un chat abierto, tus contactos pueden verte “en línea”. Puede hacer que tu teléfono principal deje de avisarte de mensajes mientras tanto.", enLinea, true, Ico.Info) { haptica(Toque.Suave); ajustes.fijarMostrarEnLinea(it) }
             }
         }

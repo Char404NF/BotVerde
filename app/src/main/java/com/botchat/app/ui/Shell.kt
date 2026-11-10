@@ -76,6 +76,8 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
     LaunchedEffect(pedido) {
         pedido?.let { j -> com.botchat.app.NavegarA.chat.value = null; nav.navigate("chat/${enc(j)}") { launchSingleTop = true } }
     }
+    // Los "ver una vez" que quedaron a medias o caducaron se borran al abrir la app.
+    LaunchedEffect(bot.id) { runCatching { Repo.barrerVerUnaVez(bot.id) } }
     val entrada by nav.currentBackStackEntryAsState()
     val rutaActual = entrada?.destination?.route
     val principal = rutaActual in RUTAS_PRINCIPALES
@@ -149,6 +151,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                             alAbrirArchivos = { nav.navigate("archivos/${enc(jid)}") },
                             alAbrirInfo = { nav.navigate("info/${enc(jid)}") },
                             irA = ir,
+                            alAbrirUnaVez = { id -> nav.navigate("unavez/${enc(jid)}/${enc(id)}") },
                         )
                     }
                 }
@@ -162,6 +165,11 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                     val jid = be.arguments?.getString("jid") ?: return@composable
                     val id = be.arguments?.getString("id") ?: return@composable
                     PantallaDocumento(bot.id, jid, id, nombreDeChat(bot.id, jid), alVolver = { nav.popBackStack() })
+                }
+                composable("unavez/{jid}/{id}") { be ->
+                    val jid = be.arguments?.getString("jid") ?: return@composable
+                    val id = be.arguments?.getString("id") ?: return@composable
+                    PantallaVerUnaVez(bot.id, jid, id, alCerrar = { nav.popBackStack() })
                 }
                 composable("info/{jid}") { be ->
                     val jid = be.arguments?.getString("jid") ?: return@composable

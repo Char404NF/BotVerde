@@ -16,6 +16,10 @@ import com.botchat.app.datos.Msg
 import com.botchat.app.datos.Participante
 import com.botchat.app.datos.PresenciaChat
 import com.botchat.app.datos.Repo
+import com.botchat.app.medios.AdjuntoListo
+import com.botchat.app.medios.GrabadorVoz
+import com.botchat.app.medios.Grabadores
+import com.botchat.app.medios.PrepararAdjunto
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -54,6 +58,21 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
         private set
     var plazoEdicionSeg by mutableStateOf(1200L)
         private set
+
+    // ---- adjuntos y notas de voz ----
+    var adjuntos by mutableStateOf<List<AdjuntoListo>>(emptyList())
+        private set
+    var preparandoAdjuntos by mutableStateOf(false)
+        private set
+    var enviandoAdjuntos by mutableStateOf(false)
+        private set
+    var grabando by mutableStateOf(false)
+        private set
+    var segundosGrabando by mutableStateOf(0)
+        private set
+    private var generacionAdjuntos = 0
+    private var grabador: GrabadorVoz? = null
+    private var cronometro: Job? = null
 
     /** Hora (segundos) hasta la que ya se había visto este chat antes de abrirlo: lo posterior es "sin leer". */
     val vistoAntes: Long
@@ -108,6 +127,8 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
     fun esNueva(id: String): Boolean = iniciales?.let { id !in it } ?: false
 
     override fun onCleared() {
+        adjuntos.forEach { it.archivo.delete() }
+        grabador?.cancelar()
         ajustes.marcarVisto(jid)
         if (ChatAbierto.jid == jid) ChatAbierto.jid = ""
         super.onCleared()
@@ -246,6 +267,92 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
 
     fun silenciar(si: Boolean) {
         viewModelScope.launch { runCatching { Repo.silenciar(botId, jid, si); estadoChat = estadoChat.copy(silenciado = si) } }
+    }
+
+    // ---------- adjuntos ----------
+
+    /** Prepara (copia, reduce y saca miniatura) lo elegido en galería o archivos. */
+    fun prepararUris(uris: List<android.net.Uri>) {
+        if (uris.isEmpty()) return
+        val gen = generacionAdjuntos
+        viewModelScope.launch {
+            preparandoAdjuntos = true
+            for (u in uris.take(10)) {
+                PrepararAdjunto.desdeUri(getApplication(), u)
+                    .onSuccess { if (gen == generacionAdjuntos) adjuntos = adjuntos + it else it.archivo.delete() } // si se canceló mientras se preparaba, se descarta
+                    .onFailure { aviso = "No se pudo preparar el archivo: ${it.message}" }
+            }
+            if (gen == generacionAdjuntos) preparandoAdjuntos = false
+        }
+    }
+
+    /** Prepara lo que acaba de tomar la cámara. */
+    fun prepararArchivo(archivo: java.io.File, mime: String) {
+        val gen = generacionAdjuntos
+        viewModelScope.launch {
+            preparandoAdjuntos = true
+            PrepararAdjunto.desdeArchivo(archivo, mime)
+                .onSuccess { if (gen == generacionAdjuntos) adjuntos = adjuntos + it else it.archivo.delete() }
+                .onFailure { aviso = "No se pudo preparar el archivo: ${it.message}" }
+            if (gen == generacionAdjuntos) preparandoAdjuntos = false
+        }
+    }
+
+    fun quitarAdjunto(a: AdjuntoListo) { a.archivo.delete(); adjuntos = adjuntos - a }
+
+    fun cancelarAdjuntos() { generacionAdjuntos++; preparandoAdjuntos = false; adjuntos.forEach { it.archivo.delete() }; adjuntos = emptyList() }
+
+    /** Manda los adjuntos de uno en uno; `pie` va en el primero. */
+    fun enviarAdjuntos(pie: String, alTerminar: () -> Unit = {}) {
+        if (enviandoAdjuntos || adjuntos.isEmpty()) return
+        enviandoAdjuntos = true
+        val cita = citando
+        viewModelScope.launch {
+            try {
+                var primero = true
+                for (a in adjuntos.toList()) {
+                    Repo.enviarMedio(botId, jid, a.tipo, a.archivo.absolutePath, a.mime, a.nombre, if (primero) pie.trim() else "", if (primero) cita?.id ?: "" else "", a.ancho, a.alto, a.durS, false, a.miniatura, null)
+                    adjuntos = adjuntos - a
+                    primero = false
+                }
+                citando = null
+                alTerminar()
+            } catch (e: Exception) {
+                aviso = e.message ?: "No se pudo enviar"
+                adjuntos = adjuntos.filter { it.archivo.exists() } // el que falló quedó guardado como fallido, con Reintentar
+                alTerminar()
+            } finally {
+                enviandoAdjuntos = false
+            }
+        }
+    }
+
+    // ---------- notas de voz ----------
+
+    /** Empieza a grabar. Devuelve false si no se pudo usar el micrófono. */
+    fun iniciarGrabacion(): Boolean {
+        if (grabando) return false
+        val g = Grabadores.fabrica(getApplication())
+        if (!g.iniciar()) { aviso = "No se pudo usar el micrófono"; return false }
+        grabador = g; grabando = true; segundosGrabando = 0
+        cronometro = viewModelScope.launch { while (true) { delay(1000); segundosGrabando++ } }
+        return true
+    }
+
+    /** Termina la grabación: se manda, o se descarta si `cancelar`. */
+    fun terminarGrabacion(cancelar: Boolean) {
+        val g = grabador ?: return
+        cronometro?.cancel(); grabando = false; grabador = null
+        if (cancelar) { g.cancelar(); return }
+        val r = g.terminar()
+        if (r == null) { aviso = "La nota de voz fue muy corta"; return }
+        val cita = citando
+        viewModelScope.launch {
+            try {
+                Repo.enviarMedio(botId, jid, "audio", r.archivo.absolutePath, r.mime, "", "", cita?.id ?: "", 0, 0, r.durS, r.esNota, null, r.onda)
+                citando = null
+            } catch (e: Exception) { aviso = e.message ?: "No se pudo enviar la nota de voz" }
+        }
     }
 
     // ---------- borrador y "escribiendo…" ----------

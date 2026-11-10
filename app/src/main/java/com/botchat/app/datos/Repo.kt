@@ -109,6 +109,14 @@ object Repo {
     suspend fun estadoChat(bot: Long, chat: String) = io { Json.estadoChat(motor.estadoDelChat(bot, chat)) }
     suspend fun plazoEdicionSeg() = io { motor.plazoEdicionSeg() }
 
+    suspend fun enviarMedio(
+        bot: Long, chat: String, tipo: String, ruta: String, mime: String, nombre: String, pie: String, citaId: String,
+        ancho: Int, alto: Int, durS: Int, notaVoz: Boolean, miniatura: ByteArray?, onda: ByteArray?,
+    ) = io { Json.envio(motor.enviarMedio(bot, chat, tipo, ruta, mime, nombre, pie, citaId, ancho.toLong(), alto.toLong(), durS.toLong(), notaVoz, miniatura, onda)) }
+    suspend fun abrirVerUnaVez(bot: Long, chat: String, id: String) = io { Json.verUnaVez(motor.abrirVerUnaVez(bot, chat, id)) }
+    suspend fun cerrarVerUnaVez(bot: Long, chat: String, id: String) = io { motor.cerrarVerUnaVez(bot, chat, id) }
+    suspend fun barrerVerUnaVez(bot: Long) = io { motor.barrerVerUnaVez(bot) }
+
     suspend fun estadisticasChat(bot: Long, chat: String) = io { Json.resumenChat(motor.estadisticasChat(bot, chat)) }
     suspend fun calendario(bot: Long, chat: String, mes: String) = io { Json.calendario(motor.calendarioChat(bot, chat, mes)) }
     suspend fun mensajesDia(bot: Long, chat: String, dia: String) = io { Json.mensajes(motor.mensajesDia(bot, chat, dia)) }

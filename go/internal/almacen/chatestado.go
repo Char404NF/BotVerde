@@ -15,6 +15,7 @@ type EstadoChat struct {
 	Silenciado     bool  `json:"silenciado"`     // sin notificaciones de este chat
 	BotPausaHasta  int64 `json:"botPausaHasta"`  // el bot calla en este chat hasta esta hora (0 = no)
 	BotActivo      bool  `json:"botActivo"`      // interruptor del bot en este chat (para grupos)
+	PausaHumano    bool  `json:"pausaHumano"`    // la pausa es porque alguien pidió hablar con una persona (no porque escribí yo)
 }
 
 func (a *Almacen) asegurarEstado(botID int64, chat string) {
@@ -24,13 +25,13 @@ func (a *Almacen) asegurarEstado(botID int64, chat string) {
 // EstadoDeChat devuelve el estado del chat (con valores por defecto si no hay registro).
 func (a *Almacen) EstadoDeChat(botID int64, chat string) EstadoChat {
 	var e EstadoChat
-	var sil, act int
-	err := a.db.QueryRow(`SELECT leido_enviado_ts, silenciado, bot_pausa_hasta, bot_activo FROM chat_estado WHERE bot_id=? AND chat_jid=?`, botID, chat).
-		Scan(&e.LeidoEnviadoTS, &sil, &e.BotPausaHasta, &act)
+	var sil, act, hum int
+	err := a.db.QueryRow(`SELECT leido_enviado_ts, silenciado, bot_pausa_hasta, bot_activo, pausa_humano FROM chat_estado WHERE bot_id=? AND chat_jid=?`, botID, chat).
+		Scan(&e.LeidoEnviadoTS, &sil, &e.BotPausaHasta, &act, &hum)
 	if errors.Is(err, sql.ErrNoRows) {
 		return EstadoChat{BotActivo: true}
 	}
-	e.Silenciado, e.BotActivo = sil == 1, act == 1
+	e.Silenciado, e.BotActivo, e.PausaHumano = sil == 1, act == 1, hum == 1
 	return e
 }
 
@@ -46,8 +47,17 @@ func (a *Almacen) Silenciar(botID int64, chat string, si bool) error {
 
 // PausarBot hace que el bot calle en un chat hasta `hasta` (segundos desde 1970). Con 0 se reactiva.
 func (a *Almacen) PausarBot(botID int64, chat string, hasta int64) error {
+	return a.pausarBot(botID, chat, hasta, false)
+}
+
+// PausarBotHumano hace que el bot calle en un chat porque alguien pidió hablar con una persona, hasta `hasta` (0 = reactivar).
+func (a *Almacen) PausarBotHumano(botID int64, chat string, hasta int64) error {
+	return a.pausarBot(botID, chat, hasta, true)
+}
+
+func (a *Almacen) pausarBot(botID int64, chat string, hasta int64, humano bool) error {
 	a.asegurarEstado(botID, chat)
-	_, err := a.db.Exec(`UPDATE chat_estado SET bot_pausa_hasta=? WHERE bot_id=? AND chat_jid=?`, hasta, botID, chat)
+	_, err := a.db.Exec(`UPDATE chat_estado SET bot_pausa_hasta=?, pausa_humano=? WHERE bot_id=? AND chat_jid=?`, hasta, b2i(humano && hasta > 0), botID, chat)
 	if err == nil {
 		a.avisa("chat:" + chat)
 	}
