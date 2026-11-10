@@ -44,7 +44,7 @@ func (a *Almacen) MarcarEliminado(botID int64, chat, id, por string, ts int64) (
 			return false, err
 		}
 	}
-	a.avisa("chat:" + chat)
+	a.avisaMsg(chat, id)
 	a.avisa("chats")
 	a.avisa("estadisticas")
 	return true, nil
@@ -63,7 +63,7 @@ func (a *Almacen) OlvidarMensaje(botID int64, chat, id string) (bool, error) {
 	if err := a.olvidar(m); err != nil {
 		return false, err
 	}
-	a.avisa("chat:" + chat)
+	a.avisaMsg(chat, id)
 	a.avisa("chats")
 	a.avisa("espacio")
 	a.avisa("estadisticas")
@@ -170,6 +170,10 @@ func (a *Almacen) BorrarParaMi(botID int64, chat string, ids []string) (int, err
 		n++
 	}
 	if n > 0 {
+		a.nombres.limpiar()
+		for _, id := range ids {
+			a.avisa("msg:" + chat + ":" + id)
+		}
 		a.avisa("chat:" + chat)
 		a.avisa("chats")
 		a.avisa("espacio")

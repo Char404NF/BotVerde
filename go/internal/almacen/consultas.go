@@ -2,6 +2,7 @@ package almacen
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"botchat/internal/identidad"
@@ -184,7 +185,8 @@ type MencionVista struct {
 	Nombre  string `json:"nombre"`
 }
 
-func (a *Almacen) vista(m *Mensaje) MensajeVista {
+// vista arma lo que ve la pantalla. Con `nom` los nombres ya vienen resueltos por lote; con nil se piden uno por uno (ruta antigua).
+func (a *Almacen) vista(m *Mensaje, nom *nombresPagina) MensajeVista {
 	v := MensajeVista{
 		ID: m.ID, Chat: m.ChatJID, RemitenteID: m.RemitenteJID, Remitente: m.RemitenteNombre, EsMio: m.EsMio, Tipo: m.Tipo, Texto: m.Texto,
 		TS: m.TS, Borrado: m.Borrado, Editado: m.Editado, Estado: m.ArchivoEstado, Bytes: m.ArchivoBytes, Mime: m.ArchivoMime,
@@ -192,19 +194,33 @@ func (a *Almacen) vista(m *Mensaje) MensajeVista {
 	}
 	v.EliminadoEn = m.EliminadoEn
 	if m.EliminadoPor != "" && m.EliminadoPor != m.RemitenteJID {
-		v.EliminadoPor = a.nombreDe(m.BotID, m.ChatJID, m.EliminadoPor)
+		if nom != nil {
+			v.EliminadoPor = nom.deMensajes(m.BotID, m.ChatJID, m.EliminadoPor)
+		} else {
+			v.EliminadoPor = a.nombreDe(m.BotID, m.ChatJID, m.EliminadoPor)
+		}
 	}
 	v.bot = m.BotID
 	v.CitaID, v.CitaTexto, v.Reenviado = m.CitaID, m.CitaTexto, m.Reenviado
 	if m.CitaID != "" {
-		v.CitaAutor = a.nombreParaMostrar(m.BotID, m.ChatJID, m.CitaAutor)
+		if nom != nil {
+			v.CitaAutor = nom.mostrado(m.BotID, m.ChatJID, m.CitaAutor)
+		} else {
+			v.CitaAutor = a.nombreParaMostrar(m.BotID, m.ChatJID, m.CitaAutor)
+		}
 		if m.CitaAutor == QuienYo {
 			v.CitaAutor = QuienYo
 		}
 	}
 	v.Menciones = []MencionVista{}
 	for _, j := range m.Menciones {
-		v.Menciones = append(v.Menciones, MencionVista{Usuario: usuarioDe(j), Nombre: a.nombreParaMostrar(m.BotID, m.ChatJID, j)})
+		var nombre string
+		if nom != nil {
+			nombre = nom.mostrado(m.BotID, m.ChatJID, j)
+		} else {
+			nombre = a.nombreParaMostrar(m.BotID, m.ChatJID, j)
+		}
+		v.Menciones = append(v.Menciones, MencionVista{Usuario: usuarioDe(j), Nombre: nombre})
 	}
 	v.VerEstado, v.VerTipo, v.VerExpira = m.VerEstado, m.VerTipo, m.VerExpira
 	v.EstadoEnvio = estadoDe(m.EstadoEnvio, m.EsMio, 0, 0)
@@ -305,19 +321,65 @@ func (a *Almacen) vistasDe(q string, args []any) ([]MensajeVista, error) {
 		return nil, err
 	}
 	defer filas.Close()
-	out := []MensajeVista{}
+	ms := []*Mensaje{}
 	for filas.Next() {
 		m, err := a.escanearMensaje(filas)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, a.vista(m))
+		ms = append(ms, m)
 	}
 	if err := filas.Err(); err != nil {
 		return nil, err
 	}
+	return a.vistasDeMensajes(ms), nil
+}
+
+// vistasDeMensajes convierte una página de mensajes en vistas: nombres por lote, y reacciones y acuses por lote.
+func (a *Almacen) vistasDeMensajes(ms []*Mensaje) []MensajeVista {
+	var nom *nombresPagina
+	if !cargaAntigua.Load() {
+		nom = a.resolverNombres(ms)
+	}
+	out := make([]MensajeVista, 0, len(ms))
+	for _, m := range ms {
+		out = append(out, a.vista(m, nom))
+	}
 	a.enriquecer(out)
-	return out, nil
+	return out
+}
+
+// MensajesPorID devuelve los mensajes pedidos (en el orden de la lista: del más nuevo al más viejo) con una consulta por
+// trozo de hasta 300 ids; los que ya no existen simplemente no aparecen.
+func (a *Almacen) MensajesPorID(botID int64, chat string, ids []string) ([]MensajeVista, error) {
+	ms := []*Mensaje{}
+	for i := 0; i < len(ids); i += 300 {
+		trozo := ids[i:min(i+300, len(ids))]
+		args := []any{botID, chat}
+		for _, id := range trozo {
+			args = append(args, id)
+		}
+		filas, err := a.db.Query("SELECT "+colsMensaje+" FROM messages WHERE bot_id=? AND chat_jid=? AND id IN ("+marcas(len(trozo))+")", args...)
+		if err != nil {
+			return nil, err
+		}
+		for filas.Next() {
+			m, err := a.escanearMensaje(filas)
+			if err != nil {
+				filas.Close()
+				return nil, err
+			}
+			ms = append(ms, m)
+		}
+		filas.Close()
+	}
+	sort.Slice(ms, func(i, j int) bool {
+		if ms[i].TS != ms[j].TS {
+			return ms[i].TS > ms[j].TS
+		}
+		return ms[i].ID > ms[j].ID
+	})
+	return a.vistasDeMensajes(ms), nil
 }
 
 // ListarArchivos devuelve los mensajes con multimedia de un chat (o de todos si chat=""), del más nuevo al más viejo.

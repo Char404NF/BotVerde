@@ -261,7 +261,11 @@ func (a *Almacen) ResumenDeChat(botID int64, chat string) (*ResumenChat, error) 
 // nombreDe busca el nombre con el que se guardó el último mensaje de esa persona en el grupo.
 func (a *Almacen) nombreDe(botID int64, chat, jid string) string {
 	var n string
-	_ = a.db.QueryRow(`SELECT remitente_nombre FROM messages WHERE bot_id=? AND chat_jid=? AND remitente_jid=? AND remitente_nombre<>'' ORDER BY ts DESC LIMIT 1`,
+	indice := "" // en la ruta antigua se usa el índice de la 0.4.0 (recorre el chat), para poder comparar
+	if cargaAntigua.Load() {
+		indice = " INDEXED BY idx_mensajes_chat_ts"
+	}
+	_ = a.db.QueryRow(`SELECT remitente_nombre FROM messages`+indice+` WHERE bot_id=? AND chat_jid=? AND remitente_jid=? AND remitente_nombre<>'' ORDER BY ts DESC LIMIT 1`,
 		botID, chat, jid).Scan(&n)
 	if n == "" {
 		return "Participante"

@@ -229,6 +229,10 @@ var migraciones = [][]string{
 			visto INTEGER NOT NULL DEFAULT 0
 		)`,
 	},
+	// 8: nombres de personas en los mensajes de un chat (un salto al índice por persona, sin recorrer el chat)
+	{
+		`CREATE INDEX idx_mensajes_remitente ON messages(bot_id, chat_jid, remitente_jid, ts) WHERE remitente_nombre<>''`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

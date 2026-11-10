@@ -535,7 +535,7 @@ func TestReparar(t *testing.T) {
 	}
 	// Un fallido puede volver a bajarse.
 	m, _ := a.ObtenerMensaje(1, c1, "F1")
-	if !a.vista(m).PuedeBajarse {
+	if !a.vista(m, a.resolverNombres([]*Mensaje{m})).PuedeBajarse {
 		t.Fatal("un archivo fallido debe poder descargarse otra vez")
 	}
 }

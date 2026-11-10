@@ -62,8 +62,9 @@ type Almacen struct {
 	conservar atomic.Int32                  // 0 = por defecto (conservar), 1 = conservar, 2 = no conservar eliminados
 	zona      atomic.Pointer[time.Location] // zona horaria del teléfono para agrupar por día (la fija la app)
 	mu        sync.Mutex                    // serializa lectura-modificación-escritura de chats
+	nombres   cacheNombres                  // nombres de personas ya resueltos para las páginas de mensajes
 	// Cambio, si no es nil, se llama cuando algo cambia (sin bloquear la operación). Los eventos son:
-	// "chats", "chat:<jid>", "archivo:<jid>:<id>" y "espacio".
+	// "chats", "chat:<jid>", "msg:<jid>:<id>", "archivo:<jid>:<id>" y "espacio".
 	Cambio func(evento string)
 }
 
@@ -109,6 +110,12 @@ func (a *Almacen) avisa(evento string) {
 	if f := a.Cambio; f != nil {
 		f(evento)
 	}
+}
+
+// avisaMsg avisa que cambió un mensaje concreto ("msg:<jid>:<id>") además del chat, para que la pantalla vuelva a pedir solo ese mensaje.
+func (a *Almacen) avisaMsg(chat, id string) {
+	a.avisa("msg:" + chat + ":" + id)
+	a.avisa("chat:" + chat)
 }
 
 // ---------- rutas de archivos (relativas a la raíz) ----------
@@ -316,6 +323,9 @@ func (a *Almacen) escribirChat(ex execer, c *Chat) error {
 		ultimo_ts=MAX(chats.ultimo_ts, excluded.ultimo_ts), busqueda=excluded.busqueda`,
 		c.JID, c.BotID, b2i(c.EsGrupo), c.Guardado, c.Publico, c.Negocio, c.Mostrado, c.TelE164, c.TelMostrado, c.PaisISO,
 		c.FotoRuta, c.FotoID, c.FotoTS, c.UltimoTS, c.busqueda(), time.Now().Unix())
+	if err == nil {
+		a.nombres.invalidaContacto(c.BotID, c.JID) // cambió el contacto o su nombre
+	}
 	return err
 }
 
@@ -417,6 +427,7 @@ func (a *Almacen) FusionarChat(botID int64, desde, hasta string) error {
 	if err := tx.Commit(); err != nil {
 		return err
 	}
+	a.nombres.limpiar()
 	a.avisa("chats")
 	return nil
 }
@@ -563,6 +574,9 @@ func (a *Almacen) GuardarMensajes(msgs []*Mensaje) (nuevos []*Mensaje, err error
 				return nil, err
 			}
 			nuevos = append(nuevos, m)
+			if m.RemitenteNombre != "" {
+				a.nombres.invalidaRemitente(m.BotID, m.ChatJID, m.RemitenteJID)
+			}
 			k := fmt.Sprintf("%d\x00%s", m.BotID, m.ChatJID)
 			if m.TS > tocados[k] {
 				tocados[k] = m.TS
@@ -622,7 +636,7 @@ func (a *Almacen) EditarTexto(botID int64, chat, id, texto string) (bool, error)
 	}
 	n, _ := r.RowsAffected()
 	if n > 0 {
-		a.avisa("chat:" + chat)
+		a.avisaMsg(chat, id)
 		a.avisa("chats")
 	}
 	return n > 0, nil

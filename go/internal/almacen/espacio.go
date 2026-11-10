@@ -312,6 +312,7 @@ func (a *Almacen) BorrarChat(botID int64, chat string) (bytes int64, err error) 
 			return 0, err
 		}
 	}
+	a.nombres.limpiar()
 	a.avisa("chats")
 	a.avisa("espacio")
 	return bytes, nil
@@ -571,6 +572,7 @@ func (a *Almacen) EliminarBot(botID int64) error {
 	}
 	_ = os.RemoveAll(filepath.Join(a.raiz, "media", fmt.Sprint(botID)))
 	_ = os.RemoveAll(filepath.Join(a.raiz, "avatars", fmt.Sprint(botID)))
+	a.nombres.limpiar()
 	a.avisa("chats")
 	return nil
 }

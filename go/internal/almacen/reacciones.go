@@ -19,7 +19,7 @@ func (a *Almacen) GuardarReaccion(botID int64, chat, msgID, sender, emoji string
 			ON CONFLICT(bot_id,chat_jid,msg_id,sender) DO UPDATE SET emoji=excluded.emoji, ts=excluded.ts`, botID, chat, msgID, sender, emoji, ts)
 	}
 	if err == nil {
-		a.avisa("chat:" + chat)
+		a.avisaMsg(chat, msgID)
 	}
 	return err
 }

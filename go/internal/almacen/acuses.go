@@ -28,7 +28,7 @@ func (a *Almacen) GuardarAcuse(botID int64, chat, msgID, participante, tipo stri
 			return false, err
 		}
 	}
-	a.avisa("chat:" + chat)
+	a.avisaMsg(chat, msgID)
 	return true, nil
 }
 
@@ -139,7 +139,7 @@ func (a *Almacen) nombreParaMostrar(botID int64, chat, jid string) string {
 func (a *Almacen) EstadoDeEnvio(botID int64, chat, id, estado string) error {
 	_, err := a.db.Exec(`UPDATE messages SET estado_envio=? WHERE bot_id=? AND chat_jid=? AND id=? AND es_mio=1`, estado, botID, chat, id)
 	if err == nil {
-		a.avisa("chat:" + chat)
+		a.avisaMsg(chat, id)
 	}
 	return err
 }

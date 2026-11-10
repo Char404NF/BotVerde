@@ -131,6 +131,33 @@ func ListarMensajes(botID int64, chat string, antesTS int64, antesID string, lim
 	return js(a.ListarMensajes(botID, chat, antesTS, antesID, limite))
 }
 
+// MensajesPorId devuelve (JSON) los mensajes pedidos de un chat (idsJSON es un arreglo de ids), con una consulta por lote.
+// Los que ya no existen no aparecen. La pantalla lo usa para refrescar mensajes ya cargados (recibos, reacciones, ediciones…).
+func MensajesPorId(botID int64, chat, idsJSON string) (string, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return "", err
+	}
+	var ids []string
+	if err := json.Unmarshal([]byte(idsJSON), &ids); err != nil {
+		return "", err
+	}
+	return js(a.MensajesPorID(botID, chat, ids))
+}
+
+// CargaAnterior activa la forma de cargar mensajes de la 0.4.0 (nombres uno por uno, sin caché) solo para medir antes y después.
+func CargaAnterior(si bool) { almacen.CargaAntigua(si) }
+
+// CrearChatPrueba crea un grupo de prueba con `cuantos` mensajes para medir la apertura de un chat; devuelve su JID.
+// BorrarChat lo quita al terminar.
+func CrearChatPrueba(botID int64, cuantos int) (string, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return "", err
+	}
+	return a.ChatSintetico(botID, cuantos)
+}
+
 // ListarArchivos devuelve (JSON) los mensajes con multimedia. chat="" es todos los chats; categoria: foto, video, audio, documento o "".
 func ListarArchivos(botID int64, chat, categoria string, soloDescargados bool, limite, desde int) (string, error) {
 	a, err := almacenAbierto()

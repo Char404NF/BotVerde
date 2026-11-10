@@ -45,7 +45,7 @@ func (a *Almacen) AbrirVerUnaVez(botID int64, chat, id string, ahora time.Time) 
 	if n, _ := r.RowsAffected(); n == 0 {
 		return "", "", "", ErrVerUnaVez
 	}
-	a.avisa("chat:" + chat)
+	a.avisaMsg(chat, id)
 	return m.ArchivoRuta, m.VerTipo, m.ArchivoMime, nil
 }
 
@@ -65,7 +65,7 @@ func (a *Almacen) cerrarVerUnaVez(m *Mensaje, estado string) error {
 	if _, err := a.db.Exec(`UPDATE messages SET ver_estado=? WHERE bot_id=? AND chat_jid=? AND id=?`, estado, m.BotID, m.ChatJID, m.ID); err != nil {
 		return err
 	}
-	a.avisa("chat:" + m.ChatJID)
+	a.avisaMsg(m.ChatJID, m.ID)
 	a.avisa("chats")
 	a.avisa("espacio")
 	return nil
@@ -118,7 +118,7 @@ func (a *Almacen) PromoverVerUnaVez(n *Mensaje) (bool, error) {
 	_, err = a.db.Exec(`UPDATE messages SET archivo_info_cifrado=?, archivo_mime=?, archivo_bytes=?, ancho=?, alto=?, duracion_s=?, nota_voz=?, archivo_estado=?, ver_estado=?, ver_tipo=?, ver_expira=?
 		WHERE bot_id=? AND chat_jid=? AND id=?`, sel, n.ArchivoMime, n.ArchivoBytes, n.Ancho, n.Alto, n.DuracionS, b2i(n.NotaVoz), EstadoPendiente, VerPendiente, n.VerTipo, n.VerExpira, n.BotID, n.ChatJID, n.ID)
 	if err == nil {
-		a.avisa("chat:" + n.ChatJID)
+		a.avisaMsg(n.ChatJID, n.ID)
 	}
 	return err == nil, err
 }

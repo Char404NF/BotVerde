@@ -114,16 +114,17 @@ func (a *Almacen) ListarFiltrados(botID int64, chat string, f FiltroLista, antes
 	if antesTS > 0 {
 		pag.Total = 0 // el total solo se calcula en la primera página
 	}
+	ms := []*Mensaje{}
 	for _, r := range elegidos {
 		m, err := a.ObtenerMensaje(botID, chat, r.id)
 		if err != nil {
 			return nil, err
 		}
 		if m != nil {
-			pag.Items = append(pag.Items, a.vista(m))
+			ms = append(ms, m)
 		}
 	}
-	a.enriquecer(pag.Items)
+	pag.Items = a.vistasDeMensajes(ms)
 	return pag, nil
 }
 
