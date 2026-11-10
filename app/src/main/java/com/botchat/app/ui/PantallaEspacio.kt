@@ -77,7 +77,7 @@ private fun colorDeTipo(cat: String): Color = when (cat) {
 
 /** Espacio: lo que ocupa BotChat, por tipo y por chat, con borrado manual (nada se borra solo). */
 @Composable
-fun PantallaEspacio(alVolver: () -> Unit, alAbrirChat: (String) -> Unit) {
+fun PantallaEspacio(alVolver: () -> Unit, alAbrirChat: (String) -> Unit, conBarra: Boolean = true) {
     val vm: EspacioVm = viewModel()
     val ctx = LocalContext.current
     val haptica = rememberHaptica()
@@ -101,7 +101,7 @@ fun PantallaEspacio(alVolver: () -> Unit, alAbrirChat: (String) -> Unit) {
                         IconButton({ haptica(Toque.Fuerte); vm.pedirBorrarSeleccion() }) { Icon(Ico.Borrar, "Borrar archivos") }
                     },
                 )
-            } else {
+            } else if (conBarra) {
                 LargeTopAppBar(
                     scrollBehavior = barra,
                     navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } },

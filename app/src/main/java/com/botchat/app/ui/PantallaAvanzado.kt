@@ -56,17 +56,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.botchat.app.BotState
 import com.botchat.app.datos.Ajustes
-import com.botchat.app.seguridad.Huella
+import android.os.Build
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import kotlin.math.roundToInt
 
-/** Avanzado: seguridad, descargas automáticas, mantenimiento, registro y eliminar el bot. */
+/** Avanzado: aspecto, mantenimiento, registro y eliminar el bot (lo técnico, escondido aquí). */
 @Composable
 fun PantallaAvanzado(
     ajustes: Ajustes,
     nombreBot: String,
     eliminando: Boolean,
     alVolver: () -> Unit,
-    alCambiarPin: () -> Unit,
     alAbrirEspacio: () -> Unit,
     alMedirRendimiento: () -> Unit,
     alEliminarBot: () -> Unit,
@@ -74,42 +76,29 @@ fun PantallaAvanzado(
     val ctx = LocalContext.current
     val barra = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val haptica = rememberHaptica()
-    val tienePin by ajustes.tienePin.collectAsState()
-    val huella by ajustes.huella.collectAsState()
-    val secure by ajustes.secure.collectAsState()
-    val d by ajustes.descargas.collectAsState()
+    val modoTema by ajustes.modoTema.collectAsState()
+    val dinamico by ajustes.colorDinamico.collectAsState()
+    val reducir by ajustes.reducirAnimaciones.collectAsState()
     val registro by BotState.registro.collectAsState()
     var confirmaEliminar by remember { mutableStateOf(false) }
-    var confirmaQuitarPin by remember { mutableStateOf(false) }
-    val huellaDisponible = remember { Huella.disponible(ctx) }
 
     Scaffold(
         modifier = Modifier.nestedScroll(barra.nestedScrollConnection),
         topBar = { LargeTopAppBar(scrollBehavior = barra, navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text("Avanzado") }) },
     ) { relleno ->
         Column(Modifier.fillMaxSize().padding(relleno).verticalScroll(rememberScrollState()).padding(bottom = 32.dp)) {
-            Seccion("Seguridad") {
-                Fila("PIN de bloqueo", if (tienePin) "Se pide al abrir y tras 1 minuto en segundo plano" else "Protege tus mensajes con un PIN de 4 a 6 dígitos", Ico.Candado) {
-                    if (tienePin) {
-                        Row { TextButton(alCambiarPin) { Text("Cambiar") }; TextButton({ confirmaQuitarPin = true }) { Text("Quitar") } }
-                    } else {
-                        Button(alCambiarPin) { Text("Crear PIN") }
+            Seccion("Aspecto") {
+                Column(Modifier.padding(horizontal = Esp.l, vertical = Esp.s), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
+                    Text("Tema", style = MaterialTheme.typography.bodyLarge)
+                    val modos = listOf(ModoTema.SISTEMA to "Sistema", ModoTema.CLARO to "Claro", ModoTema.OSCURO to "Oscuro")
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().testTag("tema_modo")) {
+                        modos.forEachIndexed { i, (m, t) ->
+                            SegmentedButton(modoTema == m, { haptica(Toque.Suave); ajustes.fijarModoTema(m) }, SegmentedButtonDefaults.itemShape(i, modos.size)) { Text(t) }
+                        }
                     }
                 }
-                Interruptor("Desbloquear con huella", if (huellaDisponible) "Opcional: el PIN siempre sirve" else "Este teléfono no tiene huella configurada", huella, tienePin && huellaDisponible, Ico.Huella) { haptica(Toque.Suave); ajustes.fijarHuella(it) }
-                Interruptor("Bloquear capturas de pantalla", "También oculta la vista previa en apps recientes", secure, true, Ico.Candado) { haptica(Toque.Suave); ajustes.fijarSecure(it) }
-            }
-            Seccion("Descarga automática") {
-                Text("Elige qué se descarga solo y por qué conexión. Lo demás queda con el botón Descargar.", Modifier.padding(horizontal = Esp.l), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(Modifier.fillMaxWidth().padding(horizontal = Esp.l, vertical = Esp.s)) {
-                    Spacer(Modifier.weight(1f)); Text("Wi-Fi", Modifier.width(72.dp), style = MaterialTheme.typography.labelLarge); Text("Datos", Modifier.width(72.dp), style = MaterialTheme.typography.labelLarge)
-                }
-                FilaDescarga("Fotos", Ico.Foto, d.foto) { r -> ajustes.cambiarDescargas { it.copy(foto = r) } }
-                FilaDescarga("Audios", Ico.Audio, d.audio) { r -> ajustes.cambiarDescargas { it.copy(audio = r) } }
-                FilaDescarga("Documentos", Ico.Documento, d.documento) { r -> ajustes.cambiarDescargas { it.copy(documento = r) } }
-                FilaDescarga("Videos", Ico.Video, d.video) { r -> ajustes.cambiarDescargas { it.copy(video = r) } }
-                Deslizador("Tamaño máximo de videos", "${d.videoMaxMb} MB", d.videoMaxMb.toFloat(), 10f..200f, 18) { ajustes.cambiarDescargas { x -> x.copy(videoMaxMb = (it / 10).roundToInt() * 10) } }
-                Deslizador("Espacio libre mínimo", if (d.pisoLibreMb >= 1000) "${"%.1f".format(d.pisoLibreMb / 1000f)} GB" else "${d.pisoLibreMb} MB", d.pisoLibreMb.toFloat(), 100f..3000f, 28, "Con menos espacio libre se pausan las descargas automáticas.") { ajustes.cambiarDescargas { x -> x.copy(pisoLibreMb = (it / 100).roundToInt() * 100) } }
+                Interruptor("Color del sistema", if (Build.VERSION.SDK_INT >= 31) "Usa los colores de tu fondo de pantalla en vez de los de Bot Chat" else "Disponible desde Android 12", dinamico, Build.VERSION.SDK_INT >= 31, Ico.Espacio) { haptica(Toque.Suave); ajustes.fijarColorDinamico(it) }
+                Interruptor("Reducir animaciones", "Todo cambia al instante, sin movimiento", reducir, true, Ico.Actualizar) { haptica(Toque.Suave); ajustes.fijarReducirAnimaciones(it) }
             }
             Seccion("Mantenimiento") {
                 Fila("Espacio", "Qué ocupa cada chat y cómo liberarlo", Ico.Espacio) { Button(alAbrirEspacio) { Text("Abrir") } }
@@ -147,19 +136,10 @@ fun PantallaAvanzado(
             dismissButton = { TextButton({ confirmaEliminar = false }) { Text("Cancelar") } },
         )
     }
-    if (confirmaQuitarPin) {
-        AlertDialog(
-            onDismissRequest = { confirmaQuitarPin = false },
-            title = { Text("¿Quitar el PIN?") },
-            text = { Text("Cualquiera que abra la app podrá ver tus mensajes.") },
-            confirmButton = { TextButton({ confirmaQuitarPin = false; ajustes.quitarPin(); EstadoBloqueo.desbloquear() }) { Text("Quitar PIN", color = MaterialTheme.colorScheme.error) } },
-            dismissButton = { TextButton({ confirmaQuitarPin = false }) { Text("Cancelar") } },
-        )
-    }
 }
 
 @Composable
-private fun Seccion(titulo: String, contenido: @Composable () -> Unit) {
+internal fun Seccion(titulo: String, contenido: @Composable () -> Unit) {
     Column(Modifier.padding(top = Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
         Text(titulo, Modifier.padding(horizontal = Esp.l), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
         Card(Modifier.fillMaxWidth().padding(horizontal = Esp.m), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
@@ -169,7 +149,7 @@ private fun Seccion(titulo: String, contenido: @Composable () -> Unit) {
 }
 
 @Composable
-private fun Fila(titulo: String, texto: String, icono: androidx.compose.ui.graphics.vector.ImageVector, accion: @Composable () -> Unit) {
+internal fun Fila(titulo: String, texto: String, icono: androidx.compose.ui.graphics.vector.ImageVector, accion: @Composable () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = Esp.l, vertical = Esp.s), verticalAlignment = Alignment.CenterVertically) {
         Icon(icono, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(Esp.l))
@@ -179,12 +159,12 @@ private fun Fila(titulo: String, texto: String, icono: androidx.compose.ui.graph
 }
 
 @Composable
-private fun Interruptor(titulo: String, texto: String, valor: Boolean, activo: Boolean, icono: androidx.compose.ui.graphics.vector.ImageVector, alCambiar: (Boolean) -> Unit) {
+internal fun Interruptor(titulo: String, texto: String, valor: Boolean, activo: Boolean, icono: androidx.compose.ui.graphics.vector.ImageVector, alCambiar: (Boolean) -> Unit) {
     Fila(titulo, texto, icono) { Switch(valor, alCambiar, Modifier.testTag("sw_" + titulo), enabled = activo) }
 }
 
 @Composable
-private fun FilaDescarga(titulo: String, icono: androidx.compose.ui.graphics.vector.ImageVector, r: Ajustes.Regla, alCambiar: (Ajustes.Regla) -> Unit) {
+internal fun FilaDescarga(titulo: String, icono: androidx.compose.ui.graphics.vector.ImageVector, r: Ajustes.Regla, alCambiar: (Ajustes.Regla) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = Esp.l, vertical = Esp.xs), verticalAlignment = Alignment.CenterVertically) {
         Icon(icono, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(Esp.m))
@@ -195,12 +175,12 @@ private fun FilaDescarga(titulo: String, icono: androidx.compose.ui.graphics.vec
 }
 
 @Composable
-private fun Box72(contenido: @Composable () -> Unit) {
+internal fun Box72(contenido: @Composable () -> Unit) {
     androidx.compose.foundation.layout.Box(Modifier.width(72.dp), Alignment.CenterStart) { contenido() }
 }
 
 @Composable
-private fun Deslizador(titulo: String, valorTexto: String, valor: Float, rango: ClosedFloatingPointRange<Float>, pasos: Int, nota: String? = null, alCambiar: (Float) -> Unit) {
+internal fun Deslizador(titulo: String, valorTexto: String, valor: Float, rango: ClosedFloatingPointRange<Float>, pasos: Int, nota: String? = null, alCambiar: (Float) -> Unit) {
     Column(Modifier.padding(horizontal = Esp.l, vertical = Esp.s)) {
         Row { Text(titulo, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge); Text(valorTexto, style = MaterialTheme.typography.titleSmall) }
         Slider(valor, alCambiar, valueRange = rango, steps = pasos)

@@ -251,3 +251,9 @@ fun Bitmap.aImagen(): ImageBitmap = asImageBitmap()
 
 /** ¿Este mensaje lleva un archivo que se ve como imagen o video en el visor? */
 val Msg.esVisual: Boolean get() = categoria == "foto" || categoria == "video"
+
+/** Logo de la app (vector del ícono, con sus colores). */
+@Composable
+fun LogoBot(modifier: Modifier = Modifier) {
+    Image(androidx.compose.ui.res.painterResource(com.botchat.app.R.drawable.ic_logo), null, modifier)
+}

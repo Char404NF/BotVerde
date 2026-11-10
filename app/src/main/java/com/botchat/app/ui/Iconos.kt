@@ -50,6 +50,18 @@ object Ico {
     private fun androidx.compose.ui.graphics.vector.ImageVector.Builder.trazo(ancho: Float = 2f, par: androidx.compose.ui.graphics.vector.PathBuilder.() -> Unit) =
         path(fill = null, stroke = SolidColor(Color.Black), strokeLineWidth = ancho, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round, pathBuilder = par)
 
+    /** Candado abierto. */
+    val Abierto = icono("abierto") {
+        trazo { moveTo(5f, 11f); lineTo(19f, 11f); lineTo(19f, 20f); lineTo(5f, 20f); close() }
+        trazo { moveTo(8f, 11f); lineTo(8f, 7f); curveTo(8f, 4.8f, 9.8f, 3f, 12f, 3f); curveTo(14f, 3f, 15.6f, 4.3f, 15.9f, 6.2f) }
+    }
+
+    /** Globo de conversación. */
+    val Chats = icono("chats") {
+        trazo { moveTo(5f, 4f); lineTo(19f, 4f); curveTo(20.1f, 4f, 21f, 4.9f, 21f, 6f); lineTo(21f, 14f); curveTo(21f, 15.1f, 20.1f, 16f, 19f, 16f); lineTo(11f, 16f); lineTo(6f, 20.5f); lineTo(6f, 16f); lineTo(5f, 16f); curveTo(3.9f, 16f, 3f, 15.1f, 3f, 14f); lineTo(3f, 6f); curveTo(3f, 4.9f, 3.9f, 4f, 5f, 4f); close() }
+        trazo { moveTo(7.5f, 8.5f); lineTo(16.5f, 8.5f); moveTo(7.5f, 12f); lineTo(13f, 12f) }
+    }
+
     /** Marco con una montaña y un sol. */
     val Foto = icono("foto") {
         trazo { moveTo(5f, 4f); lineTo(19f, 4f); curveTo(20.1f, 4f, 21f, 4.9f, 21f, 6f); lineTo(21f, 18f); curveTo(21f, 19.1f, 20.1f, 20f, 19f, 20f); lineTo(5f, 20f); curveTo(3.9f, 20f, 3f, 19.1f, 3f, 18f); lineTo(3f, 6f); curveTo(3f, 4.9f, 3.9f, 4f, 5f, 4f); close() }
