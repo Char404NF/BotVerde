@@ -109,7 +109,7 @@ fun PantallaCompartidos(botId: Long, jid: String, nombre: String, alVolver: () -
 }
 
 @Composable
-internal fun Cuadricula(datos: List<Msg>, alAbrirVisor: (String) -> Unit, porFecha: Boolean = false) {
+internal fun Cuadricula(datos: List<Msg>, alAbrirVisor: (String) -> Unit, porFecha: Boolean = false, alLlegarAlFinal: (() -> Unit)? = null) {
     val ctx = LocalContext.current
     val px = with(LocalDensity.current) { 140.dp.roundToPx() }
     LazyVerticalGrid(GridCells.Adaptive(110.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(2.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -136,6 +136,10 @@ internal fun Cuadricula(datos: List<Msg>, alAbrirVisor: (String) -> Unit, porFec
                 if (!m.descargado) Icon(Ico.Descargar, "No descargado", Modifier.align(Alignment.BottomEnd).padding(6.dp).size(20.dp), tint = Color.White)
             }
             }
+        }
+        if (alLlegarAlFinal != null) item(key = "fin", span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            LaunchedEffect(datos.size) { alLlegarAlFinal() }
+            Spacer(Modifier.size(1.dp))
         }
     }
 }

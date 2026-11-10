@@ -42,10 +42,43 @@ data class Msg(
     val dur: Int,
     val notaVoz: Boolean,
     val puedeBajarse: Boolean,
+    val eliminadoEn: Long = 0,
+    val eliminadoPor: String = "",
 ) {
     val categoria: String get() = categoriaDe(tipo)
     val descargado: Boolean get() = estado == "descargado" && ruta.isNotEmpty()
+
+    /** Eliminado por su autor (o un admin) pero todavía se puede mostrar su contenido. */
+    val contenidoDisponible: Boolean get() = !borrado || texto.isNotBlank() || descargado
 }
+
+/** Qué mensajes de un chat se quieren ver (mismo formato que el filtro del módulo Go). */
+data class FiltroLista(
+    val tipos: List<String> = emptyList(),
+    val direccion: String = "",
+    val persona: String = "",
+    val eliminados: Boolean = false,
+    val hora: Int? = null,
+    val semana: Int? = null,
+    val dia: String = "",
+) {
+    fun json(): String = JSONObject().put("tipos", JSONArray(tipos)).put("direccion", direccion).put("persona", persona).put("eliminados", eliminados)
+        .put("dia", dia).apply { hora?.let { put("hora", it) }; semana?.let { put("semana", it) } }.toString()
+
+    companion object {
+        fun desde(json: String): FiltroLista = runCatching {
+            val o = JSONObject(json)
+            val t = o.optJSONArray("tipos")
+            FiltroLista(
+                List(t?.length() ?: 0) { t!!.getString(it) }, o.optString("direccion"), o.optString("persona"), o.optBoolean("eliminados"),
+                if (o.has("hora")) o.getInt("hora") else null, if (o.has("semana")) o.getInt("semana") else null, o.optString("dia"),
+            )
+        }.getOrDefault(FiltroLista())
+    }
+}
+
+data class PaginaMensajes(val total: Long, val items: List<Msg>)
+data class PersonaChat(val jid: String, val nombre: String, val cantidad: Long)
 
 fun categoriaDe(tipo: String): String = when (tipo) {
     "imagen", "sticker" -> "foto"
@@ -92,7 +125,7 @@ data class TipoCuenta(val tipo: String, val enviados: Long, val recibidos: Long,
 data class Quien(val nombre: String, val cantidad: Long)
 data class ResumenChat(
     val desde: Long, val listo: Boolean, val enviados: Long, val recibidos: Long, val porTipo: List<TipoCuenta>,
-    val porHora: List<Long>, val porSemana: List<Long>, val quien: List<Quien>,
+    val porHora: List<Long>, val porSemana: List<Long>, val quien: List<Quien>, val eliminados: Long = 0,
 )
 data class DiaCuenta(val dia: String, val cantidad: Long)
 data class CalendarioMes(val desde: Long, val listo: Boolean, val dias: List<DiaCuenta>)
@@ -121,6 +154,7 @@ object Json {
             largos(o.optJSONArray("porHora")).let { if (it.size == 24) it else List(24) { 0L } },
             largos(o.optJSONArray("porDiaSemana")).let { if (it.size == 7) it else List(7) { 0L } },
             List(q?.length() ?: 0) { i -> q!!.getJSONObject(i).let { Quien(it.optString("nombre"), it.optLong("cantidad")) } },
+            o.optLong("eliminados"),
         )
     }
 
@@ -186,8 +220,16 @@ object Json {
             it.optString("tipo"), it.optString("texto"), it.optLong("ts"), it.optBoolean("borrado"), it.optBoolean("editado"),
             it.optString("estado"), it.optLong("bytes"), it.optString("mime"), it.optString("nombre"), it.optString("ruta"),
             it.optString("miniatura"), it.optInt("ancho"), it.optInt("alto"), it.optInt("dur"), it.optBoolean("notaVoz"), it.optBoolean("puedeBajarse"),
+            it.optLong("eliminadoEn"), it.optString("eliminadoPor"),
         )
     }
+
+    fun pagina(json: String): PaginaMensajes {
+        val o = JSONObject(json)
+        return PaginaMensajes(o.optLong("total"), mensajes(o.optJSONArray("items")?.toString() ?: "[]"))
+    }
+
+    fun personas(json: String) = lista(json) { PersonaChat(it.optString("jid"), it.optString("nombre"), it.optLong("cantidad")) }
 
     fun espacioPorTipo(json: String) = lista(json) { EspacioTipo(it.optString("categoria"), it.optLong("bytes"), it.optInt("cantidad")) }
 

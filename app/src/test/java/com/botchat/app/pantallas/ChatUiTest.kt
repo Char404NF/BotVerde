@@ -50,8 +50,8 @@ class ChatUiTest {
         regla.onNodeWithText("[foto borrada]").assertIsDisplayed()
         regla.onNodeWithText("Ver una vez").assertIsDisplayed()
         regla.onNodeWithText("Ábrelo en tu teléfono").assertIsDisplayed()
-        regla.onNodeWithText("Mensaje borrado").assertIsDisplayed()
-        assertEquals(0, regla.onAllNodesWithTextSafe("esto se borró")) // el contenido borrado no se muestra
+        regla.onNodeWithText("esto se borró").assertIsDisplayed() // el eliminado conservado se sigue viendo, con su etiqueta
+        assertEquals(0, regla.onAllNodesWithTextSafe("Mensaje borrado"))
         regla.onNodeWithText("factura.pdf").assertIsDisplayed()
         regla.onNodeWithText("Hoy").assertIsDisplayed() // separador de día
         regla.onNodeWithText("hola de hace días").assertIsDisplayed()

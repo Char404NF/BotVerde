@@ -62,6 +62,7 @@ import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -89,7 +90,7 @@ import kotlin.math.abs
 /** Visor de fotos y videos del chat. Las fotos se descifran solo en memoria; los videos se descifran en flujo. */
 @OptIn(UnstableApi::class)
 @Composable
-fun PantallaVisor(botId: Long, jid: String, idInicial: String, nombreChat: String, alCerrar: () -> Unit) {
+fun PantallaVisor(botId: Long, jid: String, idInicial: String, nombreChat: String, alCerrar: () -> Unit, alIrAlMensaje: ((String) -> Unit)? = null) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val haptica = rememberHaptica()
@@ -139,6 +140,7 @@ fun PantallaVisor(botId: Long, jid: String, idInicial: String, nombreChat: Strin
                     actual?.let { Text("${etiquetaDia(it.ts)} · ${horaDe(it.ts)}", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall) }
                 }
                 if (actual != null) {
+                    if (alIrAlMensaje != null) IconButton({ haptica(Toque.Suave); alIrAlMensaje(actual.id) }, Modifier.testTag("ir_al_mensaje")) { Icon(Ico.IrA, "Ir al mensaje en el chat", tint = Color.White) }
                     if (Exportar.disponible) IconButton({
                         haptica(Toque.Fuerte)
                         scope.launch { guardarCopia(ctx, actual, nombreChat) }

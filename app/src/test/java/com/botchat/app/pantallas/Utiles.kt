@@ -1,6 +1,8 @@
 package com.botchat.app.pantallas
 
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToString
 
 /**
  * Espera (hasta 20 s) a que algo se cumpla. El reloj de las pruebas de Compose corre más rápido que el real, así que se
@@ -11,12 +13,16 @@ fun ComposeContentTestRule.espera(condicion: () -> Boolean) {
 }
 
 fun ComposeContentTestRule.esperaTexto(texto: String, substring: Boolean = false) {
-    espera { onAllNodesWithTextSafe(texto, substring) > 0 }
+    try {
+        espera { onAllNodesWithTextSafe(texto, substring) > 0 }
+    } catch (e: Throwable) {
+        throw AssertionError("No apareció «$texto». Pantalla:\n" + onRoot(useUnmergedTree = true).printToString(40), e)
+    }
 }
 
 fun ComposeContentTestRule.onAllNodesWithTextSafe(texto: String, substring: Boolean = false): Int =
     onAllNodes(androidx.compose.ui.test.hasText(texto, substring = substring)).fetchSemanticsNodes().size
 
 fun ComposeContentTestRule.esperaEtiqueta(etiqueta: String) {
-    espera { onAllNodes(androidx.compose.ui.test.hasTestTag(etiqueta)).fetchSemanticsNodes().isNotEmpty() }
+    espera { onAllNodes(androidx.compose.ui.test.hasTestTag(etiqueta), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
 }

@@ -93,6 +93,24 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
         }
     }
 
+    /** Carga páginas hasta que el mensaje `id` esté en la lista. Devuelve false si no existe (o es muy lejano). */
+    suspend fun cargarHasta(id: String): Boolean {
+        var vueltas = 0
+        while (mensajes?.any { it.id == id } != true) {
+            val actuales = mensajes ?: return false
+            if (!hayMas || actuales.isEmpty() || vueltas++ > 200) return false
+            val u = actuales.last()
+            val mas = runCatching { Repo.mensajes(botId, jid, u.ts, u.id, pagina) }.getOrNull() ?: return false
+            mensajes = actuales + mas
+            hayMas = mas.size >= pagina
+        }
+        return true
+    }
+
+    fun olvidar(m: Msg) {
+        viewModelScope.launch { runCatching { Repo.olvidar(botId, jid, m.id) }.onFailure { aviso = it.message ?: "No se pudo olvidar el mensaje" } }
+    }
+
     fun descargar(m: Msg) {
         viewModelScope.launch {
             try {

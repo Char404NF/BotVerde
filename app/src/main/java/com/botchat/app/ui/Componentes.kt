@@ -216,7 +216,8 @@ fun EstadoVacio(icono: ImageVector, titulo: String, texto: String, modifier: Mod
 
 /** Icono según el tipo de mensaje, o null si es texto. */
 fun iconoDeTipo(tipo: String, notaVoz: Boolean = false): ImageVector? = when (tipo) {
-    "imagen", "sticker" -> Ico.Foto
+    "imagen" -> Ico.Foto
+    "sticker" -> Ico.Sticker
     "video" -> Ico.Video
     "audio" -> Ico.Audio
     "documento" -> Ico.Documento

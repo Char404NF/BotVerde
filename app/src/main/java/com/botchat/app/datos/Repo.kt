@@ -45,6 +45,7 @@ object Repo {
             motor.abrirAlmacen(raiz.absolutePath, ClaveDatos.obtener(ctx), observador)
             abierto = true
             actualizarZona()
+            com.botchat.app.datos.Ajustes.get(ctx).aplicarAGo()
             error.value = null
             true
         } catch (e: Exception) {
@@ -80,6 +81,11 @@ object Repo {
 
     suspend fun archivos(bot: Long, chat: String, categoria: String, soloDescargados: Boolean, limite: Int = 300, desde: Int = 0) =
         io { Json.mensajes(motor.listarArchivos(bot, chat, categoria, soloDescargados, limite.toLong(), desde.toLong())) }
+
+    suspend fun filtrados(bot: Long, chat: String, filtro: FiltroLista, antesTs: Long = 0, antesId: String = "", limite: Int = 60) =
+        io { Json.pagina(motor.listarFiltrados(bot, chat, filtro.json(), antesTs, antesId, limite.toLong())) }
+    suspend fun personas(bot: Long, chat: String) = io { Json.personas(motor.personasChat(bot, chat)) }
+    suspend fun olvidar(bot: Long, chat: String, id: String) = io { motor.olvidarMensaje(bot, chat, id) }
 
     suspend fun estadisticasChat(bot: Long, chat: String) = io { Json.resumenChat(motor.estadisticasChat(bot, chat)) }
     suspend fun calendario(bot: Long, chat: String, mes: String) = io { Json.calendario(motor.calendarioChat(bot, chat, mes)) }

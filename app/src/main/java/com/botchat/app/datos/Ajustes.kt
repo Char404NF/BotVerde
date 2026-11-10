@@ -68,6 +68,32 @@ class Ajustes private constructor(ctx: Context) {
     val reducirAnimaciones: StateFlow<Boolean> = _reducir
     fun fijarReducirAnimaciones(v: Boolean) { p.edit().putBoolean("reducir_anim", v).apply(); _reducir.value = v }
 
+    // ---- funciones que se pueden apagar sin reinstalar (Avanzado → Funciones) ----
+    private val _conservar = MutableStateFlow(p.getBoolean("conservar_elim", true))
+    /** Conservar el contenido de los mensajes que otros eliminan (encendido por defecto). */
+    val conservarEliminados: StateFlow<Boolean> = _conservar
+    fun fijarConservarEliminados(v: Boolean) { p.edit().putBoolean("conservar_elim", v).apply(); _conservar.value = v; aplicarAGo() }
+
+    private val _motorAuto = MutableStateFlow(p.getBoolean("motor_auto", true))
+    /** Motor de automatización (respuestas automáticas) general. */
+    val motorAutomatico: StateFlow<Boolean> = _motorAuto
+    fun fijarMotorAutomatico(v: Boolean) { p.edit().putBoolean("motor_auto", v).apply(); _motorAuto.value = v; aplicarAGo() }
+
+    private val _escribir = MutableStateFlow(p.getBoolean("escribir_app", true))
+    /** Poder escribir mensajes a mano desde la app. */
+    val escribirDesdeApp: StateFlow<Boolean> = _escribir
+    fun fijarEscribirDesdeApp(v: Boolean) { p.edit().putBoolean("escribir_app", v).apply(); _escribir.value = v }
+
+    private val _notifs = MutableStateFlow(p.getBoolean("notif_mensajes", false))
+    /** Notificaciones de mensajes nuevos (apagado por defecto). */
+    val notificacionesMensajes: StateFlow<Boolean> = _notifs
+    fun fijarNotificacionesMensajes(v: Boolean) { p.edit().putBoolean("notif_mensajes", v).apply(); _notifs.value = v }
+
+    private val _enLinea = MutableStateFlow(p.getBoolean("mostrar_en_linea", false))
+    /** Mostrarse "en línea" mientras hay un chat abierto (apagado por defecto: puede dejar sin avisos al teléfono principal). */
+    val mostrarEnLinea: StateFlow<Boolean> = _enLinea
+    fun fijarMostrarEnLinea(v: Boolean) { p.edit().putBoolean("mostrar_en_linea", v).apply(); _enLinea.value = v }
+
     // ---- aviso de herramienta no oficial (se acepta una sola vez) ----
     private val _aviso = MutableStateFlow(p.getBoolean("aviso_aceptado", false))
     val avisoAceptado: StateFlow<Boolean> = _aviso
@@ -118,6 +144,7 @@ class Ajustes private constructor(ctx: Context) {
     /** Pasa las reglas al módulo Go (se llama al iniciar el servicio y cada vez que cambian). */
     fun aplicarAGo() {
         runCatching { Wabot.configurarDescargas(jsonDescargas(_descargas.value)) }
+        runCatching { Wabot.conservarEliminados(_conservar.value) }
     }
 
     companion object {

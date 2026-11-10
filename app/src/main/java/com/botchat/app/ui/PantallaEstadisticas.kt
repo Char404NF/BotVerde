@@ -53,9 +53,9 @@ fun PantallaEstadisticas(botId: Long, alVolver: () -> Unit, alAbrirChat: (String
                 EstadoVacio(Ico.Estadisticas, "Sin números todavía", "Cuando el bot guarde mensajes, aquí verás cuántos hay y qué chats son los más activos.", Modifier.padding(top = Esp.xl))
             } else {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Esp.m)) {
-                    Cifra(datos.enviados, "Enviados", Modifier.weight(1f).testTag("cifra_enviados"))
-                    Cifra(datos.recibidos, "Recibidos", Modifier.weight(1f).testTag("cifra_recibidos"))
-                    Cifra(datos.chats, "Chats", Modifier.weight(1f).testTag("cifra_chats"))
+                    Cifra(datos.enviados, "Enviados", "Enviado", Modifier.weight(1f).testTag("cifra_enviados"))
+                    Cifra(datos.recibidos, "Recibidos", "Recibido", Modifier.weight(1f).testTag("cifra_recibidos"))
+                    Cifra(datos.chats, "Chats", "Chat", Modifier.weight(1f).testTag("cifra_chats"))
                 }
                 SeccionEst("Actividad de los últimos 30 días") {
                     val dias = datos.porDia

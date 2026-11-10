@@ -39,6 +39,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.botchat.app.AppVm
 import com.botchat.app.datos.Ajustes
+import com.botchat.app.datos.FiltroLista
 import com.botchat.app.datos.Repo
 
 private fun enc(s: String) = Uri.encode(s)
@@ -49,6 +50,13 @@ private fun nombreDeChat(botId: Long, jid: String): String {
     var nombre by remember(jid) { mutableStateOf("") }
     LaunchedEffect(jid) { nombre = runCatching { Repo.chat(botId, jid)?.nombre }.getOrNull() ?: "" }
     return nombre
+}
+
+@Composable
+private fun esGrupoDeChat(botId: Long, jid: String): Boolean {
+    var grupo by remember(jid) { mutableStateOf(false) }
+    LaunchedEffect(jid) { grupo = runCatching { Repo.chat(botId, jid)?.esGrupo }.getOrNull() ?: false }
+    return grupo
 }
 
 private val RUTAS_PRINCIPALES = listOf("inicio", "espacio", "ajustes")
@@ -125,8 +133,9 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         )
                     }
                 }
-                composable("chat/{jid}") { be ->
+                composable("chat/{jid}?ir={ir}", arguments = listOf(androidx.navigation.navArgument("ir") { type = androidx.navigation.NavType.StringType; defaultValue = "" })) { be ->
                     val jid = be.arguments?.getString("jid") ?: return@composable
+                    val ir = be.arguments?.getString("ir") ?: ""
                     CompositionLocalProvider(LocalAnimScope provides this) {
                         PantallaChat(
                             jid, alVolver = { nav.popBackStack() },
@@ -134,6 +143,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                             alAbrirDocumento = { id -> nav.navigate("documento/${enc(jid)}/${enc(id)}") },
                             alAbrirArchivos = { nav.navigate("archivos/${enc(jid)}") },
                             alAbrirInfo = { nav.navigate("info/${enc(jid)}") },
+                            irA = ir,
                         )
                     }
                 }
@@ -141,7 +151,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                     popExitTransition = { if (reducir) ExitTransition.None else fadeOut(tween(Mov.NORMAL)) }) { be ->
                     val jid = be.arguments?.getString("jid") ?: return@composable
                     val id = be.arguments?.getString("id") ?: return@composable
-                    PantallaVisor(bot.id, jid, id, nombreDeChat(bot.id, jid), alCerrar = { nav.popBackStack() })
+                    PantallaVisor(bot.id, jid, id, nombreDeChat(bot.id, jid), alCerrar = { nav.popBackStack() }, alIrAlMensaje = { m -> nav.navigate("chat/${enc(jid)}?ir=${enc(m)}") })
                 }
                 composable("documento/{jid}/{id}") { be ->
                     val jid = be.arguments?.getString("jid") ?: return@composable
@@ -154,6 +164,18 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         bot.id, jid, alVolver = { nav.popBackStack() },
                         alAbrirVisor = { id -> nav.navigate("visor/${enc(jid)}/${enc(id)}") },
                         alAbrirDocumento = { id -> nav.navigate("documento/${enc(jid)}/${enc(id)}") },
+                        alAbrirLista = { f -> nav.navigate("lista/${enc(jid)}/${enc(f.json())}") },
+                    )
+                }
+                composable("lista/{jid}/{filtro}") { be ->
+                    val jid = be.arguments?.getString("jid") ?: return@composable
+                    val filtro = FiltroLista.desde(be.arguments?.getString("filtro") ?: "")
+                    val esGrupo = esGrupoDeChat(bot.id, jid)
+                    PantallaListaFiltrada(
+                        bot.id, jid, filtro, esGrupo, alVolver = { nav.popBackStack() },
+                        alAbrirVisor = { id -> nav.navigate("visor/${enc(jid)}/${enc(id)}") },
+                        alAbrirDocumento = { id -> nav.navigate("documento/${enc(jid)}/${enc(id)}") },
+                        alIrAlMensaje = { id -> nav.navigate("chat/${enc(jid)}?ir=${enc(id)}") },
                     )
                 }
                 composable("estadisticas") { PantallaEstadisticas(bot.id, alVolver = { nav.popBackStack() }, alAbrirChat = { nav.navigate("chat/${enc(it)}") }) }
@@ -167,15 +189,17 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 }
                 composable("espacio") { PantallaEspacio(alVolver = { irA("inicio") }, alAbrirChat = { nav.navigate("chat/${enc(it)}") }, conBarra = false) }
                 composable("ajustes") {
-                    PantallaAjustes(ajustes, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("bot") }, alAvanzado = { nav.navigate("avanzado") }, alEstadisticas = { nav.navigate("estadisticas") })
+                    PantallaAjustes(ajustes, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("bot") }, alAvanzado = { nav.navigate("avanzado") }, alEstadisticas = { nav.navigate("estadisticas") }, alPrivacidad = { nav.navigate("privacidad") })
                 }
+                composable("privacidad") { PantallaPrivacidad(ajustes, alVolver = { nav.popBackStack() }) }
+                composable("funciones") { PantallaFunciones(ajustes, alVolver = { nav.popBackStack() }) }
                 composable("seguridad") { PantallaSeguridad(ajustes, alVolver = { nav.popBackStack() }) }
                 composable("descargas") { PantallaDescargas(ajustes, alVolver = { nav.popBackStack() }) }
                 composable("avanzado") {
                     PantallaAvanzado(
                         ajustes, bot.nombre, vm.eliminando, alVolver = { nav.popBackStack() },
                         alAbrirEspacio = { irA("espacio") }, alMedirRendimiento = { nav.navigate("diagnostico") },
-                        alEliminarBot = { vm.eliminar(ctx) },
+                        alFunciones = { nav.navigate("funciones") }, alEliminarBot = { vm.eliminar(ctx) },
                     )
                 }
                 composable("bot") { PantallaBot(vm, conPermiso, alVolver = { nav.popBackStack() }, alAbrirAvanzado = { nav.navigate("avanzado") }, alAbrirAyuda = { nav.navigate("ayuda") }) }

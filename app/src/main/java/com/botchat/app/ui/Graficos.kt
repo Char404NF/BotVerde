@@ -2,6 +2,7 @@ package com.botchat.app.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.drawText
@@ -64,7 +67,8 @@ fun nombreTipo(tipo: String): String = when (tipo) {
 }
 
 fun iconoDeEstadistica(tipo: String): ImageVector = when (tipo) {
-    "imagen", "sticker" -> Ico.Foto
+    "imagen" -> Ico.Foto
+    "sticker" -> Ico.Sticker
     "video" -> Ico.Video
     "audio" -> Ico.Audio
     "documento" -> Ico.Documento
@@ -96,33 +100,40 @@ fun NotaDesde(desde: Long, listo: Boolean, modifier: Modifier = Modifier) {
     Text(texto, modifier.testTag("nota_desde"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-/** Número grande con su nombre. */
+/** "1 enviado" / "2 enviados". */
+fun plural(n: Long, uno: String, varios: String): String = "${numero(n)} ${if (n == 1L) uno else varios}"
+
+/** Número grande con su nombre (en singular cuando es 1). */
 @Composable
-fun Cifra(valor: Long, nombre: String, modifier: Modifier = Modifier) {
+fun Cifra(valor: Long, nombre: String, singular: String = nombre, modifier: Modifier = Modifier) {
     Card(modifier, shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
         Column(Modifier.fillMaxWidth().padding(Esp.l)) {
             Text(numero(valor), style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
-            Text(nombre, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text(if (valor == 1L) singular else nombre, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
         }
     }
 }
 
 /** Fila de un tipo de mensaje con sus cantidades. */
 @Composable
-fun FilaTipo(t: com.botchat.app.datos.TipoCuenta) {
-    Row(Modifier.fillMaxWidth().testTag("tipo_${t.tipo}"), verticalAlignment = Alignment.CenterVertically) {
+fun FilaTipo(t: com.botchat.app.datos.TipoCuenta, alTocar: (() -> Unit)? = null) {
+    Row(
+        Modifier.fillMaxWidth().then(if (alTocar != null) Modifier.clickable { alTocar() } else Modifier).testTag("tipo_${t.tipo}"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Box(Modifier.size(36.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), Alignment.Center) {
             Icon(iconoDeEstadistica(t.tipo), null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
         }
         Column(Modifier.weight(1f).padding(start = Esp.m)) {
             Text(nombreTipo(t.tipo), style = MaterialTheme.typography.bodyLarge)
             val partes = buildList {
-                if (t.enviados > 0) add("${numero(t.enviados)} enviados")
-                if (t.recibidos > 0) add("${numero(t.recibidos)} recibidos")
+                if (t.enviados > 0) add(plural(t.enviados, "enviado", "enviados"))
+                if (t.recibidos > 0) add(plural(t.recibidos, "recibido", "recibidos"))
                 if (t.bytes > 0) add(formatoBytes(t.bytes))
             }
             Text(partes.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        if (alTocar != null) Icon(Ico.Siguiente, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -139,13 +150,16 @@ fun BarraRelativa(fraccion: Float, modifier: Modifier = Modifier) {
 
 /** Gráfico de barras dibujado con Canvas. `etiquetas` puede traer textos vacíos para no saturar el eje. */
 @Composable
-fun GraficoBarras(valores: List<Long>, etiquetas: List<String>, descripcion: String, modifier: Modifier = Modifier, alto: Dp = 120.dp) {
+fun GraficoBarras(valores: List<Long>, etiquetas: List<String>, descripcion: String, modifier: Modifier = Modifier, alto: Dp = 120.dp, alTocar: ((Int) -> Unit)? = null) {
     val color = MaterialTheme.colorScheme.primary
     val pista = MaterialTheme.colorScheme.surfaceContainerHighest
     val medidor = rememberTextMeasurer()
     val estilo = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
     val maximo = (valores.maxOrNull() ?: 0L).coerceAtLeast(1L)
-    Canvas(modifier.fillMaxWidth().height(alto).semantics { contentDescription = descripcion }) {
+    val toque = if (alTocar == null) Modifier else Modifier.pointerInput(valores.size) {
+        detectTapGestures { p -> if (valores.isNotEmpty()) alTocar((p.x / size.width * valores.size).toInt().coerceIn(0, valores.size - 1)) }
+    }
+    Canvas(modifier.fillMaxWidth().height(alto).then(toque).semantics { contentDescription = descripcion }) {
         val n = valores.size
         if (n == 0) return@Canvas
         val base = 16.dp.toPx()
@@ -172,3 +186,6 @@ internal fun primeraMayuscula(s: String) = s.replaceFirstChar { it.uppercase(Loc
 internal fun etiquetasHoras(): List<String> = List(24) { if (it % 6 == 0) it.toString() else "" }
 internal val ETIQUETAS_SEMANA = listOf("L", "M", "X", "J", "V", "S", "D")
 internal val NOMBRES_SEMANA = listOf("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+
+/** "Lunes", "Martes"… (0 = lunes). */
+internal fun nombreDia(i: Int) = primeraMayuscula(NOMBRES_SEMANA[i.coerceIn(0, 6)])

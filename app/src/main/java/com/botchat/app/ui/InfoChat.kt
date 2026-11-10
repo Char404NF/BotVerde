@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
 import com.botchat.app.datos.CalendarioMes
 import com.botchat.app.datos.ChatItem
+import com.botchat.app.datos.FiltroLista
 import com.botchat.app.datos.Msg
 import com.botchat.app.datos.Repo
 import com.botchat.app.datos.ResumenChat
@@ -73,7 +74,7 @@ private val PESTANAS_INFO = listOf("Resumen", "Calendario", "Multimedia")
 /** Info del chat: resumen de números, calendario de actividad y multimedia por fecha. Todo sale de contadores; nunca se lee el texto de los mensajes. */
 @OptIn(UnstableApi::class)
 @Composable
-fun PantallaInfoChat(botId: Long, jid: String, alVolver: () -> Unit, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit) {
+fun PantallaInfoChat(botId: Long, jid: String, alVolver: () -> Unit, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit, alAbrirLista: (FiltroLista) -> Unit = {}) {
     val scope = rememberCoroutineScope()
     val pager = rememberPagerState { PESTANAS_INFO.size }
     val haptica = rememberHaptica()
@@ -94,8 +95,8 @@ fun PantallaInfoChat(botId: Long, jid: String, alVolver: () -> Unit, alAbrirViso
     ) { relleno ->
         HorizontalPager(pager, Modifier.fillMaxSize().padding(relleno)) { pagina ->
             when (pagina) {
-                0 -> TabResumen(botId, jid, version)
-                1 -> TabCalendario(botId, jid, version, alAbrirVisor, alAbrirDocumento)
+                0 -> TabResumen(botId, jid, version, alAbrirLista)
+                1 -> TabCalendario(botId, jid, version, alAbrirLista)
                 else -> TabMultimedia(botId, jid, version, alAbrirVisor, alAbrirDocumento)
             }
         }
@@ -117,7 +118,7 @@ private fun CabeceraInfo(chat: ChatItem?, jid: String) {
 // ---------- Resumen ----------
 
 @Composable
-private fun TabResumen(botId: Long, jid: String, version: Int) {
+private fun TabResumen(botId: Long, jid: String, version: Int, alAbrirLista: (FiltroLista) -> Unit) {
     val r by produceState<ResumenChat?>(null, jid, version) { value = runCatching { Repo.estadisticasChat(botId, jid) }.getOrNull() }
     val datos = r
     if (datos == null) { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }; return }
@@ -128,15 +129,26 @@ private fun TabResumen(botId: Long, jid: String, version: Int) {
             return@Column
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Esp.m)) {
-            Cifra(datos.enviados, "Enviados", Modifier.weight(1f).testTag("cifra_enviados"))
-            Cifra(datos.recibidos, "Recibidos", Modifier.weight(1f).testTag("cifra_recibidos"))
+            Cifra(datos.enviados, "Enviados", "Enviado", Modifier.weight(1f).testTag("cifra_enviados"))
+            Cifra(datos.recibidos, "Recibidos", "Recibido", Modifier.weight(1f).testTag("cifra_recibidos"))
         }
-        SeccionEst("Por tipo de mensaje") { datos.porTipo.forEach { FilaTipo(it) } }
-        SeccionEst("A qué hora se escribe") {
-            GraficoBarras(datos.porHora, etiquetasHoras(), "Mensajes por hora del día. Hora con más mensajes: ${datos.porHora.indices.maxByOrNull { datos.porHora[it] }}:00", Modifier.testTag("grafico_hora"))
+        SeccionEst("Por tipo de mensaje") {
+            datos.porTipo.forEach { t -> FilaTipo(t) { alAbrirLista(FiltroLista(tipos = listOf(t.tipo))) } }
+            if (datos.eliminados > 0) {
+                Row(Modifier.fillMaxWidth().clickable { alAbrirLista(FiltroLista(eliminados = true)) }.testTag("fila_eliminados"), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Eliminados", style = MaterialTheme.typography.bodyLarge)
+                        Text(plural(datos.eliminados, "mensaje eliminado por su autor", "mensajes eliminados por su autor"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Icon(Ico.Siguiente, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
-        SeccionEst("Qué días de la semana") {
-            GraficoBarras(datos.porSemana, ETIQUETAS_SEMANA, "Mensajes por día de la semana. Día con más mensajes: ${NOMBRES_SEMANA[datos.porSemana.indices.maxByOrNull { datos.porSemana[it] } ?: 0]}", Modifier.testTag("grafico_semana"))
+        SeccionEst("A qué hora se escribe (toca una barra)") {
+            GraficoBarras(datos.porHora, etiquetasHoras(), "Mensajes por hora del día. Hora con más mensajes: ${datos.porHora.indices.maxByOrNull { datos.porHora[it] }}:00", Modifier.testTag("grafico_hora"), alTocar = { h -> alAbrirLista(FiltroLista(hora = h)) })
+        }
+        SeccionEst("Qué días de la semana (toca una barra)") {
+            GraficoBarras(datos.porSemana, ETIQUETAS_SEMANA, "Mensajes por día de la semana. Día con más mensajes: ${NOMBRES_SEMANA[datos.porSemana.indices.maxByOrNull { datos.porSemana[it] } ?: 0]}", Modifier.testTag("grafico_semana"), alTocar = { d -> alAbrirLista(FiltroLista(semana = d)) })
         }
         if (datos.quien.isNotEmpty()) {
             SeccionEst("Quién escribe más") {
@@ -155,11 +167,11 @@ private fun TabResumen(botId: Long, jid: String, version: Int) {
 
 // ---------- Calendario ----------
 
-private fun diaLegible(dia: String): String =
+internal fun diaLegible(dia: String): String =
     primeraMayuscula(DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", LocaleEs).format(LocalDate.parse(dia)))
 
 @Composable
-private fun TabCalendario(botId: Long, jid: String, version: Int, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit) {
+private fun TabCalendario(botId: Long, jid: String, version: Int, alAbrirLista: (FiltroLista) -> Unit) {
     var mes by rememberSaveable(stateSaver = androidx.compose.runtime.saveable.Saver<YearMonth, String>({ it.toString() }, { YearMonth.parse(it) })) { mutableStateOf(YearMonth.now()) }
     var diaSel by rememberSaveable { mutableStateOf<String?>(null) }
     val cal by produceState<CalendarioMes?>(null, jid, mes, version) { value = runCatching { Repo.calendario(botId, jid, mes.toString()) }.getOrNull() }
@@ -198,7 +210,7 @@ private fun TabCalendario(botId: Long, jid: String, version: Int, alAbrirVisor: 
                             Box(
                                 Modifier.weight(1f).aspectRatio(1f).clip(RoundedCornerShape(10.dp)).background(fondo)
                                     .then(if (clave == diaSel) Modifier.border(BorderStroke(2.dp, esquema.onSurface), RoundedCornerShape(10.dp)) else Modifier)
-                                    .clickable(enabled = cantidad > 0) { haptica(Toque.Suave); diaSel = clave }.testTag("dia_$clave"),
+                                    .clickable(enabled = cantidad > 0) { haptica(Toque.Suave); diaSel = clave; alAbrirLista(FiltroLista(dia = clave)) }.testTag("dia_$clave"),
                                 Alignment.Center,
                             ) { Text(n.toString(), color = tinta, style = MaterialTheme.typography.labelLarge) }
                         }
@@ -212,32 +224,6 @@ private fun TabCalendario(botId: Long, jid: String, version: Int, alAbrirVisor: 
             Text("Más", style = MaterialTheme.typography.labelSmall, color = esquema.onSurfaceVariant)
         }
         if (c != null && cuentas.isEmpty()) Text("No hubo mensajes en este mes.", style = MaterialTheme.typography.bodyMedium, color = esquema.onSurfaceVariant, modifier = Modifier.testTag("mes_vacio"))
-        diaSel?.let { MensajesDelDia(botId, jid, it, version, alAbrirVisor, alAbrirDocumento) }
-    }
-}
-
-@Composable
-private fun MensajesDelDia(botId: Long, jid: String, dia: String, version: Int, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit) {
-    val lista by produceState<List<Msg>?>(null, jid, dia, version) { value = runCatching { Repo.mensajesDia(botId, jid, dia) }.getOrDefault(emptyList()) }
-    SeccionEst(diaLegible(dia), Modifier.testTag("lista_dia")) {
-        val ms = lista
-        when {
-            ms == null -> CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-            ms.isEmpty() -> Text("No hay mensajes este día.")
-            else -> ms.forEach { m ->
-                val abrible = m.descargado && (m.categoria == "foto" || m.categoria == "video" || m.categoria == "documento")
-                Row(
-                    Modifier.fillMaxWidth().clickable(enabled = abrible) { if (m.categoria == "documento") alAbrirDocumento(m.id) else alAbrirVisor(m.id) }.padding(vertical = 2.dp),
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    Text(horaDe(m.ts), Modifier.width(48.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Column(Modifier.weight(1f)) {
-                        Text(if (m.esMio) "Bot" else m.remitente.ifBlank { "Contacto" }, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        Text(descripcionCorta(m.tipo, m.texto, m.borrado, m.notaVoz), maxLines = 3, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-            }
-        }
     }
 }
 

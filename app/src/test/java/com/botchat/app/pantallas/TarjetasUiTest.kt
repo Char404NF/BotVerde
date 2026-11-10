@@ -109,7 +109,7 @@ class TarjetasUiTest {
         motor.mensajes = Apoyo.arreglo(Apoyo.msgJson("s1", ahora, tipo = "sticker", estado = "descargado", ruta = "media/1/ab/s1.enc", bytes = png.size.toLong()))
         pantalla()
         regla.esperaEtiqueta("sticker")
-        regla.onNodeWithTag("sticker").assertIsDisplayed()
-        assertNotNull(regla.onNodeWithTag("sticker").fetchSemanticsNode())
+        regla.onNodeWithTag("sticker", useUnmergedTree = true).assertIsDisplayed()
+        assertNotNull(regla.onNodeWithTag("sticker", useUnmergedTree = true).fetchSemanticsNode())
     }
 }

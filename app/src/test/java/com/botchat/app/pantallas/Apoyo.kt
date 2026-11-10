@@ -62,6 +62,11 @@ class MotorFalso : Motor {
     var porDia = mutableMapOf<String, String>()
     var globales = """{"desde":0,"listo":true,"enviados":0,"recibidos":0,"chats":0,"porTipo":[],"activos":[],"porDia":[]}"""
     var zona = ""
+    var filtrados = """{"total":0,"items":[]}"""
+    var personas = "[]"
+    override fun listarFiltrados(bot: Long, chat: String, filtro: String, antesTs: Long, antesId: String, limite: Long): String { llamadas += "filtro:$filtro"; return if (antesTs > 0) """{"total":0,"items":[]}""" else filtrados }
+    override fun personasChat(bot: Long, chat: String) = personas
+    override fun olvidarMensaje(bot: Long, chat: String, id: String) { llamadas += "olvidar:$chat:$id" }
     override fun establecerZona(id: String) { zona = id }
     override fun estadisticasChat(bot: Long, chat: String) = resumenChat
     override fun calendarioChat(bot: Long, chat: String, mes: String): String { llamadas += "calendario:$mes"; return calendario }

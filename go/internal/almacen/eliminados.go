@@ -89,7 +89,7 @@ func (a *Almacen) olvidar(m *Mensaje) error {
 		}
 	}
 	_, err = a.db.Exec(`UPDATE messages SET texto_cifrado=?, archivo_nombre_cifrado=?, archivo_info_cifrado=?, archivo_ruta='', miniatura_ruta='',
-		archivo_estado=CASE WHEN archivo_estado='ninguno' THEN 'ninguno' ELSE 'borrado' END, ancho=0, alto=0
+		archivo_estado=CASE WHEN tipo IN ('imagen','video','audio','documento','sticker') THEN 'borrado' ELSE archivo_estado END, ancho=0, alto=0
 		WHERE bot_id=? AND chat_jid=? AND id=?`, vacio, nombre, info, m.BotID, m.ChatJID, m.ID)
 	return err
 }

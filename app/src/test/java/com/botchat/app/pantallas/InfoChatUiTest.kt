@@ -8,6 +8,10 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.center
+import com.botchat.app.datos.FiltroLista
 import com.botchat.app.ui.BotChatTema
 import com.botchat.app.ui.PantallaChat
 import com.botchat.app.ui.PantallaInfoChat
@@ -36,7 +40,8 @@ class InfoChatUiTest {
     @Before fun antes() { motor = Apoyo.reinicia(); bot = Apoyo.creaBot(); motor.chat = Apoyo.chatJson(jid, "Ana Pérez").toString() }
 
     private fun tipo(t: String, env: Int, rec: Int, bytes: Long = 0) = JSONObject().put("tipo", t).put("enviados", env).put("recibidos", rec).put("bytes", bytes)
-    private fun info() = regla.setContent { BotChatTema { PantallaInfoChat(bot, jid, {}, {}, {}) } }
+    private var filtroAbierto: FiltroLista? = null
+    private fun info() = regla.setContent { BotChatTema { PantallaInfoChat(bot, jid, {}, {}, {}, alAbrirLista = { filtroAbierto = it }) } }
 
     @Test fun tocarElNombreAbreInfoYTocarLaFotoAbreLaFoto() {
         var info = 0
@@ -60,10 +65,43 @@ class InfoChatUiTest {
         regla.onNodeWithText("3").assertIsDisplayed(); regla.onNodeWithText("7").assertIsDisplayed()
         regla.onNodeWithText("Mensajes de texto").assertIsDisplayed()
         regla.onNodeWithText("Fotos").assertIsDisplayed()
-        regla.onNodeWithText("1 enviados · 2 recibidos · 4 KB").assertIsDisplayed()
+        regla.onNodeWithText("1 enviado · 2 recibidos · 4 KB").assertIsDisplayed()
         regla.onNodeWithTag("grafico_hora").assertIsDisplayed()
         regla.onNodeWithTag("grafico_semana").assertIsDisplayed()
         assertEquals("Una persona no tiene ranking", 0, regla.onAllNodesWithTag("quien").fetchSemanticsNodes().size)
+                regla.onNodeWithTag("tipo_imagen").performClick()
+        regla.espera { filtroAbierto != null }
+        assertEquals(FiltroLista(tipos = listOf("imagen")), filtroAbierto)
+    }
+
+    @Test fun lasBarrasDeHoraYSemanaAbrenLaListaFiltrada() {
+        motor.resumenChat = JSONObject().put("desde", 1789992000).put("listo", true).put("enviados", 1).put("recibidos", 1)
+            .put("porTipo", JSONArray().put(tipo("texto", 1, 1))).put("porHora", JSONArray(List(24) { 1 })).put("porDiaSemana", JSONArray(List(7) { 1 }))
+            .put("quien", JSONArray()).put("eliminados", 3).toString()
+        info()
+        regla.esperaEtiqueta("grafico_hora")
+        // 24 barras repartidas a lo ancho: tocar en el centro es la hora 12; en 7 barras el centro es el jueves (3).
+        regla.onNodeWithTag("grafico_hora").performTouchInput { click(center) }
+        regla.espera { filtroAbierto != null }
+        assertEquals(FiltroLista(hora = 12), filtroAbierto)
+        filtroAbierto = null
+        regla.onNodeWithTag("grafico_semana").performTouchInput { click(center) }
+        regla.espera { filtroAbierto != null }
+        assertEquals(FiltroLista(semana = 3), filtroAbierto)
+        filtroAbierto = null
+        regla.onNodeWithTag("fila_eliminados").performClick()
+        regla.espera { filtroAbierto != null }
+        assertEquals(FiltroLista(eliminados = true), filtroAbierto)
+    }
+
+    @Test fun elSingularSeEscribeBien() {
+        motor.resumenChat = JSONObject().put("desde", 1789992000).put("listo", true).put("enviados", 1).put("recibidos", 1)
+            .put("porTipo", JSONArray().put(tipo("sticker", 1, 1))).put("porHora", JSONArray(List(24) { 0 })).put("porDiaSemana", JSONArray(List(7) { 0 }))
+            .put("quien", JSONArray()).toString()
+        info()
+        regla.esperaTexto("1 enviado · 1 recibido")
+        regla.onNodeWithText("Enviado").assertIsDisplayed(); regla.onNodeWithText("Recibido").assertIsDisplayed()
+        regla.onNodeWithText("Stickers").assertIsDisplayed()
     }
 
     @Test fun enGruposMuestraQuienEscribeMas() {
@@ -95,21 +133,14 @@ class InfoChatUiTest {
         val ts = primero.atTime(10, 30).atZone(ZoneId.systemDefault()).toEpochSecond()
         motor.calendario = JSONObject().put("desde", ts).put("listo", true)
             .put("dias", JSONArray().put(JSONObject().put("dia", primero.toString()).put("cantidad", 2))).toString()
-        motor.porDia[primero.toString()] = Apoyo.arreglo(
-            Apoyo.msgJson("a", ts, texto = "Buenos días", remitente = "Ana"),
-            Apoyo.msgJson("b", ts + 60, texto = "Respuesta del bot", mio = true),
-        )
         info()
         regla.esperaTexto("Calendario"); regla.onNodeWithText("Calendario").performClick()
         regla.esperaEtiqueta("dia_$primero")
         regla.onNodeWithTag("mes_anterior").assertIsNotEnabled()
         regla.onNodeWithTag("mes_siguiente").assertIsNotEnabled()
-        assertEquals("Sin día elegido no hay lista", 0, regla.onAllNodesWithTag("lista_dia").fetchSemanticsNodes().size)
         regla.onNodeWithTag("dia_$primero").performClick()
-        regla.esperaTexto("Buenos días")
-        regla.onNodeWithText("Respuesta del bot").assertIsDisplayed()
-        regla.onNodeWithText("Bot").assertIsDisplayed()
-        assertTrue(motor.llamadas.contains("dia:$primero"))
+        regla.espera { filtroAbierto != null }
+        assertEquals("Tocar un día abre la lista filtrada de ese día", FiltroLista(dia = primero.toString()), filtroAbierto)
     }
 
     @Test fun calendarioPermiteIrAMesesAnterioresSoloDesdeElPrimerMensaje() {

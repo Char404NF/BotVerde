@@ -171,4 +171,16 @@ object Ico {
     /** Flecha a la derecha / izquierda para cambiar de mes. */
     val Anterior = icono("anterior") { trazo(2.5f) { moveTo(15f, 5f); lineTo(8f, 12f); lineTo(15f, 19f) } }
     val Siguiente = icono("siguiente") { trazo(2.5f) { moveTo(9f, 5f); lineTo(16f, 12f); lineTo(9f, 19f) } }
+
+    /** Cara sonriente con una esquina doblada: sticker. */
+    val Sticker = icono("sticker") {
+        trazo { moveTo(4f, 5f); lineTo(20f, 5f); lineTo(20f, 14f); lineTo(14f, 20f); lineTo(4f, 20f); close() }
+        trazo { moveTo(20f, 14f); lineTo(16f, 14f); curveTo(14.9f, 14f, 14f, 14.9f, 14f, 16f); lineTo(14f, 20f) }
+        trazo { moveTo(8.5f, 10f); lineTo(8.5f, 10.1f); moveTo(15.5f, 10f); lineTo(15.5f, 10.1f); moveTo(8.5f, 14f); curveTo(9.5f, 15.5f, 11f, 16f, 12f, 16f) }
+    }
+
+    /** Flecha hacia arriba a la derecha: ir al mensaje. */
+    val IrA = icono("ir_a") {
+        trazo { moveTo(7f, 17f); lineTo(17f, 7f); moveTo(9f, 7f); lineTo(17f, 7f); lineTo(17f, 15f) }
+    }
 }

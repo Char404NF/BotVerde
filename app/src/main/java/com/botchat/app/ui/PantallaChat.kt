@@ -10,6 +10,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -111,6 +112,7 @@ fun PantallaChat(
     alAbrirDocumento: (String) -> Unit,
     alAbrirArchivos: () -> Unit,
     alAbrirInfo: () -> Unit = {},
+    irA: String = "",
 ) {
     val app = LocalContext.current.applicationContext as android.app.Application
     val vm: ChatVm = viewModel(key = "chat-$jid", factory = viewModelFactory { initializer { ChatVm(app, jid) } })
@@ -122,6 +124,7 @@ fun PantallaChat(
     var confirmaArchivos by remember { mutableStateOf<com.botchat.app.datos.Liberado?>(null) }
     var confirmaChat by remember { mutableStateOf(false) }
     var verFoto by remember { mutableStateOf(false) }
+    var olvidando by remember { mutableStateOf<Msg?>(null) }
     val estadoLista = rememberLazyListState()
 
     // Al salir del chat: se vacía la caché de imágenes y se detiene el audio.
@@ -131,6 +134,20 @@ fun PantallaChat(
     LaunchedEffect(vm.aviso) { vm.aviso?.let { Toast.makeText(ctx, it, Toast.LENGTH_LONG).show(); vm.aviso = null } }
 
     val items = remember(msgs, chat?.esGrupo) { if (msgs == null) emptyList() else elementos(msgs, chat?.esGrupo == true) }
+    var resaltado by remember { mutableStateOf("") }
+    var irHecho by remember(irA) { mutableStateOf(irA.isEmpty()) }
+    LaunchedEffect(irA, msgs) {
+        if (irHecho || msgs == null) return@LaunchedEffect
+        if (!vm.cargarHasta(irA)) { irHecho = true; return@LaunchedEffect }
+        val idx = items.indexOfFirst { it is Elem.Burbuja && it.m.id == irA }
+        if (idx >= 0) {
+            irHecho = true
+            estadoLista.animateScrollToItem(idx)
+            resaltado = irA
+            kotlinx.coroutines.delay(2200)
+            resaltado = ""
+        }
+    }
     val llegandoAlFinal by remember { derivedStateOf { val u = estadoLista.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0; u >= items.size - 6 } }
     LaunchedEffect(llegandoAlFinal, items.size) { if (llegandoAlFinal) vm.cargarMas() }
 
@@ -184,7 +201,7 @@ fun PantallaChat(
                         items(items, key = { e -> when (e) { is Elem.Dia -> "dia-${e.ts}"; is Elem.Burbuja -> "m-${e.m.id}" } }) { e ->
                             when (e) {
                                 is Elem.Dia -> SeparadorDia(e.ts, Modifier.animateItem())
-                                is Elem.Burbuja -> Burbuja(e, vm, alAbrirVisor, alAbrirDocumento, Modifier.animateItem().apareceDesdeAbajo(vm.esNueva(e.m.id)))
+                                is Elem.Burbuja -> Burbuja(e, vm, alAbrirVisor, alAbrirDocumento, Modifier.animateItem().apareceDesdeAbajo(vm.esNueva(e.m.id)), resaltado == e.m.id, alOlvidar = { olvidando = it })
                             }
                         }
                         if (vm.cargandoMas) item { Box(Modifier.fillMaxWidth().padding(Esp.l), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) } }
@@ -216,6 +233,15 @@ fun PantallaChat(
                 }) { Text("Borrar archivos", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = { TextButton({ confirmaArchivos = null }) { Text("Cancelar") } },
+        )
+    }
+    olvidando?.let { m ->
+        AlertDialog(
+            onDismissRequest = { olvidando = null },
+            title = { Text("¿Olvidar este mensaje?") },
+            text = { Text("Se borran para siempre su contenido y su archivo de este teléfono. No se borra nada en WhatsApp.") },
+            confirmButton = { TextButton({ olvidando = null; haptica(Toque.Confirmar); vm.olvidar(m) }, Modifier.testTag("confirmar_olvidar")) { Text("Olvidar", color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton({ olvidando = null }) { Text("Cancelar") } },
         )
     }
     if (confirmaChat) {
@@ -254,18 +280,21 @@ private fun SeparadorDia(ts: Long, modifier: Modifier) {
 
 // ---------- burbujas ----------
 
-@OptIn(UnstableApi::class)
+@OptIn(UnstableApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun Burbuja(e: Elem.Burbuja, vm: ChatVm, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit, modifier: Modifier) {
+private fun Burbuja(e: Elem.Burbuja, vm: ChatVm, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit, modifier: Modifier, resaltar: Boolean = false, alOlvidar: (Msg) -> Unit = {}) {
     val m = e.m
     val esquema = MaterialTheme.colorScheme
-    val fondo = if (m.esMio) esquema.primaryContainer else esquema.surfaceContainerHigh
-    val tinta = if (m.esMio) esquema.onPrimaryContainer else esquema.onSurface
+    val fondo = if (resaltar) esquema.tertiaryContainer else if (m.esMio) esquema.primaryContainer else esquema.surfaceContainerHigh
+    val tinta = if (resaltar) esquema.onTertiaryContainer else if (m.esMio) esquema.onPrimaryContainer else esquema.onSurface
     val g = 18.dp
     val p = 5.dp
     val forma = if (m.esMio) RoundedCornerShape(g, g, if (e.ultimoDelGrupo) p else g, g) else RoundedCornerShape(g, g, g, if (e.ultimoDelGrupo) p else g)
+    var menu by remember { mutableStateOf(false) }
+    val haptica = rememberHaptica()
     Row(modifier.fillMaxWidth(), horizontalArrangement = if (m.esMio) Arrangement.End else Arrangement.Start) {
-        Surface(color = fondo, contentColor = tinta, shape = forma, modifier = Modifier.widthIn(max = 300.dp)) {
+        Box {
+        Surface(color = fondo, contentColor = tinta, shape = forma, modifier = Modifier.widthIn(max = 300.dp).clip(forma).combinedClickable(onClick = {}, onLongClick = { haptica(Toque.Fuerte); menu = true }).testTag("burbuja_${m.id}")) {
             Column(Modifier.padding(horizontal = 10.dp, vertical = 7.dp)) {
                 if (e.mostrarRemitente && m.remitente.isNotEmpty()) {
                     Text(m.remitente, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = colorEstable(m.remitenteId, androidx.compose.foundation.isSystemInDarkTheme()).let { c -> androidx.compose.ui.graphics.lerp(c, tinta, 0.35f) }, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -276,6 +305,10 @@ private fun Burbuja(e: Elem.Burbuja, vm: ChatVm, alAbrirVisor: (String) -> Unit,
                     Text(horaDe(m.ts), style = MaterialTheme.typography.labelSmall, color = tinta.copy(alpha = 0.65f))
                 }
             }
+        }
+        DropdownMenu(menu, { menu = false }) {
+            DropdownMenuItem(text = { Text("Olvidar este mensaje") }, onClick = { menu = false; alOlvidar(m) }, modifier = Modifier.testTag("olvidar_mensaje"))
+        }
         }
     }
 }
@@ -289,12 +322,57 @@ private fun etiquetaBorrado(tipo: String) = when (tipo) {
     else -> "[archivo borrado]"
 }
 
+/** Un mensaje eliminado por su autor: se muestra el original con una etiqueta discreta; si no queda nada, se dice así. */
 @OptIn(UnstableApi::class)
 @Composable
 private fun ContenidoMensaje(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit) {
+    if (!m.borrado) { ContenidoBase(m, vm, alAbrirVisor, alAbrirDocumento); return }
+    val cursiva = FontStyle.Italic
+    val sinArchivo = m.categoria.isNotEmpty() && !m.descargado
+    val vacio = m.texto.isBlank() && (m.categoria.isEmpty() && m.tipo != "ver_una_vez" || m.estado == "borrado")
+    when {
+        vacio -> {
+            Text("Eliminado · contenido no disponible", Modifier.testTag("eliminado_no_disponible"), fontStyle = cursiva, color = LocalContentColorSuave())
+            if (m.eliminadoEn > 0 || m.eliminadoPor.isNotEmpty()) EtiquetaEliminado(m, conPalabra = false)
+        }
+        sinArchivo -> {
+            TarjetaSinDescargar(m)
+            if (m.texto.isNotBlank()) Text(m.texto)
+            EtiquetaEliminado(m)
+        }
+        else -> { ContenidoBase(m, vm, alAbrirVisor, alAbrirDocumento); EtiquetaEliminado(m) }
+    }
+}
+
+@Composable
+private fun EtiquetaEliminado(m: Msg, conPalabra: Boolean = true) {
+    val partes = buildList {
+        if (conPalabra) add("Eliminado")
+        if (m.eliminadoEn > 0) add(horaDe(m.eliminadoEn))
+        if (m.eliminadoPor.isNotEmpty()) add("por ${m.eliminadoPor}")
+    }
+    Text(partes.joinToString(" · "), Modifier.testTag("etiqueta_eliminado"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error.copy(alpha = 0.85f))
+}
+
+@Composable
+private fun TarjetaSinDescargar(m: Msg) {
+    Row(Modifier.widthIn(min = 220.dp).testTag("eliminado_sin_descargar"), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f)), Alignment.Center) {
+            Icon(iconoDeTipo(m.tipo) ?: Ico.Documento, null, Modifier.size(24.dp))
+        }
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(descripcionCorta(m.tipo, "", false, m.notaVoz) + if (m.bytes > 0) " · " + formatoBytes(m.bytes) else "", fontWeight = FontWeight.Medium)
+            Text("Eliminado antes de descargarse", style = MaterialTheme.typography.bodySmall, color = LocalContentColorSuave())
+        }
+    }
+}
+
+@OptIn(UnstableApi::class)
+@Composable
+private fun ContenidoBase(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit) {
     val cursiva = FontStyle.Italic
     when {
-        m.borrado -> Text("Mensaje borrado", fontStyle = cursiva, color = LocalContentColorSuave())
         m.tipo == "ver_una_vez" -> Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Ico.Candado, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp))
             Column { Text("Ver una vez", fontWeight = FontWeight.SemiBold); Text("Ábrelo en tu teléfono", style = MaterialTheme.typography.bodySmall, color = LocalContentColorSuave()) }

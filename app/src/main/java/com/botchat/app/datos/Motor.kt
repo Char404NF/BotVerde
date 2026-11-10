@@ -26,6 +26,9 @@ interface Motor {
     fun calendarioChat(bot: Long, chat: String, mes: String): String
     fun mensajesDia(bot: Long, chat: String, dia: String): String
     fun estadisticasGlobales(bot: Long, dias: Long): String
+    fun listarFiltrados(bot: Long, chat: String, filtro: String, antesTs: Long, antesId: String, limite: Long): String
+    fun personasChat(bot: Long, chat: String): String
+    fun olvidarMensaje(bot: Long, chat: String, id: String)
 }
 
 /** El módulo Go de verdad (whatsmeow + almacén cifrado). */
@@ -51,4 +54,7 @@ object MotorGo : Motor {
     override fun calendarioChat(bot: Long, chat: String, mes: String) = Wabot.calendarioChat(bot, chat, mes)
     override fun mensajesDia(bot: Long, chat: String, dia: String) = Wabot.mensajesDia(bot, chat, dia)
     override fun estadisticasGlobales(bot: Long, dias: Long) = Wabot.estadisticasGlobales(bot, dias)
+    override fun listarFiltrados(bot: Long, chat: String, filtro: String, antesTs: Long, antesId: String, limite: Long) = Wabot.listarFiltrados(bot, chat, filtro, antesTs, antesId, limite)
+    override fun personasChat(bot: Long, chat: String) = Wabot.personasChat(bot, chat)
+    override fun olvidarMensaje(bot: Long, chat: String, id: String) = Wabot.olvidarMensaje(bot, chat, id)
 }

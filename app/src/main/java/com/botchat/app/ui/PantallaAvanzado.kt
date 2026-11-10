@@ -72,6 +72,7 @@ fun PantallaAvanzado(
     alAbrirEspacio: () -> Unit,
     alMedirRendimiento: () -> Unit,
     alEliminarBot: () -> Unit,
+    alFunciones: () -> Unit = {},
 ) {
     val ctx = LocalContext.current
     val barra = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -99,6 +100,9 @@ fun PantallaAvanzado(
                 }
                 Interruptor("Color del sistema", if (Build.VERSION.SDK_INT >= 31) "Usa los colores de tu fondo de pantalla en vez de los de Bot Chat" else "Disponible desde Android 12", dinamico, Build.VERSION.SDK_INT >= 31, Ico.Espacio) { haptica(Toque.Suave); ajustes.fijarColorDinamico(it) }
                 Interruptor("Reducir animaciones", "Todo cambia al instante, sin movimiento", reducir, true, Ico.Actualizar) { haptica(Toque.Suave); ajustes.fijarReducirAnimaciones(it) }
+            }
+            Seccion("Funciones") {
+                Fila("Funciones", "Apagar motor, escritura, avisos y más sin reinstalar", Ico.Ajustes) { Button(alFunciones, Modifier.testTag("abrir_funciones")) { Text("Abrir") } }
             }
             Seccion("Mantenimiento") {
                 Fila("Espacio", "Qué ocupa cada chat y cómo liberarlo", Ico.Espacio) { Button(alAbrirEspacio) { Text("Abrir") } }
