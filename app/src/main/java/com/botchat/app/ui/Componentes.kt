@@ -263,3 +263,9 @@ val Msg.esVisual: Boolean get() = categoria == "foto" || categoria == "video"
 fun LogoBot(modifier: Modifier = Modifier) {
     Image(androidx.compose.ui.res.painterResource(com.botchat.app.R.drawable.ic_logo), null, modifier)
 }
+
+/** Muestra un aviso breve desde cualquier hilo (siempre se pide al hilo principal). */
+fun avisaToast(ctx: android.content.Context, texto: String?, largo: Boolean = false) {
+    val t = texto ?: return
+    android.os.Handler(android.os.Looper.getMainLooper()).post { android.widget.Toast.makeText(ctx, t, if (largo) android.widget.Toast.LENGTH_LONG else android.widget.Toast.LENGTH_SHORT).show() }
+}

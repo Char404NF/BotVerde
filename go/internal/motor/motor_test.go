@@ -194,7 +194,7 @@ func TestDiezChatsCincuentaMensajesSimultaneos(t *testing.T) {
 }
 
 func TestRafagaEnPrivadoSeContestaUnaSolaVez(t *testing.T) {
-	e := nuevoEntorno(t, func(c *Config) { c.Repetido = time.Nanosecond })
+	e := nuevoEntorno(t, func(c *Config) { c.Repetido = time.Nanosecond; c.Debounce = 150 * time.Millisecond; c.DebounceMax = 2 * time.Second })
 	for i := 0; i < 5; i++ {
 		e.m.Entrar(priv("5215511111111@s.whatsapp.net", fmt.Sprintf("r%d", i), fmt.Sprintf("hola %d", i)))
 	}

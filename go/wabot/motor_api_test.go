@@ -8,6 +8,7 @@ import (
 
 	"botchat/internal/motor"
 
+	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
@@ -204,5 +205,56 @@ func TestReactivarElChatCierraLasConversacionesConUnaPersona(t *testing.T) {
 	}
 	if a.BotPausado(1, chat, now) {
 		t.Fatal("y el chat deja de estar en pausa")
+	}
+}
+
+func TestElBotNoReaccionaALasEliminacionesNiALasReacciones(t *testing.T) {
+	reinicia(t)
+	decisorPrueba = nil
+	ConfigurarMotor(true, 10)
+	f := &falso{}
+	raiz := t.TempDir()
+	if err := AbrirAlmacen(raiz, clavePrueba(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := Start(raiz, 1, clavePrueba(), f); err != nil {
+		t.Fatal(err)
+	}
+	defer Stop()
+	mu.Lock()
+	s := st
+	mu.Unlock()
+	ana, _ := types.ParseJID("34600000002@s.whatsapp.net")
+	base := types.MessageInfo{MessageSource: types.MessageSource{Chat: ana, Sender: ana}, Timestamp: time.Now(), PushName: "Ana"}
+	enviar := func(id string, m *waE2E.Message) {
+		e := &events.Message{Info: base, RawMessage: m}
+		e.Info.ID = id
+		e.UnwrapRaw()
+		s.evento(e)
+	}
+	enviar("T1", &waE2E.Message{Conversation: proto.String("hola")}) // este sí llega al motor
+	for i := 0; i < 200; i++ {
+		if a, _ := ActividadMotor(1, 50); contiene(a, `"evento":"llego"`) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	antes, _ := ActividadMotor(1, 500)
+	llegadas := func(a string) int {
+		n := 0
+		for i := 0; i+len(`"evento":"llego"`) <= len(a); i++ {
+			if a[i:i+len(`"evento":"llego"`)] == `"evento":"llego"` {
+				n++
+			}
+		}
+		return n
+	}
+	enviar("R1", &waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{Type: waE2E.ProtocolMessage_REVOKE.Enum(), Key: &waCommon.MessageKey{ID: proto.String("T1")}}})
+	enviar("X1", &waE2E.Message{ReactionMessage: &waE2E.ReactionMessage{Key: &waCommon.MessageKey{ID: proto.String("T1")}, Text: proto.String("👍")}})
+	enviar("E1", &waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{Type: waE2E.ProtocolMessage_MESSAGE_EDIT.Enum(), Key: &waCommon.MessageKey{ID: proto.String("T1")}, EditedMessage: &waE2E.Message{Conversation: proto.String("otra cosa")}}})
+	time.Sleep(500 * time.Millisecond)
+	despues, _ := ActividadMotor(1, 500)
+	if llegadas(antes) != 1 || llegadas(despues) != 1 {
+		t.Fatalf("eliminaciones, reacciones y ediciones no deben llegar al motor: antes=%d después=%d\n%s", llegadas(antes), llegadas(despues), despues)
 	}
 }

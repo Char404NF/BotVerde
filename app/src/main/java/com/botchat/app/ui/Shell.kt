@@ -53,6 +53,13 @@ private fun nombreDeChat(botId: Long, jid: String): String {
 }
 
 @Composable
+private fun nombreDeAuto(botId: Long, id: Long): String {
+    var nombre by remember(id) { mutableStateOf("") }
+    LaunchedEffect(id) { nombre = runCatching { Repo.automatizacion(botId, id).def.nombre }.getOrDefault("") }
+    return nombre
+}
+
+@Composable
 private fun esGrupoDeChat(botId: Long, jid: String): Boolean {
     var grupo by remember(jid) { mutableStateOf(false) }
     LaunchedEffect(jid) { grupo = runCatching { Repo.chat(botId, jid)?.esGrupo }.getOrNull() ?: false }
@@ -202,9 +209,32 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 }
                 composable("espacio") { PantallaEspacio(alVolver = { irA("inicio") }, alAbrirChat = { nav.navigate("chat/${enc(it)}") }, conBarra = false) }
                 composable("ajustes") {
-                    PantallaAjustes(ajustes, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("bot") }, alAvanzado = { nav.navigate("avanzado") }, alEstadisticas = { nav.navigate("estadisticas") }, alPrivacidad = { nav.navigate("privacidad") })
+                    PantallaAjustes(ajustes, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("bot") }, alAvanzado = { nav.navigate("avanzado") }, alEstadisticas = { nav.navigate("estadisticas") }, alPrivacidad = { nav.navigate("privacidad") }, alAutomatizaciones = { nav.navigate("automatizaciones") })
                 }
                 composable("privacidad") { PantallaPrivacidad(ajustes, alVolver = { nav.popBackStack() }) }
+                composable("automatizaciones") {
+                    PantallaAutomatizaciones(
+                        bot.id, alVolver = { nav.popBackStack() }, alEditar = { nav.navigate("automatizacion/$it") }, alEnCurso = { nav.navigate("en_curso") },
+                        alActividad = { nav.navigate("actividad") }, alEstadisticas = { nav.navigate("estadisticas_menu/$it") }, alProbar = { nav.navigate("simulador/$it") },
+                    )
+                }
+                composable("automatizacion/{id}") { be ->
+                    val id = be.arguments?.getString("id")?.toLongOrNull() ?: return@composable
+                    EditorAutomatizacion(bot.id, id, alVolver = { nav.popBackStack() }, alProbar = { nav.navigate("simulador/$it") })
+                }
+                composable("en_curso") { PantallaEnCurso(bot.id, alVolver = { nav.popBackStack() }, alAbrir = { nav.navigate("recorrido/$it") }) }
+                composable("recorrido/{id}") { be ->
+                    val id = be.arguments?.getString("id")?.toLongOrNull() ?: return@composable
+                    PantallaRecorrido(bot.id, id, alVolver = { nav.popBackStack() })
+                }
+                composable("estadisticas_menu/{id}") { be ->
+                    val id = be.arguments?.getString("id")?.toLongOrNull() ?: return@composable
+                    PantallaEstadisticasMenu(bot.id, id, nombreDeAuto(bot.id, id), alVolver = { nav.popBackStack() })
+                }
+                composable("simulador/{id}") { be ->
+                    val id = be.arguments?.getString("id")?.toLongOrNull() ?: return@composable
+                    PantallaSimulador(bot.id, id, nombreDeAuto(bot.id, id), alVolver = { nav.popBackStack() })
+                }
                 composable("actividad") { PantallaActividad(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("funciones") { PantallaFunciones(ajustes, alVolver = { nav.popBackStack() }) }
                 composable("seguridad") { PantallaSeguridad(ajustes, alVolver = { nav.popBackStack() }) }

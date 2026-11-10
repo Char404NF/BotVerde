@@ -121,6 +121,24 @@ object Repo {
     suspend fun botEnChat(bot: Long, chat: String, activo: Boolean) = io { motor.botEnChat(bot, chat, activo) }
     suspend fun pausarBotEnChat(bot: Long, chat: String, minutos: Int) = io { motor.pausarBotEnChat(bot, chat, minutos.toLong()) }
 
+    suspend fun automatizaciones(bot: Long) = io { JsonAuto.resumenes(motor.listarAutomatizaciones(bot)) }
+    suspend fun automatizacion(bot: Long, id: Long) = io { JsonAuto.detalle(motor.obtenerAutomatizacion(bot, id)) }
+    suspend fun validar(def: AutoDef) = io { JsonAuto.validacion(motor.validarAutomatizacion(def.json())) }
+    suspend fun guardarAutomatizacion(bot: Long, id: Long, def: AutoDef) = io { JsonAuto.guardado(motor.guardarAutomatizacion(bot, id, def.json())) }
+    suspend fun activarAutomatizacion(bot: Long, id: Long, si: Boolean) = io { motor.activarAutomatizacion(bot, id, si) }
+    suspend fun duplicarAutomatizacion(bot: Long, id: Long) = io { motor.duplicarAutomatizacion(bot, id) }
+    suspend fun borrarAutomatizacion(bot: Long, id: Long) = io { motor.borrarAutomatizacion(bot, id) }
+    suspend fun plantillasAutomatizacion() = io { JsonAuto.plantillas(motor.plantillasAutomatizacion()) }
+    suspend fun exportarAutomatizacion(bot: Long, id: Long) = io { motor.exportarAutomatizacion(bot, id) }
+    suspend fun importarAutomatizacion(bot: Long, json: String) = io { JsonAuto.guardado(motor.importarAutomatizacion(bot, json)) }
+    suspend fun simular(bot: Long, id: Long, texto: String, reiniciar: Boolean) = io { JsonAuto.prueba(motor.simularAutomatizacion(bot, id, texto, reiniciar)) }
+    suspend fun sesionesEnCurso(bot: Long) = io { JsonAuto.sesiones(motor.sesionesEnCurso(bot)) }
+    suspend fun recorrido(bot: Long, id: Long) = io { JsonAuto.recorrido(motor.recorridoSesion(bot, id)) }
+    suspend fun accionSesion(bot: Long, id: Long, accion: String) = io { motor.accionSesion(bot, id, accion) }
+    suspend fun estadisticasMenu(bot: Long, id: Long, desde: String, hasta: String, prueba: Boolean) = io { JsonAuto.estadisticas(motor.estadisticasAutomatizacion(bot, id, desde, hasta, prueba)) }
+    suspend fun etiquetaChat(bot: Long, chat: String) = io { JsonAuto.etiquetas(motor.etiquetaDeChat(bot, chat)) }
+    suspend fun aviso(bot: Long, id: Long) = io { JsonAuto.aviso(motor.obtenerAviso(bot, id)) }
+
     suspend fun estadisticasChat(bot: Long, chat: String) = io { Json.resumenChat(motor.estadisticasChat(bot, chat)) }
     suspend fun calendario(bot: Long, chat: String, mes: String) = io { Json.calendario(motor.calendarioChat(bot, chat, mes)) }
     suspend fun mensajesDia(bot: Long, chat: String, dia: String) = io { Json.mensajes(motor.mensajesDia(bot, chat, dia)) }

@@ -549,6 +549,9 @@ func (m *Motor) Probar(menuID int64, texto string, reiniciar bool, nombre string
 			_ = alm.CerrarSesion(bot, s, almacen.SesAbandonada, 0, m.c.Ahora())
 		}
 	}
+	if reiniciar && strings.TrimSpace(texto) == "" {
+		return Prueba{Estado: almacen.SesActiva}, nil // solo borra la conversación de prueba; no empieza otra
+	}
 	e := entrada{Chat: chatPrueba, Sender: sender, Texto: texto, TS: m.c.Ahora(), PrimerTS: m.c.Ahora()}
 	// Si no hay una conversación de prueba abierta, se ve si el mensaje activaría la automatización de verdad.
 	pr := Prueba{}

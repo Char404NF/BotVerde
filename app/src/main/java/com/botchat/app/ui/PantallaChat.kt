@@ -361,6 +361,19 @@ fun PantallaChat(
                     }
                 }
             }
+            val etiquetas = vm.etiquetasMenu
+            if (etiquetas.isNotEmpty() && pausaHasta <= ahoraS) {
+                Surface(Modifier.align(Alignment.TopCenter).fillMaxWidth().zIndex(1f).testTag("etiqueta_menu"), color = MaterialTheme.colorScheme.secondaryContainer) {
+                    Column(Modifier.padding(horizontal = Esp.l, vertical = 4.dp)) {
+                        etiquetas.take(3).forEach { e ->
+                            Text(
+                                (if (e.estado == "activo") "En menú: " else "Con una persona: ") + e.ruta.replace(" › ", " › ") + " · " + haceCuanto(e.ultima) + if (chat?.esGrupo == true && e.nombre.isNotBlank()) " (${e.nombre})" else "",
+                                style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
             when {
                 msgs == null -> CargaDeMensajes()
                 msgs.isEmpty() -> EstadoVacio(Ico.Documento, "Sin mensajes", "Todavía no hay mensajes en este chat.", Modifier.align(Alignment.Center))

@@ -49,11 +49,12 @@ object Notificador {
     private fun permitido(ctx: Context) = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
     /** Empieza a vigilar los cambios; hay que cancelar el Job al detener el servicio. */
-    fun iniciar(ctx: Context, scope: CoroutineScope): Job = scope.launch {
+    fun iniciar(ctx: Context, scope: CoroutineScope): Job = scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
         Repo.cambios.collect { evs ->
             for (e in evs) {
                 if (e.startsWith("chat:")) runCatching { revisar(ctx, e.removePrefix("chat:")) }
                 if (e == "motor:freno") runCatching { avisoFreno(ctx) }
+                if (e.startsWith("aviso:")) e.removePrefix("aviso:").toLongOrNull()?.let { runCatching { avisoLocal(ctx, it) } }
             }
         }
     }
@@ -103,6 +104,33 @@ object Notificador {
     }
 
     private const val ID_FRENO = 7001
+    private const val CANAL_AVISOS = "avisos"
+
+    /**
+     * Aviso local de una automatización ("Alguien pidió hablar con una persona", "Nueva solicitud"). En la pantalla bloqueada solo sale el título
+     * neutro (visibilidad privada con versión pública); el detalle (nombre, número, datos) se ve con el teléfono desbloqueado. Un interruptor de
+     * Avanzado permite verlo también bloqueado (apagado por defecto).
+     */
+    private suspend fun avisoLocal(ctx: Context, id: Long) {
+        if (!permitido(ctx)) return
+        val bot = Datos.get(ctx).primero() ?: return
+        val a = Repo.aviso(bot.id, id)
+        val nm = ctx.getSystemService(NotificationManager::class.java) ?: return
+        nm.createNotificationChannel(NotificationChannel(CANAL_AVISOS, "Avisos del bot", NotificationManager.IMPORTANCE_HIGH))
+        val detalleVisibleBloqueado = Ajustes.get(ctx).detalleBloqueado.value
+        val abrir = PendingIntent.getActivity(
+            ctx, a.chat.hashCode(), Intent(ctx, MainActivity::class.java).apply { if (a.chat.isNotEmpty() && a.tipo == "humano") putExtra(EXTRA_CHAT, a.chat) }.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val publica = NotificationCompat.Builder(ctx, CANAL_AVISOS).setSmallIcon(R.drawable.ic_stat_bot).setContentTitle(a.titulo).build()
+        val n = NotificationCompat.Builder(ctx, CANAL_AVISOS)
+            .setSmallIcon(R.drawable.ic_stat_bot).setContentTitle(a.titulo).setContentText(a.detalle.lineSequence().firstOrNull().orEmpty())
+            .setStyle(NotificationCompat.BigTextStyle().bigText(a.detalle)).setContentIntent(abrir).setAutoCancel(true)
+            .setVisibility(if (detalleVisibleBloqueado) NotificationCompat.VISIBILITY_PUBLIC else NotificationCompat.VISIBILITY_PRIVATE)
+            .apply { if (!detalleVisibleBloqueado) setPublicVersion(publica) }
+            .build()
+        nm.notify(8000 + (id % 1000).toInt(), n)
+    }
 
     /** El motor se pausó unos minutos porque fallaron varios envíos seguidos. */
     private fun avisoFreno(ctx: Context) {

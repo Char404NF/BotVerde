@@ -58,6 +58,8 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
         private set
     var plazoEdicionSeg by mutableStateOf(1200L)
         private set
+    var etiquetasMenu by mutableStateOf<List<com.botchat.app.datos.EtiquetaMenu>>(emptyList())
+        private set
 
     // ---- adjuntos y notas de voz ----
     var adjuntos by mutableStateOf<List<AdjuntoListo>>(emptyList())
@@ -97,11 +99,17 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
                     trabajo = launch { delay(80); recargar() }
                 }
                 if (evs.any { it == "presencia:$jid" }) actualizarPresencia()
+                if (evs.any { it == "sesiones" || it == "chat:$jid" }) actualizarEtiqueta()
             }
         }
     }
 
+    private fun actualizarEtiqueta() {
+        viewModelScope.launch { etiquetasMenu = runCatching { Repo.etiquetaChat(botId, jid) }.getOrDefault(emptyList()) }
+    }
+
     private fun cargarExtras() {
+        actualizarEtiqueta()
         viewModelScope.launch {
             borradorInicial = runCatching { Repo.borrador(botId, jid) }.getOrDefault("")
             estadoChat = runCatching { Repo.estadoChat(botId, jid) }.getOrDefault(EstadoChat())

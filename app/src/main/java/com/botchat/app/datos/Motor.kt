@@ -58,6 +58,25 @@ interface Motor {
     fun actividadMotor(bot: Long, limite: Long): String
     fun botEnChat(bot: Long, chat: String, activo: Boolean)
     fun pausarBotEnChat(bot: Long, chat: String, minutos: Long)
+    fun listarAutomatizaciones(bot: Long): String
+    fun obtenerAutomatizacion(bot: Long, id: Long): String
+    fun validarAutomatizacion(def: String): String
+    fun guardarAutomatizacion(bot: Long, id: Long, def: String): String
+    fun activarAutomatizacion(bot: Long, id: Long, si: Boolean)
+    fun duplicarAutomatizacion(bot: Long, id: Long): Long
+    fun borrarAutomatizacion(bot: Long, id: Long)
+    fun reordenarAutomatizaciones(bot: Long, idsJson: String)
+    fun plantillasAutomatizacion(): String
+    fun exportarAutomatizacion(bot: Long, id: Long): String
+    fun importarAutomatizacion(bot: Long, def: String): String
+    fun simularAutomatizacion(bot: Long, id: Long, texto: String, reiniciar: Boolean): String
+    fun sesionesEnCurso(bot: Long): String
+    fun recorridoSesion(bot: Long, id: Long): String
+    fun accionSesion(bot: Long, id: Long, accion: String)
+    fun estadisticasAutomatizacion(bot: Long, id: Long, desde: String, hasta: String, prueba: Boolean): String
+    fun etiquetaDeChat(bot: Long, chat: String): String
+    fun obtenerAviso(bot: Long, id: Long): String
+    fun configurarFlujo(expiraMin: Long)
 }
 
 /** El módulo Go de verdad (whatsmeow + almacén cifrado). */
@@ -116,4 +135,23 @@ object MotorGo : Motor {
     override fun actividadMotor(bot: Long, limite: Long) = Wabot.actividadMotor(bot, limite)
     override fun botEnChat(bot: Long, chat: String, activo: Boolean) = Wabot.botEnChat(bot, chat, activo)
     override fun pausarBotEnChat(bot: Long, chat: String, minutos: Long) = Wabot.pausarBotEnChat(bot, chat, minutos)
+    override fun listarAutomatizaciones(bot: Long) = Wabot.listarAutomatizaciones(bot)
+    override fun obtenerAutomatizacion(bot: Long, id: Long) = Wabot.obtenerAutomatizacion(bot, id)
+    override fun validarAutomatizacion(def: String) = Wabot.validarAutomatizacion(def)
+    override fun guardarAutomatizacion(bot: Long, id: Long, def: String) = Wabot.guardarAutomatizacion(bot, id, def)
+    override fun activarAutomatizacion(bot: Long, id: Long, si: Boolean) = Wabot.activarAutomatizacion(bot, id, si)
+    override fun duplicarAutomatizacion(bot: Long, id: Long) = Wabot.duplicarAutomatizacion(bot, id)
+    override fun borrarAutomatizacion(bot: Long, id: Long) = Wabot.borrarAutomatizacion(bot, id)
+    override fun reordenarAutomatizaciones(bot: Long, idsJson: String) = Wabot.reordenarAutomatizaciones(bot, idsJson)
+    override fun plantillasAutomatizacion() = Wabot.plantillasAutomatizacion()
+    override fun exportarAutomatizacion(bot: Long, id: Long) = Wabot.exportarAutomatizacion(bot, id)
+    override fun importarAutomatizacion(bot: Long, def: String) = Wabot.importarAutomatizacion(bot, def)
+    override fun simularAutomatizacion(bot: Long, id: Long, texto: String, reiniciar: Boolean) = Wabot.simularAutomatizacion(bot, id, texto, reiniciar)
+    override fun sesionesEnCurso(bot: Long) = Wabot.sesionesEnCurso(bot)
+    override fun recorridoSesion(bot: Long, id: Long) = Wabot.recorridoSesion(bot, id)
+    override fun accionSesion(bot: Long, id: Long, accion: String) = Wabot.accionSesion(bot, id, accion)
+    override fun estadisticasAutomatizacion(bot: Long, id: Long, desde: String, hasta: String, prueba: Boolean) = Wabot.estadisticasAutomatizacion(bot, id, desde, hasta, prueba)
+    override fun etiquetaDeChat(bot: Long, chat: String) = Wabot.etiquetaDeChat(bot, chat)
+    override fun obtenerAviso(bot: Long, id: Long) = Wabot.obtenerAviso(bot, id)
+    override fun configurarFlujo(expiraMin: Long) = Wabot.configurarFlujo(expiraMin)
 }

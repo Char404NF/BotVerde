@@ -48,6 +48,8 @@ fun PantallaFunciones(ajustes: Ajustes, alVolver: () -> Unit) {
     val pausa by ajustes.pausaBotMin.collectAsState()
     val verDias by ajustes.verUnaVezDias.collectAsState()
     val antiguedad by ajustes.antiguedadMin.collectAsState()
+    val expira by ajustes.expiraFlujoMin.collectAsState()
+    val detalle by ajustes.detalleBloqueado.collectAsState()
     Scaffold(
         modifier = Modifier.nestedScroll(barra.nestedScrollConnection),
         topBar = { LargeTopAppBar(scrollBehavior = barra, navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text("Funciones") }) },
@@ -56,6 +58,8 @@ fun PantallaFunciones(ajustes: Ajustes, alVolver: () -> Unit) {
             Seccion("Se pueden apagar sin reinstalar") {
                 Interruptor("Motor de automatización", "Las respuestas automáticas del bot (el bot solo responde, nunca escribe primero)", motor, true, Ico.Chats) { haptica(Toque.Suave); ajustes.fijarMotorAutomatico(it) }
                 Deslizador("No responder mensajes de hace más de", "$antiguedad min", antiguedad.toFloat(), 1f..60f, 58, "El bot no contesta lo que llegó hace más que esto, ni lo que WhatsApp entrega de golpe al reconectar.") { ajustes.fijarAntiguedadMin(it.toInt().coerceIn(1, 60)) }
+                Deslizador("Un menú caduca tras", if (expira >= 60) "${expira / 60} h ${expira % 60} min" else "$expira min", expira.toFloat(), 30f..360f, 10, "Si la persona deja de contestar, al volver a escribir se le muestra el menú otra vez.") { ajustes.fijarExpiraFlujoMin((it / 30f).toInt().coerceAtLeast(1) * 30) }
+                Interruptor("Detalle de avisos con el teléfono bloqueado", "Cuando alguien pide hablar con una persona, el aviso en pantalla bloqueada solo dice “Alguien pidió hablar con una persona”. Actívalo para ver también el nombre y número.", detalle, true, Ico.Candado) { haptica(Toque.Suave); ajustes.fijarDetalleBloqueado(it) }
                 Interruptor("Escribir desde la app", "Poder mandar mensajes a mano desde los chats", escribir, true, Ico.Compartir) { haptica(Toque.Suave); ajustes.fijarEscribirDesdeApp(it) }
                 Interruptor("Notificaciones de mensajes", "Avisar cuando llega un mensaje nuevo. En la pantalla bloqueada solo dice “Mensaje nuevo”. Puedes silenciar chats concretos desde el chat.", notifs, true, Ico.Aviso) {
                     haptica(Toque.Suave)

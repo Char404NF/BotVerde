@@ -38,11 +38,12 @@ import com.botchat.app.datos.Ajustes
 
 /** Pestaña Ajustes: Seguridad, Descargas, Estado del bot y Avanzado. */
 @Composable
-fun PantallaAjustes(ajustes: Ajustes, alSeguridad: () -> Unit, alDescargas: () -> Unit, alBot: () -> Unit, alAvanzado: () -> Unit, alEstadisticas: () -> Unit = {}, alPrivacidad: () -> Unit = {}) {
+fun PantallaAjustes(ajustes: Ajustes, alSeguridad: () -> Unit, alDescargas: () -> Unit, alBot: () -> Unit, alAvanzado: () -> Unit, alEstadisticas: () -> Unit = {}, alPrivacidad: () -> Unit = {}, alAutomatizaciones: () -> Unit = {}) {
     val modo by ajustes.bloqueo.collectAsState()
     val ctx = LocalContext.current
     val version = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "" }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
+        Tarjeta(Ico.Chats, "Automatizaciones", "Menús y respuestas del bot", alAutomatizaciones, "ajuste_automatizaciones")
         Tarjeta(Ico.Candado, "Seguridad", when (modo) { Ajustes.Bloqueo.NINGUNO -> "Sin bloqueo"; Ajustes.Bloqueo.PIN -> "Protegida con PIN"; Ajustes.Bloqueo.HUELLA -> "Protegida con huella" }, alSeguridad, "ajuste_seguridad")
         Tarjeta(Ico.Candado, "Privacidad", "Mensajes eliminados por otros", alPrivacidad, "ajuste_privacidad")
         Tarjeta(Ico.Estadisticas, "Estadísticas", "Mensajes enviados y recibidos, y los chats más activos", alEstadisticas, "ajuste_estadisticas")

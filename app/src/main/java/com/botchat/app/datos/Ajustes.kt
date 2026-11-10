@@ -104,6 +104,16 @@ class Ajustes private constructor(ctx: Context) {
     val antiguedadMin: StateFlow<Int> = _antiguedad
     fun fijarAntiguedadMin(v: Int) { p.edit().putInt("antiguedad_min", v).apply(); _antiguedad.value = v; aplicarAGo() }
 
+    private val _expiraFlujo = MutableStateFlow(p.getInt("expira_flujo_min", 120))
+    /** Minutos sin actividad para que una conversación dentro de un menú caduque. */
+    val expiraFlujoMin: StateFlow<Int> = _expiraFlujo
+    fun fijarExpiraFlujoMin(v: Int) { p.edit().putInt("expira_flujo_min", v).apply(); _expiraFlujo.value = v; aplicarAGo() }
+
+    private val _detalleBloqueado = MutableStateFlow(p.getBoolean("detalle_bloqueado", false))
+    /** Mostrar el detalle completo de los avisos de "hablar con una persona" también con el teléfono bloqueado (apagado por defecto). */
+    val detalleBloqueado: StateFlow<Boolean> = _detalleBloqueado
+    fun fijarDetalleBloqueado(v: Boolean) { p.edit().putBoolean("detalle_bloqueado", v).apply(); _detalleBloqueado.value = v }
+
     private val _verDias = MutableStateFlow(p.getInt("ver_una_vez_dias", 14))
     /** Días que un "ver una vez" espera a que lo abras antes de borrarse. */
     val verUnaVezDias: StateFlow<Int> = _verDias
@@ -168,6 +178,7 @@ class Ajustes private constructor(ctx: Context) {
         runCatching { Wabot.configurarEnvio(_pausaBot.value.toLong()) }
         runCatching { Wabot.configurarVerUnaVez(_verDias.value.toLong()) }
         runCatching { Wabot.configurarMotor(_motorAuto.value, _antiguedad.value.toLong()) }
+        runCatching { Wabot.configurarFlujo(_expiraFlujo.value.toLong()) }
     }
 
     companion object {
