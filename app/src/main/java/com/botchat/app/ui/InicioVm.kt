@@ -24,6 +24,11 @@ class InicioVm(app: Application) : AndroidViewModel(app) {
     val personales: StateFlow<List<ChatItem>?> = _personales
     val grupos: StateFlow<List<ChatItem>?> = _grupos
 
+    /** Mensajes recibidos desde la última vez que se abrió cada chat (hasta 30). Solo se calcula para chats con algo nuevo. */
+    private val _contadores = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val contadores: StateFlow<Map<String, Int>> = _contadores
+    private val ajustes = com.botchat.app.datos.Ajustes.get(app)
+
     var consulta by mutableStateOf("")
         private set
     var buscando by mutableStateOf(false)
@@ -51,6 +56,17 @@ class InicioVm(app: Application) : AndroidViewModel(app) {
         if (consulta.isNotEmpty()) cambiarConsulta("")
     }
 
+    private suspend fun contar(chats: List<ChatItem>) {
+        val nuevo = HashMap<String, Int>()
+        for (c in chats) {
+            val visto = ajustes.visto(c.jid)
+            if (c.ultimoTs <= visto) continue
+            val n = runCatching { Repo.mensajes(botId, c.jid, limite = 30).count { it.ts > visto && !it.esMio } }.getOrDefault(0)
+            if (n > 0) nuevo[c.jid] = n
+        }
+        _contadores.value = nuevo
+    }
+
     private fun recargar() {
         trabajo?.cancel()
         trabajo = viewModelScope.launch { cargar() }
@@ -64,6 +80,7 @@ class InicioVm(app: Application) : AndroidViewModel(app) {
             _personales.value = p
             _grupos.value = g
             error = null
+            contar(p + g)
         } catch (e: Exception) {
             error = e.message
             if (_personales.value == null) { _personales.value = emptyList(); _grupos.value = emptyList() }

@@ -32,7 +32,10 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
     private var trabajo: Job? = null
     private val pagina = 60
 
+    private val ajustes = com.botchat.app.datos.Ajustes.get(app)
+
     init {
+        ajustes.marcarVisto(jid)
         recargar()
         viewModelScope.launch {
             Repo.cambios.collect { evs ->
@@ -48,9 +51,18 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
         val c = runCatching { Repo.chat(botId, jid) }.getOrNull()
         chat = c
         val m = Repo.mensajes(botId, jid, limite = cuantos)
+        if (iniciales == null) iniciales = m.mapTo(HashSet()) { it.id }
         mensajes = m
         hayMas = m.size >= cuantos
+        ajustes.marcarVisto(jid) // el chat está abierto: lo que llega ahora ya se ve
     }
+
+    private var iniciales: Set<String>? = null
+
+    /** Un mensaje es "nuevo" si llegó con el chat ya abierto (para animar su entrada). */
+    fun esNueva(id: String): Boolean = iniciales?.let { id !in it } ?: false
+
+    override fun onCleared() { ajustes.marcarVisto(jid); super.onCleared() }
 
     fun recargar() {
         viewModelScope.launch {

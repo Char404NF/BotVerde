@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -18,7 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -52,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -65,106 +67,46 @@ import com.botchat.app.Paises
 import com.botchat.app.datos.ChatItem
 import kotlinx.coroutines.launch
 
-/** Pantalla principal: lista de chats con pestañas Personales | Grupos y buscador por nombre y por número. */
+/** Pestaña Chats: buscador por nombre y número, y la lista con pestañas Personales | Grupos. La barra superior la pone el Shell. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PantallaInicio(
     sinSesion: Boolean,
     alAbrirChat: (String) -> Unit,
-    alAbrirEspacio: () -> Unit,
-    alAbrirAvanzado: () -> Unit,
-    alAbrirBot: () -> Unit,
     alRevincular: () -> Unit,
 ) {
     val vm: InicioVm = viewModel()
     val scope = rememberCoroutineScope()
     val pager = rememberPagerState { 2 }
-    val barra = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    val barraPequena = TopAppBarDefaults.pinnedScrollBehavior()
     val personales by vm.personales.collectAsState()
     val grupos by vm.grupos.collectAsState()
-    val estado by BotState.estado.collectAsState()
-    val corriendo by BotState.corriendo.collectAsState()
+    val contadores by vm.contadores.collectAsState()
     val haptica = rememberHaptica()
-    var menu by remember { mutableStateOf(false) }
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(if (vm.buscando) barraPequena.nestedScrollConnection else barra.nestedScrollConnection),
-        topBar = {
-            if (vm.buscando) {
-                val foco = remember { FocusRequester() }
-                TopAppBar(
-                    scrollBehavior = barraPequena,
-                    navigationIcon = { IconButton({ vm.cerrarBusqueda() }) { Icon(Ico.Atras, "Cerrar búsqueda") } },
-                    title = {
-                        TextField(
-                            value = vm.consulta, onValueChange = vm::cambiarConsulta, singleLine = true,
-                            placeholder = { Text("Buscar por nombre o número") },
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            colors = TextFieldDefaults.colors(focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent, unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
-                                focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent, unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent),
-                            modifier = Modifier.fillMaxWidth().focusRequester(foco),
-                        )
-                        androidx.compose.runtime.LaunchedEffect(Unit) { foco.requestFocus() }
-                    },
-                    actions = { if (vm.consulta.isNotEmpty()) IconButton({ vm.cambiarConsulta("") }) { Icon(Ico.Cerrar, "Borrar texto") } },
-                )
-            } else {
-                LargeTopAppBar(
-                    scrollBehavior = barra,
-                    title = { Text("Mensajes") },
-                    actions = {
-                        EstadoBot(estado, corriendo, sinSesion, alAbrirBot)
-                        IconButton({ haptica(Toque.Suave); vm.abrirBusqueda() }) { Icon(Ico.Buscar, "Buscar") }
-                        IconButton(alAbrirEspacio) { Icon(Ico.Espacio, "Espacio") }
-                        Box {
-                            IconButton({ menu = true }) { Icon(Ico.Mas, "Más opciones") }
-                            DropdownMenu(menu, { menu = false }) {
-                                DropdownMenuItem(text = { Text("Estado del bot") }, onClick = { menu = false; alAbrirBot() })
-                                DropdownMenuItem(text = { Text("Avanzado") }, onClick = { menu = false; alAbrirAvanzado() })
-                            }
-                        }
-                    },
-                )
-            }
-        },
-    ) { relleno ->
-        Column(Modifier.fillMaxSize().padding(relleno)) {
-            if (sinSesion) BannerSinSesion(alRevincular)
-            PrimaryTabRow(selectedTabIndex = pager.currentPage, containerColor = MaterialTheme.colorScheme.surface) {
-                listOf("Personales", "Grupos").forEachIndexed { i, titulo ->
-                    Tab(selected = pager.currentPage == i, onClick = { haptica(Toque.Suave); scope.launch { pager.animateScrollToPage(i) } }, text = { Text(titulo) })
-                }
-            }
-            HorizontalPager(pager, Modifier.fillMaxSize(), key = { it }) { pagina ->
-                val lista = if (pagina == 0) personales else grupos
-                ListaDeChats(lista, esGrupos = pagina == 1, buscando = vm.consulta.isNotBlank(), error = vm.error, alAbrirChat = alAbrirChat)
+    Column(Modifier.fillMaxSize()) {
+        TextField(
+            value = vm.consulta, onValueChange = vm::cambiarConsulta, singleLine = true,
+            placeholder = { Text("Buscar por nombre o número") },
+            leadingIcon = { Icon(Ico.Buscar, null) },
+            trailingIcon = { if (vm.consulta.isNotEmpty()) IconButton({ vm.cambiarConsulta("") }) { Icon(Ico.Cerrar, "Borrar texto") } },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            shape = RoundedCornerShape(28.dp),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh, unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, disabledIndicatorColor = Color.Transparent,
+            ),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Esp.l, vertical = Esp.s).testTag("buscador"),
+        )
+        if (sinSesion) BannerSinSesion(alRevincular)
+        PrimaryTabRow(selectedTabIndex = pager.currentPage, containerColor = MaterialTheme.colorScheme.surface) {
+            listOf("Personales", "Grupos").forEachIndexed { i, titulo ->
+                Tab(selected = pager.currentPage == i, onClick = { haptica(Toque.Suave); scope.launch { pager.animateScrollToPage(i) } }, text = { Text(titulo) })
             }
         }
-    }
-}
-
-@Composable
-private fun EstadoBot(estado: String, corriendo: Boolean, sinSesion: Boolean, alPulsar: () -> Unit) {
-    val verde = corriendo && estado == "conectado"
-    val color = when {
-        verde -> Color(0xFF2E9E5B)
-        sinSesion || estado.startsWith("error") -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.outline
-    }
-    val texto = when {
-        sinSesion -> "Sin sesión"
-        verde -> "En línea"
-        corriendo -> "Conectando"
-        else -> "Detenido"
-    }
-    Row(
-        Modifier.clip(RoundedCornerShape(50)).clickable(onClick = alPulsar).padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(9.dp).clip(CircleShape).background(color))
-        Spacer(Modifier.width(6.dp))
-        Text(texto, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        HorizontalPager(pager, Modifier.fillMaxSize(), key = { it }) { pagina ->
+            val lista = if (pagina == 0) personales else grupos
+            ListaDeChats(lista, contadores, esGrupos = pagina == 1, buscando = vm.consulta.isNotBlank(), error = vm.error, alAbrirChat = alAbrirChat)
+        }
     }
 }
 
@@ -184,7 +126,7 @@ private fun BannerSinSesion(alRevincular: () -> Unit) {
 }
 
 @Composable
-private fun ListaDeChats(lista: List<ChatItem>?, esGrupos: Boolean, buscando: Boolean, error: String?, alAbrirChat: (String) -> Unit) {
+private fun ListaDeChats(lista: List<ChatItem>?, contadores: Map<String, Int>, esGrupos: Boolean, buscando: Boolean, error: String?, alAbrirChat: (String) -> Unit) {
     when {
         lista == null -> FilasDeCarga()
         lista.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -199,8 +141,9 @@ private fun ListaDeChats(lista: List<ChatItem>?, esGrupos: Boolean, buscando: Bo
             }
         }
         else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-            items(lista, key = { it.jid }) { c ->
-                FilaChat(c, Modifier.animateItem(), alAbrirChat)
+            item { androidx.compose.runtime.LaunchedEffect(Unit) { kotlinx.coroutines.delay(700); EntradaLista.hecha = true } }
+            itemsIndexed(lista, key = { _, c -> c.jid }) { i, c ->
+                FilaChat(c, Modifier.animateItem().entradaEscalonada(i), alAbrirChat, contadores[c.jid] ?: 0)
                 HorizontalDivider(Modifier.padding(start = 84.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             }
         }
@@ -208,8 +151,8 @@ private fun ListaDeChats(lista: List<ChatItem>?, esGrupos: Boolean, buscando: Bo
 }
 
 @Composable
-fun FilaChat(c: ChatItem, modifier: Modifier, alAbrir: (String) -> Unit) {
-    Row(modifier.fillMaxWidth().clickable { alAbrir(c.jid) }.padding(horizontal = Esp.l, vertical = Esp.m), verticalAlignment = Alignment.CenterVertically) {
+fun FilaChat(c: ChatItem, modifier: Modifier, alAbrir: (String) -> Unit, contador: Int = 0) {
+    Row(modifier.fillMaxWidth().clickableEscala { alAbrir(c.jid) }.padding(horizontal = Esp.l, vertical = Esp.m), verticalAlignment = Alignment.CenterVertically) {
         Avatar(c.nombre, c.foto, c.fotoTs, c.jid, 52.dp, Modifier.compartido("avatar-${c.jid}"))
         Spacer(Modifier.width(Esp.l))
         Column(Modifier.weight(1f)) {
@@ -234,7 +177,15 @@ fun FilaChat(c: ChatItem, modifier: Modifier, alAbrir: (String) -> Unit) {
             }
         }
         Spacer(Modifier.width(Esp.m))
-        Text(horaLista(c.ultimoTs), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
+        Column(horizontalAlignment = Alignment.End) {
+            Text(horaLista(c.ultimoTs), style = MaterialTheme.typography.labelMedium, color = if (contador > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
+            if (contador > 0) {
+                Spacer(Modifier.size(4.dp))
+                Box(Modifier.defaultMinSize(minWidth = 22.dp, minHeight = 22.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary).padding(horizontal = 6.dp).testTag("contador_${c.jid}"), Alignment.Center) {
+                    Text(if (contador >= 30) "30+" else contador.toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
     }
 }
 
