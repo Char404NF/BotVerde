@@ -76,3 +76,34 @@ Sin probar contra WhatsApp real (lo prueba Charly con su número secundario) ni 
 - Servicio `specialUse` (dataSync se corta a las 6 h en Android 15). Sin Firebase/Play Services: `./gradlew :app:dependencies` no muestra gms ni firebase y el dex no contiene `com/google/android/gms`.
 - La sesión de WhatsApp (`filesDir/bots/<id>/sesion.db`) queda excluida de copias en la nube y de transferencia a otro equipo.
 - El APK debug se firma con `~/.android/debug.keystore` de este servidor: para instalar actualizaciones encima hay que seguir usando esa misma llave.
+
+## Estado: ETAPA 2 (2026-11-09) — versión 0.2.0 (versionCode 3)
+Hecho: el bot guarda mensajes y archivos cifrados, se ven con Material 3 (lista de chats, chat, visor de fotos/videos, audios, PDF/documentos, archivos compartidos), administración de espacio, PIN + huella + FLAG_SECURE, Avanzado y "Medir rendimiento". El bot SOLO RESPONDE ("hola"); no envía nada por su cuenta (sin programados, estados ni botones).
+No verificado aquí: WhatsApp real, teléfono real, rendimiento real, Keystore, PDF y reproducción Media3 en ejecución (no hay emulador/KVM). Lo cubren pruebas Go, pruebas Kotlin JVM y pruebas Robolectric con un `Motor` falso.
+
+### Módulos nuevos
+- Go `go/internal/`: `cifrado` (archivos y columnas), `identidad` (teléfonos, nombre_mostrado), `almacen` (messages.db, migraciones, consultas, espacio, reparar), `ingesta` (eventos → filas; política de descarga), `medios` (cola de descargas), `fotos` (fotos de perfil). API para Kotlin en `go/wabot/api.go` (`Start(raiz, botID, clave, Listener)`, `ListarChats/Mensajes/Archivos`, `EspacioTotal/PorTipo/PorChat`, `Estimar*/Borrar*`, `Reparar`, `Descargar`, `FotoGrande`, `ConfigurarDescargas`, `EstablecerRed`…) y `Observador.OnCambio(json)`.
+- Kotlin: `seguridad/` (FormatoCifrado, ClaveDatos, Pin, Huella), `datos/` (Motor = interfaz sobre Go, Repo, Ajustes, Modelos), `medios/` (Temporales, CacheImagenes, FuenteCifrada para Media3, Exportar, ReproductorAudio), `ui/` (Compose). Pruebas de pantalla en `app/src/test/.../pantallas/`.
+
+### Formato de cifrado (igual en Go y Kotlin; fixtures en `pruebas_cruzadas/`)
+- Llave de datos: 32 bytes aleatorios, envueltos con una llave AES-GCM de AndroidKeyStore (alias `botchat_envolver_v1`, sin autenticación de usuario) en `filesDir/clave.bin`. Se pasa a Go como `[]byte` y solo vive en memoria.
+- Archivos `.enc` (BCF1): encabezado de 20 bytes ("BCF1", versión 1, log2 del bloque = 16, 2 reservados, nonce base de 12). Bloques de 64 KB de texto claro, cada uno AES-256-GCM (texto cifrado + etiqueta de 16). Nonce = base + índice de bloque (96 bits big-endian con acarreo). AAD = encabezado(20) ‖ índice (8, BE) ‖ marca de último (1). Siempre hay ≥ 1 bloque (archivo vacío = un bloque vacío). El tamaño en claro se deduce del tamaño del archivo; permite acceso aleatorio (seek de video).
+- Columnas de texto: versión(1) ‖ nonce(12) ‖ cifrado+etiqueta, AAD = nombre de la columna; vacío = NULL.
+
+### Esquema (`filesDir/bots/<id>/mensajes.db`, SQLite modernc, WAL; sesión de WhatsApp aparte en `sesion.db`)
+- Migraciones en `almacen/migraciones.go` (cada una en su transacción, tabla `schema_info`). Tablas: `chats` (clave jid+bot_id), `mensajes` (id+chat_jid+bot_id, FK con cascada), `archivos`/adjuntos con estado (`ninguno`, `descargando`, `descargado`, `fallido`, `omitido`), `ajustes`. Fechas en segundos Unix. Rutas relativas: `media/<bot>/<hash16(chat)>/<id>.enc`, `.thumb.enc`, `avatars/<bot>/<hash>.enc` y `_full.enc`.
+- Texto, nombres y rutas de adjuntos van cifrados por columna. Nunca se muestra un JID/LID.
+
+### Decisiones
+- Nombre mostrado: agenda → nombre de perfil → negocio → número con formato; grupos = asunto; solo LID sin número → "Número no disponible". México: se oculta el 521 solo al mostrar. Al conocerse la relación LID↔teléfono se fusionan los chats.
+- Ver una vez: solo se guarda un registro `ver_una_vez` con texto fijo, estado `omitido`, sin miniatura, llaves ni rutas.
+- Descargas: fotos/audios/documentos ≤ 50 MB automático; videos solo con Wi‑Fi (salvo ajuste); mínimo 500 MB libres; 2 simultáneas y las > 8 MB de una en una; reintentos 10 s / 1 min / 5 min; 403/404/410 = `fallido` definitivo.
+- Seguridad: PIN (PBKDF2, bloqueos crecientes por intentos), huella opcional, bloqueo tras 1 min en segundo plano, FLAG_SECURE activado por defecto (se cambia en Avanzado). Copias descifradas temporales en `cache/tmp_descifrado/` se borran al bloquear y al abrir la app. "Guardar copia" va a Documents/BotChat/<chat>/ (MediaStore, Android 10+).
+- Logs: nunca llevan texto de mensajes, nombres ni nombres de archivos; los números van enmascarados.
+- Sin Google: ni Firebase ni Play Services (verificado en el APK). Lint: `UnsafeOptInUsageError` desactivado a propósito (Media3 UnstableApi, versión fija).
+
+### Límites conocidos
+- La búsqueda solo funciona por nombre del chat y número (el texto de los mensajes va cifrado por columna y no se indexa).
+- whatsmeow solo descarga a memoria: un archivo de ~50 MB sube la memoria de golpe; por eso las grandes van de una en una.
+- Rendimiento sin medir en teléfono real. Objetivos: foto ~5 MB < 200 ms, primer cuadro de video de ~50 MB < 1 s, desplazamiento de 200 chats fluido (≤ 5 % de cuadros caídos). Se mide en Avanzado → Medir rendimiento.
+- Solo arm64; APK debug firmado con la llave de este servidor (misma que la etapa 1, actualiza sin perder la sesión).

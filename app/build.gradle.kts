@@ -4,6 +4,10 @@ plugins {
 }
 
 android {
+    lint {
+        // Media3 marca partes de su API como inestables; se usan a propósito con la versión fija del proyecto.
+        disable += "UnsafeOptInUsageError"
+    }
     namespace = "com.botchat.app"
     compileSdk = 37
 

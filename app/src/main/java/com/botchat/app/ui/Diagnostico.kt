@@ -110,7 +110,7 @@ fun PantallaDiagnostico(alVolver: () -> Unit) {
                     scope.launch {
                         try {
                             anota("Teléfono: ${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
-                            anota("Pantalla: ${"%.0f".format(ctx.display.refreshRate)} Hz · Objetivos: foto < $OBJ_FOTO_MS ms, video < $OBJ_VIDEO_MS ms, desplazamiento fluido")
+                            anota("Pantalla: ${"%.0f".format(hzPantalla(ctx))} Hz · Objetivos: foto < $OBJ_FOTO_MS ms, video < $OBJ_VIDEO_MS ms, desplazamiento fluido")
                             corre(ctx, ::anota, { progreso = it }, { modoDesplazar = it }, estadoLista, filas.size)
                         } catch (e: Exception) {
                             anota("Error inesperado: ${e.message}")
@@ -198,7 +198,7 @@ private suspend fun corre(
         val f = medirFluidez(estadoLista, ctx, nFilas)
         desplazando(false)
         anota("Desplazamiento de ${f.segundos} s: ${f.cuadros} cuadros, ${f.caidos} caídos (${"%.1f".format(100.0 * f.caidos / f.cuadros.coerceAtLeast(1))} %), ${f.muyLentos} muy lentos; peor cuadro = ${f.peorMs} ms")
-        anota("  → " + (if (f.caidos * 100 <= f.cuadros * 5 && f.muyLentos * 100 <= f.cuadros) "FLUIDO" else "NO cumple el objetivo (más de 5 % de cuadros caídos)") + "  [cuadro caído = más de ${"%.1f".format(1.5 * 1000 / ctx.display.refreshRate)} ms]")
+        anota("  → " + (if (f.caidos * 100 <= f.cuadros * 5 && f.muyLentos * 100 <= f.cuadros) "FLUIDO" else "NO cumple el objetivo (más de 5 % de cuadros caídos)") + "  [cuadro caído = más de ${"%.1f".format(1.5 * 1000 / hzPantalla(ctx))} ms]")
         anota("\nListo. Esta prueba mide el teléfono y los archivos sintéticos; con tus mensajes reales los números pueden variar.")
     } finally {
         runCatching { carpeta.deleteRecursively() }
@@ -338,7 +338,7 @@ private data class Fluidez(val segundos: Int, val cuadros: Int, val caidos: Int,
 
 /** Desplaza la lista arriba y abajo durante 8 s y cuenta los cuadros que tardaron más de lo debido (Choreographer). */
 private suspend fun medirFluidez(estado: androidx.compose.foundation.lazy.LazyListState, ctx: Context, filas: Int): Fluidez {
-    val periodoNs = (1_000_000_000.0 / ctx.display.refreshRate).toLong()
+    val periodoNs = (1_000_000_000.0 / hzPantalla(ctx)).toLong()
     var ultimo = 0L; var cuadros = 0; var caidos = 0; var lentos = 0; var peor = 0L
     var activo = true
     val cb = object : Choreographer.FrameCallback {
@@ -363,4 +363,12 @@ private suspend fun medirFluidez(estado: androidx.compose.foundation.lazy.LazyLi
     }
     activo = false
     return Fluidez(8, cuadros, caidos, lentos, peor)
+}
+
+/** Frecuencia de la pantalla; `Context.display` solo existe desde Android 11. */
+@Suppress("DEPRECATION")
+private fun hzPantalla(ctx: android.content.Context): Float {
+    val d = if (android.os.Build.VERSION.SDK_INT >= 30) ctx.display
+    else (ctx.getSystemService(android.content.Context.WINDOW_SERVICE) as android.view.WindowManager).defaultDisplay
+    return d?.refreshRate?.takeIf { it > 0f } ?: 60f
 }
