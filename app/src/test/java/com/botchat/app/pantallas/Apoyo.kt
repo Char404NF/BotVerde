@@ -1,0 +1,101 @@
+package com.botchat.app.pantallas
+
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import com.botchat.app.Datos
+import com.botchat.app.datos.Ajustes
+import com.botchat.app.datos.Motor
+import com.botchat.app.datos.Repo
+import com.botchat.app.medios.CacheImagenes
+import com.botchat.app.seguridad.ClaveDatos
+import org.json.JSONArray
+import org.json.JSONObject
+import wabot.Observador
+import java.io.File
+
+/** Motor de ejemplo: devuelve JSON con el mismo formato que el módulo Go y anota lo que la pantalla le pide. */
+class MotorFalso : Motor {
+    var chatsPersonales = "[]"
+    var chatsGrupos = "[]"
+    var chat = "null"
+    var mensajes = "[]"
+    var archivos = "[]"
+    var espacioTotal = """{"multimedia":0,"miniaturas":0,"fotos":0,"base":0,"libre":0,"total":0}"""
+    var espacioPorTipo = "[]"
+    var espacioPorChat = "[]"
+    var liberar = """{"bytes":0,"cantidad":0}"""
+    var reporte = """{"estadosCorregidos":0,"tamanosCorregidos":0,"archivosDanados":0,"miniaturasLimpiadas":0,"fotosLimpiadas":0,"huerfanos":0,"bytesHuerfanos":0,"chatsRecalculados":0}"""
+    val llamadas = mutableListOf<String>()
+    val consultas = mutableListOf<String>()
+
+    override fun abrirAlmacen(raiz: String, clave: ByteArray, o: Observador?) { llamadas += "abrirAlmacen" }
+    override fun listarChats(bot: Long, grupos: Boolean, consulta: String, limite: Long, desde: Long): String {
+        consultas += consulta
+        val todos = JSONArray(if (grupos) chatsGrupos else chatsPersonales)
+        if (consulta.isBlank()) return todos.toString()
+        val q = consulta.lowercase()
+        return JSONArray().also { a -> for (i in 0 until todos.length()) if (todos.getJSONObject(i).getString("nombre").lowercase().contains(q)) a.put(todos.get(i)) }.toString()
+    }
+    override fun obtenerChat(bot: Long, chat: String) = this.chat
+    override fun listarMensajes(bot: Long, chat: String, antesTs: Long, antesId: String, limite: Long): String {
+        llamadas += "mensajes:$chat:$antesTs"
+        return if (antesTs > 0) "[]" else mensajes
+    }
+    override fun listarArchivos(bot: Long, chat: String, categoria: String, soloDescargados: Boolean, limite: Long, desde: Long): String {
+        val a = JSONArray(archivos)
+        if (categoria.isEmpty()) return a.toString()
+        return JSONArray().also { r -> for (i in 0 until a.length()) { val o = a.getJSONObject(i); if (o.optString("tipo").let { t -> (t == "imagen" || t == "sticker") && categoria == "foto" || t == categoria }) r.put(o) } }.toString()
+    }
+    override fun espacioTotal(bot: Long) = espacioTotal
+    override fun espacioPorTipo(bot: Long) = espacioPorTipo
+    override fun espacioPorChat(bot: Long) = espacioPorChat
+    override fun estimarBorrado(bot: Long, filtro: String): String { llamadas += "estimar:$filtro"; return liberar }
+    override fun borrarArchivos(bot: Long, filtro: String): String { llamadas += "borrarArchivos:" + JSONObject(filtro).let { "${it.optString("chat")}|${it.optString("categoria")}|${it.optInt("diasMin")}" }; return liberar }
+    override fun estimarLista(bot: Long, items: String) = liberar
+    override fun borrarLista(bot: Long, items: String): String { llamadas += "borrarLista:$items"; return liberar }
+    override fun borrarChat(bot: Long, chat: String): String { llamadas += "borrarChat:$chat"; return liberar }
+    override fun reparar(bot: Long): String { llamadas += "reparar"; return reporte }
+    override fun descargar(bot: Long, chat: String, id: String) { llamadas += "descargar:$chat:$id" }
+    override fun fotoGrande(bot: Long, chat: String) = throw IllegalStateException("Este chat no tiene foto")
+}
+
+object Apoyo {
+    val clave = ByteArray(32) { (it + 1).toByte() }
+
+    fun ctx(): Context = ApplicationProvider.getApplicationContext()
+
+    /** Deja todo limpio: base local, ajustes, llave en memoria y motor de ejemplo. */
+    fun reinicia(motor: MotorFalso = MotorFalso()): MotorFalso {
+        Datos.reiniciarParaPruebas()
+        Ajustes.reiniciarParaPruebas()
+        ctx().getSharedPreferences("ajustes", Context.MODE_PRIVATE).edit().clear().commit()
+        ctx().getSharedPreferences("seguridad", Context.MODE_PRIVATE).edit().clear().commit()
+        ClaveDatos.paraPruebas(clave)
+        CacheImagenes.vaciar()
+        Repo.paraPruebas(ctx().filesDir, motor)
+        return motor
+    }
+
+    /** Crea el bot (ya vinculado) y devuelve su id. */
+    fun creaBot(vinculado: Boolean = true): Long {
+        val d = Datos.get(ctx())
+        val id = d.crear("Mi bot", "MX", 52, "5512345678", "525512345678", false)
+        if (vinculado) d.marcarVinculado(id)
+        return id
+    }
+
+    fun chatJson(jid: String, nombre: String, tel: String = "+52 55 1234 5678", pais: String = "MX", grupo: Boolean = false, tipo: String = "texto", texto: String = "hola", ts: Long = System.currentTimeMillis() / 1000, borrado: Boolean = false, mio: Boolean = false) =
+        JSONObject().put("jid", jid).put("nombre", nombre).put("telefono", tel).put("pais", pais).put("esGrupo", grupo).put("foto", "").put("fotoTs", 0).put("ultimoTs", ts)
+            .put("ultimoTexto", texto).put("ultimoTipo", tipo).put("ultimoBorrado", borrado).put("ultimoMio", mio)
+
+    fun msgJson(
+        id: String, ts: Long, texto: String = "", tipo: String = "texto", mio: Boolean = false, remitente: String = "", remitenteId: String = "x", estado: String = "ninguno",
+        bytes: Long = 0, ruta: String = "", miniatura: String = "", borrado: Boolean = false, editado: Boolean = false, puedeBajarse: Boolean = false, dur: Int = 0, nombre: String = "", notaVoz: Boolean = false,
+    ) = JSONObject().put("id", id).put("chat", "chat").put("remitenteId", remitenteId).put("remitente", remitente).put("esMio", mio).put("tipo", tipo).put("texto", texto).put("ts", ts)
+        .put("borrado", borrado).put("editado", editado).put("estado", estado).put("bytes", bytes).put("mime", "").put("nombre", nombre).put("ruta", ruta).put("miniatura", miniatura)
+        .put("ancho", 0).put("alto", 0).put("dur", dur).put("notaVoz", notaVoz).put("puedeBajarse", puedeBajarse)
+
+    fun arreglo(vararg o: JSONObject) = JSONArray().also { a -> o.forEach { a.put(it) } }.toString()
+
+    fun carpetaTemporal(): File = File(ctx().cacheDir, "pruebas").apply { mkdirs() }
+}
