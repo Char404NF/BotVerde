@@ -1,5 +1,5 @@
-// Paquete wabot: conexión con WhatsApp (whatsmeow) para usar desde Android con gomobile.
-// Solo usa tipos simples (string, bool, error, interfaz Listener).
+// Paquete wabot: conexión con WhatsApp (whatsmeow), almacén de mensajes cifrados y descargas, para usar desde Android con gomobile.
+// Solo usa tipos simples (string, bool, int, int64, []byte, error y las interfaces Listener y Observador).
 package wabot
 
 import (
@@ -12,20 +12,23 @@ import (
 	"sync"
 	"time"
 
+	"botchat/internal/fotos"
+	"botchat/internal/ingesta"
+	"botchat/internal/medios"
+
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
-	waLog "go.mau.fi/whatsmeow/util/log"
 	"google.golang.org/protobuf/proto"
 	_ "modernc.org/sqlite" // SQLite en Go puro (sin cgo)
 )
 
 // Listener recibe lo que pasa en el bot. Lo implementa la app Kotlin.
 //
-// Textos de OnStatus: "detenido", "sin_vincular", "esperando_codigo", "vinculado",
-// "conectando", "conectado", "desconectado", "sesion_cerrada" y "error: <detalle>".
+// Textos de OnStatus: "detenido", "sin_vincular", "esperando_codigo", "vinculado", "conectando", "conectado", "desconectado",
+// "sesion_cerrada" (WhatsApp desvinculó este dispositivo) y "error: <detalle>".
 type Listener interface {
 	OnStatus(texto string)
 	OnPairingCode(codigo string)
@@ -33,18 +36,33 @@ type Listener interface {
 }
 
 type estado struct {
-	l    Listener
-	cont *sqlstore.Container
-	cli  *whatsmeow.Client
-	lim  *limitador
-	qr   chan struct{}
-	cerr bool // true cuando el cierre lo pidió la app (Stop/Logout)
+	l       Listener
+	cont    *sqlstore.Container
+	cli     *whatsmeow.Client
+	lim     *limitador
+	qr      chan struct{}
+	cerr    bool // true cuando el cierre lo pidió la app (Stop/Logout)
+	botID   int64
+	ctx     context.Context
+	cancel  context.CancelFunc
+	trabajo chan func()
+	wg      sync.WaitGroup
+
+	ing       *ingesta.Ingesta
+	descargas *medios.Gestor
+	fotos     *fotos.Gestor
+	grupos    *colaGrupos
+	refresco  *time.Timer
+	refMu     sync.Mutex
 }
 
 var (
 	mu sync.Mutex
 	st *estado
 )
+
+// log envía una línea al registro con los números largos enmascarados. Nunca debe recibir texto de mensajes, nombres ni nombres de archivo.
+func (s *estado) log(linea string) { s.l.OnLog(enmascaraTexto(linea)) }
 
 func (s *estado) status(t string) { s.l.OnStatus(t) }
 
@@ -55,8 +73,9 @@ func dsnSesion(dataDir string) string {
 		"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=temp_store(2)"
 }
 
-// Start abre (o crea) la sesión guardada en dataDir. Si ya está vinculada, se conecta sola.
-func Start(dataDir string, l Listener) error {
+// Start abre la sesión guardada y el almacén de mensajes. raiz es la carpeta de datos de la app (filesDir),
+// botID el número del bot y clave la llave de datos de 32 bytes (solo vive en memoria). Si la sesión ya está vinculada, se conecta sola.
+func Start(raiz string, botID int64, clave []byte, l Listener) error {
 	if l == nil {
 		return errors.New("falta el listener")
 	}
@@ -65,13 +84,17 @@ func Start(dataDir string, l Listener) error {
 	if st != nil {
 		return errors.New("el bot ya está iniciado")
 	}
-	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+	if err := abrirAlmacenLocked(raiz, clave); err != nil {
+		return err
+	}
+	sesion := filepath.Join(raiz, "bots", fmt.Sprint(botID))
+	if err := os.MkdirAll(sesion, 0o700); err != nil {
 		return fmt.Errorf("no se pudo crear la carpeta: %w", err)
 	}
-	lg := &registro{l: l}
 	ctx := context.Background()
-	dsn := dsnSesion(dataDir)
-	cont, err := sqlstore.New(ctx, "sqlite", dsn, lg.Sub("DB"))
+	s := &estado{l: l, botID: botID, lim: nuevoLimitador(), qr: make(chan struct{}, 1), trabajo: make(chan func(), 8192)}
+	lg := &registro{salida: func(x string) { s.log(x) }}
+	cont, err := sqlstore.New(ctx, "sqlite", dsnSesion(sesion), lg.Sub("DB"))
 	if err != nil {
 		return fmt.Errorf("no se pudo abrir la base: %w", err)
 	}
@@ -82,23 +105,74 @@ func Start(dataDir string, l Listener) error {
 	}
 	cli := whatsmeow.NewClient(dev, lg.Sub("WA"))
 	cli.EnableAutoReconnect = true
-	s := &estado{l: l, cont: cont, cli: cli, lim: nuevoLimitador(), qr: make(chan struct{}, 1)}
+	s.cont, s.cli = cont, cli
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	s.armar()
 	cli.AddEventHandler(s.evento)
 	st = s
+	s.wg.Add(2)
+	go s.trabajador()
+	go func() {
+		defer s.wg.Done()
+		(&vigilante{vinculado: func() bool { return cli.Store.ID != nil }, conectado: cli.IsConnected, log: s.log,
+			conectar: func() { _ = cli.Connect() }}).correr(s.ctx)
+	}()
 	if dev.ID == nil {
-		l.OnLog("Sesión nueva: falta vincular.")
+		s.log("Sesión nueva: falta vincular.")
 		s.status("sin_vincular")
 		return nil
 	}
-	l.OnLog("Sesión encontrada. Conectando…")
+	s.log("Sesión encontrada. Conectando…")
 	s.status("conectando")
 	go func() {
 		if err := cli.Connect(); err != nil {
-			l.OnLog("No se pudo conectar: " + err.Error())
+			s.log("No se pudo conectar: " + err.Error())
 			s.status("error: " + err.Error())
 		}
 	}()
 	return nil
+}
+
+// armar crea la ingesta, las descargas y las fotos de perfil.
+func (s *estado) armar() {
+	conectado := func() bool { return s.cli.IsConnected() && s.cli.IsLoggedIn() }
+	s.descargas = medios.Nuevo(medios.Config{BotID: s.botID, Alm: alm,
+		Cliente:  func() (medios.Cliente, bool) { return s.cli, conectado() },
+		Politica: politicaActual, Libre: func() int64 { l, _ := alm.Libre(); return l }, Log: s.log})
+	s.fotos = fotos.Nuevo(fotos.Config{BotID: s.botID, Alm: alm, Cliente: func() (fotos.Cliente, bool) { return s.cli, conectado() }, Log: s.log})
+	s.grupos = nuevaColaGrupos(s)
+	s.ing = ingesta.Nueva(ingesta.Config{BotID: s.botID, Alm: alm, Contactos: s.cli.Store.Contacts, Mapa: s.cli.Store.LIDs,
+		Servicios: servicios{s}, Politica: politicaActual, Red: redActual, Libre: func() int64 { l, _ := alm.Libre(); return l }, Log: s.log})
+	s.descargas.Iniciar(s.ctx)
+	s.fotos.Iniciar(s.ctx)
+	s.grupos.iniciar(s.ctx)
+}
+
+// trabajador procesa en orden lo que llega (mensajes, historial, nombres) para no frenar el bucle de eventos de whatsmeow.
+func (s *estado) trabajador() {
+	defer s.wg.Done()
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case f := <-s.trabajo:
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						s.log(fmt.Sprintf("error interno: %v", r))
+					}
+				}()
+				f()
+			}()
+		}
+	}
+}
+
+func (s *estado) encola(f func()) {
+	select {
+	case s.trabajo <- f:
+	case <-s.ctx.Done():
+	}
 }
 
 // Pair pide a WhatsApp un código de 8 caracteres para vincular el número dado
@@ -131,32 +205,32 @@ func (s *estado) vincular(tel string) {
 	default:
 	}
 	if !s.cli.IsConnected() {
-		s.l.OnLog("Conectando para pedir el código…")
+		s.log("Conectando para pedir el código…")
 		if err := s.cli.Connect(); err != nil {
-			s.l.OnLog("No se pudo conectar: " + err.Error())
+			s.log("No se pudo conectar: " + err.Error())
 			s.status("error: " + err.Error())
 			return
 		}
 		select { // WhatsApp avisa con un evento QR cuando ya se puede pedir el código
 		case <-s.qr:
 		case <-time.After(20 * time.Second):
-			s.l.OnLog("WhatsApp tardó en responder; se intenta igual.")
+			s.log("WhatsApp tardó en responder; se intenta igual.")
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	codigo, err := s.cli.PairPhone(ctx, tel, true, whatsmeow.PairClientChrome, "Chrome (Linux)")
 	if err != nil {
-		s.l.OnLog("WhatsApp rechazó la solicitud: " + err.Error())
+		s.log("WhatsApp rechazó la solicitud: " + err.Error())
 		s.status("error: " + err.Error())
 		return
 	}
-	s.l.OnLog("Código de vinculación generado para el número " + enmascara(tel) + ".")
+	s.log("Código de vinculación generado para el número " + enmascara(tel) + ".")
 	s.status("esperando_codigo")
 	s.l.OnPairingCode(formatoCodigo(codigo))
 }
 
-// Stop desconecta y cierra la sesión local (la vinculación con WhatsApp se conserva).
+// Stop desconecta y cierra la sesión local (la vinculación con WhatsApp se conserva). Los mensajes guardados siguen disponibles.
 func Stop() {
 	mu.Lock()
 	s := st
@@ -166,7 +240,16 @@ func Stop() {
 		return
 	}
 	s.cerr = true
+	s.cancel()
+	s.refMu.Lock()
+	if s.refresco != nil {
+		s.refresco.Stop()
+	}
+	s.refMu.Unlock()
 	s.cli.Disconnect()
+	s.descargas.Detener()
+	s.fotos.Detener()
+	s.wg.Wait()
 	_ = s.cont.Close()
 	s.status("detenido")
 }
@@ -180,6 +263,7 @@ func IsConnected() bool {
 }
 
 // Logout quita el dispositivo vinculado en WhatsApp y borra la sesión local. Deja el bot detenido.
+// No borra los mensajes guardados: para eso está EliminarBot.
 func Logout() error {
 	mu.Lock()
 	s := st
@@ -193,13 +277,13 @@ func Logout() error {
 		err := s.cli.Logout(ctx)
 		cancel()
 		if err != nil {
-			s.l.OnLog("No se pudo avisar a WhatsApp: " + err.Error())
+			s.log("No se pudo avisar a WhatsApp: " + err.Error())
 			aviso = fmt.Errorf("no se pudo cerrar la sesión en WhatsApp (quita el dispositivo a mano en Dispositivos vinculados): %w", err)
 			if derr := s.cli.Store.Delete(context.Background()); derr != nil {
-				s.l.OnLog("Tampoco se pudo borrar la sesión local: " + derr.Error())
+				s.log("Tampoco se pudo borrar la sesión local: " + derr.Error())
 			}
 		} else {
-			s.l.OnLog("Sesión cerrada en WhatsApp.")
+			s.log("Sesión cerrada en WhatsApp.")
 		}
 	}
 	Stop()
@@ -214,37 +298,80 @@ func (s *estado) evento(e any) {
 		default:
 		}
 	case *events.PairSuccess:
-		s.l.OnLog("Vinculado con el número " + enmascara(v.ID.User) + ".")
+		s.log("Vinculado con el número " + enmascara(v.ID.User) + ".")
 		s.status("vinculado")
 	case *events.PairError:
-		s.l.OnLog("Falló la vinculación: " + v.Error.Error())
+		s.log("Falló la vinculación: " + v.Error.Error())
 		s.status("error: falló la vinculación")
 	case *events.Connected:
-		s.l.OnLog("Conectado.")
+		s.log("Conectado.")
 		s.status("conectado")
+		go s.fotos.RevisarVencidas()
 	case *events.Disconnected:
 		if !s.cerr {
-			s.l.OnLog("Desconectado; se intentará reconectar.")
+			s.log("Desconectado; se intentará reconectar.")
 			s.status("desconectado")
 		}
 	case *events.LoggedOut:
-		s.l.OnLog("WhatsApp cerró la sesión de este dispositivo.")
+		s.log("WhatsApp cerró la sesión de este dispositivo.")
 		s.status("sesion_cerrada")
 	case *events.StreamReplaced:
-		s.l.OnLog("La sesión se abrió en otro lugar.")
+		s.log("La sesión se abrió en otro lugar.")
 		s.status("error: la sesión se abrió en otro lugar")
 	case *events.TemporaryBan:
-		s.l.OnLog("Bloqueo temporal: " + v.String())
+		s.log("Bloqueo temporal: " + v.String())
 		s.status("error: bloqueo temporal de WhatsApp")
 	case *events.ClientOutdated:
-		s.l.OnLog("WhatsApp pide una versión más nueva de la conexión.")
+		s.log("WhatsApp pide una versión más nueva de la conexión.")
 		s.status("error: conexión desactualizada")
 	case *events.ConnectFailure:
-		s.l.OnLog(fmt.Sprintf("No se pudo conectar (código %d).", int(v.Reason)))
+		s.log(fmt.Sprintf("No se pudo conectar (código %d).", int(v.Reason)))
 		s.status(fmt.Sprintf("error: no se pudo conectar (%d)", int(v.Reason)))
 	case *events.Message:
-		s.mensaje(v)
+		s.encola(func() { s.ing.Mensaje(s.ctx, v, false) })
+		s.responder(v)
+	case *events.HistorySync:
+		s.encola(func() {
+			n := s.ing.Historial(s.ctx, v.Data, s.cli.ParseWebMessage)
+			if n > 0 {
+				s.log(fmt.Sprintf("Historial: %d mensajes guardados.", n))
+			}
+		})
+	case *events.Picture:
+		s.encola(func() { s.alCambiarFoto(v) })
+	case *events.GroupInfo:
+		if v.Name != nil {
+			nombre, jid := v.Name.Name, v.JID.ToNonAD().String()
+			s.encola(func() { s.ing.Asunto(jid, nombre) })
+		}
+	case *events.JoinedGroup:
+		nombre, jid := v.GroupName.Name, v.JID.ToNonAD().String()
+		s.encola(func() { s.ing.Asunto(jid, nombre) })
+	case *events.PushName:
+		s.encola(func() { s.ing.NombrePublico(s.ctx, v.JID, v.NewPushName) })
+	case *events.Contact, *events.AppStateSyncComplete:
+		s.refrescarNombres()
 	}
+}
+
+// refrescarNombres vuelve a leer la agenda cuando deja de haber cambios por unos segundos.
+func (s *estado) refrescarNombres() {
+	s.refMu.Lock()
+	defer s.refMu.Unlock()
+	if s.refresco != nil {
+		s.refresco.Stop()
+	}
+	s.refresco = time.AfterFunc(5*time.Second, func() { s.encola(func() { s.ing.RefrescarNombres(s.ctx) }) })
+}
+
+func (s *estado) alCambiarFoto(v *events.Picture) {
+	j := v.JID.ToNonAD()
+	if j.Server == types.HiddenUserServer {
+		if pn, err := s.cli.Store.LIDs.GetPNForLID(s.ctx, j); err == nil && !pn.IsEmpty() {
+			j = pn.ToNonAD()
+		}
+	}
+	s.fotos.Forzar(j.String())
 }
 
 func textoDe(m *waE2E.Message) string {
@@ -254,7 +381,8 @@ func textoDe(m *waE2E.Message) string {
 	return m.GetExtendedTextMessage().GetText()
 }
 
-func (s *estado) mensaje(v *events.Message) {
+// responder contesta "hola" a los textos privados de otras personas (máximo uno por contacto cada 60 segundos). No cambia desde la etapa 1.
+func (s *estado) responder(v *events.Message) {
 	chat := v.Info.Chat
 	ent := entrada{
 		EsMio:      v.Info.IsFromMe,
@@ -265,42 +393,33 @@ func (s *estado) mensaje(v *events.Message) {
 		Texto:      textoDe(v.Message),
 		Clave:      chat.String(),
 	}
+	if ent.Servidor != "" && esVerUnaVez(v) {
+		ent.Texto = "" // un "ver una vez" no es texto
+	}
 	ok, motivo := s.lim.decidir(ent, time.Now())
 	if !ok {
 		if !ent.EsMio {
-			s.l.OnLog("Mensaje de " + enmascara(chat.User) + " ignorado: " + motivo + ".")
+			s.log("Mensaje de " + enmascara(chat.User) + " ignorado: " + motivo + ".")
 		}
 		return
 	}
 	go func() {
 		time.Sleep(time.Duration(1000+rand.Intn(2000)) * time.Millisecond) // pausa corta, como una persona
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
 		defer cancel()
-		_, err := s.cli.SendMessage(ctx, chat, &waE2E.Message{Conversation: proto.String(textoRespuesta)})
+		resp, err := s.cli.SendMessage(ctx, chat, &waE2E.Message{Conversation: proto.String(textoRespuesta)})
 		if err != nil {
-			s.l.OnLog("No se pudo responder a " + enmascara(chat.User) + ": " + err.Error())
+			s.log("No se pudo responder a " + enmascara(chat.User) + ": " + err.Error())
 			return
 		}
-		s.l.OnLog("Respondido a " + enmascara(chat.User) + ".")
+		s.log("Respondido a " + enmascara(chat.User) + ".")
+		propio := types.EmptyJID
+		if s.cli.Store.ID != nil {
+			propio = s.cli.Store.ID.ToNonAD()
+		}
+		s.encola(func() { s.ing.Enviado(s.ctx, chat, resp.ID, textoRespuesta, resp.Timestamp, propio) })
 	}()
 }
 
-// registro lleva los mensajes internos de whatsmeow al Listener (sin datos sensibles: solo avisos y errores).
-type registro struct {
-	l   Listener
-	mod string
-}
-
-func (r *registro) emite(nivel, msg string, a ...any) {
-	if r.l == nil {
-		return
-	}
-	r.l.OnLog(fmt.Sprintf("[%s %s] ", r.mod, nivel) + fmt.Sprintf(msg, a...))
-}
-func (r *registro) Warnf(m string, a ...any)  { r.emite("aviso", m, a...) }
-func (r *registro) Errorf(m string, a ...any) { r.emite("error", m, a...) }
-func (r *registro) Infof(m string, a ...any)  { r.emite("info", m, a...) }
-func (r *registro) Debugf(string, ...any)     {}
-func (r *registro) Sub(mod string) waLog.Logger {
-	return &registro{l: r.l, mod: mod}
-}
+// esVerUnaVez: ver ingesta.EsVerUnaVez.
+func esVerUnaVez(v *events.Message) bool { return ingesta.EsVerUnaVez(v) }

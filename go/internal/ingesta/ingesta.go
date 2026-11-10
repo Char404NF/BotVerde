@@ -10,6 +10,7 @@ import (
 	"botchat/internal/almacen"
 	"botchat/internal/identidad"
 
+	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/proto/waHistorySync"
 	"go.mau.fi/whatsmeow/proto/waWeb"
 	"go.mau.fi/whatsmeow/types"
@@ -451,4 +452,17 @@ func (g *Ingesta) Asunto(chat, asunto string) {
 		return
 	}
 	_, _ = g.Alm.ActualizarChat(g.BotID, chat, true, func(c *almacen.Chat) { c.Guardado = asunto })
+}
+
+// Enviado guarda un mensaje de texto que envió el propio bot (por ejemplo la respuesta "hola").
+func (g *Ingesta) Enviado(ctx context.Context, chat types.JID, id, texto string, ts time.Time, propio types.JID) {
+	e := &events.Message{
+		Info: types.MessageInfo{
+			MessageSource: types.MessageSource{Chat: chat, Sender: propio, IsFromMe: true, IsGroup: chat.Server == types.GroupServer},
+			ID:            id, Timestamp: ts,
+		},
+		RawMessage: &waE2E.Message{Conversation: &texto},
+	}
+	e.UnwrapRaw()
+	g.Mensaje(ctx, e, false)
 }
