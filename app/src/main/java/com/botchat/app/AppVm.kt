@@ -7,9 +7,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class Pantalla { NOMBRE, NUMERO, PAIS, CONFIRMAR, CODIGO, PRINCIPAL, AYUDA }
+enum class Pantalla { NOMBRE, NUMERO, PAIS, CONFIRMAR, CODIGO, LISTO, PRINCIPAL, AYUDA }
 
 class AppVm(app: Application) : AndroidViewModel(app) {
     private val datos = Datos.get(app)
@@ -53,9 +54,12 @@ class AppVm(app: Application) : AndroidViewModel(app) {
     private fun alVincular() {
         if (pantalla == Pantalla.CODIGO || pantalla == Pantalla.CONFIRMAR) {
             bot = datos.primero()
-            pantalla = Pantalla.PRINCIPAL
+            pantalla = Pantalla.LISTO // palomita animada; pasa sola a la pantalla principal
+            viewModelScope.launch { delay(1800); terminarCelebracion() }
         }
     }
+
+    fun terminarCelebracion() { if (pantalla == Pantalla.LISTO) pantalla = Pantalla.PRINCIPAL }
 
     // ---------- paso 1 ----------
     fun cambiaNombre(t: String) { nombre = t.take(30); errorNombre = null }
@@ -139,7 +143,7 @@ class AppVm(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    val puedeVolver: Boolean get() = pantalla !in listOf(Pantalla.NOMBRE, Pantalla.PRINCIPAL)
+    val puedeVolver: Boolean get() = pantalla !in listOf(Pantalla.NOMBRE, Pantalla.PRINCIPAL, Pantalla.LISTO)
 
     // ---------- pantalla principal ----------
     fun abreAyuda() { pantalla = Pantalla.AYUDA }

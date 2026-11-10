@@ -26,6 +26,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -82,6 +83,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.botchat.app.AppVm
@@ -128,6 +130,7 @@ fun Asistente(vm: AppVm, conPermiso: (() -> Unit) -> Unit) {
             Pantalla.PAIS -> ListaPaises(vm)
             Pantalla.CONFIRMAR -> PasoConfirmar(vm, conPermiso)
             Pantalla.CODIGO -> PasoCodigo(vm, conPermiso)
+            Pantalla.LISTO -> PasoListo(vm)
             else -> {}
         }
     }
@@ -181,6 +184,21 @@ private fun PasoNombre(vm: AppVm) {
             supportingText = { Text(vm.errorNombre ?: "${vm.nombre.length}/30") },
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+// ---------- vinculado: palomita animada ----------
+
+@Composable
+private fun PasoListo(vm: AppVm) {
+    Column(Modifier.fillMaxSize().padding(Esp.xl), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        CheckAnimado(Modifier.testTag("check_vinculado"), 120.dp)
+        Spacer(Modifier.height(Esp.xl))
+        Text("¡Listo!", style = MaterialTheme.typography.headlineMedium)
+        Spacer(Modifier.height(Esp.s))
+        Text("Tu bot quedó vinculado.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(Esp.xl))
+        BotonPrincipal("Continuar", onClick = vm::terminarCelebracion)
     }
 }
 
@@ -364,7 +382,7 @@ fun PantallaBot(vm: AppVm, conPermiso: (() -> Unit) -> Unit, alVolver: () -> Uni
     val verde = corriendo && estado == "conectado"
     val trabajando = corriendo && !verde && !estado.startsWith("error") && estado != "sesion_cerrada"
     val color = when {
-        verde -> Color(0xFF2E9E5B)
+        verde -> LocalColoresApp.current.conectado
         estado.startsWith("error") || estado == "sesion_cerrada" -> MaterialTheme.colorScheme.error
         trabajando -> MaterialTheme.colorScheme.tertiary
         else -> MaterialTheme.colorScheme.outline

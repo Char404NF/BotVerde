@@ -118,7 +118,7 @@ private fun Cuadricula(botId: Long, jid: String, datos: List<Msg>, alAbrirVisor:
             LaunchedEffect(ruta) { img = if (ruta.isEmpty()) null else CacheImagenes.cargar(ctx, Repo.archivo(ruta), px)?.asImageBitmap() }
             Box(Modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceContainerHighest).clickable(enabled = m.descargado) { alAbrirVisor(m.id) }, Alignment.Center) {
                 val i = img
-                if (i != null) Image(i, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                if (i != null) androidx.compose.animation.Crossfade(i, Modifier.fillMaxSize(), animationSpec = Mov.tiempo(LocalReducirMovimiento.current, Mov.NORMAL), label = "miniatura") { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
                 if (m.categoria == "video") Icon(Ico.Reproducir, null, Modifier.size(32.dp).background(Color.Black.copy(alpha = 0.4f), CircleShape), tint = Color.White)
                 if (!m.descargado) Icon(Ico.Descargar, "No descargado", Modifier.align(Alignment.BottomEnd).padding(6.dp).size(20.dp), tint = Color.White)
             }

@@ -178,7 +178,7 @@ fun PantallaChat(
                         items(items, key = { e -> when (e) { is Elem.Dia -> "dia-${e.ts}"; is Elem.Burbuja -> "m-${e.m.id}" } }) { e ->
                             when (e) {
                                 is Elem.Dia -> SeparadorDia(e.ts, Modifier.animateItem())
-                                is Elem.Burbuja -> Burbuja(e, vm, alAbrirVisor, alAbrirDocumento, Modifier.animateItem())
+                                is Elem.Burbuja -> Burbuja(e, vm, alAbrirVisor, alAbrirDocumento, Modifier.animateItem().apareceDesdeAbajo(vm.esNueva(e.m.id)))
                             }
                         }
                         if (vm.cargandoMas) item { Box(Modifier.fillMaxWidth().padding(Esp.l), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) } }
@@ -335,7 +335,8 @@ private fun MiniaturaMedia(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         val img = imagen ?: miniatura
-        if (img != null) Image(img, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) else if (m.estado == "pendiente" || ruta.isNotEmpty()) Box(Modifier.fillMaxSize().shimmer())
+        if (img != null) androidx.compose.animation.Crossfade(img, Modifier.fillMaxSize(), animationSpec = Mov.tiempo(LocalReducirMovimiento.current, Mov.NORMAL), label = "foto") { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+        else if (m.estado == "pendiente" || ruta.isNotEmpty()) Box(Modifier.fillMaxSize().shimmer())
         if (m.categoria == "video" && m.descargado) {
             Box(Modifier.size(48.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.45f)), contentAlignment = Alignment.Center) { Icon(Ico.Reproducir, null, tint = Color.White, modifier = Modifier.size(30.dp)) }
         }
