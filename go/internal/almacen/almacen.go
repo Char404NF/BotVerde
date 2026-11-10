@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"botchat/internal/cifrado"
@@ -57,7 +58,8 @@ type Almacen struct {
 	db    *sql.DB
 	raiz  string
 	clave []byte
-	mu    sync.Mutex // serializa lectura-modificación-escritura de chats
+	zona  atomic.Pointer[time.Location] // zona horaria del teléfono para agrupar por día (la fija la app)
+	mu    sync.Mutex                    // serializa lectura-modificación-escritura de chats
 	// Cambio, si no es nil, se llama cuando algo cambia (sin bloquear la operación). Los eventos son:
 	// "chats", "chat:<jid>", "archivo:<jid>:<id>" y "espacio".
 	Cambio func(evento string)
@@ -390,6 +392,9 @@ func (a *Almacen) FusionarChat(botID int64, desde, hasta string) error {
 	if _, err := tx.Exec(`UPDATE messages SET chat_jid=? WHERE bot_id=? AND chat_jid=?`, hasta, botID, desde); err != nil {
 		return err
 	}
+	if err := fusionaStats(tx, botID, desde, hasta); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM chats WHERE bot_id=? AND jid=?`, botID, desde); err != nil {
 		return err
 	}
@@ -489,6 +494,11 @@ func (a *Almacen) GuardarMensajes(msgs []*Mensaje) (nuevos []*Mensaje, err error
 		return nil, err
 	}
 	defer st.Close()
+	est, err := tx.Prepare(upsertStats)
+	if err != nil {
+		return nil, err
+	}
+	defer est.Close()
 	tocados := map[string]int64{}
 	for _, m := range msgs {
 		v, err := a.valoresMensaje(m)
@@ -500,6 +510,9 @@ func (a *Almacen) GuardarMensajes(msgs []*Mensaje) (nuevos []*Mensaje, err error
 			return nil, err
 		}
 		if n, _ := r.RowsAffected(); n > 0 {
+			if err := a.sumaStats(est, m); err != nil {
+				return nil, err
+			}
 			nuevos = append(nuevos, m)
 			k := fmt.Sprintf("%d\x00%s", m.BotID, m.ChatJID)
 			if m.TS > tocados[k] {

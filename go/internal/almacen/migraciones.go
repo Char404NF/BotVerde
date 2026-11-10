@@ -64,6 +64,25 @@ var migraciones = [][]string{
 		// lista de chats por pestaña, de lo nuevo a lo viejo
 		`CREATE INDEX idx_chats_lista ON chats(bot_id, es_grupo, ultimo_ts)`,
 	},
+	// 2: estadísticas diarias (solo datos sin cifrar: quién, cuándo, tipo y tamaño; nunca el texto).
+	// `rowid_max` marca hasta dónde llegan los mensajes anteriores a esta migración; el relleno cuenta solo esos.
+	{
+		`CREATE TABLE daily_stats (
+			bot_id INTEGER NOT NULL,
+			chat TEXT NOT NULL,
+			sender TEXT NOT NULL,
+			day TEXT NOT NULL,
+			hora INTEGER NOT NULL,
+			tipo TEXT NOT NULL,
+			count INTEGER NOT NULL,
+			bytes INTEGER NOT NULL,
+			PRIMARY KEY (bot_id, chat, sender, day, hora, tipo)
+		) WITHOUT ROWID`,
+		`CREATE INDEX idx_stats_dia ON daily_stats(bot_id, day)`,
+		`CREATE TABLE stats_info (campo TEXT PRIMARY KEY, valor INTEGER NOT NULL)`,
+		`INSERT INTO stats_info(campo, valor) SELECT 'rowid_max', COALESCE(MAX(rowid),0) FROM messages`,
+		`INSERT INTO stats_info(campo, valor) VALUES('relleno', 0)`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

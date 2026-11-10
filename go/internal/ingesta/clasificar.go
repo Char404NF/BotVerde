@@ -5,6 +5,7 @@ package ingesta
 import (
 	"encoding/base64"
 	"encoding/json"
+	"regexp"
 	"strings"
 
 	"botchat/internal/almacen"
@@ -182,14 +183,15 @@ func Clasificar(evt *events.Message) Clasificado {
 		return Clasificado{Tipo: almacen.TipoSticker, Mime: s.GetMimetype(), Bytes: int64(s.GetFileLength()), Ancho: int(s.GetWidth()), Alto: int(s.GetHeight()),
 			Info: infoDe("sticker", s.GetDirectPath(), s.GetMediaKey(), s.GetFileSHA256(), s.GetFileEncSHA256(), s.GetMimetype(), s.GetFileLength())}
 	case m.GetContactMessage() != nil:
-		return Clasificado{Tipo: almacen.TipoContacto, Texto: "Contacto: " + m.GetContactMessage().GetDisplayName()}
+		return Clasificado{Tipo: almacen.TipoContacto, Texto: contactosJSON([]*waE2E.ContactMessage{m.GetContactMessage()})}
 	case m.GetContactsArrayMessage() != nil:
-		return Clasificado{Tipo: almacen.TipoContacto, Texto: "Contactos: " + m.GetContactsArrayMessage().GetDisplayName()}
+		return Clasificado{Tipo: almacen.TipoContacto, Texto: contactosJSON(m.GetContactsArrayMessage().GetContacts())}
 	case m.GetLocationMessage() != nil:
 		l := m.GetLocationMessage()
-		return Clasificado{Tipo: almacen.TipoUbicacion, Texto: strings.TrimSpace("Ubicación: " + l.GetName() + " " + l.GetAddress())}
+		return Clasificado{Tipo: almacen.TipoUbicacion, Texto: ubicacionJSON(l.GetDegreesLatitude(), l.GetDegreesLongitude(), l.GetName(), l.GetAddress(), false)}
 	case m.GetLiveLocationMessage() != nil:
-		return Clasificado{Tipo: almacen.TipoUbicacion, Texto: "Ubicación en tiempo real"}
+		l := m.GetLiveLocationMessage()
+		return Clasificado{Tipo: almacen.TipoUbicacion, Texto: ubicacionJSON(l.GetDegreesLatitude(), l.GetDegreesLongitude(), "", l.GetCaption(), true)}
 	case m.GetPollCreationMessage() != nil:
 		return Clasificado{Tipo: almacen.TipoEncuesta, Texto: "Encuesta: " + m.GetPollCreationMessage().GetName()}
 	case m.GetPollCreationMessageV2() != nil:
@@ -206,7 +208,41 @@ func Clasificar(evt *events.Message) Clasificado {
 	if sinContenido(m) {
 		return Clasificado{Omitir: true}
 	}
-	return Clasificado{Tipo: almacen.TipoOtro, Texto: "[Mensaje no compatible con esta versión]"}
+	return Clasificado{Tipo: almacen.TipoOtro, Texto: TextoEspecial}
+}
+
+// TextoEspecial es lo que se guarda de un mensaje que esta versión no sabe mostrar (la pantalla lo dibuja como tarjeta).
+const TextoEspecial = "Mensaje especial"
+
+var reTel = regexp.MustCompile(`(?im)^(?:item\d+\.)?TEL[^:\r\n]*:([^\r\n]+)`)
+var reNombre = regexp.MustCompile(`(?im)^FN[^:\r\n]*:([^\r\n]+)`)
+
+// contactosJSON guarda cada contacto compartido con su nombre y teléfonos (sacados de la tarjeta vCard).
+func contactosJSON(cs []*waE2E.ContactMessage) string {
+	v := almacen.ContactoVista{V: 1, Contacts: []almacen.ContactoUn{}}
+	for _, c := range cs {
+		nombre := strings.TrimSpace(c.GetDisplayName())
+		card := c.GetVcard()
+		if nombre == "" {
+			if m := reNombre.FindStringSubmatch(card); m != nil {
+				nombre = strings.TrimSpace(m[1])
+			}
+		}
+		u := almacen.ContactoUn{Nombre: nombre, Tels: []string{}}
+		for _, m := range reTel.FindAllStringSubmatch(card, -1) {
+			if t := strings.TrimSpace(m[1]); t != "" {
+				u.Tels = append(u.Tels, t)
+			}
+		}
+		v.Contacts = append(v.Contacts, u)
+	}
+	b, _ := json.Marshal(v)
+	return string(b)
+}
+
+func ubicacionJSON(lat, lon float64, nombre, dir string, vivo bool) string {
+	b, _ := json.Marshal(almacen.UbicacionVista{V: 1, Lat: lat, Lon: lon, Nombre: strings.TrimSpace(nombre), Dir: strings.TrimSpace(dir), Vivo: vivo})
+	return string(b)
 }
 
 // sinContenido: el mensaje no trae nada que mostrar (solo datos internos o un texto vacío).

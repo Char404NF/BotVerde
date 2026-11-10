@@ -304,6 +304,9 @@ func (a *Almacen) BorrarChat(botID int64, chat string) (bytes int64, err error) 
 	if _, err = a.db.Exec("DELETE FROM chats WHERE bot_id=? AND jid=?", botID, chat); err != nil {
 		return 0, err
 	}
+	if _, err = a.db.Exec("DELETE FROM daily_stats WHERE bot_id=? AND chat=?", botID, chat); err != nil {
+		return 0, err
+	}
 	a.avisa("chats")
 	a.avisa("espacio")
 	return bytes, nil
@@ -551,6 +554,9 @@ func (a *Almacen) EliminarBot(botID int64) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if _, err := a.db.Exec("DELETE FROM chats WHERE bot_id=?", botID); err != nil {
+		return err
+	}
+	if _, err := a.db.Exec("DELETE FROM daily_stats WHERE bot_id=?", botID); err != nil {
 		return err
 	}
 	_ = os.RemoveAll(filepath.Join(a.raiz, "media", fmt.Sprint(botID)))

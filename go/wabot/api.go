@@ -302,3 +302,53 @@ func DescargasConfig() string {
 
 // EstablecerRed avisa el tipo de conexión del teléfono: 0 desconocida, 1 Wi-Fi, 2 datos móviles.
 func EstablecerRed(tipo int) { redAhora.Store(int32(tipo)) }
+
+// EstablecerZona fija la zona horaria del teléfono (por ejemplo "America/Mexico_City") para agrupar mensajes por día.
+// La primera vez que se llama también cuenta los mensajes que ya estaban guardados, en segundo plano.
+func EstablecerZona(id string) error {
+	a, err := almacenAbierto()
+	if err != nil {
+		return err
+	}
+	if err := a.FijarZona(id); err != nil {
+		return err
+	}
+	go func() { _ = a.RellenarEstadisticas() }()
+	return nil
+}
+
+// EstadisticasChat devuelve (JSON) el resumen de un chat: enviados, recibidos, por tipo, por hora, por día de la semana y, en grupos, quién escribe más.
+func EstadisticasChat(botID int64, chat string) (string, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return "", err
+	}
+	return js(a.ResumenDeChat(botID, chat))
+}
+
+// CalendarioChat devuelve (JSON) cuántos mensajes hubo cada día de un mes (formato AAAA-MM).
+func CalendarioChat(botID int64, chat, mes string) (string, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return "", err
+	}
+	return js(a.CalendarioMes(botID, chat, mes))
+}
+
+// MensajesDia devuelve (JSON) los mensajes de un día (AAAA-MM-DD) de un chat, del más viejo al más nuevo.
+func MensajesDia(botID int64, chat, dia string) (string, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return "", err
+	}
+	return js(a.MensajesDelDia(botID, chat, dia))
+}
+
+// EstadisticasGlobales devuelve (JSON) los totales de toda la cuenta, los chats más activos y la actividad de los últimos `dias` días.
+func EstadisticasGlobales(botID int64, dias int) (string, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return "", err
+	}
+	return js(a.ResumenDeTodo(botID, dias))
+}

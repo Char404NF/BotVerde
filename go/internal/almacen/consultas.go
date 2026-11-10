@@ -112,7 +112,7 @@ func (a *Almacen) listaChats(extra string, extraArgs []any, botID int64, esGrupo
 			c.UltimoTipo = *tipo
 		}
 		if c.UltimoTipo != TipoVerUnaVez && !c.UltimoBorrado {
-			c.UltimoTexto = a.abreTexto("texto", texto)
+			c.UltimoTexto = VistaPrevia(c.UltimoTipo, a.abreTexto("texto", texto))
 		}
 		if c.UltimoTipo == TipoVerUnaVez {
 			c.UltimoTexto = TextoVerUnaVez

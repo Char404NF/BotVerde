@@ -1,6 +1,7 @@
 package ingesta
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -119,7 +120,7 @@ func TestProtocoloEdicionRevocacionYOmitidos(t *testing.T) {
 	if c := Clasificar(nil); !c.Omitir {
 		t.Error("nil se omite")
 	}
-	if c := Clasificar(evt(&waE2E.Message{ContactMessage: &waE2E.ContactMessage{DisplayName: proto.String("Pepe")}})); c.Tipo != almacen.TipoContacto || c.Texto != "Contacto: Pepe" {
+	if c := Clasificar(evt(&waE2E.Message{ContactMessage: &waE2E.ContactMessage{DisplayName: proto.String("Pepe")}})); c.Tipo != almacen.TipoContacto || !strings.Contains(c.Texto, "Pepe") {
 		t.Errorf("%+v", c)
 	}
 	if c := Clasificar(evt(&waE2E.Message{LocationMessage: &waE2E.LocationMessage{Name: proto.String("Casa")}})); c.Tipo != almacen.TipoUbicacion {
@@ -163,5 +164,23 @@ func TestPoliticaDeDescarga(t *testing.T) {
 	// Sin tamaño conocido (0) se permite; el tope se aplica con el tamaño real al descargar.
 	if auto, _ := p.Decidir(almacen.CatFoto, 0, RedWifi, 10*gb); !auto {
 		t.Error("tamaño desconocido")
+	}
+}
+
+func TestContactoUbicacionYEspecial(t *testing.T) {
+	vc := "BEGIN:VCARD\nVERSION:3.0\nFN:Juan Pérez\nTEL;type=CELL;waid=5215512345678:+52 1 55 1234 5678\nitem1.TEL:+52 55 0000 1111\nEND:VCARD"
+	c := Clasificar(&events.Message{Message: &waE2E.Message{ContactMessage: &waE2E.ContactMessage{DisplayName: proto.String("Juan"), Vcard: proto.String(vc)}}})
+	var cv almacen.ContactoVista
+	if c.Tipo != almacen.TipoContacto || json.Unmarshal([]byte(c.Texto), &cv) != nil || len(cv.Contacts) != 1 || len(cv.Contacts[0].Tels) != 2 || cv.Contacts[0].Nombre != "Juan" {
+		t.Fatalf("contacto: %+v %s", c, c.Texto)
+	}
+	u := Clasificar(&events.Message{Message: &waE2E.Message{LocationMessage: &waE2E.LocationMessage{DegreesLatitude: proto.Float64(19.43), DegreesLongitude: proto.Float64(-99.13), Name: proto.String("Zócalo")}}})
+	var uv almacen.UbicacionVista
+	if u.Tipo != almacen.TipoUbicacion || json.Unmarshal([]byte(u.Texto), &uv) != nil || uv.Nombre != "Zócalo" || uv.Lat != 19.43 {
+		t.Fatalf("ubicación: %+v", u)
+	}
+	o := Clasificar(&events.Message{Message: &waE2E.Message{OrderMessage: &waE2E.OrderMessage{}}})
+	if o.Tipo != almacen.TipoOtro || o.Texto != TextoEspecial {
+		t.Fatalf("especial: %+v", o)
 	}
 }
