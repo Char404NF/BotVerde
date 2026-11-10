@@ -2,8 +2,6 @@ package wabot
 
 import (
 	"context"
-	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -60,6 +58,7 @@ func PausarBotEnChat(botID int64, chat string, minutos int) error {
 		return err
 	}
 	if minutos <= 0 {
+		a.ReactivarSesiones(botID, chat)
 		return a.PausarBot(botID, chat, 0)
 	}
 	return a.PausarBot(botID, chat, time.Now().Add(time.Duration(minutos)*time.Minute).Unix())
@@ -131,32 +130,3 @@ func (s *estado) alMotor(v *events.Message, sincronizando bool) {
 	}
 	s.motor.Entrar(m)
 }
-
-// ---------- decisor por defecto (hasta que haya automatizaciones) ----------
-
-// saludo reproduce lo que hacía el bot desde la etapa 1: contesta "hola" a los textos privados de otras personas,
-// como máximo una vez por minuto por persona. Ya cita el mensaje. Las automatizaciones lo reemplazan.
-type saludo struct {
-	mu     sync.Mutex
-	ultimo map[string]time.Time
-}
-
-func (d *saludo) Decidir(_ context.Context, u motor.Mensaje, _ []motor.Mensaje) (motor.Decision, error) {
-	if u.EsGrupo || strings.TrimSpace(u.Texto) == "" {
-		return motor.Decision{}, nil
-	}
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if t, ok := d.ultimo[u.Chat]; ok && time.Since(t) < time.Minute {
-		return motor.Decision{}, nil
-	}
-	if d.ultimo == nil {
-		d.ultimo = map[string]time.Time{}
-	}
-	d.ultimo[u.Chat] = time.Now()
-	return motor.Decision{Coincidio: "saludo", Respuestas: []motor.Salida{{Texto: "hola"}}}, nil
-}
-
-var decisorGlobal motor.Decisor = &saludo{}
-
-func decisorActual() motor.Decisor { return decisorGlobal }

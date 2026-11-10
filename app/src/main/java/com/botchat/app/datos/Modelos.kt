@@ -73,7 +73,8 @@ data class VerUnaVezAbierto(val ruta: String, val tipo: String, val mime: String
 data class ResultadoEnvio(val id: String, val estado: String, val ts: Long)
 data class PresenciaChat(val escribiendo: Boolean = false, val enLinea: Boolean = false, val ultimaVez: Long = 0)
 data class ReenvioResultado(val enviados: Int, val omitidos: Int, val fallidos: Int)
-data class EstadoChat(val silenciado: Boolean = false, val botPausaHasta: Long = 0, val botActivo: Boolean = true)
+data class EstadoChat(val silenciado: Boolean = false, val botPausaHasta: Long = 0, val botActivo: Boolean = true, val pausaHumano: Boolean = false)
+data class ActividadItem(val ts: Long, val evento: String, val motivo: String, val chat: String, val detalle: String)
 
 /** Qué mensajes de un chat se quieren ver (mismo formato que el filtro del módulo Go). */
 data class FiltroLista(
@@ -256,7 +257,8 @@ object Json {
     fun envio(json: String): ResultadoEnvio { val o = JSONObject(json); return ResultadoEnvio(o.optString("id"), o.optString("estado"), o.optLong("ts")) }
     fun presencia(json: String): PresenciaChat = runCatching { JSONObject(json).let { PresenciaChat(it.optBoolean("escribiendo"), it.optBoolean("enLinea"), it.optLong("ultimaVez")) } }.getOrDefault(PresenciaChat())
     fun reenvio(json: String): ReenvioResultado { val o = JSONObject(json); return ReenvioResultado(o.optInt("enviados"), o.optInt("omitidos"), o.optInt("fallidos")) }
-    fun estadoChat(json: String): EstadoChat = runCatching { JSONObject(json).let { EstadoChat(it.optBoolean("silenciado"), it.optLong("botPausaHasta"), it.optBoolean("botActivo", true)) } }.getOrDefault(EstadoChat())
+    fun estadoChat(json: String): EstadoChat = runCatching { JSONObject(json).let { EstadoChat(it.optBoolean("silenciado"), it.optLong("botPausaHasta"), it.optBoolean("botActivo", true), it.optBoolean("pausaHumano")) } }.getOrDefault(EstadoChat())
+    fun actividad(json: String) = lista(json) { ActividadItem(it.optLong("ts"), it.optString("evento"), it.optString("motivo"), it.optString("chat"), it.optString("detalle")) }
     fun participantes(json: String) = lista(json) { Participante(it.optString("jid"), it.optString("usuario"), it.optString("nombre"), it.optString("telefono"), it.optBoolean("esAdmin")) }
     fun infoMensaje(json: String): InfoMsg {
         val o = JSONObject(json)

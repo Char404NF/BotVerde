@@ -4,6 +4,7 @@ package com.botchat.app.ui
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.zIndex
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -287,6 +288,10 @@ fun PantallaChat(
                     Box {
                         IconButton({ menu = true }) { Icon(Ico.Mas, "Más opciones") }
                         DropdownMenu(menu, { menu = false }) {
+                            if (chat?.esGrupo == true) DropdownMenuItem(
+                                text = { Text(if (vm.estadoChat.botActivo) "Bot en este grupo: Activo (tocar para pausar)" else "Bot en este grupo: Pausado (tocar para activar)") },
+                                onClick = { menu = false; vm.botActivoEnChat(!vm.estadoChat.botActivo) }, modifier = Modifier.testTag("menu_bot_grupo"),
+                            )
                             DropdownMenuItem(text = { Text(if (vm.estadoChat.silenciado) "Activar notificaciones" else "Silenciar notificaciones") }, onClick = { menu = false; vm.silenciar(!vm.estadoChat.silenciado) }, modifier = Modifier.testTag("menu_silenciar"))
                             DropdownMenuItem(text = { Text("Borrar archivos de este chat") }, onClick = {
                                 menu = false
@@ -343,6 +348,19 @@ fun PantallaChat(
         containerColor = MaterialTheme.colorScheme.surface,
     ) { relleno ->
         Box(Modifier.fillMaxSize().padding(relleno)) {
+            val pausaHasta = vm.estadoChat.botPausaHasta
+            val ahoraS = System.currentTimeMillis() / 1000
+            if (pausaHasta > ahoraS) {
+                Surface(Modifier.align(Alignment.TopCenter).fillMaxWidth().zIndex(2f).testTag("aviso_bot_pausado"), color = MaterialTheme.colorScheme.tertiaryContainer) {
+                    Row(Modifier.padding(horizontal = Esp.l, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            if (vm.estadoChat.pausaHumano) "Esperando a una persona: el bot calla aquí hasta las ${horaDe(pausaHasta)}" else "El bot está en pausa en este chat hasta las ${horaDe(pausaHasta)}",
+                            Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        )
+                        TextButton({ haptica(Toque.Suave); vm.reactivarBot() }, Modifier.testTag("reactivar_bot")) { Text("Reactivar") }
+                    }
+                }
+            }
             when {
                 msgs == null -> CargaDeMensajes()
                 msgs.isEmpty() -> EstadoVacio(Ico.Documento, "Sin mensajes", "Todavía no hay mensajes en este chat.", Modifier.align(Alignment.Center))

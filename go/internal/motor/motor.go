@@ -43,7 +43,8 @@ type Salida struct{ Texto string }
 type Decision struct {
 	Respuestas   []Salida
 	Coincidio    string // nombre corto de lo que coincidió (para el registro; sin textos del usuario)
-	PasarAHumano bool   // calla en ese chat hasta que se reactive o pasen 12 h
+	PasarAHumano bool   // calla en ese chat (privado) hasta que se reactive o pasen 12 h; en grupos el motor de menús calla solo con esa persona
+	Omitir       string // no responder y anotar este motivo en el registro (por ejemplo "esperando a una persona")
 	Aviso        string // texto neutro para una notificación local ("" = ninguna)
 }
 
@@ -388,6 +389,10 @@ func (m *Motor) atiende(chat string, lote []Mensaje) {
 		m.c.Log("Error al decidir la respuesta: " + err.Error())
 		return
 	}
+	if d.Omitir != "" {
+		m.omite(ultimo, d.Omitir)
+		return
+	}
 	if d.Coincidio == "" && len(d.Respuestas) == 0 && !d.PasarAHumano {
 		m.c.Alm.RegistrarActividad(m.c.BotID, almacen.ActSinCoincid, "", chat, "")
 		return
@@ -419,7 +424,7 @@ func (m *Motor) atiende(chat string, lote []Mensaje) {
 			return
 		}
 	}
-	if d.PasarAHumano {
+	if d.PasarAHumano && !ultimo.EsGrupo { // en grupos no se calla todo el grupo: el motor de menús calla solo con esa persona
 		_ = m.c.Alm.PausarBotHumano(m.c.BotID, chat, m.c.Ahora().Add(12*time.Hour).Unix())
 		m.c.Alm.RegistrarActividad(m.c.BotID, almacen.ActOmitido, almacen.MotHumano, chat, "pasó a una persona")
 		if m.c.AlHumano != nil {

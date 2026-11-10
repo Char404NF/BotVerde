@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"botchat/internal/envio"
+	"botchat/internal/flujo"
 	"botchat/internal/fotos"
 	"botchat/internal/ingesta"
 	"botchat/internal/medios"
@@ -51,6 +52,7 @@ type estado struct {
 	ing           *ingesta.Ingesta
 	envio         *envio.Servicio
 	motor         *motor.Motor
+	flujo         *flujo.Motor
 	sincronizando atomic.Bool // WhatsApp está entregando mensajes acumulados: no se contestan
 	descargas     *medios.Gestor
 	fotos         *fotos.Gestor
@@ -148,8 +150,10 @@ func (s *estado) armar() {
 		Servicios: servicios{s}, EsPropio: s.esPropio, VerUnaVezDias: func() int { return int(verUnaVezDias.Load()) }, Politica: politicaActual, Red: redActual, Libre: func() int64 { l, _ := alm.Libre(); return l }, Log: s.log})
 	s.envio = envio.Nuevo(s.botID, alm, envio.Real{Client: s.cli}, s.log)
 	s.envio.PausaBot = pausaTrasEscribir
+	alm.SembrarSaludo(s.botID, flujo.SaludoJSON())
+	s.flujo = s.nuevoFlujo()
 	s.motor = motor.Nuevo(motor.Config{
-		BotID: s.botID, Alm: alm, Decisor: decisorActual(), Enviador: enviadorMotor{s}, Log: s.log,
+		BotID: s.botID, Alm: alm, Decisor: s.decisor(), Enviador: enviadorMotor{s}, Log: s.log,
 		Activo: motorActivo.Load, VentanaAntigua: func() time.Duration { return time.Duration(ventanaAntiguaMin.Load()) * time.Minute },
 		AlFrenar: func() { s.avisaCambio("motor:freno") },
 		AlHumano: func(chat, aviso string) { s.avisaCambio("humano:" + chat) },
@@ -385,6 +389,14 @@ func (s *estado) evento(e any) {
 	case *events.Contact, *events.AppStateSyncComplete:
 		s.refrescarNombres()
 	}
+}
+
+// decisor devuelve quién decide las respuestas: el motor de menús (o el de las pruebas).
+func (s *estado) decisor() motor.Decisor {
+	if d := decisorActual(); d != nil {
+		return d
+	}
+	return s.flujo
 }
 
 // esPropio dice si un JID es el de esta misma cuenta (teléfono o LID).

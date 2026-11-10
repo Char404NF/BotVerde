@@ -117,6 +117,10 @@ object Repo {
     suspend fun cerrarVerUnaVez(bot: Long, chat: String, id: String) = io { motor.cerrarVerUnaVez(bot, chat, id) }
     suspend fun barrerVerUnaVez(bot: Long) = io { motor.barrerVerUnaVez(bot) }
 
+    suspend fun actividadMotor(bot: Long, limite: Int = 200) = io { Json.actividad(motor.actividadMotor(bot, limite.toLong())) }
+    suspend fun botEnChat(bot: Long, chat: String, activo: Boolean) = io { motor.botEnChat(bot, chat, activo) }
+    suspend fun pausarBotEnChat(bot: Long, chat: String, minutos: Int) = io { motor.pausarBotEnChat(bot, chat, minutos.toLong()) }
+
     suspend fun estadisticasChat(bot: Long, chat: String) = io { Json.resumenChat(motor.estadisticasChat(bot, chat)) }
     suspend fun calendario(bot: Long, chat: String, mes: String) = io { Json.calendario(motor.calendarioChat(bot, chat, mes)) }
     suspend fun mensajesDia(bot: Long, chat: String, dia: String) = io { Json.mensajes(motor.mensajesDia(bot, chat, dia)) }

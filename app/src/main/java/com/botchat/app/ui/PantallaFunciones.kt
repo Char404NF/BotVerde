@@ -47,6 +47,7 @@ fun PantallaFunciones(ajustes: Ajustes, alVolver: () -> Unit) {
     val leido by ajustes.marcarLeidoAlAbrir.collectAsState()
     val pausa by ajustes.pausaBotMin.collectAsState()
     val verDias by ajustes.verUnaVezDias.collectAsState()
+    val antiguedad by ajustes.antiguedadMin.collectAsState()
     Scaffold(
         modifier = Modifier.nestedScroll(barra.nestedScrollConnection),
         topBar = { LargeTopAppBar(scrollBehavior = barra, navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text("Funciones") }) },
@@ -54,6 +55,7 @@ fun PantallaFunciones(ajustes: Ajustes, alVolver: () -> Unit) {
         Column(Modifier.fillMaxSize().padding(relleno).verticalScroll(rememberScrollState()).padding(bottom = 32.dp)) {
             Seccion("Se pueden apagar sin reinstalar") {
                 Interruptor("Motor de automatización", "Las respuestas automáticas del bot (el bot solo responde, nunca escribe primero)", motor, true, Ico.Chats) { haptica(Toque.Suave); ajustes.fijarMotorAutomatico(it) }
+                Deslizador("No responder mensajes de hace más de", "$antiguedad min", antiguedad.toFloat(), 1f..60f, 58, "El bot no contesta lo que llegó hace más que esto, ni lo que WhatsApp entrega de golpe al reconectar.") { ajustes.fijarAntiguedadMin(it.toInt().coerceIn(1, 60)) }
                 Interruptor("Escribir desde la app", "Poder mandar mensajes a mano desde los chats", escribir, true, Ico.Compartir) { haptica(Toque.Suave); ajustes.fijarEscribirDesdeApp(it) }
                 Interruptor("Notificaciones de mensajes", "Avisar cuando llega un mensaje nuevo. En la pantalla bloqueada solo dice “Mensaje nuevo”. Puedes silenciar chats concretos desde el chat.", notifs, true, Ico.Aviso) {
                     haptica(Toque.Suave)

@@ -205,6 +205,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                     PantallaAjustes(ajustes, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("bot") }, alAvanzado = { nav.navigate("avanzado") }, alEstadisticas = { nav.navigate("estadisticas") }, alPrivacidad = { nav.navigate("privacidad") })
                 }
                 composable("privacidad") { PantallaPrivacidad(ajustes, alVolver = { nav.popBackStack() }) }
+                composable("actividad") { PantallaActividad(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("funciones") { PantallaFunciones(ajustes, alVolver = { nav.popBackStack() }) }
                 composable("seguridad") { PantallaSeguridad(ajustes, alVolver = { nav.popBackStack() }) }
                 composable("descargas") { PantallaDescargas(ajustes, alVolver = { nav.popBackStack() }) }
@@ -212,7 +213,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                     PantallaAvanzado(
                         ajustes, bot.nombre, vm.eliminando, alVolver = { nav.popBackStack() },
                         alAbrirEspacio = { irA("espacio") }, alMedirRendimiento = { nav.navigate("diagnostico") },
-                        alFunciones = { nav.navigate("funciones") }, alEliminarBot = { vm.eliminar(ctx) },
+                        alFunciones = { nav.navigate("funciones") }, alActividad = { nav.navigate("actividad") }, alEliminarBot = { vm.eliminar(ctx) },
                     )
                 }
                 composable("bot") { PantallaBot(vm, conPermiso, alVolver = { nav.popBackStack() }, alAbrirAvanzado = { nav.navigate("avanzado") }, alAbrirAyuda = { nav.navigate("ayuda") }) }

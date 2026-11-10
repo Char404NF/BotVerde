@@ -45,9 +45,8 @@ func (c *capturaDecisor) espera(t *testing.T, n int) []motor.Mensaje {
 func TestEventosDeMensajeLleganAlMotorConMencionCitaYSincronizacion(t *testing.T) {
 	reinicia(t)
 	cap := &capturaDecisor{}
-	anterior := decisorGlobal
-	decisorGlobal = cap
-	defer func() { decisorGlobal = anterior }()
+	decisorPrueba = cap
+	defer func() { decisorPrueba = nil }()
 	ConfigurarMotor(true, 10)
 	f := &falso{}
 	raiz := t.TempDir()
@@ -144,4 +143,66 @@ func contiene(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+func TestSaludoDeFabricaCoincideConUnMensajePrivado(t *testing.T) {
+	reinicia(t)
+	decisorPrueba = nil
+	ConfigurarMotor(true, 10)
+	f := &falso{}
+	raiz := t.TempDir()
+	if err := AbrirAlmacen(raiz, clavePrueba(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := Start(raiz, 1, clavePrueba(), f); err != nil {
+		t.Fatal(err)
+	}
+	defer Stop()
+	l, _ := ListarAutomatizaciones(1)
+	if !contiene(l, `"nombre":"Saludo"`) || !contiene(l, `"sistema":true`) || !contiene(l, `"activo":true`) {
+		t.Fatalf("el Saludo de fábrica debe estar creado y activo: %s", l)
+	}
+	mu.Lock()
+	s := st
+	mu.Unlock()
+	ana, _ := types.ParseJID("34600000001@s.whatsapp.net")
+	e := &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: ana, Sender: ana}, ID: "P1", Timestamp: time.Now(), PushName: "Ana"},
+		RawMessage: &waE2E.Message{Conversation: proto.String("buenas")}}
+	e.UnwrapRaw()
+	s.evento(e)
+	var act string
+	for i := 0; i < 300; i++ {
+		act, _ = ActividadMotor(1, 50)
+		if contiene(act, `"evento":"coincidio"`) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !contiene(act, `"evento":"coincidio"`) || !contiene(act, `"detalle":"Saludo"`) {
+		t.Fatalf("debió coincidir con el Saludo: %s", act)
+	}
+}
+
+func TestReactivarElChatCierraLasConversacionesConUnaPersona(t *testing.T) {
+	reinicia(t)
+	if err := AbrirAlmacen(t.TempDir(), clavePrueba(), nil); err != nil {
+		t.Fatal(err)
+	}
+	a, _ := almacenAbierto()
+	chat := "34600000001@s.whatsapp.net"
+	now := time.Now()
+	_ = a.SilenciarSesion(1, chat, chat, 1, 1, "humano", now.Add(12*time.Hour), now)
+	_ = a.PausarBotHumano(1, chat, now.Add(12*time.Hour).Unix())
+	if s, _ := a.SesionVigente(1, chat, chat, false, now, time.Hour); s == nil {
+		t.Fatal("debía haber una conversación con una persona")
+	}
+	if err := PausarBotEnChat(1, chat, 0); err != nil {
+		t.Fatal(err)
+	}
+	if s, _ := a.SesionVigente(1, chat, chat, false, now, time.Hour); s != nil {
+		t.Fatal("al reactivar se cierra la conversación con una persona")
+	}
+	if a.BotPausado(1, chat, now) {
+		t.Fatal("y el chat deja de estar en pausa")
+	}
 }

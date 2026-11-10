@@ -73,6 +73,7 @@ fun PantallaAvanzado(
     alMedirRendimiento: () -> Unit,
     alEliminarBot: () -> Unit,
     alFunciones: () -> Unit = {},
+    alActividad: () -> Unit = {},
 ) {
     val ctx = LocalContext.current
     val barra = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -103,6 +104,7 @@ fun PantallaAvanzado(
             }
             Seccion("Funciones") {
                 Fila("Funciones", "Apagar motor, escritura, avisos y más sin reinstalar", Ico.Ajustes) { Button(alFunciones, Modifier.testTag("abrir_funciones")) { Text("Abrir") } }
+                Fila("Actividad del bot", "Qué llegó, qué respondió y por qué no", Ico.Estadisticas) { OutlinedButton(alActividad, Modifier.testTag("abrir_actividad")) { Text("Ver") } }
             }
             Seccion("Mantenimiento") {
                 Fila("Espacio", "Qué ocupa cada chat y cómo liberarlo", Ico.Espacio) { Button(alAbrirEspacio) { Text("Abrir") } }

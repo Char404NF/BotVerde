@@ -112,6 +112,7 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
     private suspend fun cargar(cuantos: Int) {
         val c = runCatching { Repo.chat(botId, jid) }.getOrNull()
         chat = c
+        runCatching { Repo.estadoChat(botId, jid) }.onSuccess { estadoChat = it }
         val m = Repo.mensajes(botId, jid, limite = cuantos)
         if (iniciales == null) iniciales = m.mapTo(HashSet()) { it.id }
         mensajes = m
@@ -264,6 +265,16 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
     }
 
     suspend fun info(m: Msg): InfoMsg? = runCatching { Repo.infoMensaje(botId, jid, m.id) }.getOrNull()
+
+    /** Interruptor Activo / Pausado del bot en este chat (grupos). */
+    fun botActivoEnChat(si: Boolean) {
+        viewModelScope.launch { runCatching { Repo.botEnChat(botId, jid, si); estadoChat = estadoChat.copy(botActivo = si) }.onFailure { aviso = it.message } }
+    }
+
+    /** Quita la pausa del bot en este chat (la de escribir yo o la de "hablar con una persona"). */
+    fun reactivarBot() {
+        viewModelScope.launch { runCatching { Repo.pausarBotEnChat(botId, jid, 0); estadoChat = estadoChat.copy(botPausaHasta = 0, pausaHumano = false) }.onFailure { aviso = it.message } }
+    }
 
     fun silenciar(si: Boolean) {
         viewModelScope.launch { runCatching { Repo.silenciar(botId, jid, si); estadoChat = estadoChat.copy(silenciado = si) } }

@@ -99,6 +99,11 @@ class Ajustes private constructor(ctx: Context) {
     val pausaBotMin: StateFlow<Int> = _pausaBot
     fun fijarPausaBotMin(v: Int) { p.edit().putInt("pausa_bot_min", v).apply(); _pausaBot.value = v; aplicarAGo() }
 
+    private val _antiguedad = MutableStateFlow(p.getInt("antiguedad_min", 10))
+    /** Minutos: lo que llegó hace más que esto no se responde. */
+    val antiguedadMin: StateFlow<Int> = _antiguedad
+    fun fijarAntiguedadMin(v: Int) { p.edit().putInt("antiguedad_min", v).apply(); _antiguedad.value = v; aplicarAGo() }
+
     private val _verDias = MutableStateFlow(p.getInt("ver_una_vez_dias", 14))
     /** Días que un "ver una vez" espera a que lo abras antes de borrarse. */
     val verUnaVezDias: StateFlow<Int> = _verDias
@@ -162,6 +167,7 @@ class Ajustes private constructor(ctx: Context) {
         runCatching { Wabot.conservarEliminados(_conservar.value) }
         runCatching { Wabot.configurarEnvio(_pausaBot.value.toLong()) }
         runCatching { Wabot.configurarVerUnaVez(_verDias.value.toLong()) }
+        runCatching { Wabot.configurarMotor(_motorAuto.value, _antiguedad.value.toLong()) }
     }
 
     companion object {

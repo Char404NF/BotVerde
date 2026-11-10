@@ -106,6 +106,11 @@ class MotorFalso : Motor {
     override fun cerrarVerUnaVez(bot: Long, chat: String, id: String) { llamadas += "cerrarUnaVez:$id" }
     override fun barrerVerUnaVez(bot: Long): Long { llamadas += "barrer"; return 0 }
     override fun configurarVerUnaVez(dias: Long) { llamadas += "verDias:$dias" }
+    var actividad = "[]"
+    override fun configurarMotor(activo: Boolean, ventanaMin: Long) { llamadas += "motor:$activo:$ventanaMin" }
+    override fun actividadMotor(bot: Long, limite: Long) = actividad
+    override fun botEnChat(bot: Long, chat: String, activo: Boolean) { llamadas += "botChat:$activo" }
+    override fun pausarBotEnChat(bot: Long, chat: String, minutos: Long) { llamadas += "pausarBot:$minutos" }
     override fun olvidarMensaje(bot: Long, chat: String, id: String) { llamadas += "olvidar:$chat:$id" }
     override fun establecerZona(id: String) { zona = id }
     override fun estadisticasChat(bot: Long, chat: String) = resumenChat

@@ -154,6 +154,81 @@ var migraciones = [][]string{
 		`CREATE INDEX idx_actividad_ts ON actividad(bot_id, ts)`,
 		`ALTER TABLE chat_estado ADD COLUMN pausa_humano INTEGER NOT NULL DEFAULT 0`,
 	},
+	// 7: automatizaciones (menús y respuestas), sus versiones, el seguimiento de cada conversación y los avisos locales.
+	{
+		`CREATE TABLE menus (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			activo INTEGER NOT NULL DEFAULT 1,
+			sistema INTEGER NOT NULL DEFAULT 0,
+			version INTEGER NOT NULL DEFAULT 1,
+			orden INTEGER NOT NULL DEFAULT 0,
+			creado INTEGER NOT NULL,
+			actualizado INTEGER NOT NULL,
+			def_cifrado BLOB
+		)`,
+		`CREATE TABLE menu_versiones (
+			menu_id INTEGER NOT NULL,
+			version INTEGER NOT NULL,
+			ts INTEGER NOT NULL,
+			def_cifrado BLOB,
+			PRIMARY KEY (menu_id, version)
+		) WITHOUT ROWID`,
+		`CREATE TABLE flow_sessions (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			chat TEXT NOT NULL,
+			sender TEXT NOT NULL,
+			menu_id INTEGER NOT NULL,
+			menu_version INTEGER NOT NULL,
+			paso TEXT NOT NULL,
+			espera_dato INTEGER NOT NULL DEFAULT 0,
+			invalidas INTEGER NOT NULL DEFAULT 0,
+			cortado INTEGER NOT NULL DEFAULT 0,
+			inicio_ts INTEGER NOT NULL,
+			ultima_ts INTEGER NOT NULL,
+			hasta_ts INTEGER NOT NULL DEFAULT 0,
+			estado TEXT NOT NULL DEFAULT 'activo',
+			prueba INTEGER NOT NULL DEFAULT 0
+		)`,
+		`CREATE INDEX idx_sesiones_persona ON flow_sessions(bot_id, chat, sender, estado)`,
+		`CREATE INDEX idx_sesiones_menu ON flow_sessions(bot_id, menu_id, inicio_ts)`,
+		`CREATE TABLE flow_events (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			session_id INTEGER NOT NULL,
+			ts INTEGER NOT NULL,
+			paso TEXT NOT NULL,
+			opcion TEXT NOT NULL DEFAULT '',
+			resultado TEXT NOT NULL
+		)`,
+		`CREATE INDEX idx_eventos_sesion ON flow_events(session_id)`,
+		`CREATE TABLE flow_vars (
+			session_id INTEGER NOT NULL,
+			nombre TEXT NOT NULL,
+			valor_cifrado BLOB,
+			PRIMARY KEY (session_id, nombre)
+		) WITHOUT ROWID`,
+		`CREATE TABLE menu_stats (
+			bot_id INTEGER NOT NULL,
+			day TEXT NOT NULL,
+			menu_id INTEGER NOT NULL,
+			paso TEXT NOT NULL,
+			opcion TEXT NOT NULL,
+			prueba INTEGER NOT NULL DEFAULT 0,
+			cuenta INTEGER NOT NULL,
+			PRIMARY KEY (bot_id, day, menu_id, paso, opcion, prueba)
+		) WITHOUT ROWID`,
+		`CREATE TABLE avisos (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			ts INTEGER NOT NULL,
+			tipo TEXT NOT NULL,
+			chat TEXT NOT NULL DEFAULT '',
+			titulo TEXT NOT NULL,
+			detalle_cifrado BLOB,
+			visto INTEGER NOT NULL DEFAULT 0
+		)`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

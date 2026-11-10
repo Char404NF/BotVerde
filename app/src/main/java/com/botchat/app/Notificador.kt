@@ -51,7 +51,10 @@ object Notificador {
     /** Empieza a vigilar los cambios; hay que cancelar el Job al detener el servicio. */
     fun iniciar(ctx: Context, scope: CoroutineScope): Job = scope.launch {
         Repo.cambios.collect { evs ->
-            for (e in evs) if (e.startsWith("chat:")) runCatching { revisar(ctx, e.removePrefix("chat:")) }
+            for (e in evs) {
+                if (e.startsWith("chat:")) runCatching { revisar(ctx, e.removePrefix("chat:")) }
+                if (e == "motor:freno") runCatching { avisoFreno(ctx) }
+            }
         }
     }
 
@@ -97,6 +100,18 @@ object Notificador {
             b.addAction(NotificationCompat.Action.Builder(0, "Responder", respuesta).addRemoteInput(RemoteInput.Builder(CLAVE_RESPUESTA).setLabel("Escribe tu respuesta").build()).setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY).build())
         }
         ctx.getSystemService(NotificationManager::class.java)?.notify(jid.hashCode(), b.build())
+    }
+
+    private const val ID_FRENO = 7001
+
+    /** El motor se pausó unos minutos porque fallaron varios envíos seguidos. */
+    private fun avisoFreno(ctx: Context) {
+        if (!permitido(ctx)) return
+        crearCanal(ctx)
+        val abrir = PendingIntent.getActivity(ctx, ID_FRENO, Intent(ctx, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val n = NotificationCompat.Builder(ctx, CANAL).setSmallIcon(R.drawable.ic_stat_bot).setContentTitle("El bot se pausó unos minutos")
+            .setContentText("Fallaron varios envíos seguidos. Se reanuda solo.").setContentIntent(abrir).setAutoCancel(true).build()
+        ctx.getSystemService(NotificationManager::class.java)?.notify(ID_FRENO, n)
     }
 
     fun quitar(ctx: Context, jid: String) { ctx.getSystemService(NotificationManager::class.java)?.cancel(jid.hashCode()) }
