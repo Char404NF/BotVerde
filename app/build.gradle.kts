@@ -15,8 +15,8 @@ android {
         applicationId = "com.botchat.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.2.0"
+        versionCode = 4
+        versionName = "0.2.1"
         ndk { abiFilters += "arm64-v8a" }
     }
     buildFeatures { compose = true }
