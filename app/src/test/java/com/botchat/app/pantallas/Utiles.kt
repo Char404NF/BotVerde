@@ -2,10 +2,21 @@ package com.botchat.app.pantallas
 
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 
-/** Espera (hasta 20 s, por si el servidor está ocupado) a que aparezca un texto: los datos llegan por hilos de fondo, igual que en la app. */
+/**
+ * Espera (hasta 20 s) a que algo se cumpla. El reloj de las pruebas de Compose corre más rápido que el real, así que se
+ * duerme un poco en cada vuelta para dar tiempo a los hilos de fondo (los datos llegan por ellos, igual que en la app).
+ */
+fun ComposeContentTestRule.espera(condicion: () -> Boolean) {
+    waitUntil(20_000) { condicion() || run { waitForIdle(); Thread.sleep(25); false } }
+}
+
 fun ComposeContentTestRule.esperaTexto(texto: String, substring: Boolean = false) {
-    waitUntil(20_000) { onAllNodesWithTextSafe(texto, substring) > 0 }
+    espera { onAllNodesWithTextSafe(texto, substring) > 0 }
 }
 
 fun ComposeContentTestRule.onAllNodesWithTextSafe(texto: String, substring: Boolean = false): Int =
     onAllNodes(androidx.compose.ui.test.hasText(texto, substring = substring)).fetchSemanticsNodes().size
+
+fun ComposeContentTestRule.esperaEtiqueta(etiqueta: String) {
+    espera { onAllNodes(androidx.compose.ui.test.hasTestTag(etiqueta)).fetchSemanticsNodes().isNotEmpty() }
+}

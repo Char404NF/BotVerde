@@ -133,6 +133,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                             alAbrirVisor = { id -> nav.navigate("visor/${enc(jid)}/${enc(id)}") },
                             alAbrirDocumento = { id -> nav.navigate("documento/${enc(jid)}/${enc(id)}") },
                             alAbrirArchivos = { nav.navigate("archivos/${enc(jid)}") },
+                            alAbrirInfo = { nav.navigate("info/${enc(jid)}") },
                         )
                     }
                 }
@@ -147,6 +148,15 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                     val id = be.arguments?.getString("id") ?: return@composable
                     PantallaDocumento(bot.id, jid, id, nombreDeChat(bot.id, jid), alVolver = { nav.popBackStack() })
                 }
+                composable("info/{jid}") { be ->
+                    val jid = be.arguments?.getString("jid") ?: return@composable
+                    PantallaInfoChat(
+                        bot.id, jid, alVolver = { nav.popBackStack() },
+                        alAbrirVisor = { id -> nav.navigate("visor/${enc(jid)}/${enc(id)}") },
+                        alAbrirDocumento = { id -> nav.navigate("documento/${enc(jid)}/${enc(id)}") },
+                    )
+                }
+                composable("estadisticas") { PantallaEstadisticas(bot.id, alVolver = { nav.popBackStack() }, alAbrirChat = { nav.navigate("chat/${enc(it)}") }) }
                 composable("archivos/{jid}") { be ->
                     val jid = be.arguments?.getString("jid") ?: return@composable
                     PantallaCompartidos(
@@ -157,7 +167,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 }
                 composable("espacio") { PantallaEspacio(alVolver = { irA("inicio") }, alAbrirChat = { nav.navigate("chat/${enc(it)}") }, conBarra = false) }
                 composable("ajustes") {
-                    PantallaAjustes(ajustes, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("bot") }, alAvanzado = { nav.navigate("avanzado") })
+                    PantallaAjustes(ajustes, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("bot") }, alAvanzado = { nav.navigate("avanzado") }, alEstadisticas = { nav.navigate("estadisticas") })
                 }
                 composable("seguridad") { PantallaSeguridad(ajustes, alVolver = { nav.popBackStack() }) }
                 composable("descargas") { PantallaDescargas(ajustes, alVolver = { nav.popBackStack() }) }

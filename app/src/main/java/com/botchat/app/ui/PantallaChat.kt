@@ -110,6 +110,7 @@ fun PantallaChat(
     alAbrirVisor: (String) -> Unit,
     alAbrirDocumento: (String) -> Unit,
     alAbrirArchivos: () -> Unit,
+    alAbrirInfo: () -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as android.app.Application
     val vm: ChatVm = viewModel(key = "chat-$jid", factory = viewModelFactory { initializer { ChatVm(app, jid) } })
@@ -138,10 +139,11 @@ fun PantallaChat(
             TopAppBar(
                 navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } },
                 title = {
-                    Row(Modifier.clip(RoundedCornerShape(12.dp)).clickable { haptica(Toque.Suave); verFoto = true }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Avatar(chat?.nombre ?: "", chat?.foto ?: "", chat?.fotoTs ?: 0, jid, 40.dp, Modifier.compartido("avatar-$jid"))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // La foto abre la foto grande; el nombre y el número abren la Info del chat.
+                        Avatar(chat?.nombre ?: "", chat?.foto ?: "", chat?.fotoTs ?: 0, jid, 40.dp, Modifier.clip(CircleShape).clickable { haptica(Toque.Suave); verFoto = true }.compartido("avatar-$jid").testTag("avatar_chat"))
                         Spacer(Modifier.width(Esp.m))
-                        Column {
+                        Column(Modifier.clip(RoundedCornerShape(12.dp)).clickable { haptica(Toque.Suave); alAbrirInfo() }.padding(vertical = 4.dp, horizontal = 4.dp).testTag("encabezado_info")) {
                             Text(chat?.nombre ?: "", Modifier.compartido("nombre-$jid", limites = true), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             if (chat != null && !chat.esGrupo) {
                                 TextoUnaLinea(banderaTelefono(chat), estilo = MaterialTheme.typography.bodySmall)
@@ -301,14 +303,17 @@ private fun ContenidoMensaje(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit,
             Text(etiquetaBorrado(m.tipo), fontStyle = cursiva, color = LocalContentColorSuave())
             if (m.texto.isNotBlank()) Text(m.texto)
         }
+        m.tipo == "sticker" && m.descargado -> StickerAnimado(m)
         m.categoria == "foto" || m.categoria == "video" -> {
             MiniaturaMedia(m, vm, alAbrirVisor)
             if (m.texto.isNotBlank()) { Spacer(Modifier.size(4.dp)); Text(m.texto) }
         }
         m.categoria == "audio" -> { BurbujaAudio(m, vm); if (m.texto.isNotBlank()) Text(m.texto) }
         m.categoria == "documento" -> { BurbujaDocumento(m, vm, alAbrirDocumento); if (m.texto.isNotBlank()) { Spacer(Modifier.size(4.dp)); Text(m.texto) } }
-        m.tipo == "contacto" || m.tipo == "ubicacion" || m.tipo == "encuesta" -> Text(m.texto)
-        m.tipo == "otro" -> Text(m.texto, fontStyle = cursiva, color = LocalContentColorSuave())
+        m.tipo == "contacto" -> TarjetaContacto(m)
+        m.tipo == "ubicacion" -> TarjetaUbicacion(m)
+        m.tipo == "encuesta" -> Text(m.texto)
+        m.tipo == "otro" -> TarjetaEspecial()
         else -> Text(m.texto)
     }
 }

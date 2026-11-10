@@ -44,12 +44,19 @@ object Repo {
             raiz = ctx.applicationContext.filesDir
             motor.abrirAlmacen(raiz.absolutePath, ClaveDatos.obtener(ctx), observador)
             abierto = true
+            actualizarZona()
             error.value = null
             true
         } catch (e: Exception) {
             error.value = e.message ?: "No se pudieron abrir los mensajes guardados"
             false
         }
+    }
+
+    /** Avisa al módulo Go la zona horaria del teléfono para agrupar mensajes por día (la primera vez cuenta también los mensajes anteriores). */
+    fun actualizarZona() {
+        if (!abierto) return
+        runCatching { motor.establecerZona(java.util.TimeZone.getDefault().id) }
     }
 
     fun archivo(rutaRelativa: String): File = File(raiz, rutaRelativa)
@@ -73,6 +80,11 @@ object Repo {
 
     suspend fun archivos(bot: Long, chat: String, categoria: String, soloDescargados: Boolean, limite: Int = 300, desde: Int = 0) =
         io { Json.mensajes(motor.listarArchivos(bot, chat, categoria, soloDescargados, limite.toLong(), desde.toLong())) }
+
+    suspend fun estadisticasChat(bot: Long, chat: String) = io { Json.resumenChat(motor.estadisticasChat(bot, chat)) }
+    suspend fun calendario(bot: Long, chat: String, mes: String) = io { Json.calendario(motor.calendarioChat(bot, chat, mes)) }
+    suspend fun mensajesDia(bot: Long, chat: String, dia: String) = io { Json.mensajes(motor.mensajesDia(bot, chat, dia)) }
+    suspend fun estadisticasGlobales(bot: Long, dias: Int = 30) = io { Json.resumenGlobal(motor.estadisticasGlobales(bot, dias.toLong())) }
 
     suspend fun espacioTotal(bot: Long) = io { Json.espacioTotal(motor.espacioTotal(bot)) }
     suspend fun espacioPorTipo(bot: Long) = io { Json.espacioPorTipo(motor.espacioPorTipo(bot)) }

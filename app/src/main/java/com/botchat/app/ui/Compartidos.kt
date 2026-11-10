@@ -100,7 +100,7 @@ fun PantallaCompartidos(botId: Long, jid: String, nombre: String, alVolver: () -
                     when (categoria) { "foto" -> Ico.Foto; "video" -> Ico.Video; "audio" -> Ico.Audio; else -> Ico.Documento },
                     "Nada por aquí", "Cuando este chat tenga ${PESTANAS[pagina].first.lowercase()}, aparecerán en esta pestaña.", Modifier.padding(top = 80.dp),
                 )
-                categoria == "foto" || categoria == "video" -> Cuadricula(botId, jid, datos, alAbrirVisor)
+                categoria == "foto" || categoria == "video" -> Cuadricula(datos, alAbrirVisor)
                 categoria == "audio" -> ListaAudios(botId, jid, datos)
                 else -> ListaDocumentos(botId, jid, datos, alAbrirDocumento)
             }
@@ -109,11 +109,20 @@ fun PantallaCompartidos(botId: Long, jid: String, nombre: String, alVolver: () -
 }
 
 @Composable
-private fun Cuadricula(botId: Long, jid: String, datos: List<Msg>, alAbrirVisor: (String) -> Unit) {
+internal fun Cuadricula(datos: List<Msg>, alAbrirVisor: (String) -> Unit, porFecha: Boolean = false) {
     val ctx = LocalContext.current
     val px = with(LocalDensity.current) { 140.dp.roundToPx() }
     LazyVerticalGrid(GridCells.Adaptive(110.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(2.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        items(datos, key = { it.id }) { m ->
+        var diaAnterior = ""
+        datos.forEach { m ->
+            val dia = if (porFecha) etiquetaDia(m.ts) else ""
+            if (porFecha && dia != diaAnterior) {
+                diaAnterior = dia
+                item(key = "dia-$dia", span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                    Text(dia, Modifier.padding(horizontal = Esp.m, vertical = Esp.s), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            item(key = m.id) {
             val ruta = if (m.descargado) m.ruta else m.miniatura
             var img by remember(ruta) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
             LaunchedEffect(ruta) {
@@ -126,13 +135,14 @@ private fun Cuadricula(botId: Long, jid: String, datos: List<Msg>, alAbrirVisor:
                 if (m.categoria == "video") Icon(Ico.Reproducir, null, Modifier.size(32.dp).background(Color.Black.copy(alpha = 0.4f), CircleShape), tint = Color.White)
                 if (!m.descargado) Icon(Ico.Descargar, "No descargado", Modifier.align(Alignment.BottomEnd).padding(6.dp).size(20.dp), tint = Color.White)
             }
+            }
         }
     }
 }
 
 @OptIn(UnstableApi::class)
 @Composable
-private fun ListaAudios(botId: Long, jid: String, datos: List<Msg>) {
+internal fun ListaAudios(botId: Long, jid: String, datos: List<Msg>) {
     val ctx = LocalContext.current
     val rep by ReproductorAudio.estado.collectAsState()
     val scope = rememberCoroutineScope()
@@ -156,7 +166,7 @@ private fun ListaAudios(botId: Long, jid: String, datos: List<Msg>) {
 }
 
 @Composable
-private fun ListaDocumentos(botId: Long, jid: String, datos: List<Msg>, alAbrir: (String) -> Unit) {
+internal fun ListaDocumentos(botId: Long, jid: String, datos: List<Msg>, alAbrir: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     LazyColumn(Modifier.fillMaxSize()) {
         items(datos, key = { it.id }) { m ->

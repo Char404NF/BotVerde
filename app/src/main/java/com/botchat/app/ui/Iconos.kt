@@ -144,4 +144,31 @@ object Ico {
         trazo { moveTo(4f, 4f); lineTo(20f, 4f); lineTo(20f, 20f); lineTo(4f, 20f); close() }
         trazo { moveTo(8f, 12f); lineTo(11f, 15f); lineTo(16.5f, 9f) }
     }
+
+    /** Tres barras: estadísticas. */
+    val Estadisticas = icono("estadisticas") {
+        trazo { moveTo(5f, 20f); lineTo(5f, 12f); moveTo(12f, 20f); lineTo(12f, 5f); moveTo(19f, 20f); lineTo(19f, 9f) }
+    }
+
+    /** Hoja de calendario. */
+    val Calendario = icono("calendario") {
+        trazo { moveTo(4f, 6f); lineTo(20f, 6f); lineTo(20f, 20f); lineTo(4f, 20f); close() }
+        trazo { moveTo(4f, 10f); lineTo(20f, 10f); moveTo(8f, 3f); lineTo(8f, 7f); moveTo(16f, 3f); lineTo(16f, 7f) }
+    }
+
+    /** Silueta de persona (contacto). */
+    val Persona = icono("persona") {
+        trazo { moveTo(12f, 4f); curveTo(14f, 4f, 15.5f, 5.5f, 15.5f, 7.5f); curveTo(15.5f, 9.5f, 14f, 11f, 12f, 11f); curveTo(10f, 11f, 8.5f, 9.5f, 8.5f, 7.5f); curveTo(8.5f, 5.5f, 10f, 4f, 12f, 4f) }
+        trazo { moveTo(5f, 20f); curveTo(5f, 16f, 8f, 13.5f, 12f, 13.5f); curveTo(16f, 13.5f, 19f, 16f, 19f, 20f) }
+    }
+
+    /** Marcador de mapa. */
+    val Ubicacion = icono("ubicacion") {
+        trazo { moveTo(12f, 21f); curveTo(8f, 16f, 5.5f, 12.5f, 5.5f, 9.5f); curveTo(5.5f, 6f, 8.5f, 3.5f, 12f, 3.5f); curveTo(15.5f, 3.5f, 18.5f, 6f, 18.5f, 9.5f); curveTo(18.5f, 12.5f, 16f, 16f, 12f, 21f) }
+        trazo { moveTo(12f, 7.5f); curveTo(13.1f, 7.5f, 14f, 8.4f, 14f, 9.5f); curveTo(14f, 10.6f, 13.1f, 11.5f, 12f, 11.5f); curveTo(10.9f, 11.5f, 10f, 10.6f, 10f, 9.5f); curveTo(10f, 8.4f, 10.9f, 7.5f, 12f, 7.5f) }
+    }
+
+    /** Flecha a la derecha / izquierda para cambiar de mes. */
+    val Anterior = icono("anterior") { trazo(2.5f) { moveTo(15f, 5f); lineTo(8f, 12f); lineTo(15f, 19f) } }
+    val Siguiente = icono("siguiente") { trazo(2.5f) { moveTo(9f, 5f); lineTo(16f, 12f); lineTo(9f, 19f) } }
 }

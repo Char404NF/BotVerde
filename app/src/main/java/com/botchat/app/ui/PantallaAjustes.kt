@@ -38,12 +38,13 @@ import com.botchat.app.datos.Ajustes
 
 /** Pestaña Ajustes: Seguridad, Descargas, Estado del bot y Avanzado. */
 @Composable
-fun PantallaAjustes(ajustes: Ajustes, alSeguridad: () -> Unit, alDescargas: () -> Unit, alBot: () -> Unit, alAvanzado: () -> Unit) {
+fun PantallaAjustes(ajustes: Ajustes, alSeguridad: () -> Unit, alDescargas: () -> Unit, alBot: () -> Unit, alAvanzado: () -> Unit, alEstadisticas: () -> Unit = {}) {
     val modo by ajustes.bloqueo.collectAsState()
     val ctx = LocalContext.current
     val version = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "" }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
         Tarjeta(Ico.Candado, "Seguridad", when (modo) { Ajustes.Bloqueo.NINGUNO -> "Sin bloqueo"; Ajustes.Bloqueo.PIN -> "Protegida con PIN"; Ajustes.Bloqueo.HUELLA -> "Protegida con huella" }, alSeguridad, "ajuste_seguridad")
+        Tarjeta(Ico.Estadisticas, "Estadísticas", "Mensajes enviados y recibidos, y los chats más activos", alEstadisticas, "ajuste_estadisticas")
         Tarjeta(Ico.Descargar, "Descargas", "Qué se baja solo, con Wi-Fi o con datos", alDescargas, "ajuste_descargas")
         Tarjeta(Ico.Chats, "Estado del bot", "Encender, apagar y mantenerlo conectado", alBot, "ajuste_bot")
         Tarjeta(Ico.Info, "Avanzado", "Aspecto, registro y otras opciones técnicas", alAvanzado, "ajuste_avanzado")

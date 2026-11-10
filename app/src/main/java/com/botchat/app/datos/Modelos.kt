@@ -88,7 +88,75 @@ data class ReporteReparacion(
     val sinCambios: Boolean get() = estadosCorregidos + tamanosCorregidos + archivosDanados + miniaturasLimpiadas + fotosLimpiadas + huerfanos + chatsRecalculados == 0
 }
 
+data class TipoCuenta(val tipo: String, val enviados: Long, val recibidos: Long, val bytes: Long) { val total: Long get() = enviados + recibidos }
+data class Quien(val nombre: String, val cantidad: Long)
+data class ResumenChat(
+    val desde: Long, val listo: Boolean, val enviados: Long, val recibidos: Long, val porTipo: List<TipoCuenta>,
+    val porHora: List<Long>, val porSemana: List<Long>, val quien: List<Quien>,
+)
+data class DiaCuenta(val dia: String, val cantidad: Long)
+data class CalendarioMes(val desde: Long, val listo: Boolean, val dias: List<DiaCuenta>)
+data class ChatActivo(val jid: String, val nombre: String, val foto: String, val fotoTs: Long, val esGrupo: Boolean, val pais: String, val cantidad: Long)
+data class ResumenGlobal(
+    val desde: Long, val listo: Boolean, val enviados: Long, val recibidos: Long, val chats: Long,
+    val porTipo: List<TipoCuenta>, val activos: List<ChatActivo>, val porDia: List<DiaCuenta>,
+)
+
+/** Contacto compartido en un mensaje. */
+data class ContactoCompartido(val nombre: String, val telefonos: List<String>)
+
+/** Ubicación compartida en un mensaje. */
+data class UbicacionCompartida(val lat: Double, val lon: Double, val nombre: String, val direccion: String, val vivo: Boolean)
+
 object Json {
+    private fun largos(a: JSONArray?) = List(a?.length() ?: 0) { a!!.optLong(it) }
+    private fun tipos(a: JSONArray?) = List(a?.length() ?: 0) { i -> a!!.getJSONObject(i).let { TipoCuenta(it.optString("tipo"), it.optLong("enviados"), it.optLong("recibidos"), it.optLong("bytes")) } }
+    private fun dias(a: JSONArray?) = List(a?.length() ?: 0) { i -> a!!.getJSONObject(i).let { DiaCuenta(it.optString("dia"), it.optLong("cantidad")) } }
+
+    fun resumenChat(json: String): ResumenChat {
+        val o = JSONObject(json)
+        val q = o.optJSONArray("quien")
+        return ResumenChat(
+            o.optLong("desde"), o.optBoolean("listo"), o.optLong("enviados"), o.optLong("recibidos"), tipos(o.optJSONArray("porTipo")),
+            largos(o.optJSONArray("porHora")).let { if (it.size == 24) it else List(24) { 0L } },
+            largos(o.optJSONArray("porDiaSemana")).let { if (it.size == 7) it else List(7) { 0L } },
+            List(q?.length() ?: 0) { i -> q!!.getJSONObject(i).let { Quien(it.optString("nombre"), it.optLong("cantidad")) } },
+        )
+    }
+
+    fun calendario(json: String): CalendarioMes {
+        val o = JSONObject(json)
+        return CalendarioMes(o.optLong("desde"), o.optBoolean("listo"), dias(o.optJSONArray("dias")))
+    }
+
+    fun resumenGlobal(json: String): ResumenGlobal {
+        val o = JSONObject(json)
+        val a = o.optJSONArray("activos")
+        return ResumenGlobal(
+            o.optLong("desde"), o.optBoolean("listo"), o.optLong("enviados"), o.optLong("recibidos"), o.optLong("chats"),
+            tipos(o.optJSONArray("porTipo")),
+            List(a?.length() ?: 0) { i -> a!!.getJSONObject(i).let { ChatActivo(it.optString("jid"), it.optString("nombre"), it.optString("foto"), it.optLong("fotoTs"), it.optBoolean("esGrupo"), it.optString("pais"), it.optLong("cantidad")) } },
+            dias(o.optJSONArray("porDia")),
+        )
+    }
+
+    /** Contactos de un mensaje de contacto, o null si es un mensaje guardado con el formato anterior (solo texto). */
+    fun contactos(texto: String): List<ContactoCompartido>? = runCatching {
+        if (!texto.startsWith("{")) return null
+        val a = JSONObject(texto).optJSONArray("contactos") ?: return null
+        List(a.length()) { i ->
+            val c = a.getJSONObject(i)
+            val t = c.optJSONArray("tels")
+            ContactoCompartido(c.optString("nombre"), List(t?.length() ?: 0) { t!!.optString(it) })
+        }
+    }.getOrNull()
+
+    fun ubicacion(texto: String): UbicacionCompartida? = runCatching {
+        if (!texto.startsWith("{")) return null
+        val o = JSONObject(texto)
+        UbicacionCompartida(o.optDouble("lat"), o.optDouble("lon"), o.optString("nombre"), o.optString("dir"), o.optBoolean("vivo"))
+    }.getOrNull()
+
     private inline fun <T> lista(json: String, f: (JSONObject) -> T): List<T> {
         val a = JSONArray(json.ifBlank { "[]" })
         return List(a.length()) { f(a.getJSONObject(it)) }

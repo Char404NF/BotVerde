@@ -41,6 +41,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onStart() {
         super.onStart()
+        com.botchat.app.datos.Repo.actualizarZona() // por si el teléfono cambió de zona horaria
         EstadoBloqueo.alVolver(this, ajustes) // si hay bloqueo activo, se vuelve a pedir tras el tiempo elegido
     }
 }

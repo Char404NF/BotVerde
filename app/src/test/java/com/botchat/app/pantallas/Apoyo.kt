@@ -57,6 +57,16 @@ class MotorFalso : Motor {
     override fun reparar(bot: Long): String { llamadas += "reparar"; return reporte }
     override fun descargar(bot: Long, chat: String, id: String) { llamadas += "descargar:$chat:$id" }
     override fun fotoGrande(bot: Long, chat: String) = throw IllegalStateException("Este chat no tiene foto")
+    var resumenChat = """{"desde":0,"listo":true,"enviados":0,"recibidos":0,"porTipo":[],"porHora":[],"porDiaSemana":[],"quien":[]}"""
+    var calendario = """{"desde":0,"listo":true,"dias":[]}"""
+    var porDia = mutableMapOf<String, String>()
+    var globales = """{"desde":0,"listo":true,"enviados":0,"recibidos":0,"chats":0,"porTipo":[],"activos":[],"porDia":[]}"""
+    var zona = ""
+    override fun establecerZona(id: String) { zona = id }
+    override fun estadisticasChat(bot: Long, chat: String) = resumenChat
+    override fun calendarioChat(bot: Long, chat: String, mes: String): String { llamadas += "calendario:$mes"; return calendario }
+    override fun mensajesDia(bot: Long, chat: String, dia: String): String { llamadas += "dia:$dia"; return porDia[dia] ?: "[]" }
+    override fun estadisticasGlobales(bot: Long, dias: Long) = globales
 }
 
 object Apoyo {

@@ -221,6 +221,8 @@ fun iconoDeTipo(tipo: String, notaVoz: Boolean = false): ImageVector? = when (ti
     "audio" -> Ico.Audio
     "documento" -> Ico.Documento
     "ver_una_vez" -> Ico.Candado
+    "contacto" -> Ico.Persona
+    "ubicacion" -> Ico.Ubicacion
     else -> null
 }
 
@@ -234,6 +236,9 @@ fun descripcionCorta(tipo: String, texto: String, borrado: Boolean, notaVoz: Boo
         "audio" -> if (notaVoz) "Nota de voz" else "Audio"
         "documento" -> "Documento"
         "ver_una_vez" -> return "Ver una vez"
+        "otro" -> return "Mensaje especial"
+        "contacto" -> return com.botchat.app.datos.Json.contactos(texto)?.let { l -> "Contacto: " + l.joinToString(", ") { it.nombre } } ?: texto
+        "ubicacion" -> return com.botchat.app.datos.Json.ubicacion(texto)?.let { u -> if (u.vivo) "Ubicación en tiempo real" else if (u.nombre.isNotBlank()) "Ubicación: " + u.nombre else "Ubicación" } ?: texto
         else -> return texto.replace('\n', ' ')
     }
     return if (texto.isBlank()) etiqueta else "$etiqueta · ${texto.replace('\n', ' ')}"
