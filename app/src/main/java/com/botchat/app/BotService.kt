@@ -8,6 +8,11 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import com.botchat.app.datos.Ajustes
+import com.botchat.app.seguridad.ClaveDatos
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -25,6 +30,7 @@ class BotService : Service() {
     private val oyente = object : Listener {
         override fun onStatus(texto: String) {
             if (texto == "vinculado") bot?.let { Datos.get(this@BotService).marcarVinculado(it.id) } // primero se guarda
+            if (texto == "sesion_cerrada") bot?.let { Datos.get(this@BotService).marcarVinculado(it.id, false) } // WhatsApp desvinculó el bot
             BotState.estado.value = texto
             BotState.log("Estado: $texto")
             actualizaNotificacion()
@@ -40,10 +46,27 @@ class BotService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private var redCallback: ConnectivityManager.NetworkCallback? = null
+
     override fun onCreate() {
         super.onCreate()
         BotState.corriendo.value = true
         creaCanal()
+        vigilaRed()
+    }
+
+    /** Avisa al módulo Go si el teléfono usa Wi-Fi (o una red sin costo) o datos móviles, para las reglas de descarga. */
+    private fun vigilaRed() {
+        val cm = getSystemService(ConnectivityManager::class.java) ?: return
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                val sinCosto = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+                Wabot.establecerRed(if (sinCosto) Wabot.RedWifi else Wabot.RedDatos)
+            }
+            override fun onLost(network: Network) { Wabot.establecerRed(Wabot.RedDesconocida) }
+        }
+        redCallback = cb
+        runCatching { cm.registerDefaultNetworkCallback(cb) }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -85,7 +108,8 @@ class BotService : Service() {
 
     private fun arranca(b: Bot) {
         try {
-            Wabot.start(Datos.get(this).carpetaSesion(b.id).absolutePath, oyente)
+            Ajustes.get(this).aplicarAGo()
+            Wabot.start(filesDir.absolutePath, b.id, ClaveDatos.obtener(this), oyente)
         } catch (e: Exception) {
             if (e.message?.contains("ya está iniciado") == true) return
             BotState.log("No se pudo iniciar: ${e.message}")
@@ -113,6 +137,7 @@ class BotService : Service() {
             aviso = e.message ?: "No se pudo cerrar la sesión en WhatsApp."
         }
         Wabot.stop()
+        runCatching { Wabot.eliminarBot(b.id) } // mensajes, archivos y fotos de este bot
         runCatching { Datos.get(this).carpetaSesion(b.id).deleteRecursively() }
         Datos.get(this).eliminar(b.id)
         BotState.log("Bot eliminado.")
@@ -130,6 +155,7 @@ class BotService : Service() {
 
     override fun onDestroy() {
         BotState.corriendo.value = false
+        redCallback?.let { cb -> runCatching { getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(cb) } }
         hilo.execute { Wabot.stop() }
         hilo.shutdown()
         super.onDestroy()

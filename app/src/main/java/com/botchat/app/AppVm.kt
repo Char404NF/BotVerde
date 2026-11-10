@@ -44,7 +44,9 @@ class AppVm(app: Application) : AndroidViewModel(app) {
             pantalla = Pantalla.NOMBRE
         } else {
             nombre = b.nombre; iso = b.iso; digitos = b.numero; mx1 = b.mx1
-            pantalla = if (b.vinculado) Pantalla.PRINCIPAL else Pantalla.CONFIRMAR
+            // Un bot que alguna vez se vinculó conserva sus mensajes aunque WhatsApp cierre la sesión: se entra a la app
+            // y se ofrece "Vincular de nuevo". Un bot que nunca llegó a vincularse vuelve al paso de confirmar.
+            pantalla = if (b.vinculado || b.algunaVez) Pantalla.PRINCIPAL else Pantalla.CONFIRMAR
         }
     }
 
@@ -127,7 +129,7 @@ class AppVm(app: Application) : AndroidViewModel(app) {
         when (pantalla) {
             Pantalla.NUMERO -> pantalla = Pantalla.NOMBRE
             Pantalla.PAIS -> pantalla = Pantalla.NUMERO
-            Pantalla.CONFIRMAR -> corregir(ctx)
+            Pantalla.CONFIRMAR -> if (enRevinculacion) pantalla = Pantalla.PRINCIPAL else corregir(ctx)
             Pantalla.CODIGO -> {
                 bot?.let { BotService.manda(ctx, BotService.ACC_DETENER, it.id) }
                 pantalla = Pantalla.CONFIRMAR
@@ -141,6 +143,13 @@ class AppVm(app: Application) : AndroidViewModel(app) {
 
     // ---------- pantalla principal ----------
     fun abreAyuda() { pantalla = Pantalla.AYUDA }
+
+    /** WhatsApp cerró la sesión: se vuelve a pedir el código para el mismo número, sin perder los mensajes. */
+    fun revincular() {
+        if (bot != null) pantalla = Pantalla.CONFIRMAR
+    }
+
+    val enRevinculacion: Boolean get() = bot?.algunaVez == true && bot?.vinculado == false
 
     fun iniciaODetiene(ctx: Context) {
         val b = bot ?: return

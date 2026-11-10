@@ -11,6 +11,8 @@ class BotApp : Application() {
     override fun onCreate() {
         super.onCreate()
         BotState.iniciar(File(filesDir, "registro.txt"))
+        com.botchat.app.datos.Repo.abrir(this) // abre los mensajes guardados (con o sin bot conectado)
+        com.botchat.app.medios.Temporales.barrer(this) // borra restos de copias temporales de la vez anterior
     }
 }
 

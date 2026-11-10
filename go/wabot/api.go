@@ -109,6 +109,15 @@ func ListarChats(botID int64, grupos bool, consulta string, limite, desde int) (
 	return js(a.ListarChats(botID, grupos, consulta, limite, desde))
 }
 
+// ObtenerChat devuelve (JSON) un chat con su último mensaje, o "null" si no existe.
+func ObtenerChat(botID int64, chat string) (string, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return "", err
+	}
+	return js(a.ChatPorJID(botID, chat))
+}
+
 // ListarMensajes devuelve (JSON) hasta `limite` mensajes de un chat, del más nuevo al más viejo.
 // Para la página siguiente se pasan la hora y el id del último mensaje recibido; con antesTS=0 empieza por los últimos.
 func ListarMensajes(botID int64, chat string, antesTS int64, antesID string, limite int) (string, error) {

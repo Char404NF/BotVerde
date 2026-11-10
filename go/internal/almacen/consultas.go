@@ -68,16 +68,28 @@ func (a *Almacen) ListarChats(botID int64, grupos bool, consulta string, limite,
 	if limite <= 0 || limite > 500 {
 		limite = 100
 	}
+	extra, args := "", []any(nil)
+	if t := strings.TrimSpace(consulta); t != "" {
+		extra = ` AND c.busqueda LIKE ? ESCAPE '\'`
+		args = append(args, "%"+escapaLike(identidad.Normalizar(t))+"%")
+	}
+	return a.listaChats(extra, args, botID, b2i(grupos), limite, desde, false)
+}
+
+// listaChats arma la consulta de chats con su último mensaje. Con ignoraTipo se devuelven personas y grupos por igual.
+func (a *Almacen) listaChats(extra string, extraArgs []any, botID int64, esGrupo, limite, desde int, ignoraTipo bool) ([]ChatLista, error) {
 	q := `SELECT c.jid,c.nombre_mostrado,c.telefono_mostrado,c.pais_iso,c.es_grupo,c.foto_ruta,c.foto_ts,c.ultimo_ts,
 		m.tipo,m.texto_cifrado,m.borrado,m.es_mio
 		FROM chats c LEFT JOIN messages m ON m.rowid = (
 			SELECT rowid FROM messages WHERE bot_id=c.bot_id AND chat_jid=c.jid ORDER BY ts DESC, id DESC LIMIT 1)
-		WHERE c.bot_id=? AND c.es_grupo=?`
-	args := []any{botID, b2i(grupos)}
-	if t := strings.TrimSpace(consulta); t != "" {
-		q += ` AND c.busqueda LIKE ? ESCAPE '\'`
-		args = append(args, "%"+escapaLike(identidad.Normalizar(t))+"%")
+		WHERE c.bot_id=?`
+	args := []any{botID}
+	if !ignoraTipo {
+		q += ` AND c.es_grupo=?`
+		args = append(args, esGrupo)
 	}
+	q += extra
+	args = append(args, extraArgs...)
 	// Los chats sin mensajes (solo creados por nombres de contacto) no se listan.
 	q += ` AND m.id IS NOT NULL ORDER BY c.ultimo_ts DESC, c.jid LIMIT ? OFFSET ?`
 	args = append(args, limite, desde)
@@ -108,6 +120,15 @@ func (a *Almacen) ListarChats(botID int64, grupos bool, consulta string, limite,
 		out = append(out, c)
 	}
 	return out, filas.Err()
+}
+
+// ChatPorJID devuelve un chat con su último mensaje (o nil si no existe), con el mismo formato que la lista.
+func (a *Almacen) ChatPorJID(botID int64, jid string) (*ChatLista, error) {
+	filas, err := a.listaChats(` AND c.jid=?`, []any{jid}, botID, b2i(false), 1, 0, true)
+	if err != nil || len(filas) == 0 {
+		return nil, err
+	}
+	return &filas[0], nil
 }
 
 func escapaLike(s string) string {

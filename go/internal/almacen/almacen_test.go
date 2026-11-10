@@ -619,3 +619,21 @@ func TestEscribirCifradoDesdeNoDejaNadaEnClaro(t *testing.T) {
 type errReader struct{}
 
 func (errReader) Read([]byte) (int, error) { return 0, errors.New("se cortó la red") }
+
+func TestChatPorJID(t *testing.T) {
+	a := nuevo(t)
+	pers, grupo := "5215512345678@s.whatsapp.net", "120363@g.us"
+	chatBasico(t, a, pers, "5215512345678", "Ana", false)
+	chatBasico(t, a, grupo, "", "Familia", true)
+	_, _ = a.GuardarMensaje(msg(pers, "M1", 10, "hola"))
+	_, _ = a.GuardarMensaje(msg(grupo, "G1", 11, "hola grupo"))
+	for jid, nombre := range map[string]string{pers: "Ana", grupo: "Familia"} {
+		c, err := a.ChatPorJID(1, jid)
+		if err != nil || c == nil || c.Nombre != nombre {
+			t.Fatalf("%s: %+v %v", jid, c, err)
+		}
+	}
+	if c, err := a.ChatPorJID(1, "no@existe"); err != nil || c != nil {
+		t.Fatalf("debía ser nil: %+v %v", c, err)
+	}
+}

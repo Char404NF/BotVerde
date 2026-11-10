@@ -24,6 +24,18 @@ object Paises {
         return String(Character.toChars(a)) + String(Character.toChars(b))
     }
 
+    private val banderaCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val pincel by lazy { Paint() }
+
+    /** Bandera de un país (emoji); si el teléfono no sabe dibujarla, las dos letras del país. Vacío si el código no es válido. */
+    fun banderaDe(iso: String): String {
+        if (iso.length != 2) return ""
+        return banderaCache.getOrPut(iso.uppercase()) {
+            val emoji = emojiBandera(iso)
+            if (emoji.isNotEmpty() && runCatching { pincel.hasGlyph(emoji) }.getOrDefault(false)) emoji else iso.uppercase()
+        }
+    }
+
     fun normaliza(s: String): String =
         Normalizer.normalize(s, Normalizer.Form.NFD).replace(acentos, "").lowercase(es)
 

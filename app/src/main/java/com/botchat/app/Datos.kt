@@ -16,10 +16,11 @@ data class Bot(
     val vincular: String,  // número con código de país, solo dígitos
     val mx1: Boolean,      // formato antiguo de México (521…)
     val vinculado: Boolean,
+    val algunaVez: Boolean = vinculado, // se vinculó alguna vez (aunque WhatsApp haya cerrado la sesión después)
 )
 
 /** Base local de la app (SQLite de Android, sin servicios de Google). */
-class Datos private constructor(private val ctx: Context) : SQLiteOpenHelper(ctx, "botchat.db", null, 1) {
+class Datos private constructor(private val ctx: Context) : SQLiteOpenHelper(ctx, "botchat.db", null, 2) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -32,19 +33,25 @@ class Datos private constructor(private val ctx: Context) : SQLiteOpenHelper(ctx
                 numero_vincular TEXT NOT NULL,
                 mx1 INTEGER NOT NULL DEFAULT 0,
                 vinculado INTEGER NOT NULL DEFAULT 0,
-                creado INTEGER NOT NULL
+                creado INTEGER NOT NULL,
+                alguna_vez INTEGER NOT NULL DEFAULT 0
             )""",
         )
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {}
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE bots ADD COLUMN alguna_vez INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("UPDATE bots SET alguna_vez = vinculado")
+        }
+    }
 
     private fun lee(c: android.database.Cursor) = Bot(
         id = c.getLong(0), nombre = c.getString(1), iso = c.getString(2), codigo = c.getInt(3),
-        numero = c.getString(4), vincular = c.getString(5), mx1 = c.getInt(6) == 1, vinculado = c.getInt(7) == 1,
+        numero = c.getString(4), vincular = c.getString(5), mx1 = c.getInt(6) == 1, vinculado = c.getInt(7) == 1, algunaVez = c.getInt(8) == 1,
     )
 
-    private val columnas = "id,nombre,pais_iso,pais_codigo,numero,numero_vincular,mx1,vinculado"
+    private val columnas = "id,nombre,pais_iso,pais_codigo,numero,numero_vincular,mx1,vinculado,alguna_vez"
 
     @Synchronized
     fun lista(): List<Bot> = readableDatabase.rawQuery("SELECT $columnas FROM bots ORDER BY id", null).use { c ->
@@ -69,7 +76,7 @@ class Datos private constructor(private val ctx: Context) : SQLiteOpenHelper(ctx
 
     @Synchronized
     fun marcarVinculado(id: Long, si: Boolean = true) {
-        val v = ContentValues().apply { put("vinculado", if (si) 1 else 0) }
+        val v = ContentValues().apply { put("vinculado", if (si) 1 else 0); if (si) put("alguna_vez", 1) }
         writableDatabase.update("bots", v, "id=?", arrayOf(id.toString()))
     }
 

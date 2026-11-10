@@ -33,9 +33,18 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
     implementation("androidx.core:core-ktx:1.19.1")
+    implementation("androidx.fragment:fragment-ktx:1.9.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
+    implementation("androidx.navigation:navigation-compose:2.10.2")
+    implementation("androidx.compose.material:material-icons-core:1.7.8")
+    implementation("androidx.biometric:biometric:1.1.0")
+    // Video y audio descifrados en flujo (Media3: AndroidX, sin servicios de Google)
+    implementation("androidx.media3:media3-exoplayer:1.11.1")
+    implementation("androidx.media3:media3-ui:1.11.1")
 
     // Teléfonos y países (código abierto, Java puro, sin Google Play Services)
     implementation("com.googlecode.libphonenumber:libphonenumber:9.0.43")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }
