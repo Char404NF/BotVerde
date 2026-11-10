@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"botchat/internal/envio"
 	"botchat/internal/fotos"
 	"botchat/internal/ingesta"
 	"botchat/internal/medios"
@@ -49,6 +50,7 @@ type estado struct {
 	wg      sync.WaitGroup
 
 	ing       *ingesta.Ingesta
+	envio     *envio.Servicio
 	descargas *medios.Gestor
 	fotos     *fotos.Gestor
 	grupos    *colaGrupos
@@ -142,7 +144,9 @@ func (s *estado) armar() {
 	s.fotos = fotos.Nuevo(fotos.Config{BotID: s.botID, Alm: alm, Cliente: func() (fotos.Cliente, bool) { return s.cli, conectado() }, Log: s.log})
 	s.grupos = nuevaColaGrupos(s)
 	s.ing = ingesta.Nueva(ingesta.Config{BotID: s.botID, Alm: alm, Contactos: s.cli.Store.Contacts, Mapa: s.cli.Store.LIDs,
-		Servicios: servicios{s}, Politica: politicaActual, Red: redActual, Libre: func() int64 { l, _ := alm.Libre(); return l }, Log: s.log})
+		Servicios: servicios{s}, EsPropio: s.esPropio, Politica: politicaActual, Red: redActual, Libre: func() int64 { l, _ := alm.Libre(); return l }, Log: s.log})
+	s.envio = envio.Nuevo(s.botID, alm, envio.Real{Client: s.cli}, s.log)
+	s.envio.PausaBot = pausaTrasEscribir
 	s.descargas.Iniciar(s.ctx)
 	s.fotos.Iniciar(s.ctx)
 	s.grupos.iniciar(s.ctx)
@@ -328,8 +332,17 @@ func (s *estado) evento(e any) {
 		s.log(fmt.Sprintf("No se pudo conectar (código %d).", int(v.Reason)))
 		s.status(fmt.Sprintf("error: no se pudo conectar (%d)", int(v.Reason)))
 	case *events.Message:
-		s.encola(func() { s.ing.Mensaje(s.ctx, v, false) })
+		s.encola(func() {
+			s.ing.Mensaje(s.ctx, v, false)
+			s.pausaPorTelefono(v)
+		})
 		s.responder(v)
+	case *events.Receipt:
+		s.alRecibirAcuse(v)
+	case *events.ChatPresence:
+		s.alRecibirChatPresencia(v)
+	case *events.Presence:
+		s.alRecibirPresencia(v)
 	case *events.HistorySync:
 		s.encola(func() {
 			n := s.ing.Historial(s.ctx, v.Data, s.cli.ParseWebMessage)
@@ -352,6 +365,36 @@ func (s *estado) evento(e any) {
 	case *events.Contact, *events.AppStateSyncComplete:
 		s.refrescarNombres()
 	}
+}
+
+// esPropio dice si un JID es el de esta misma cuenta (teléfono o LID).
+func (s *estado) esPropio(j types.JID) bool {
+	if s.cli.Store == nil {
+		return false
+	}
+	if s.cli.Store.ID != nil && j.User == s.cli.Store.ID.User {
+		return true
+	}
+	return !s.cli.Store.LID.IsEmpty() && j.User == s.cli.Store.LID.User
+}
+
+// pausaPorTelefono: si yo escribo desde mi teléfono en un chat, el bot calla ahí unos minutos. Lo que mandó esta app
+// o el motor no cuenta (sus IDs se conocen), para que el bot no se pause solo.
+func (s *estado) pausaPorTelefono(v *events.Message) {
+	min := pausaTrasEscribirMin.Load()
+	if !v.Info.IsFromMe || min <= 0 || time.Since(v.Info.Timestamp) > 2*time.Minute {
+		return
+	}
+	c := ingesta.Clasificar(v)
+	if c.Omitir || c.Revocar != "" || c.Editar != nil || c.Reaccion != nil {
+		return
+	}
+	chat, ok := s.ing.ChatDe(s.ctx, v.Info.MessageSource)
+	if !ok || s.envio.EsEnvioPropio(chat, string(v.Info.ID)) {
+		return
+	}
+	_ = alm.PausarBot(s.botID, chat, time.Now().Add(time.Duration(min)*time.Minute).Unix())
+	s.log("El bot calla en un chat porque escribiste desde el teléfono.")
 }
 
 // refrescarNombres vuelve a leer la agenda cuando deja de haber cambios por unos segundos.

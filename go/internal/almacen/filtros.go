@@ -123,6 +123,7 @@ func (a *Almacen) ListarFiltrados(botID int64, chat string, f FiltroLista, antes
 			pag.Items = append(pag.Items, a.vista(m))
 		}
 	}
+	a.enriquecer(pag.Items)
 	return pag, nil
 }
 

@@ -89,6 +89,43 @@ var migraciones = [][]string{
 		`ALTER TABLE messages ADD COLUMN eliminado_por TEXT NOT NULL DEFAULT ''`,
 		`CREATE INDEX idx_mensajes_eliminados ON messages(bot_id, chat_jid, borrado, ts)`,
 	},
+	// 4: escribir desde la app: estado de envío, citas, menciones, reenviados, acuses, reacciones y estado por chat.
+	{
+		`ALTER TABLE messages ADD COLUMN estado_envio TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE messages ADD COLUMN cita_id TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE messages ADD COLUMN cita_autor TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE messages ADD COLUMN cita_texto_cifrado BLOB`,
+		`ALTER TABLE messages ADD COLUMN menciones_cifrado BLOB`,
+		`ALTER TABLE messages ADD COLUMN reenviado INTEGER NOT NULL DEFAULT 0`,
+		`CREATE TABLE message_receipts (
+			bot_id INTEGER NOT NULL,
+			chat_jid TEXT NOT NULL,
+			msg_id TEXT NOT NULL,
+			participante TEXT NOT NULL,
+			tipo TEXT NOT NULL,
+			ts INTEGER NOT NULL,
+			PRIMARY KEY (bot_id, chat_jid, msg_id, participante, tipo)
+		) WITHOUT ROWID`,
+		`CREATE TABLE reacciones (
+			bot_id INTEGER NOT NULL,
+			chat_jid TEXT NOT NULL,
+			msg_id TEXT NOT NULL,
+			sender TEXT NOT NULL,
+			emoji TEXT NOT NULL,
+			ts INTEGER NOT NULL,
+			PRIMARY KEY (bot_id, chat_jid, msg_id, sender)
+		) WITHOUT ROWID`,
+		`CREATE TABLE chat_estado (
+			bot_id INTEGER NOT NULL,
+			chat_jid TEXT NOT NULL,
+			leido_enviado_ts INTEGER NOT NULL DEFAULT 0,
+			silenciado INTEGER NOT NULL DEFAULT 0,
+			bot_pausa_hasta INTEGER NOT NULL DEFAULT 0,
+			bot_activo INTEGER NOT NULL DEFAULT 1,
+			borrador_cifrado BLOB,
+			PRIMARY KEY (bot_id, chat_jid)
+		) WITHOUT ROWID`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

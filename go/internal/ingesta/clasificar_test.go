@@ -107,7 +107,6 @@ func TestProtocoloEdicionRevocacionYOmitidos(t *testing.T) {
 		t.Fatalf("%+v", c)
 	}
 	otros := []*waE2E.Message{
-		{ReactionMessage: &waE2E.ReactionMessage{Text: proto.String("👍")}},
 		{ProtocolMessage: &waE2E.ProtocolMessage{Type: waE2E.ProtocolMessage_HISTORY_SYNC_NOTIFICATION.Enum()}},
 		{SenderKeyDistributionMessage: &waE2E.SenderKeyDistributionMessage{GroupID: proto.String("g")}},
 		{Conversation: proto.String("")},
@@ -182,5 +181,29 @@ func TestContactoUbicacionYEspecial(t *testing.T) {
 	o := Clasificar(&events.Message{Message: &waE2E.Message{OrderMessage: &waE2E.OrderMessage{}}})
 	if o.Tipo != almacen.TipoOtro || o.Texto != TextoEspecial {
 		t.Fatalf("especial: %+v", o)
+	}
+}
+
+func TestReaccionCitaMencionesYReenviado(t *testing.T) {
+	r := Clasificar(evt(&waE2E.Message{ReactionMessage: &waE2E.ReactionMessage{Key: &waCommon.MessageKey{ID: proto.String("ORIG")}, Text: proto.String("👍")}}))
+	if r.Omitir || r.Reaccion == nil || r.Reaccion.ID != "ORIG" || r.Reaccion.Emoji != "👍" {
+		t.Fatalf("reacción: %+v", r)
+	}
+	q := Clasificar(evt(&waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+		Text: proto.String("sí, ahí estaré @5215511111111"),
+		ContextInfo: &waE2E.ContextInfo{
+			StanzaID: proto.String("ORIG"), Participant: proto.String("5215522222222@s.whatsapp.net"),
+			QuotedMessage: &waE2E.Message{ImageMessage: &waE2E.ImageMessage{Caption: proto.String("mi casa")}},
+			MentionedJID:  []string{"5215511111111@s.whatsapp.net"}, IsForwarded: proto.Bool(true),
+		}}}))
+	if q.Tipo != "texto" || q.CitaID != "ORIG" || q.CitaAutor != "5215522222222@s.whatsapp.net" || q.CitaTexto != "Foto · mi casa" ||
+		len(q.Menciones) != 1 || !q.Reenviado {
+		t.Fatalf("cita: %+v", q)
+	}
+	if p := PreviewCita(&waE2E.Message{AudioMessage: &waE2E.AudioMessage{PTT: proto.Bool(true)}}); p != "Nota de voz" {
+		t.Fatal(p)
+	}
+	if p := PreviewCita(nil); p != "" {
+		t.Fatal("sin cita no hay vista previa")
 	}
 }

@@ -1,6 +1,7 @@
 package almacen
 
 import (
+	"strings"
 	"time"
 
 	"botchat/internal/cifrado"
@@ -38,7 +39,7 @@ func (a *Almacen) MarcarEliminado(botID int64, chat, id, por string, ts int64) (
 	if _, err := a.db.Exec("UPDATE messages SET borrado=1, eliminado_en=?, eliminado_por=? WHERE bot_id=? AND chat_jid=? AND id=?", ts, por, botID, chat, id); err != nil {
 		return false, err
 	}
-	if !a.ConservarEliminados() {
+	if !a.ConservarEliminados() && !m.EsMio {
 		if err := a.olvidar(m); err != nil {
 			return false, err
 		}
@@ -103,4 +104,75 @@ func (a *Almacen) Eliminados(botID int64, chat string) int64 {
 		_ = a.db.QueryRow(`SELECT COUNT(*) FROM messages WHERE bot_id=? AND chat_jid=? AND borrado=1`, botID, chat).Scan(&n)
 	}
 	return n
+}
+
+// ResumenCorto es el texto breve de un mensaje (para citas y vistas previas).
+func ResumenCorto(m *Mensaje) string {
+	corto := func(s string) string {
+		s = strings.Join(strings.Fields(s), " ")
+		if r := []rune(s); len(r) > 140 {
+			return string(r[:140]) + "…"
+		}
+		return s
+	}
+	con := func(etiqueta, pie string) string {
+		if strings.TrimSpace(pie) == "" {
+			return etiqueta
+		}
+		return etiqueta + " · " + corto(pie)
+	}
+	switch m.Tipo {
+	case TipoImagen:
+		return con("Foto", m.Texto)
+	case TipoVideo:
+		return con("Video", m.Texto)
+	case TipoAudio:
+		if m.NotaVoz {
+			return "Nota de voz"
+		}
+		return "Audio"
+	case TipoDocumento:
+		return con("Documento", m.ArchivoNombre)
+	case TipoSticker:
+		return "Sticker"
+	case TipoContacto, TipoUbicacion:
+		return VistaPrevia(m.Tipo, m.Texto)
+	case TipoVerUnaVez:
+		return "Ver una vez"
+	case TipoOtro:
+		return "Mensaje especial"
+	}
+	return corto(m.Texto)
+}
+
+// BorrarParaMi quita mensajes de este teléfono (con sus archivos, acuses y reacciones). No toca WhatsApp ni las estadísticas ya contadas.
+func (a *Almacen) BorrarParaMi(botID int64, chat string, ids []string) (int, error) {
+	n := 0
+	for _, id := range ids {
+		m, err := a.ObtenerMensaje(botID, chat, id)
+		if err != nil {
+			return n, err
+		}
+		if m == nil {
+			continue
+		}
+		a.quita(m.ArchivoRuta)
+		a.quita(m.MiniaturaRuta)
+		for _, q := range []string{"DELETE FROM messages", "DELETE FROM message_receipts", "DELETE FROM reacciones"} {
+			col := "id"
+			if q != "DELETE FROM messages" {
+				col = "msg_id"
+			}
+			if _, err := a.db.Exec(q+" WHERE bot_id=? AND chat_jid=? AND "+col+"=?", botID, chat, id); err != nil {
+				return n, err
+			}
+		}
+		n++
+	}
+	if n > 0 {
+		a.avisa("chat:" + chat)
+		a.avisa("chats")
+		a.avisa("espacio")
+	}
+	return n, nil
 }

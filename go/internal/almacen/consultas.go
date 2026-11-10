@@ -1,6 +1,7 @@
 package almacen
 
 import (
+	"fmt"
 	"strings"
 
 	"botchat/internal/identidad"
@@ -160,6 +161,24 @@ type MensajeVista struct {
 	PuedeBajarse bool   `json:"puedeBajarse"`
 	EliminadoEn  int64  `json:"eliminadoEn"`
 	EliminadoPor string `json:"eliminadoPor"` // nombre de quien lo eliminó, solo si no fue su autor
+
+	EstadoEnvio string          `json:"estadoEnvio"` // solo mensajes propios: enviando, enviado, entregado, leido o fallido
+	Entregados  int             `json:"entregados"`
+	Leidos      int             `json:"leidos"`
+	CitaID      string          `json:"citaId"`
+	CitaAutor   string          `json:"citaAutor"` // nombre de quien escribió lo citado ("yo" si fui yo)
+	CitaTexto   string          `json:"citaTexto"`
+	Menciones   []MencionVista  `json:"menciones"`
+	Reenviado   bool            `json:"reenviado"`
+	Reacciones  []ReaccionVista `json:"reacciones"`
+
+	bot int64
+}
+
+// MencionVista es alguien mencionado con @ en el texto: Usuario es lo que aparece tras la @ en el texto.
+type MencionVista struct {
+	Usuario string `json:"usuario"`
+	Nombre  string `json:"nombre"`
 }
 
 func (a *Almacen) vista(m *Mensaje) MensajeVista {
@@ -172,6 +191,20 @@ func (a *Almacen) vista(m *Mensaje) MensajeVista {
 	if m.EliminadoPor != "" && m.EliminadoPor != m.RemitenteJID {
 		v.EliminadoPor = a.nombreDe(m.BotID, m.ChatJID, m.EliminadoPor)
 	}
+	v.bot = m.BotID
+	v.CitaID, v.CitaTexto, v.Reenviado = m.CitaID, m.CitaTexto, m.Reenviado
+	if m.CitaID != "" {
+		v.CitaAutor = a.nombreParaMostrar(m.BotID, m.ChatJID, m.CitaAutor)
+		if m.CitaAutor == QuienYo {
+			v.CitaAutor = QuienYo
+		}
+	}
+	v.Menciones = []MencionVista{}
+	for _, j := range m.Menciones {
+		v.Menciones = append(v.Menciones, MencionVista{Usuario: usuarioDe(j), Nombre: a.nombreParaMostrar(m.BotID, m.ChatJID, j)})
+	}
+	v.EstadoEnvio = estadoDe(m.EstadoEnvio, m.EsMio, 0, 0)
+	v.Reacciones = []ReaccionVista{}
 	v.PuedeBajarse = CategoriaDe(m.Tipo) != "" && len(m.ArchivoInfo) > 0 &&
 		(m.ArchivoEstado == EstadoNinguno || m.ArchivoEstado == EstadoOmitido || m.ArchivoEstado == EstadoFallido)
 	return v
@@ -194,6 +227,74 @@ func (a *Almacen) ListarMensajes(botID int64, chat string, antesTS int64, antesI
 	return a.vistasDe(q, args)
 }
 
+// usuarioDe devuelve la parte de un JID antes de la @ (y antes de los dos puntos del dispositivo).
+func usuarioDe(j string) string {
+	if i := strings.IndexByte(j, '@'); i >= 0 {
+		j = j[:i]
+	}
+	if i := strings.IndexByte(j, ':'); i >= 0 {
+		j = j[:i]
+	}
+	return j
+}
+
+// enriquecer agrega a una página de mensajes sus acuses de recibo y sus reacciones (una consulta por chat).
+func (a *Almacen) enriquecer(vs []MensajeVista) {
+	porChat := map[string][]int{}
+	for i := range vs {
+		k := fmt.Sprintf("%d\x00%s", vs[i].bot, vs[i].Chat)
+		porChat[k] = append(porChat[k], i)
+	}
+	for _, idx := range porChat {
+		bot, chat := vs[idx[0]].bot, vs[idx[0]].Chat
+		ids := make([]string, 0, len(idx))
+		propios := make([]string, 0, len(idx))
+		pos := map[string]int{}
+		for _, i := range idx {
+			ids = append(ids, vs[i].ID)
+			pos[vs[i].ID] = i
+			if vs[i].EsMio {
+				propios = append(propios, vs[i].ID)
+			}
+		}
+		if rs, err := a.reaccionesDe(bot, chat, ids); err == nil {
+			for id, r := range rs {
+				vs[pos[id]].Reacciones = r
+			}
+		}
+		if len(propios) == 0 {
+			continue
+		}
+		args := []any{bot, chat}
+		for _, id := range propios {
+			args = append(args, id)
+		}
+		filas, err := a.db.Query(`SELECT msg_id, tipo, COUNT(*) FROM message_receipts WHERE bot_id=? AND chat_jid=? AND msg_id IN (`+marcas(len(propios))+`) GROUP BY msg_id, tipo`, args...)
+		if err != nil {
+			continue
+		}
+		for filas.Next() {
+			var id, tipo string
+			var n int
+			if filas.Scan(&id, &tipo, &n) != nil {
+				continue
+			}
+			v := &vs[pos[id]]
+			switch tipo {
+			case AcuseEntregado:
+				v.Entregados = n
+			case AcuseLeido:
+				v.Leidos = n
+			}
+		}
+		filas.Close()
+		for _, id := range propios {
+			v := &vs[pos[id]]
+			v.EstadoEnvio = estadoDe(v.EstadoEnvio, true, v.Entregados, v.Leidos)
+		}
+	}
+}
+
 func (a *Almacen) vistasDe(q string, args []any) ([]MensajeVista, error) {
 	filas, err := a.db.Query(q, args...)
 	if err != nil {
@@ -208,7 +309,11 @@ func (a *Almacen) vistasDe(q string, args []any) ([]MensajeVista, error) {
 		}
 		out = append(out, a.vista(m))
 	}
-	return out, filas.Err()
+	if err := filas.Err(); err != nil {
+		return nil, err
+	}
+	a.enriquecer(out)
+	return out, nil
 }
 
 // ListarArchivos devuelve los mensajes con multimedia de un chat (o de todos si chat=""), del más nuevo al más viejo.

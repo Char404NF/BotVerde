@@ -44,6 +44,8 @@ type Config struct {
 	Politica  func() Politica
 	Red       func() Red
 	Libre     func() int64
+	// EsPropio dice si un JID es el del propio bot (teléfono o LID). Puede ser nil.
+	EsPropio func(types.JID) bool
 	// Log recibe avisos sin datos personales (nunca texto de mensajes, nombres ni nombres de archivo).
 	Log func(string)
 }
@@ -264,10 +266,24 @@ func (g *Ingesta) preparar(ctx context.Context, evt *events.Message, historial b
 		return nil, err
 	}
 	rem, remNombre := g.remitente(ctx, evt.Info, chat, esGrupo)
+	if c.Reaccion != nil {
+		quien := rem
+		if evt.Info.IsFromMe {
+			quien = almacen.QuienYo
+		}
+		return nil, g.Alm.GuardarReaccion(g.BotID, jid, c.Reaccion.ID, quien, c.Reaccion.Emoji, evt.Info.Timestamp.Unix())
+	}
 	m := &almacen.Mensaje{
 		ID: evt.Info.ID, ChatJID: jid, BotID: g.BotID, RemitenteJID: rem, RemitenteNombre: remNombre, EsMio: evt.Info.IsFromMe,
 		Tipo: c.Tipo, Texto: c.Texto, TS: evt.Info.Timestamp.Unix(), ArchivoMime: c.Mime, ArchivoBytes: c.Bytes, ArchivoNombre: c.Nombre,
 		Ancho: c.Ancho, Alto: c.Alto, DuracionS: c.DurS, NotaVoz: c.NotaVoz, ArchivoInfo: c.Info, ArchivoEstado: almacen.EstadoNinguno,
+		CitaID: c.CitaID, CitaTexto: c.CitaTexto, Menciones: c.Menciones, Reenviado: c.Reenviado,
+	}
+	if c.CitaID != "" {
+		m.CitaAutor = g.autorCitado(ctx, c.CitaAutor, evt.Info, chat, esGrupo)
+	}
+	if evt.Info.IsFromMe {
+		m.EstadoEnvio = "telefono" // lo escribí yo desde el teléfono (no desde esta app)
 	}
 	if m.TS <= 0 {
 		m.TS = time.Now().Unix()
@@ -289,6 +305,39 @@ func (g *Ingesta) preparar(ctx context.Context, evt *events.Message, historial b
 		}
 	}
 	return l, nil
+}
+
+// ChatDe da la clave del chat a la que pertenece un evento (acuses, presencia) con las mismas reglas que los mensajes.
+func (g *Ingesta) ChatDe(ctx context.Context, src types.MessageSource) (string, bool) {
+	chat, _, _, ok := g.chatDe(ctx, types.MessageInfo{MessageSource: src})
+	if !ok {
+		return "", false
+	}
+	return chat.String(), true
+}
+
+// Persona lleva el JID de quien dio un acuse a la forma guardada (teléfono si se conoce).
+func (g *Ingesta) Persona(ctx context.Context, j types.JID) string {
+	return g.resolver(ctx, j).String()
+}
+
+// autorCitado lleva a la forma guardada (teléfono si se conoce, o "yo") el JID de quien escribió un mensaje citado.
+func (g *Ingesta) autorCitado(ctx context.Context, participante string, info types.MessageInfo, chat types.JID, esGrupo bool) string {
+	if participante == "" {
+		if !esGrupo { // en un chat privado, sin participante, la cita es de la otra persona
+			return chat.String()
+		}
+		return ""
+	}
+	j, err := types.ParseJID(participante)
+	if err != nil {
+		return participante
+	}
+	if g.EsPropio != nil && g.EsPropio(j) {
+		return almacen.QuienYo
+	}
+	r := g.resolver(ctx, j.ToNonAD())
+	return r.String()
 }
 
 func pushDe(evt *events.Message) string {

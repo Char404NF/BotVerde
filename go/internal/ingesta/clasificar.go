@@ -38,6 +38,19 @@ type Clasificado struct {
 	NotaVoz   bool
 	Info      []byte // datos para descargar (JSON); vacío si no hay nada que descargar
 	Miniatura []byte // miniatura JPEG que ya viene en el mensaje
+
+	CitaID    string    // id del mensaje al que responde
+	CitaAutor string    // JID de quien escribió el mensaje citado
+	CitaTexto string    // vista previa del mensaje citado
+	Menciones []string  // JIDs mencionados con @
+	Reenviado bool      // viene con la marca "Reenviado"
+	Reaccion  *Reaccion // es una reacción a otro mensaje (Emoji vacío = la quitó)
+}
+
+// Reaccion es una reacción con emoji a un mensaje.
+type Reaccion struct {
+	ID    string
+	Emoji string
 }
 
 // InfoDescarga son los datos mínimos para descargar y descifrar un archivo de WhatsApp.
@@ -116,6 +129,93 @@ func EsVerUnaVez(evt *events.Message) bool {
 
 // Clasificar decide qué es un mensaje y extrae lo que se guarda. No toca la red ni el disco.
 func Clasificar(evt *events.Message) Clasificado {
+	c := clasificar(evt)
+	if !c.Omitir && evt != nil && evt.Message != nil && c.Reaccion == nil && c.Revocar == "" && c.Editar == nil {
+		if ci := contextoDe(evt.Message); ci != nil {
+			c.CitaID = ci.GetStanzaID()
+			if c.CitaID != "" {
+				c.CitaAutor = ci.GetParticipant()
+				c.CitaTexto = PreviewCita(ci.GetQuotedMessage())
+			}
+			c.Menciones = ci.GetMentionedJID()
+			c.Reenviado = ci.GetIsForwarded() || ci.GetForwardingScore() > 0
+		}
+	}
+	return c
+}
+
+// contextoDe encuentra el ContextInfo (cita, menciones, reenviado) de cualquier tipo de mensaje.
+func contextoDe(m *waE2E.Message) *waE2E.ContextInfo {
+	switch {
+	case m.GetExtendedTextMessage() != nil:
+		return m.GetExtendedTextMessage().GetContextInfo()
+	case m.GetImageMessage() != nil:
+		return m.GetImageMessage().GetContextInfo()
+	case m.GetVideoMessage() != nil:
+		return m.GetVideoMessage().GetContextInfo()
+	case m.GetAudioMessage() != nil:
+		return m.GetAudioMessage().GetContextInfo()
+	case m.GetDocumentMessage() != nil:
+		return m.GetDocumentMessage().GetContextInfo()
+	case m.GetStickerMessage() != nil:
+		return m.GetStickerMessage().GetContextInfo()
+	case m.GetContactMessage() != nil:
+		return m.GetContactMessage().GetContextInfo()
+	case m.GetLocationMessage() != nil:
+		return m.GetLocationMessage().GetContextInfo()
+	}
+	return nil
+}
+
+// PreviewCita es el texto corto de un mensaje citado.
+func PreviewCita(q *waE2E.Message) string {
+	if q == nil {
+		return ""
+	}
+	corto := func(s string) string {
+		s = strings.Join(strings.Fields(s), " ")
+		if r := []rune(s); len(r) > 140 {
+			return string(r[:140]) + "…"
+		}
+		return s
+	}
+	con := func(etiqueta, pie string) string {
+		if strings.TrimSpace(pie) == "" {
+			return etiqueta
+		}
+		return etiqueta + " · " + corto(pie)
+	}
+	switch {
+	case q.GetConversation() != "":
+		return corto(q.GetConversation())
+	case q.GetExtendedTextMessage() != nil:
+		return corto(q.GetExtendedTextMessage().GetText())
+	case q.GetImageMessage() != nil:
+		return con("Foto", q.GetImageMessage().GetCaption())
+	case q.GetVideoMessage() != nil:
+		return con("Video", q.GetVideoMessage().GetCaption())
+	case q.GetAudioMessage() != nil:
+		if q.GetAudioMessage().GetPTT() {
+			return "Nota de voz"
+		}
+		return "Audio"
+	case q.GetDocumentMessage() != nil:
+		n := q.GetDocumentMessage().GetFileName()
+		if n == "" {
+			n = q.GetDocumentMessage().GetTitle()
+		}
+		return con("Documento", n)
+	case q.GetStickerMessage() != nil:
+		return "Sticker"
+	case q.GetContactMessage() != nil:
+		return "Contacto: " + corto(q.GetContactMessage().GetDisplayName())
+	case q.GetLocationMessage() != nil:
+		return "Ubicación"
+	}
+	return "Mensaje"
+}
+
+func clasificar(evt *events.Message) Clasificado {
 	if evt == nil || evt.Message == nil && evt.RawMessage == nil {
 		return Clasificado{Omitir: true}
 	}
@@ -145,7 +245,10 @@ func Clasificar(evt *events.Message) Clasificado {
 		}
 		return Clasificado{Omitir: true}
 	}
-	if m.GetReactionMessage() != nil || m.GetPollUpdateMessage() != nil || m.GetKeepInChatMessage() != nil || m.GetPinInChatMessage() != nil {
+	if r := m.GetReactionMessage(); r != nil {
+		return Clasificado{Reaccion: &Reaccion{ID: r.GetKey().GetID(), Emoji: r.GetText()}}
+	}
+	if m.GetPollUpdateMessage() != nil || m.GetKeepInChatMessage() != nil || m.GetPinInChatMessage() != nil {
 		return Clasificado{Omitir: true}
 	}
 	if t, ok := textoDe(m); ok {

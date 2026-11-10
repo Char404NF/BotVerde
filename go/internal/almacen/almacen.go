@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -396,6 +397,20 @@ func (a *Almacen) FusionarChat(botID int64, desde, hasta string) error {
 	if err := fusionaStats(tx, botID, desde, hasta); err != nil {
 		return err
 	}
+	for _, t := range []string{"message_receipts", "reacciones"} {
+		if _, err := tx.Exec(`UPDATE OR IGNORE `+t+` SET chat_jid=? WHERE bot_id=? AND chat_jid=?`, hasta, botID, desde); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM `+t+` WHERE bot_id=? AND chat_jid=?`, botID, desde); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(`UPDATE OR IGNORE chat_estado SET chat_jid=? WHERE bot_id=? AND chat_jid=?`, hasta, botID, desde); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM chat_estado WHERE bot_id=? AND chat_jid=?`, botID, desde); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM chats WHERE bot_id=? AND jid=?`, botID, desde); err != nil {
 		return err
 	}
@@ -431,19 +446,26 @@ type Mensaje struct {
 	Ancho, Alto     int
 	DuracionS       int
 	NotaVoz         bool
-	EliminadoEn     int64  // hora en que llegó la eliminación (0 = no se sabe)
-	EliminadoPor    string // JID de quien lo eliminó si no fue su autor (un admin); vacío si no se sabe o fue el autor
+	EliminadoEn     int64    // hora en que llegó la eliminación (0 = no se sabe)
+	EliminadoPor    string   // JID de quien lo eliminó si no fue su autor (un admin); vacío si no se sabe o fue el autor
+	EstadoEnvio     string   // solo en mensajes propios: "enviando", "enviado" o "fallido" ("" si llegó de otra persona)
+	CitaID          string   // id del mensaje al que responde
+	CitaAutor       string   // JID de quien escribió el mensaje citado
+	CitaTexto       string   // vista previa del mensaje citado (cifrada en la base)
+	Menciones       []string // JIDs mencionados (cifrados en la base)
+	Reenviado       bool
 }
 
-const colsInsertMensaje = "id,chat_jid,bot_id,remitente_jid,remitente_nombre,es_mio,tipo,texto_cifrado,ts,borrado,editado,archivo_ruta,archivo_bytes,archivo_mime,archivo_estado,miniatura_ruta,archivo_nombre_cifrado,archivo_info_cifrado,ancho,alto,duracion_s,nota_voz"
+const colsInsertMensaje = "id,chat_jid,bot_id,remitente_jid,remitente_nombre,es_mio,tipo,texto_cifrado,ts,borrado,editado,archivo_ruta,archivo_bytes,archivo_mime,archivo_estado,miniatura_ruta,archivo_nombre_cifrado,archivo_info_cifrado,ancho,alto,duracion_s,nota_voz,estado_envio,cita_id,cita_autor,cita_texto_cifrado,menciones_cifrado,reenviado"
 const colsMensaje = colsInsertMensaje + ",eliminado_en,eliminado_por"
 
 func (a *Almacen) escanearMensaje(s interface{ Scan(...any) error }) (*Mensaje, error) {
 	var m Mensaje
 	var mio, borrado, editado, nota int
-	var texto, nombre, info []byte
+	var texto, nombre, info, citaTexto, menciones []byte
+	var reenv int
 	if err := s.Scan(&m.ID, &m.ChatJID, &m.BotID, &m.RemitenteJID, &m.RemitenteNombre, &mio, &m.Tipo, &texto, &m.TS, &borrado, &editado,
-		&m.ArchivoRuta, &m.ArchivoBytes, &m.ArchivoMime, &m.ArchivoEstado, &m.MiniaturaRuta, &nombre, &info, &m.Ancho, &m.Alto, &m.DuracionS, &nota, &m.EliminadoEn, &m.EliminadoPor); err != nil {
+		&m.ArchivoRuta, &m.ArchivoBytes, &m.ArchivoMime, &m.ArchivoEstado, &m.MiniaturaRuta, &nombre, &info, &m.Ancho, &m.Alto, &m.DuracionS, &nota, &m.EstadoEnvio, &m.CitaID, &m.CitaAutor, &citaTexto, &menciones, &reenv, &m.EliminadoEn, &m.EliminadoPor); err != nil {
 		return nil, err
 	}
 	m.EsMio, m.Borrado, m.Editado, m.NotaVoz = mio == 1, borrado == 1, editado == 1, nota == 1
@@ -455,6 +477,13 @@ func (a *Almacen) escanearMensaje(s interface{ Scan(...any) error }) (*Mensaje, 
 	}
 	if t, err := cifrado.AbrirTexto(a.clave, "archivo_info", info); err == nil {
 		m.ArchivoInfo = t
+	}
+	m.Reenviado = reenv == 1
+	if t, err := cifrado.AbrirTexto(a.clave, "cita_texto", citaTexto); err == nil {
+		m.CitaTexto = string(t)
+	}
+	if t, err := cifrado.AbrirTexto(a.clave, "menciones", menciones); err == nil && len(t) > 0 {
+		_ = json.Unmarshal(t, &m.Menciones)
 	}
 	return &m, nil
 }
@@ -472,15 +501,28 @@ func (a *Almacen) valoresMensaje(m *Mensaje) ([]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	cita, err := cifrado.SellarTexto(a.clave, "cita_texto", []byte(m.CitaTexto))
+	if err != nil {
+		return nil, err
+	}
+	var mencionesJSON []byte
+	if len(m.Menciones) > 0 {
+		mencionesJSON, _ = json.Marshal(m.Menciones)
+	}
+	menc, err := cifrado.SellarTexto(a.clave, "menciones", mencionesJSON)
+	if err != nil {
+		return nil, err
+	}
 	estado := m.ArchivoEstado
 	if estado == "" {
 		estado = EstadoNinguno
 	}
 	return []any{m.ID, m.ChatJID, m.BotID, m.RemitenteJID, m.RemitenteNombre, b2i(m.EsMio), m.Tipo, texto, m.TS, b2i(m.Borrado), b2i(m.Editado),
-		m.ArchivoRuta, m.ArchivoBytes, m.ArchivoMime, estado, m.MiniaturaRuta, nombre, info, m.Ancho, m.Alto, m.DuracionS, b2i(m.NotaVoz)}, nil
+		m.ArchivoRuta, m.ArchivoBytes, m.ArchivoMime, estado, m.MiniaturaRuta, nombre, info, m.Ancho, m.Alto, m.DuracionS, b2i(m.NotaVoz),
+		m.EstadoEnvio, m.CitaID, m.CitaAutor, cita, menc, b2i(m.Reenviado)}, nil
 }
 
-const insertMensaje = "INSERT INTO messages(" + colsInsertMensaje + ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id,chat_jid,bot_id) DO NOTHING"
+const insertMensaje = "INSERT INTO messages(" + colsInsertMensaje + ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id,chat_jid,bot_id) DO NOTHING"
 
 // GuardarMensajes guarda varios mensajes en una sola transacción. Los chats deben existir.
 // Devuelve cuáles eran nuevos (los repetidos se ignoran).
