@@ -22,3 +22,23 @@ bind.log
 # Go
 go/**/*.test
 app/libs/
+
+# Más exclusiones de seguridad (etapa 2.5)
+.env
+.env.*
+*.enc
+keystore.properties
+signing.properties
+id_rsa*
+id_ed25519*
+*.secret
+*.log
+# Go y Android generados
+go/bin/
+go/pkg/
+captures/
+*.iml
+.vscode/
+.DS_Store
+.kotlin/
+.externalNativeBuild/
