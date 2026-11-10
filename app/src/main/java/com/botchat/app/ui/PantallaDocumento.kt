@@ -53,6 +53,7 @@ import com.botchat.app.datos.Msg
 import com.botchat.app.datos.Repo
 import com.botchat.app.medios.Exportar
 import com.botchat.app.medios.Temporales
+import com.botchat.app.medios.TipoArchivo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -77,15 +78,15 @@ fun PantallaDocumento(botId: Long, jid: String, id: String, nombreChat: String, 
         if (EstadoCompartir.pendiente) { EstadoCompartir.pendiente = false; Temporales.borrarTodo(ctx) }
     }
     val m = msg
-    val esPdf = m != null && (m.mime.contains("pdf", true) || m.nombre.endsWith(".pdf", true))
+    val esPdf = m != null && TipoArchivo.familia(m.nombre, m.mime) == TipoArchivo.Familia.PDF
     Scaffold(
         topBar = {
             TopAppBar(
                 navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } },
-                title = { Text(m?.nombre?.ifBlank { null } ?: "Documento", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = { Text(m?.let { TipoArchivo.nombreMostrable(it.nombre, it.mime) } ?: "Documento", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
                     if (m != null && Exportar.disponible) IconButton({ scope.launch { guardarCopia(ctx, m, nombreChat) } }) { Icon(Ico.Guardar, "Guardar copia en mi carpeta") }
-                    if (m != null) IconButton({ scope.launch { compartirTemporal(ctx, m, m.nombre.ifBlank { "documento" }) } }) { Icon(Ico.Compartir, "Compartir") }
+                    if (m != null) IconButton({ scope.launch { compartirTemporal(ctx, m, TipoArchivo.nombreMostrable(m.nombre, m.mime)) } }) { Icon(Ico.Compartir, "Compartir") }
                 },
             )
         },
@@ -108,10 +109,10 @@ private fun DocumentoGenerico(m: Msg, nombreChat: String) {
     Column(Modifier.fillMaxSize().padding(Esp.xl), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Box(Modifier.size(96.dp).clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.secondaryContainer), Alignment.Center) { Icon(Ico.Documento, null, Modifier.size(52.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer) }
         Spacer(Modifier.height(Esp.l))
-        Text(m.nombre.ifBlank { "Documento" }, style = MaterialTheme.typography.titleLarge)
-        Text(formatoBytes(m.bytes), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(TipoArchivo.nombreMostrable(m.nombre, m.mime), style = MaterialTheme.typography.titleLarge)
+        Text(listOfNotNull(TipoArchivo.etiqueta(m.nombre, m.mime), if (m.bytes > 0) formatoBytes(m.bytes) else null).joinToString(" · "), color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(Esp.xl))
-        Button({ scope.launch { compartirTemporal(ctx, m, m.nombre.ifBlank { "documento" }, ver = true) } }, Modifier.fillMaxWidth()) { Text("Abrir con otra app") }
+        Button({ scope.launch { compartirTemporal(ctx, m, TipoArchivo.nombreMostrable(m.nombre, m.mime), ver = true) } }, Modifier.fillMaxWidth()) { Text("Abrir con…") }
         Spacer(Modifier.height(Esp.s))
         Text("Se abre una copia temporal que se borra al volver aquí, al bloquear la app o a los 10 minutos.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

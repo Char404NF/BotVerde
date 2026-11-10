@@ -179,7 +179,7 @@ suspend fun compartirTemporal(ctx: Context, m: Msg, nombre: String, ver: Boolean
     try {
         val f = withContext(Dispatchers.IO) { Temporales.descifrar(ctx, Repo.archivo(m.ruta), nombre) }
         val uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.packageName + ".compartir", f)
-        val mime = m.mime.substringBefore(';').ifBlank { "application/octet-stream" }
+        val mime = com.botchat.app.medios.TipoArchivo.mimeEfectivo(nombre, m.mime)
         val intent = if (ver) android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(uri, mime)
         else android.content.Intent(android.content.Intent.ACTION_SEND).setType(mime).putExtra(android.content.Intent.EXTRA_STREAM, uri)
         intent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
