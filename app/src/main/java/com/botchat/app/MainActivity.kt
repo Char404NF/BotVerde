@@ -22,7 +22,7 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) EstadoBloqueo.iniciar(ajustes)
-        // FLAG_SECURE: sin capturas de pantalla ni vista previa en apps recientes (activado por defecto; se cambia en Avanzado).
+        // FLAG_SECURE: sin capturas ni vista previa en apps recientes, solo si el usuario lo activa en Ajustes → Seguridad (apagado por defecto).
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.CREATED) {
                 ajustes.secure.collect { activo ->
@@ -36,11 +36,11 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
-        EstadoBloqueo.alSalir()
+        if (!isChangingConfigurations) EstadoBloqueo.alSalir() // girar la pantalla no cuenta como salir
     }
 
     override fun onStart() {
         super.onStart()
-        EstadoBloqueo.alVolver(this, ajustes) // tras 1 minuto en segundo plano se vuelve a pedir el PIN
+        EstadoBloqueo.alVolver(this, ajustes) // si hay bloqueo activo, se vuelve a pedir tras el tiempo elegido
     }
 }

@@ -15,24 +15,77 @@ class Ajustes private constructor(ctx: Context) {
 
     val intentos = ControlIntentos({ seg.getString(it, null) }, { k, v -> seg.edit().apply { if (v == null) remove(k) else putString(k, v) }.apply() })
 
-    private val _secure = MutableStateFlow(p.getBoolean("secure", true))
-    /** Bloquea capturas de pantalla y la vista previa en apps recientes (activado por defecto). */
-    val secure: StateFlow<Boolean> = _secure
-    fun fijarSecure(v: Boolean) { p.edit().putBoolean("secure", v).apply(); _secure.value = v }
+    // ---- bloqueo opcional: por defecto la app NO pide PIN ni huella ----
+    enum class Bloqueo { NINGUNO, PIN, HUELLA }
 
-    private val _huella = MutableStateFlow(p.getBoolean("huella", false))
+    /** Quien venía de la 0.2.0 con PIN (y huella) conserva su bloqueo; los demás empiezan sin bloqueo. */
+    private fun bloqueoInicial(): Bloqueo = when (p.getString("bloqueo", null)) {
+        "pin" -> Bloqueo.PIN
+        "huella" -> Bloqueo.HUELLA
+        "ninguno" -> Bloqueo.NINGUNO
+        else -> if (!intentos.tienePin()) Bloqueo.NINGUNO else if (p.getBoolean("huella", false)) Bloqueo.HUELLA else Bloqueo.PIN
+    }
+
+    private val _bloqueo = MutableStateFlow(bloqueoInicial())
+    val bloqueo: StateFlow<Bloqueo> = _bloqueo
+    fun fijarBloqueo(b: Bloqueo) {
+        p.edit().putString("bloqueo", b.name.lowercase()).putBoolean("huella", b == Bloqueo.HUELLA).apply()
+        _bloqueo.value = b
+        _huella.value = b == Bloqueo.HUELLA
+    }
+
+    private val _huella = MutableStateFlow(_bloqueo.value == Bloqueo.HUELLA)
     val huella: StateFlow<Boolean> = _huella
-    fun fijarHuella(v: Boolean) { p.edit().putBoolean("huella", v).apply(); _huella.value = v }
+
+    private val _bloqueoSeg = MutableStateFlow(p.getInt("bloqueo_seg", 60))
+    /** Segundos fuera de la app antes de volver a pedir el desbloqueo: 0 (inmediato), 60 o 300. */
+    val bloqueoSeg: StateFlow<Int> = _bloqueoSeg
+    fun fijarBloqueoSeg(s: Int) { p.edit().putInt("bloqueo_seg", s).apply(); _bloqueoSeg.value = s }
+
+    /** Quita el bloqueo sin tocar nada más: los mensajes y su llave no dependen del PIN. */
+    fun quitarBloqueo() { intentos.quitar(); _pin.value = false; fijarBloqueo(Bloqueo.NINGUNO) }
 
     private val _pin = MutableStateFlow(intentos.tienePin())
     val tienePin: StateFlow<Boolean> = _pin
     fun fijarPin(pin: String) { intentos.fijar(pin); _pin.value = true }
-    fun quitarPin() { intentos.quitar(); fijarHuella(false); _pin.value = false }
     fun refrescarPin() { _pin.value = intentos.tienePin() }
 
-    private val _omitioPin = MutableStateFlow(p.getBoolean("omitio_pin", false))
-    val omitioPin: StateFlow<Boolean> = _omitioPin
-    fun omitirPin() { p.edit().putBoolean("omitio_pin", true).apply(); _omitioPin.value = true }
+    private val _secure = MutableStateFlow(p.getBoolean("secure", false))
+    /** Bloquea capturas de pantalla y la vista previa en apps recientes (apagado por defecto). */
+    val secure: StateFlow<Boolean> = _secure
+    fun fijarSecure(v: Boolean) { p.edit().putBoolean("secure", v).apply(); _secure.value = v }
+
+    // ---- aspecto ----
+    private val _modoTema = MutableStateFlow(runCatching { com.botchat.app.ui.ModoTema.valueOf(p.getString("tema", "SISTEMA")!!) }.getOrDefault(com.botchat.app.ui.ModoTema.SISTEMA))
+    val modoTema: StateFlow<com.botchat.app.ui.ModoTema> = _modoTema
+    fun fijarModoTema(m: com.botchat.app.ui.ModoTema) { p.edit().putString("tema", m.name).apply(); _modoTema.value = m }
+
+    private val _dinamico = MutableStateFlow(p.getBoolean("color_dinamico", false))
+    val colorDinamico: StateFlow<Boolean> = _dinamico
+    fun fijarColorDinamico(v: Boolean) { p.edit().putBoolean("color_dinamico", v).apply(); _dinamico.value = v }
+
+    private val _reducir = MutableStateFlow(p.getBoolean("reducir_anim", false))
+    val reducirAnimaciones: StateFlow<Boolean> = _reducir
+    fun fijarReducirAnimaciones(v: Boolean) { p.edit().putBoolean("reducir_anim", v).apply(); _reducir.value = v }
+
+    // ---- aviso de herramienta no oficial (se acepta una sola vez) ----
+    private val _aviso = MutableStateFlow(p.getBoolean("aviso_aceptado", false))
+    val avisoAceptado: StateFlow<Boolean> = _aviso
+    fun aceptarAviso() { p.edit().putBoolean("aviso_aceptado", true).apply(); _aviso.value = true }
+
+    // ---- "mensajes nuevos": hasta cuándo vio cada chat (solo en este teléfono; no toca la base de mensajes) ----
+    private val vistos: SharedPreferences = ctx.getSharedPreferences("vistos", Context.MODE_PRIVATE)
+
+    /** Momento (segundos) desde el que todo cuenta como ya visto: al actualizar no aparecen contadores viejos. */
+    fun baseVistos(): Long {
+        val b = vistos.getLong("_base", 0L)
+        if (b > 0) return b
+        val ahora = System.currentTimeMillis() / 1000
+        vistos.edit().putLong("_base", ahora).apply()
+        return ahora
+    }
+    fun visto(jid: String): Long = maxOf(vistos.getLong(jid, 0L), baseVistos())
+    fun marcarVisto(jid: String, ts: Long = System.currentTimeMillis() / 1000) { vistos.edit().putLong(jid, ts).apply() }
 
     // ---- descargas automáticas: cada tipo, por Wi-Fi y por datos móviles ----
     data class Regla(val wifi: Boolean, val datos: Boolean)

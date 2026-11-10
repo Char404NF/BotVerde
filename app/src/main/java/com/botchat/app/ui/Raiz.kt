@@ -26,7 +26,7 @@ import com.botchat.app.Pantalla
 import com.botchat.app.datos.Ajustes
 import com.botchat.app.datos.Repo
 
-/** Raíz de la app: asistente si no hay bot, bloqueo con PIN, y la navegación principal cuando hay mensajes que ver. */
+/** Raíz de la app: bloqueo (solo si el usuario lo activó), aviso o bienvenida, asistente si no hay bot y la navegación principal. */
 @Composable
 fun Raiz() {
     val vm: AppVm = viewModel()
@@ -49,22 +49,24 @@ fun Raiz() {
         }
     }
 
-    BackHandler(enabled = vm.puedeVolver && vm.pantalla != Pantalla.PRINCIPAL) { vm.atras(ctx) }
+    val aceptado by ajustes.avisoAceptado.collectAsState()
+    BackHandler(enabled = vm.puedeVolver && vm.pantalla != Pantalla.PRINCIPAL && aceptado) { vm.atras(ctx) }
 
     val bloqueado by EstadoBloqueo.bloqueado.collectAsState()
-    val tienePin by ajustes.tienePin.collectAsState()
-    val omitioPin by ajustes.omitioPin.collectAsState()
+    val modo by ajustes.bloqueo.collectAsState()
     val errorDatos by Repo.error.collectAsState()
-    var cambiandoPin by remember { mutableStateOf(false) }
 
     Surface(Modifier.fillMaxSize()) {
-        when {
-            vm.pantalla != Pantalla.PRINCIPAL -> Asistente(vm, conPermiso)
-            errorDatos != null -> PantallaErrorDatos(errorDatos ?: "")
-            cambiandoPin -> PantallaConfigurarPin(if (tienePin) "Elige un PIN nuevo" else "Protege tus mensajes con un PIN", { ajustes.fijarPin(it); EstadoBloqueo.desbloquear(); cambiandoPin = false }, { cambiandoPin = false })
-            tienePin && bloqueado -> PantallaBloqueo(ajustes) { EstadoBloqueo.desbloquear() }
-            !tienePin && !omitioPin -> PantallaConfigurarPin("Protege tus mensajes con un PIN", { ajustes.fijarPin(it); EstadoBloqueo.desbloquear() }, { ajustes.omitirPin() })
-            else -> Shell(nav, vm, ajustes, conPermiso, alCambiarPin = { cambiandoPin = true })
+        Box(Modifier.fillMaxSize()) {
+            when {
+                errorDatos != null -> PantallaErrorDatos(errorDatos ?: "")
+                modo != Ajustes.Bloqueo.NINGUNO && bloqueado -> PantallaBloqueo(ajustes) { EstadoBloqueo.desbloquear() }
+                // Quien ya tenía el bot vinculado solo ve el aviso una vez; quien empieza ve la bienvenida completa.
+                !aceptado -> if (vm.bot?.algunaVez == true) AvisoUnico { ajustes.aceptarAviso() } else Bienvenida { ajustes.aceptarAviso() }
+                vm.pantalla != Pantalla.PRINCIPAL -> Asistente(vm, conPermiso)
+                else -> Shell(nav, vm, ajustes, conPermiso)
+            }
+            Splash()
         }
     }
 }
