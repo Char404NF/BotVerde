@@ -94,7 +94,7 @@ class VisoresUiTest {
         guarda("media/1/ab/D1.enc", "texto".toByteArray())
         motor.archivos = Apoyo.arreglo(Apoyo.msgJson("D1", 1_700_000_000, tipo = "documento", estado = "descargado", ruta = "media/1/ab/D1.enc", nombre = "notas.txt", bytes = 5))
         regla.setContent { BotChatTema { PantallaDocumento(1, jid, "D1", "María López", {}) } }
-        regla.esperaTexto("Abrir con otra app")
+        regla.esperaTexto("Abrir con…")
         regla.onAllNodesWithText("notas.txt", substring = true).onFirst().assertIsDisplayed()
         regla.onNodeWithText("Se abre una copia temporal", substring = true).assertIsDisplayed()
         regla.onNodeWithContentDescription("Guardar copia en mi carpeta").assertIsDisplayed()
