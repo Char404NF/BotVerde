@@ -8,7 +8,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.botchat.app.datos.Ajustes
 import com.botchat.app.ui.BotChatTema
+import com.botchat.app.ui.ModoTema
 import com.botchat.app.ui.PantallaAvanzado
+import com.botchat.app.ui.PantallaDescargas
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -27,21 +29,19 @@ class AvanzadoUiTest {
 
     @Before fun antes() { Apoyo.reinicia(); ajustes = Ajustes.get(Apoyo.ctx()) }
 
-    private fun pantalla(eliminar: () -> Unit = {}, medir: () -> Unit = {}, pin: () -> Unit = {}) =
-        regla.setContent { BotChatTema { PantallaAvanzado(ajustes, "Mi bot", false, {}, pin, {}, medir, eliminar) } }
+    private fun pantalla(eliminar: () -> Unit = {}, medir: () -> Unit = {}) =
+        regla.setContent { BotChatTema { PantallaAvanzado(ajustes, "Mi bot", false, {}, {}, medir, eliminar) } }
 
     @Test fun valoresPorDefectoCumplenLoPedido() {
-        assertTrue("FLAG_SECURE activado por defecto", ajustes.secure.value)
+        assertFalse("evitar capturas viene apagado", ajustes.secure.value)
         val d = ajustes.descargas.value
         assertTrue(d.foto.wifi && d.foto.datos && d.audio.wifi && d.audio.datos && d.documento.wifi && d.documento.datos)
         assertTrue(d.video.wifi); assertFalse("los videos con datos móviles vienen apagados", d.video.datos)
         assertEquals(50, d.videoMaxMb); assertEquals(500, d.pisoLibreMb)
     }
 
-    @Test fun interruptoresGuardanSusCambios() {
-        pantalla()
-        regla.onNodeWithTag("sw_Bloquear capturas de pantalla").performScrollTo().performClick()
-        assertFalse(ajustes.secure.value)
+    @Test fun descargasGuardanSusCambios() {
+        regla.setContent { BotChatTema { PantallaDescargas(ajustes, {}) } }
         regla.onNodeWithTag("datos_Videos").performScrollTo().performClick()
         assertTrue(ajustes.descargas.value.video.datos)
         regla.onNodeWithTag("wifi_Fotos").performScrollTo().performClick()
@@ -50,6 +50,20 @@ class AvanzadoUiTest {
         Ajustes.reiniciarParaPruebas()
         val otra = Ajustes.get(Apoyo.ctx())
         assertFalse(otra.secure.value); assertTrue(otra.descargas.value.video.datos); assertFalse(otra.descargas.value.foto.wifi)
+    }
+
+    @Test fun aspectoGuardaTemaColorYAnimaciones() {
+        pantalla()
+        assertEquals(ModoTema.SISTEMA, ajustes.modoTema.value); assertFalse(ajustes.colorDinamico.value); assertFalse(ajustes.reducirAnimaciones.value)
+        regla.onNodeWithText("Oscuro").performScrollTo().performClick()
+        assertEquals(ModoTema.OSCURO, ajustes.modoTema.value)
+        regla.onNodeWithTag("sw_Reducir animaciones").performScrollTo().performClick()
+        assertTrue(ajustes.reducirAnimaciones.value)
+        regla.onNodeWithTag("sw_Color del sistema").performScrollTo().performClick()
+        assertTrue(ajustes.colorDinamico.value)
+        Ajustes.reiniciarParaPruebas()
+        val otra = Ajustes.get(Apoyo.ctx())
+        assertEquals(ModoTema.OSCURO, otra.modoTema.value); assertTrue(otra.reducirAnimaciones.value)
     }
 
     @Test fun reglasDeDescargaViajanAlModuloGo() {
@@ -70,20 +84,6 @@ class AvanzadoUiTest {
         regla.onNodeWithText("Eliminar bot").performScrollTo().performClick()
         regla.onNodeWithText("Sí, eliminar").performClick()
         assertTrue(eliminado)
-    }
-
-    @Test fun pinSeCreaYSeQuita() {
-        var pedido = false
-        pantalla(pin = { pedido = true })
-        regla.onNodeWithText("Crear PIN").performScrollTo().performClick()
-        assertTrue(pedido)
-        ajustes.fijarPin("1357")
-        regla.waitForIdle()
-        regla.onNodeWithText("Cambiar").performScrollTo().assertIsDisplayed()
-        regla.onNodeWithText("Quitar").performScrollTo().performClick()
-        regla.onNodeWithText("¿Quitar el PIN?").assertIsDisplayed()
-        regla.onNodeWithText("Quitar PIN").performClick()
-        regla.waitUntil(5_000) { !ajustes.tienePin.value }
     }
 
     @Test fun registroYMedicion() {

@@ -67,9 +67,18 @@ object Apoyo {
     /** Deja todo limpio: base local, ajustes, llave en memoria y motor de ejemplo. */
     fun reinicia(motor: MotorFalso = MotorFalso()): MotorFalso {
         Datos.reiniciarParaPruebas()
+        ctx().deleteDatabase("botchat.db") // cada prueba empieza sin bot, aunque la anterior haya creado uno
+        ctx().filesDir.listFiles()?.forEach { it.deleteRecursively() }
+        ctx().cacheDir.listFiles()?.forEach { it.deleteRecursively() }
+        Datos.get(ctx()).let { d -> d.lista().forEach { d.eliminar(it.id) } } // por si la base de la prueba anterior sigue ahí
         Ajustes.reiniciarParaPruebas()
         ctx().getSharedPreferences("ajustes", Context.MODE_PRIVATE).edit().clear().commit()
         ctx().getSharedPreferences("seguridad", Context.MODE_PRIVATE).edit().clear().commit()
+        ctx().getSharedPreferences("vistos", Context.MODE_PRIVATE).edit().clear().commit()
+        com.botchat.app.BotState.estado.value = "detenido"; com.botchat.app.BotState.corriendo.value = false
+        com.botchat.app.ui.ArranqueLogo.mostrado = true // sin splash salvo en su propia prueba
+        com.botchat.app.ui.EntradaLista.hecha = true
+        com.botchat.app.ui.EstadoBloqueo.bloqueado.value = false
         ClaveDatos.paraPruebas(clave)
         CacheImagenes.vaciar()
         Repo.paraPruebas(ctx().filesDir, motor)

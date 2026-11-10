@@ -31,7 +31,7 @@ class BloqueoUiTest {
         val a = Ajustes.get(Apoyo.ctx()); a.fijarPin("4821")
         var abierto = false
         regla.setContent { BotChatTema { PantallaBloqueo(a) { abierto = true } } }
-        regla.onNodeWithText("BotChat está bloqueado").assertIsDisplayed()
+        regla.onNodeWithText("Bot Chat está bloqueado").assertIsDisplayed()
         teclea("4821"); regla.onNodeWithText("OK").performClick()
         regla.waitUntil(8_000) { abierto }
     }

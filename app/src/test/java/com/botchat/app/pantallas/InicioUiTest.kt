@@ -1,6 +1,11 @@
 package com.botchat.app.pantallas
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onChild
+import androidx.compose.ui.test.onNodeWithTag
+import com.botchat.app.datos.Ajustes
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -27,7 +32,7 @@ class InicioUiTest {
     @Before fun antes() { motor = Apoyo.reinicia(); Apoyo.creaBot() }
 
     private fun pantalla(sinSesion: Boolean = false, alChat: (String) -> Unit = {}, alRevincular: () -> Unit = {}) =
-        regla.setContent { BotChatTema { PantallaInicio(sinSesion, alChat, {}, {}, {}, alRevincular) } }
+        regla.setContent { BotChatTema { PantallaInicio(sinSesion, alChat, alRevincular) } }
 
     @Test fun listaConPestanasYBuscador() {
         motor.chatsPersonales = Apoyo.arreglo(
@@ -49,11 +54,28 @@ class InicioUiTest {
         regla.onNodeWithText("¿quién viene?").assertIsDisplayed()
         // Buscador
         regla.onNodeWithText("Personales").performClick()
-        regla.onNodeWithContentDescription("Buscar").performClick()
         regla.onNode(hasSetTextAction()).performTextInput("jos")
         regla.waitUntil(5_000) { regla.onAllNodesWithTextSafe("María López") == 0 }
         regla.onNodeWithText("José Peña").assertIsDisplayed()
         assertTrue(motor.consultas.contains("jos"))
+    }
+
+    @Test fun contadorDeMensajesNuevosPorChat() {
+        val ahora = System.currentTimeMillis() / 1000
+        Ajustes.get(Apoyo.ctx()).baseVistos() // desde aquí cuenta lo nuevo
+        motor.chatsPersonales = Apoyo.arreglo(
+            Apoyo.chatJson("a@s.whatsapp.net", "María López", ts = ahora + 20),
+            Apoyo.chatJson("b@s.whatsapp.net", "José Peña", ts = ahora - 500),
+        )
+        motor.mensajes = Apoyo.arreglo(Apoyo.msgJson("m2", ahora + 20, "dos"), Apoyo.msgJson("m1", ahora + 10, "uno"), Apoyo.msgJson("m0", ahora - 600, "viejo"), Apoyo.msgJson("mio", ahora + 15, "hola", mio = true))
+        pantalla()
+        regla.esperaTexto("María López")
+        regla.waitUntil(5_000) { regla.onAllNodes(hasTestTag("contador_a@s.whatsapp.net"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        regla.onNodeWithTag("contador_a@s.whatsapp.net", useUnmergedTree = true).onChild().assertTextEquals("2") // los propios y los viejos no cuentan
+        regla.onNodeWithTag("contador_b@s.whatsapp.net", useUnmergedTree = true).assertDoesNotExist()
+        // Al abrir el chat queda como visto
+        Ajustes.get(Apoyo.ctx()).marcarVisto("a@s.whatsapp.net", ahora + 100)
+        assertTrue(Ajustes.get(Apoyo.ctx()).visto("a@s.whatsapp.net") >= ahora + 100)
     }
 
     @Test fun sinMensajesMuestraAyuda() {
@@ -78,6 +100,5 @@ class InicioUiTest {
         regla.onNodeWithText("Tus mensajes guardados siguen aquí.").assertIsDisplayed()
         regla.onNodeWithText("Vincular de nuevo").performClick()
         assertTrue(vinculado)
-        regla.onNodeWithText("Sin sesión").assertIsDisplayed()
     }
 }

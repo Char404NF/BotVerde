@@ -29,7 +29,7 @@ import org.robolectric.annotation.Config
 class AsistenteUiTest {
     @get:Rule val regla = createComposeRule()
 
-    @Before fun antes() { Apoyo.reinicia(); BotState.codigo.value = null }
+    @Before fun antes() { Apoyo.reinicia(); BotState.codigo.value = null; com.botchat.app.datos.Ajustes.get(Apoyo.ctx()).aceptarAviso() /* la bienvenida tiene su propia prueba */ }
 
     @Test fun pasoAPasoHastaElCodigo() {
         regla.setContent { BotChatTema { Raiz() } }
