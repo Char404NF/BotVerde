@@ -59,6 +59,7 @@ import androidx.media3.common.util.UnstableApi
 import com.botchat.app.datos.Msg
 import com.botchat.app.datos.Repo
 import com.botchat.app.medios.CacheImagenes
+import com.botchat.app.medios.PortadaVideo
 import com.botchat.app.medios.ReproductorAudio
 import kotlinx.coroutines.launch
 
@@ -115,7 +116,10 @@ private fun Cuadricula(botId: Long, jid: String, datos: List<Msg>, alAbrirVisor:
         items(datos, key = { it.id }) { m ->
             val ruta = if (m.descargado) m.ruta else m.miniatura
             var img by remember(ruta) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
-            LaunchedEffect(ruta) { img = if (ruta.isEmpty()) null else CacheImagenes.cargar(ctx, Repo.archivo(ruta), px)?.asImageBitmap() }
+            LaunchedEffect(ruta) {
+                img = if (ruta.isEmpty()) null else if (m.categoria == "video" && m.descargado) (PortadaVideo.cargar(ctx, Repo.archivo(ruta), px * 2, m.dur * 1000L) ?: CacheImagenes.cargar(ctx, Repo.archivo(m.miniatura), px))?.asImageBitmap()
+                else CacheImagenes.cargar(ctx, Repo.archivo(ruta), px)?.asImageBitmap()
+            }
             Box(Modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceContainerHighest).clickable(enabled = m.descargado) { alAbrirVisor(m.id) }, Alignment.Center) {
                 val i = img
                 if (i != null) androidx.compose.animation.Crossfade(i, Modifier.fillMaxSize(), animationSpec = Mov.tiempo(LocalReducirMovimiento.current, Mov.NORMAL), label = "miniatura") { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }

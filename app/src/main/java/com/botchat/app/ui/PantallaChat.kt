@@ -62,6 +62,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import kotlinx.coroutines.launch
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -76,6 +78,8 @@ import com.botchat.app.Paises
 import com.botchat.app.datos.Msg
 import com.botchat.app.datos.Repo
 import com.botchat.app.medios.CacheImagenes
+import com.botchat.app.medios.PortadaVideo
+import com.botchat.app.medios.TipoArchivo
 import com.botchat.app.medios.ReproductorAudio
 
 private sealed interface Elem {
@@ -325,7 +329,12 @@ private fun MiniaturaMedia(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit) {
         miniatura = if (m.miniatura.isEmpty()) null else CacheImagenes.cargar(ctx, Repo.archivo(m.miniatura), 320)?.asImageBitmap()
     }
     LaunchedEffect(m.ruta, m.descargado) {
-        imagen = if (!m.descargado) null else CacheImagenes.cargar(ctx, Repo.archivo(m.ruta), px)?.asImageBitmap()
+        imagen = when {
+            !m.descargado -> null
+            // Videos: un cuadro real del video (la miniatura de WhatsApp es diminuta y se ve borrosa al ampliarla).
+            m.categoria == "video" -> PortadaVideo.cargar(ctx, Repo.archivo(m.ruta), px * 2, m.dur * 1000L)?.asImageBitmap()
+            else -> CacheImagenes.cargar(ctx, Repo.archivo(m.ruta), px)?.asImageBitmap()
+        }
     }
     val ruta = if (m.descargado) m.ruta else m.miniatura
     val haptica = rememberHaptica()
@@ -395,22 +404,46 @@ private fun BurbujaAudio(m: Msg, vm: ChatVm) {
 @Composable
 private fun BurbujaDocumento(m: Msg, vm: ChatVm, alAbrirDocumento: (String) -> Unit) {
     val haptica = rememberHaptica()
-    Row(
-        Modifier.widthIn(min = 220.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f)).clickable(enabled = m.descargado) { alAbrirDocumento(m.id) }.padding(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    val ctx = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val nombre = TipoArchivo.nombreMostrable(m.nombre, m.mime)
+    val familia = TipoArchivo.familia(m.nombre, m.mime)
+    val esPdf = familia == TipoArchivo.Familia.PDF
+    val abrirFuera = { scope.launch { compartirTemporal(ctx, m, nombre, ver = true) }; Unit }
+    Column(
+        Modifier.widthIn(min = 240.dp, max = 300.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f))
+            .clickable(enabled = m.descargado) { haptica(Toque.Suave); if (esPdf) alAbrirDocumento(m.id) else abrirFuera() }.padding(10.dp).testTag("tarjeta_documento"),
     ) {
-        Icon(Ico.Documento, null, Modifier.size(34.dp))
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(m.nombre.ifBlank { "Documento" }, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
-            Text(listOfNotNull(if (m.bytes > 0) formatoBytes(m.bytes) else null, m.mime.substringAfter('/').substringBefore(';').uppercase().takeIf { it.isNotBlank() }).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = LocalContentColorSuave())
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)).background(colorDeFamilia(familia)), Alignment.Center) {
+                Text(TipoArchivo.etiqueta(m.nombre, m.mime), color = Color.White, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(nombre, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
+                Text(if (m.bytes > 0) formatoBytes(m.bytes) else "Tamaño desconocido", style = MaterialTheme.typography.bodySmall, color = LocalContentColorSuave())
+            }
+            if (!m.descargado) {
+                Spacer(Modifier.width(8.dp))
+                if (m.estado == "pendiente") CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
+                else if (m.puedeBajarse) IconButton({ haptica(Toque.Fuerte); vm.descargar(m) }) { Icon(Ico.Descargar, if (m.estado == "fallido") "Reintentar" else "Descargar") }
+            }
         }
-        if (!m.descargado) {
-            Spacer(Modifier.width(8.dp))
-            if (m.estado == "pendiente") CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
-            else if (m.puedeBajarse) IconButton({ haptica(Toque.Fuerte); vm.descargar(m) }) { Icon(Ico.Descargar, if (m.estado == "fallido") "Reintentar" else "Descargar") }
+        if (m.descargado) {
+            androidx.compose.material3.TextButton({ haptica(Toque.Suave); abrirFuera() }, Modifier.align(Alignment.End).testTag("abrir_con")) { Text("Abrir con…") }
         }
     }
+}
+
+@Composable
+private fun colorDeFamilia(f: TipoArchivo.Familia): Color = when (f) {
+    TipoArchivo.Familia.PDF -> Color(0xFFC62828)
+    TipoArchivo.Familia.HOJA -> Color(0xFF2E7D32)
+    TipoArchivo.Familia.TEXTO -> Color(0xFF1565C0)
+    TipoArchivo.Familia.PRESENTACION -> Color(0xFFE65100)
+    TipoArchivo.Familia.COMPRIMIDO -> Color(0xFF6A4C93)
+    TipoArchivo.Familia.APP -> Color(0xFF00695C)
+    else -> Color(0xFF546E7A)
 }
 
 // ---------- foto grande ----------

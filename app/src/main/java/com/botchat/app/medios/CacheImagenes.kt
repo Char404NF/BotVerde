@@ -26,6 +26,8 @@ object CacheImagenes {
 
     fun enCache(clave: String): Bitmap? = cache.get(clave)
 
+    fun guardar(clave: String, bmp: Bitmap) { cache.put(clave, bmp) }
+
     /**
      * Devuelve la imagen del archivo cifrado `archivo`, reducida para que su lado mayor no pase de `ladoMax` píxeles.
      * `etiqueta` distingue versiones del mismo archivo (por ejemplo una foto de perfil que cambió).
