@@ -76,6 +76,7 @@ type Config struct {
 	DebounceMax  time.Duration // tope de espera para juntar una ráfaga (6 s)
 	EsperaMin    time.Duration // espera antes de enviar (0,8 s)
 	EsperaMax    time.Duration // (2,5 s)
+	PorCaracter  time.Duration // espera extra por cada letra de la respuesta, como alguien que teclea (25 ms; tope 2,5 s)
 	LimiteGlobal int           // respuestas por minuto en total (20)
 	LimiteChat   int           // respuestas por minuto en un chat (6)
 	MaxCola      int           // mensajes en espera por chat (10)
@@ -160,6 +161,7 @@ func Nuevo(c Config) *Motor {
 	def(&c.DebounceMax, 6*time.Second)
 	def(&c.EsperaMin, 800*time.Millisecond)
 	def(&c.EsperaMax, 2500*time.Millisecond)
+	def(&c.PorCaracter, 25*time.Millisecond)
 	def(&c.Repetido, 5*time.Second)
 	def(&c.FrenoDura, 5*time.Minute)
 	for p, v := range map[*int]int{&c.LimiteGlobal: 20, &c.LimiteChat: 6, &c.MaxCola: 10, &c.FrenoFallos: 5} {
@@ -506,7 +508,7 @@ func (m *Motor) salirUno(p *pedido) error {
 		espera += time.Duration(m.c.Aleatorio(span))
 	}
 	// Un poco más de espera si el texto es largo, como alguien que teclea.
-	extra := time.Duration(len([]rune(p.texto))) * 25 * time.Millisecond
+	extra := time.Duration(len([]rune(p.texto))) * m.c.PorCaracter
 	if extra > 2500*time.Millisecond {
 		extra = 2500 * time.Millisecond
 	}

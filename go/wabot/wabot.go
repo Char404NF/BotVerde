@@ -6,23 +6,23 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"botchat/internal/envio"
 	"botchat/internal/fotos"
 	"botchat/internal/ingesta"
 	"botchat/internal/medios"
+	"botchat/internal/motor"
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
-	"google.golang.org/protobuf/proto"
 	_ "modernc.org/sqlite" // SQLite en Go puro (sin cgo)
 )
 
@@ -40,7 +40,6 @@ type estado struct {
 	l       Listener
 	cont    *sqlstore.Container
 	cli     *whatsmeow.Client
-	lim     *limitador
 	qr      chan struct{}
 	cerr    bool // true cuando el cierre lo pidió la app (Stop/Logout)
 	botID   int64
@@ -49,13 +48,15 @@ type estado struct {
 	trabajo chan func()
 	wg      sync.WaitGroup
 
-	ing       *ingesta.Ingesta
-	envio     *envio.Servicio
-	descargas *medios.Gestor
-	fotos     *fotos.Gestor
-	grupos    *colaGrupos
-	refresco  *time.Timer
-	refMu     sync.Mutex
+	ing           *ingesta.Ingesta
+	envio         *envio.Servicio
+	motor         *motor.Motor
+	sincronizando atomic.Bool // WhatsApp está entregando mensajes acumulados: no se contestan
+	descargas     *medios.Gestor
+	fotos         *fotos.Gestor
+	grupos        *colaGrupos
+	refresco      *time.Timer
+	refMu         sync.Mutex
 }
 
 var (
@@ -94,7 +95,7 @@ func Start(raiz string, botID int64, clave []byte, l Listener) error {
 		return fmt.Errorf("no se pudo crear la carpeta: %w", err)
 	}
 	ctx := context.Background()
-	s := &estado{l: l, botID: botID, lim: nuevoLimitador(), qr: make(chan struct{}, 1), trabajo: make(chan func(), 8192)}
+	s := &estado{l: l, botID: botID, qr: make(chan struct{}, 1), trabajo: make(chan func(), 8192)}
 	lg := &registro{salida: func(x string) { s.log(x) }}
 	cont, err := sqlstore.New(ctx, "sqlite", dsnSesion(sesion), lg.Sub("DB"))
 	if err != nil {
@@ -147,6 +148,13 @@ func (s *estado) armar() {
 		Servicios: servicios{s}, EsPropio: s.esPropio, VerUnaVezDias: func() int { return int(verUnaVezDias.Load()) }, Politica: politicaActual, Red: redActual, Libre: func() int64 { l, _ := alm.Libre(); return l }, Log: s.log})
 	s.envio = envio.Nuevo(s.botID, alm, envio.Real{Client: s.cli}, s.log)
 	s.envio.PausaBot = pausaTrasEscribir
+	s.motor = motor.Nuevo(motor.Config{
+		BotID: s.botID, Alm: alm, Decisor: decisorActual(), Enviador: enviadorMotor{s}, Log: s.log,
+		Activo: motorActivo.Load, VentanaAntigua: func() time.Duration { return time.Duration(ventanaAntiguaMin.Load()) * time.Minute },
+		AlFrenar: func() { s.avisaCambio("motor:freno") },
+		AlHumano: func(chat, aviso string) { s.avisaCambio("humano:" + chat) },
+	})
+	s.motor.Iniciar(s.ctx)
 	s.descargas.Iniciar(s.ctx)
 	s.fotos.Iniciar(s.ctx)
 	s.grupos.iniciar(s.ctx)
@@ -251,6 +259,7 @@ func Stop() {
 	}
 	s.refMu.Unlock()
 	s.cli.Disconnect()
+	s.motor.Detener()
 	s.descargas.Detener()
 	s.fotos.Detener()
 	s.wg.Wait()
@@ -332,11 +341,16 @@ func (s *estado) evento(e any) {
 		s.log(fmt.Sprintf("No se pudo conectar (código %d).", int(v.Reason)))
 		s.status(fmt.Sprintf("error: no se pudo conectar (%d)", int(v.Reason)))
 	case *events.Message:
+		sinc := s.sincronizando.Load() // se mira al llegar, no cuando le toque al trabajador
 		s.encola(func() {
 			s.ing.Mensaje(s.ctx, v, false)
 			s.pausaPorTelefono(v)
+			s.alMotor(v, sinc)
 		})
-		s.responder(v)
+	case *events.OfflineSyncPreview:
+		s.sincronizando.Store(true)
+	case *events.OfflineSyncCompleted:
+		s.sincronizando.Store(false)
 	case *events.UndecryptableMessage:
 		// WhatsApp no entrega a los dispositivos vinculados el contenido de algunos "ver una vez": solo queda el aviso.
 		if v.IsUnavailable && v.UnavailableType == events.UnavailableTypeViewOnce {
@@ -428,46 +442,6 @@ func textoDe(m *waE2E.Message) string {
 		return t
 	}
 	return m.GetExtendedTextMessage().GetText()
-}
-
-// responder contesta "hola" a los textos privados de otras personas (máximo uno por contacto cada 60 segundos). No cambia desde la etapa 1.
-func (s *estado) responder(v *events.Message) {
-	chat := v.Info.Chat
-	ent := entrada{
-		EsMio:      v.Info.IsFromMe,
-		EsGrupo:    v.Info.IsGroup || chat.Server == types.GroupServer,
-		Edicion:    v.IsEdit || v.IsBotInvoke,
-		Servidor:   chat.Server,
-		Antiguedad: time.Since(v.Info.Timestamp),
-		Texto:      textoDe(v.Message),
-		Clave:      chat.String(),
-	}
-	if ent.Servidor != "" && esVerUnaVez(v) {
-		ent.Texto = "" // un "ver una vez" no es texto
-	}
-	ok, motivo := s.lim.decidir(ent, time.Now())
-	if !ok {
-		if !ent.EsMio {
-			s.log("Mensaje de " + enmascara(chat.User) + " ignorado: " + motivo + ".")
-		}
-		return
-	}
-	go func() {
-		time.Sleep(time.Duration(1000+rand.Intn(2000)) * time.Millisecond) // pausa corta, como una persona
-		ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
-		defer cancel()
-		resp, err := s.cli.SendMessage(ctx, chat, &waE2E.Message{Conversation: proto.String(textoRespuesta)})
-		if err != nil {
-			s.log("No se pudo responder a " + enmascara(chat.User) + ": " + err.Error())
-			return
-		}
-		s.log("Respondido a " + enmascara(chat.User) + ".")
-		propio := types.EmptyJID
-		if s.cli.Store.ID != nil {
-			propio = s.cli.Store.ID.ToNonAD()
-		}
-		s.encola(func() { s.ing.Enviado(s.ctx, chat, resp.ID, textoRespuesta, resp.Timestamp, propio) })
-	}()
 }
 
 // esVerUnaVez: ver ingesta.EsVerUnaVez.

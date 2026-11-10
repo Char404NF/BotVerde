@@ -307,7 +307,7 @@ func (a *Almacen) BorrarChat(botID int64, chat string) (bytes int64, err error) 
 	if _, err = a.db.Exec("DELETE FROM daily_stats WHERE bot_id=? AND chat=?", botID, chat); err != nil {
 		return 0, err
 	}
-	for _, t := range []string{"message_receipts", "reacciones", "chat_estado"} {
+	for _, t := range []string{"message_receipts", "reacciones", "chat_estado", "dedupe"} {
 		if _, err = a.db.Exec("DELETE FROM "+t+" WHERE bot_id=? AND chat_jid=?", botID, chat); err != nil {
 			return 0, err
 		}
@@ -564,7 +564,7 @@ func (a *Almacen) EliminarBot(botID int64) error {
 	if _, err := a.db.Exec("DELETE FROM daily_stats WHERE bot_id=?", botID); err != nil {
 		return err
 	}
-	for _, t := range []string{"message_receipts", "reacciones", "chat_estado"} {
+	for _, t := range []string{"message_receipts", "reacciones", "chat_estado", "dedupe", "actividad"} {
 		if _, err := a.db.Exec("DELETE FROM "+t+" WHERE bot_id=?", botID); err != nil {
 			return err
 		}
