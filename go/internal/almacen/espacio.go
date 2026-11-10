@@ -558,3 +558,9 @@ func (a *Almacen) EliminarBot(botID int64) error {
 	a.avisa("chats")
 	return nil
 }
+
+// TieneMensajes dice si el chat ya tiene al menos un mensaje guardado.
+func (a *Almacen) TieneMensajes(botID int64, chat string) bool {
+	var x int
+	return a.db.QueryRow("SELECT 1 FROM messages WHERE bot_id=? AND chat_jid=? LIMIT 1", botID, chat).Scan(&x) == nil
+}
