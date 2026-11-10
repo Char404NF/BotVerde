@@ -102,6 +102,16 @@ object Json {
         )
     }
 
+    fun chatOpt(json: String): ChatItem? {
+        if (json.isBlank() || json == "null") return null
+        val o = JSONObject(json)
+        return ChatItem(
+            o.optString("jid"), o.optString("nombre"), o.optString("telefono"), o.optString("pais"), o.optBoolean("esGrupo"),
+            o.optString("foto"), o.optLong("fotoTs"), o.optLong("ultimoTs"), o.optString("ultimoTexto"), o.optString("ultimoTipo"),
+            o.optBoolean("ultimoBorrado"), o.optBoolean("ultimoMio"),
+        )
+    }
+
     fun mensajes(json: String) = lista(json) {
         Msg(
             it.optString("id"), it.optString("chat"), it.optString("remitenteId"), it.optString("remitente"), it.optBoolean("esMio"),

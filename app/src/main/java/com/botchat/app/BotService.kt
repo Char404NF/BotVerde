@@ -194,6 +194,7 @@ class BotService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .addAction(0, "Detener", detener)
             .build()
     }

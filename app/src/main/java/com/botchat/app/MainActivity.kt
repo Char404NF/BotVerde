@@ -1,63 +1,46 @@
 package com.botchat.app
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.botchat.app.datos.Ajustes
+import com.botchat.app.ui.BotChatTema
+import com.botchat.app.ui.EstadoBloqueo
+import com.botchat.app.ui.Raiz
+import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity() {
+/** FragmentActivity (en vez de ComponentActivity) porque la huella (androidx.biometric) lo necesita. */
+class MainActivity : FragmentActivity() {
+    private val ajustes by lazy { Ajustes.get(this) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        setContent { Tema { Raiz() } }
-    }
-}
-
-@Composable
-private fun Raiz() {
-    val vm: AppVm = viewModel()
-    val ctx = LocalContext.current
-
-    // Permiso de notificaciones (Android 13+): se pide antes de iniciar el bot.
-    val pendiente = remember { mutableStateOf<(() -> Unit)?>(null) }
-    val lanzador = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        pendiente.value?.invoke()
-        pendiente.value = null
-    }
-    val conPermiso: (() -> Unit) -> Unit = { accion ->
-        if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            pendiente.value = accion
-            lanzador.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            accion()
+        if (savedInstanceState == null) EstadoBloqueo.iniciar(ajustes)
+        // FLAG_SECURE: sin capturas de pantalla ni vista previa en apps recientes (activado por defecto; se cambia en Avanzado).
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.CREATED) {
+                ajustes.secure.collect { activo ->
+                    if (activo) window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+                    else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                }
+            }
         }
+        setContent { BotChatTema { Raiz() } }
     }
 
-    BackHandler(enabled = vm.puedeVolver) { vm.atras(ctx) }
+    override fun onStop() {
+        super.onStop()
+        EstadoBloqueo.alSalir()
+    }
 
-    Surface(modifier = Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
-            Pantallas(vm, conPermiso)
-        }
+    override fun onStart() {
+        super.onStart()
+        EstadoBloqueo.alVolver(this, ajustes) // tras 1 minuto en segundo plano se vuelve a pedir el PIN
     }
 }

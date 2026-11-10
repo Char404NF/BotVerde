@@ -54,6 +54,8 @@ object Repo {
 
     private suspend fun <T> io(f: () -> T): T = withContext(Dispatchers.IO) { f() }
 
+    suspend fun chat(bot: Long, jid: String) = io { Json.chatOpt(Wabot.obtenerChat(bot, jid)) }
+
     suspend fun chats(bot: Long, grupos: Boolean, consulta: String, limite: Int = 300, desde: Int = 0) =
         io { Json.chats(Wabot.listarChats(bot, grupos, consulta, limite.toLong(), desde.toLong())) }
 

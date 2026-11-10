@@ -15,6 +15,7 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
+        android:enableOnBackInvokedCallback="true"
         android:supportsRtl="true"
         android:theme="@style/Theme.BotChat"
         android:usesCleartextTraffic="false">
@@ -28,6 +29,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Para abrir o compartir una copia temporal descifrada (permiso temporal de lectura). Solo la carpeta de temporales. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.compartir"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/rutas_compartir" />
+        </provider>
 
         <!-- Servicio en primer plano: mantiene el bot conectado. "specialUse" no tiene límite de tiempo
              (dataSync se corta a las 6 h en Android 15) y no depende de Google. -->
