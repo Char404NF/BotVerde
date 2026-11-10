@@ -65,7 +65,7 @@ Sin probar contra WhatsApp real (lo prueba Charly con su número secundario) ni 
 
 ### Comandos (como wabot)
 - Pruebas Go: `cd ~/wabot-app/go && nice -n 10 go test ./...`
-- Regenerar el .aar (tras cambiar Go): `cd ~/wabot-app/go && nice -n 10 gomobile bind -target=android/arm64 -androidapi 26 -o ../app/libs/wabot.aar ./wabot`
+- Regenerar el .aar (tras cambiar Go): `cd ~/wabot-app/go && nice -n 10 gomobile bind -target=android/arm64 -androidapi 26 -trimpath -ldflags="-s -w" -o ../app/libs/wabot.aar ./wabot`
 - Pruebas Kotlin: `cd ~/wabot-app && nice -n 10 ./gradlew testDebugUnitTest --no-daemon`
 - APK: `cd ~/wabot-app && nice -n 10 ./gradlew assembleDebug --no-daemon` y copiar `app/build/outputs/apk/debug/app-debug.apk` a `salida/`.
 

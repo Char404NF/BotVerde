@@ -16,6 +16,7 @@ android {
         ndk { abiFilters += "arm64-v8a" }
     }
     buildFeatures { compose = true }
+    packaging { jniLibs { useLegacyPackaging = true } } // comprime la librería nativa: APK mucho más liviano
     testOptions { unitTests.isReturnDefaultValues = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
