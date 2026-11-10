@@ -195,3 +195,26 @@ Una sola entrega con cinco bloques (A–E). `PROGRESO.md` tiene la lista de íte
 - Sin pruebas con tráfico real de WhatsApp: acuses, presencia, reenvío, menciones con LID, voz y ver una vez requieren probarse en el teléfono.
 - No hay reordenar automatizaciones desde la pantalla (la API `ReordenarAutomatizaciones` existe); el orden es el de creación.
 - El editor es una lista indentada (sin lienzo). Las estadísticas por menú cuentan a partir de 0.4.0.
+
+## Estado: 0.4.1 "Rendimiento al abrir un chat" (2026-11-10) — versionCode 8
+
+Parche solo de rendimiento (sin funciones nuevas). Causa: `vista()` pedía el nombre de cada autor de cita, mencionado y "eliminado por" con
+1–2 consultas por mensaje, y `nombreDe` recorría el chat entero si la persona no tenía nombre (≈1 s por página de 60 con 20,000 mensajes); además
+cada cambio releía todo lo ya cargado.
+
+- **Go**: `internal/almacen/nombres.go` resuelve los nombres por lote (una consulta por chat para contactos y una sentencia con un salto al índice por
+  persona) y los guarda en una caché pequeña que se invalida en `escribirChat` (contacto, push name, negocio), al llegar un mensaje con nombre de esa
+  persona, y al borrar/fusionar chats. Migración 8: índice parcial `idx_mensajes_remitente`. `MensajesPorID` (lote de hasta 300 ids) y eventos nuevos
+  `msg:<jid>:<id>` (`avisaMsg`) en acuses, reacciones, ediciones, eliminados, estado de envío y ver una vez. `ChatSintetico` crea el chat de prueba.
+  `CargaAntigua(true)` reproduce la ruta de la 0.4.0 (solo para medir).
+- **Kotlin**: `ChatVm` abre con 40 mensajes (la caché `CachePaginas` pinta al instante lo último visto), la mezcla (`MezclaMensajes`, con tests) refresca
+  la primera página y pide por id, en un solo lote, los mensajes viejos ya cargados que cambiaron. Los renglones (`ElementosChat.kt`) y el texto con
+  formato (`CacheTexto`) se calculan fuera del hilo principal. Presencia, leído, participantes y extras esperan `ENTRADA_MS` (fin de la animación).
+  Miniaturas: la miniatura al instante; la imagen nítida se pide tras 140 ms y a ≤720 px. LazyColumn con `contentType`, sin fade de entrada.
+- **Medir**: Avanzado → Medir rendimiento → "Medir abrir chat" (chat sintético de 20,000 mensajes que se borra solo; 3 aperturas; ms hasta el primer
+  contenido y hasta el completo; cuadros perdidos). Tocar 5 veces el título muestra "Medir con carga anterior (0.4.0)" para ver antes y después.
+- **Dos APK, mismo app**: `debug` y `rendimiento` (no depurable, R8, `proguard-rules.pro`, `baseline-prof.txt` escrito a mano). Mismo applicationId, mismo
+  versionCode y la misma llave (`~/.android/debug.keystore`, SHA-256 699002c7…40e0): se instalan uno encima del otro en ambos sentidos sin desinstalar.
+  Compilar: `./gradlew :app:assembleDebug` / `:app:assembleRendimiento` (el APK sale en `app/build/outputs/apk/<variante>/`). Tests contra la variante:
+  `./gradlew -PpruebasRendimiento :app:testRendimientoUnitTest` (la propiedad solo añade `ui-test-manifest` para Robolectric; el APK no la lleva).
+  Si se agrega una librería que use reflexión o JNI, revisar `proguard-rules.pro` y comprobar con `apkanalyzer dex packages` que sus clases siguen ahí.
