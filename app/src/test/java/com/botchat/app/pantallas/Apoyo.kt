@@ -66,6 +66,36 @@ class MotorFalso : Motor {
     var personas = "[]"
     override fun listarFiltrados(bot: Long, chat: String, filtro: String, antesTs: Long, antesId: String, limite: Long): String { llamadas += "filtro:$filtro"; return if (antesTs > 0) """{"total":0,"items":[]}""" else filtrados }
     override fun personasChat(bot: Long, chat: String) = personas
+    var envioResultado = """{"id":"NUEVO1","estado":"enviado","ts":1}"""
+    var envioFalla: String? = null
+    var presencia = """{"escribiendo":false,"enLinea":false,"ultimaVez":0}"""
+    var participantes = "[]"
+    var info = """{"enviado":0,"estado":"enviado","esGrupo":false,"personas":[],"editado":false,"reenviado":false}"""
+    var borrador = ""
+    var estadoChat = """{"silenciado":false,"botPausaHasta":0,"botActivo":true}"""
+    var plazo = 1200L
+    var reenvio = """{"enviados":1,"omitidos":0,"fallidos":0}"""
+    private fun falla() { envioFalla?.let { throw IllegalStateException(it) } }
+    override fun enviarTexto(bot: Long, chat: String, texto: String, citaId: String, mencionesJson: String): String { llamadas += "enviar:$chat:$texto:$citaId:$mencionesJson"; falla(); return envioResultado }
+    override fun reintentarEnvio(bot: Long, chat: String, id: String): String { llamadas += "reintentar:$id"; falla(); return envioResultado }
+    override fun reaccionar(bot: Long, chat: String, id: String, emoji: String) { llamadas += "reaccion:$id:$emoji"; falla() }
+    override fun editarMensaje(bot: Long, chat: String, id: String, texto: String) { llamadas += "editar:$id:$texto"; falla() }
+    override fun borrarParaTodos(bot: Long, chat: String, id: String) { llamadas += "borrarTodos:$id"; falla() }
+    override fun borrarParaMi(bot: Long, chat: String, idsJson: String): Long { llamadas += "borrarMi:$idsJson"; return 1 }
+    override fun reenviarTexto(bot: Long, origen: String, idsJson: String, destinosJson: String): String { llamadas += "reenviar:$idsJson:$destinosJson"; falla(); return reenvio }
+    override fun marcarLeido(bot: Long, chat: String) { llamadas += "leido:$chat" }
+    override fun escribiendo(bot: Long, chat: String, si: Boolean) { llamadas += "escribiendo:$si" }
+    override fun enLinea(bot: Long, si: Boolean) { llamadas += "enLinea:$si" }
+    override fun suscribirPresencia(bot: Long, chat: String) { llamadas += "suscribir:$chat" }
+    override fun presenciaDe(chat: String) = presencia
+    override fun participantesGrupo(bot: Long, chat: String) = participantes
+    override fun infoMensaje(bot: Long, chat: String, id: String) = info
+    override fun guardarBorrador(bot: Long, chat: String, texto: String) { llamadas += "borrador:$texto"; borrador = texto }
+    override fun leerBorrador(bot: Long, chat: String) = borrador
+    override fun silenciarChat(bot: Long, chat: String, si: Boolean) { llamadas += "silenciar:$si" }
+    override fun estadoDelChat(bot: Long, chat: String) = estadoChat
+    override fun plazoEdicionSeg() = plazo
+    override fun configurarEnvio(pausaBotMin: Long) { llamadas += "configurarEnvio:$pausaBotMin" }
     override fun olvidarMensaje(bot: Long, chat: String, id: String) { llamadas += "olvidar:$chat:$id" }
     override fun establecerZona(id: String) { zona = id }
     override fun estadisticasChat(bot: Long, chat: String) = resumenChat
@@ -90,6 +120,7 @@ object Apoyo {
         ctx().getSharedPreferences("ajustes", Context.MODE_PRIVATE).edit().clear().commit()
         ctx().getSharedPreferences("seguridad", Context.MODE_PRIVATE).edit().clear().commit()
         ctx().getSharedPreferences("vistos", Context.MODE_PRIVATE).edit().clear().commit()
+        ctx().getSharedPreferences("notificados", Context.MODE_PRIVATE).edit().clear().commit()
         com.botchat.app.BotState.estado.value = "detenido"; com.botchat.app.BotState.corriendo.value = false
         com.botchat.app.ui.ArranqueLogo.mostrado = true // sin splash salvo en su propia prueba
         com.botchat.app.ui.EntradaLista.hecha = true
@@ -118,6 +149,7 @@ object Apoyo {
     ) = JSONObject().put("id", id).put("chat", "chat").put("remitenteId", remitenteId).put("remitente", remitente).put("esMio", mio).put("tipo", tipo).put("texto", texto).put("ts", ts)
         .put("borrado", borrado).put("editado", editado).put("estado", estado).put("bytes", bytes).put("mime", "").put("nombre", nombre).put("ruta", ruta).put("miniatura", miniatura)
         .put("ancho", 0).put("alto", 0).put("dur", dur).put("notaVoz", notaVoz).put("puedeBajarse", puedeBajarse)
+        .put("estadoEnvio", if (mio) "enviado" else "").put("menciones", JSONArray()).put("reacciones", JSONArray())
 
     fun arreglo(vararg o: JSONObject) = JSONArray().also { a -> o.forEach { a.put(it) } }.toString()
 

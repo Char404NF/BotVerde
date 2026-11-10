@@ -183,4 +183,42 @@ object Ico {
     val IrA = icono("ir_a") {
         trazo { moveTo(7f, 17f); lineTo(17f, 7f); moveTo(9f, 7f); lineTo(17f, 7f); lineTo(17f, 15f) }
     }
+
+    /** Palomita simple. */
+    val Palomita = icono("palomita") { trazo(2.2f) { moveTo(5f, 13f); lineTo(10f, 18f); lineTo(19f, 7f) } }
+
+    /** Dos palomitas. */
+    val PalomitaDoble = icono("palomita_doble") {
+        trazo(2f) { moveTo(2f, 13f); lineTo(7f, 18f); lineTo(16f, 7f); moveTo(11f, 15.5f); lineTo(13f, 18f); lineTo(22f, 7f) }
+    }
+
+    /** Reloj: enviando. */
+    val Reloj = icono("reloj") {
+        trazo(2f) { moveTo(12f, 3f); curveTo(17f, 3f, 21f, 7f, 21f, 12f); curveTo(21f, 17f, 17f, 21f, 12f, 21f); curveTo(7f, 21f, 3f, 17f, 3f, 12f); curveTo(3f, 7f, 7f, 3f, 12f, 3f) }
+        trazo(2f) { moveTo(12f, 7f); lineTo(12f, 12f); lineTo(16f, 14f) }
+    }
+
+    /** Avión de papel: enviar. */
+    val Enviar = icono("enviar") {
+        relleno { moveTo(3f, 20f); lineTo(21f, 12f); lineTo(3f, 4f); lineTo(3f, 10f); lineTo(15f, 12f); lineTo(3f, 14f); close() }
+    }
+
+    /** Flecha que regresa: responder. */
+    val Responder = icono("responder") {
+        trazo(2.2f) { moveTo(10f, 6f); lineTo(4f, 12f); lineTo(10f, 18f); moveTo(4f, 12f); lineTo(14f, 12f); curveTo(18f, 12f, 20f, 14f, 20f, 18f) }
+    }
+
+    /** Flecha hacia abajo: ir al último mensaje. */
+    val Abajo = icono("abajo") { trazo(2.4f) { moveTo(6f, 9f); lineTo(12f, 15f); lineTo(18f, 9f) } }
+
+    /** Lápiz: editar. */
+    val Editar = icono("editar") {
+        trazo(2f) { moveTo(4f, 20f); lineTo(5f, 15f); lineTo(16f, 4f); lineTo(20f, 8f); lineTo(9f, 19f); close() }
+    }
+
+    /** Emoji: carita. */
+    val Emoji = icono("emoji") {
+        trazo(2f) { moveTo(12f, 3f); curveTo(17f, 3f, 21f, 7f, 21f, 12f); curveTo(21f, 17f, 17f, 21f, 12f, 21f); curveTo(7f, 21f, 3f, 17f, 3f, 12f); curveTo(3f, 7f, 7f, 3f, 12f, 3f) }
+        trazo(2f) { moveTo(8.5f, 14f); curveTo(9.5f, 16f, 14.5f, 16f, 15.5f, 14f); moveTo(9f, 9.5f); lineTo(9f, 9.6f); moveTo(15f, 9.5f); lineTo(15f, 9.6f) }
+    }
 }

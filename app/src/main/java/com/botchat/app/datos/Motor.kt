@@ -29,6 +29,26 @@ interface Motor {
     fun listarFiltrados(bot: Long, chat: String, filtro: String, antesTs: Long, antesId: String, limite: Long): String
     fun personasChat(bot: Long, chat: String): String
     fun olvidarMensaje(bot: Long, chat: String, id: String)
+    fun enviarTexto(bot: Long, chat: String, texto: String, citaId: String, mencionesJson: String): String
+    fun reintentarEnvio(bot: Long, chat: String, id: String): String
+    fun reaccionar(bot: Long, chat: String, id: String, emoji: String)
+    fun editarMensaje(bot: Long, chat: String, id: String, texto: String)
+    fun borrarParaTodos(bot: Long, chat: String, id: String)
+    fun borrarParaMi(bot: Long, chat: String, idsJson: String): Long
+    fun reenviarTexto(bot: Long, origen: String, idsJson: String, destinosJson: String): String
+    fun marcarLeido(bot: Long, chat: String)
+    fun escribiendo(bot: Long, chat: String, si: Boolean)
+    fun enLinea(bot: Long, si: Boolean)
+    fun suscribirPresencia(bot: Long, chat: String)
+    fun presenciaDe(chat: String): String
+    fun participantesGrupo(bot: Long, chat: String): String
+    fun infoMensaje(bot: Long, chat: String, id: String): String
+    fun guardarBorrador(bot: Long, chat: String, texto: String)
+    fun leerBorrador(bot: Long, chat: String): String
+    fun silenciarChat(bot: Long, chat: String, si: Boolean)
+    fun estadoDelChat(bot: Long, chat: String): String
+    fun plazoEdicionSeg(): Long
+    fun configurarEnvio(pausaBotMin: Long)
 }
 
 /** El módulo Go de verdad (whatsmeow + almacén cifrado). */
@@ -57,4 +77,24 @@ object MotorGo : Motor {
     override fun listarFiltrados(bot: Long, chat: String, filtro: String, antesTs: Long, antesId: String, limite: Long) = Wabot.listarFiltrados(bot, chat, filtro, antesTs, antesId, limite)
     override fun personasChat(bot: Long, chat: String) = Wabot.personasChat(bot, chat)
     override fun olvidarMensaje(bot: Long, chat: String, id: String) = Wabot.olvidarMensaje(bot, chat, id)
+    override fun enviarTexto(bot: Long, chat: String, texto: String, citaId: String, mencionesJson: String) = Wabot.enviarTexto(bot, chat, texto, citaId, mencionesJson)
+    override fun reintentarEnvio(bot: Long, chat: String, id: String) = Wabot.reintentarEnvio(bot, chat, id)
+    override fun reaccionar(bot: Long, chat: String, id: String, emoji: String) = Wabot.reaccionar(bot, chat, id, emoji)
+    override fun editarMensaje(bot: Long, chat: String, id: String, texto: String) = Wabot.editarMensaje(bot, chat, id, texto)
+    override fun borrarParaTodos(bot: Long, chat: String, id: String) = Wabot.borrarParaTodos(bot, chat, id)
+    override fun borrarParaMi(bot: Long, chat: String, idsJson: String) = Wabot.borrarParaMi(bot, chat, idsJson).toLong()
+    override fun reenviarTexto(bot: Long, origen: String, idsJson: String, destinosJson: String) = Wabot.reenviarTexto(bot, origen, idsJson, destinosJson)
+    override fun marcarLeido(bot: Long, chat: String) = Wabot.marcarLeido(bot, chat)
+    override fun escribiendo(bot: Long, chat: String, si: Boolean) = Wabot.escribiendo(bot, chat, si)
+    override fun enLinea(bot: Long, si: Boolean) = Wabot.enLinea(bot, si)
+    override fun suscribirPresencia(bot: Long, chat: String) = Wabot.suscribirPresencia(bot, chat)
+    override fun presenciaDe(chat: String) = Wabot.presenciaDe(chat)
+    override fun participantesGrupo(bot: Long, chat: String) = Wabot.participantesGrupo(bot, chat)
+    override fun infoMensaje(bot: Long, chat: String, id: String) = Wabot.infoMensaje(bot, chat, id)
+    override fun guardarBorrador(bot: Long, chat: String, texto: String) = Wabot.guardarBorrador(bot, chat, texto)
+    override fun leerBorrador(bot: Long, chat: String) = Wabot.leerBorrador(bot, chat)
+    override fun silenciarChat(bot: Long, chat: String, si: Boolean) = Wabot.silenciarChat(bot, chat, si)
+    override fun estadoDelChat(bot: Long, chat: String) = Wabot.estadoDelChat(bot, chat)
+    override fun plazoEdicionSeg() = Wabot.plazoEdicionSeg().toLong()
+    override fun configurarEnvio(pausaBotMin: Long) = Wabot.configurarEnvio(pausaBotMin)
 }

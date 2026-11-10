@@ -70,6 +70,8 @@ class EliminadosUiTest {
         pantalla()
         regla.esperaTexto("para olvidar")
         regla.onNodeWithTag("burbuja_t").performTouchInput { longClick() }
+        regla.esperaEtiqueta("accion_mas")
+        regla.onNodeWithTag("accion_mas").performClick()
         regla.esperaEtiqueta("olvidar_mensaje")
         regla.onNodeWithTag("olvidar_mensaje").performClick()
         regla.esperaEtiqueta("confirmar_olvidar")

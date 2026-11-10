@@ -3,6 +3,15 @@
 package com.botchat.app.ui
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -85,12 +94,15 @@ import com.botchat.app.medios.ReproductorAudio
 
 private sealed interface Elem {
     data class Dia(val ts: Long) : Elem
+    data class SinLeer(val cuantos: Int) : Elem
     data class Burbuja(val m: Msg, val mostrarRemitente: Boolean, val ultimoDelGrupo: Boolean) : Elem
 }
 
-/** Arma la lista visual (del más nuevo al más viejo, para una lista invertida) con separadores de día y agrupación por remitente. */
-private fun elementos(msgs: List<Msg>, esGrupo: Boolean): List<Elem> {
+/** Arma la lista visual (del más nuevo al más viejo, para una lista invertida) con separadores de día, agrupación por remitente y la línea de "sin leer". */
+private fun elementos(msgs: List<Msg>, esGrupo: Boolean, vistoAntes: Long = Long.MAX_VALUE): List<Elem> {
     val out = ArrayList<Elem>(msgs.size + 8)
+    val noLeidos = msgs.count { !it.esMio && it.ts > vistoAntes }
+    val primerNoLeido = if (noLeidos > 0) msgs.lastOrNull { !it.esMio && it.ts > vistoAntes }?.id else null
     for (i in msgs.indices) {
         val m = msgs[i]
         val mas = msgs.getOrNull(i + 1)      // el mensaje anterior en el tiempo
@@ -98,6 +110,7 @@ private fun elementos(msgs: List<Msg>, esGrupo: Boolean): List<Elem> {
         val mismoAnterior = mas != null && mismoDia(mas.ts, m.ts) && mas.remitenteId == m.remitenteId && m.ts - mas.ts < 300
         val mismoSiguiente = menos != null && mismoDia(menos.ts, m.ts) && menos.remitenteId == m.remitenteId && menos.ts - m.ts < 300
         out += Elem.Burbuja(m, mostrarRemitente = esGrupo && !m.esMio && !mismoAnterior, ultimoDelGrupo = !mismoSiguiente)
+        if (m.id == primerNoLeido) out += Elem.SinLeer(noLeidos)
         if (mas == null || !mismoDia(mas.ts, m.ts)) out += Elem.Dia(m.ts)
     }
     return out
@@ -117,7 +130,11 @@ fun PantallaChat(
     val app = LocalContext.current.applicationContext as android.app.Application
     val vm: ChatVm = viewModel(key = "chat-$jid", factory = viewModelFactory { initializer { ChatVm(app, jid) } })
     val ctx = LocalContext.current
+    val ajustes = remember { com.botchat.app.datos.Ajustes.get(app) }
+    val escribirActivo by ajustes.escribirDesdeApp.collectAsState()
+    val enLinea by ajustes.mostrarEnLinea.collectAsState()
     val haptica = rememberHaptica()
+    val scope = rememberCoroutineScope()
     val chat = vm.chat
     val msgs = vm.mensajes
     var menu by remember { mutableStateOf(false) }
@@ -125,35 +142,107 @@ fun PantallaChat(
     var confirmaChat by remember { mutableStateOf(false) }
     var verFoto by remember { mutableStateOf(false) }
     var olvidando by remember { mutableStateOf<Msg?>(null) }
+    var seleccion by remember { mutableStateOf(setOf<String>()) }
+    var borrando by remember { mutableStateOf(false) }
+    var reenviando by remember { mutableStateOf(false) }
+    var infoDe by remember { mutableStateOf<Msg?>(null) }
+    var infoCargada by remember { mutableStateOf<com.botchat.app.datos.InfoMsg?>(null) }
+    var texto by remember { mutableStateOf(TextFieldValue("")) }
     val estadoLista = rememberLazyListState()
 
     // Al salir del chat: se vacía la caché de imágenes y se detiene el audio.
     DisposableEffect(jid) {
         onDispose { CacheImagenes.vaciar(); ReproductorAudio.detener() }
     }
+    // Con el chat a la vista: presencia y "en línea" (solo si el usuario lo permitió); al salir se apaga.
+    val dueno = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(dueno, enLinea) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, ev ->
+            if (ev == androidx.lifecycle.Lifecycle.Event.ON_RESUME) vm.alMostrar(enLinea)
+            if (ev == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) vm.alOcultar(enLinea)
+        }
+        dueno.lifecycle.addObserver(obs)
+        onDispose { dueno.lifecycle.removeObserver(obs); vm.alOcultar(enLinea) }
+    }
     LaunchedEffect(vm.aviso) { vm.aviso?.let { Toast.makeText(ctx, it, Toast.LENGTH_LONG).show(); vm.aviso = null } }
+    // Borrador del chat: se recupera al abrir y se guarda mientras se escribe.
+    var borradorListo by remember(jid) { mutableStateOf(false) }
+    LaunchedEffect(vm.borradorInicial) {
+        val b = vm.borradorInicial
+        if (b != null && !borradorListo) { borradorListo = true; if (texto.text.isEmpty()) texto = TextFieldValue(b, TextRange(b.length)) }
+    }
+    LaunchedEffect(vm.editando) { vm.editando?.let { texto = TextFieldValue(it.texto, TextRange(it.texto.length)) } }
 
-    val items = remember(msgs, chat?.esGrupo) { if (msgs == null) emptyList() else elementos(msgs, chat?.esGrupo == true) }
+    val items = remember(msgs, chat?.esGrupo) { if (msgs == null) emptyList() else elementos(msgs, chat?.esGrupo == true, vm.vistoAntes) }
     var resaltado by remember { mutableStateOf("") }
-    var irHecho by remember(irA) { mutableStateOf(irA.isEmpty()) }
-    LaunchedEffect(irA, msgs) {
-        if (irHecho || msgs == null) return@LaunchedEffect
-        if (!vm.cargarHasta(irA)) { irHecho = true; return@LaunchedEffect }
-        val idx = items.indexOfFirst { it is Elem.Burbuja && it.m.id == irA }
+
+    suspend fun irAMensaje(id: String) {
+        if (!vm.cargarHasta(id)) { Toast.makeText(ctx, "Ese mensaje ya no está en este teléfono", Toast.LENGTH_SHORT).show(); return }
+        kotlinx.coroutines.delay(60)
+        val idx = elementos(vm.mensajes ?: return, chat?.esGrupo == true, vm.vistoAntes).indexOfFirst { it is Elem.Burbuja && it.m.id == id }
         if (idx >= 0) {
-            irHecho = true
             estadoLista.animateScrollToItem(idx)
-            resaltado = irA
+            resaltado = id
             kotlinx.coroutines.delay(2200)
             resaltado = ""
         }
     }
+    var irHecho by remember(irA) { mutableStateOf(irA.isEmpty()) }
+    LaunchedEffect(irA, msgs) {
+        if (irHecho || msgs == null) return@LaunchedEffect
+        irHecho = true
+        irAMensaje(irA)
+    }
+    // Al abrir con mensajes sin leer, se empieza en el primero.
+    var inicioHecho by remember(jid) { mutableStateOf(false) }
+    LaunchedEffect(msgs != null) {
+        if (msgs == null || inicioHecho) return@LaunchedEffect
+        inicioHecho = true
+        if (irA.isEmpty()) {
+            val idx = items.indexOfFirst { it is Elem.SinLeer }
+            if (idx >= 0) estadoLista.scrollToItem(idx)
+        }
+    }
     val llegandoAlFinal by remember { derivedStateOf { val u = estadoLista.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0; u >= items.size - 6 } }
     LaunchedEffect(llegandoAlFinal, items.size) { if (llegandoAlFinal) vm.cargarMas() }
+    val lejosDelFinal by remember { derivedStateOf { estadoLista.firstVisibleItemIndex > 4 } }
+
+    val elegidos = remember(msgs, seleccion) { msgs?.filter { it.id in seleccion } ?: emptyList() }
+    val unico = elegidos.singleOrNull()
+    fun limpiarSeleccion() { seleccion = emptySet() }
+    BackHandler(seleccion.isNotEmpty()) { limpiarSeleccion() }
+    fun puedeEditar(m: Msg) = m.esMio && m.tipo == "texto" && !m.borrado && m.estadoEnvio in setOf("enviado", "entregado", "leido") &&
+        System.currentTimeMillis() / 1000 - m.ts < vm.plazoEdicionSeg
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            if (seleccion.isNotEmpty()) {
+                TopAppBar(
+                    navigationIcon = { IconButton({ limpiarSeleccion() }, Modifier.testTag("cerrar_seleccion")) { Icon(Ico.Cerrar, "Cancelar selección") } },
+                    title = { Text("${seleccion.size}", Modifier.testTag("contador_seleccion")) },
+                    actions = {
+                        if (unico != null && escribirActivo) IconButton({ vm.citando = unico; limpiarSeleccion() }, Modifier.testTag("accion_responder")) { Icon(Ico.Responder, "Responder") }
+                        if (unico != null && escribirActivo && puedeEditar(unico)) IconButton({ vm.editando = unico; limpiarSeleccion() }, Modifier.testTag("accion_editar")) { Icon(Ico.Editar, "Editar") }
+                        IconButton({
+                            val t = elegidos.sortedBy { it.ts }.filter { it.texto.isNotBlank() && it.tipo != "contacto" && it.tipo != "ubicacion" }.joinToString("\n") { it.texto }
+                            ctx.getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(android.content.ClipData.newPlainText("Mensajes", t))
+                            Toast.makeText(ctx, "Copiado", Toast.LENGTH_SHORT).show()
+                            limpiarSeleccion()
+                        }, Modifier.testTag("accion_copiar")) { Icon(Ico.Copiar, "Copiar") }
+                        if (escribirActivo) IconButton({ reenviando = true }, Modifier.testTag("accion_reenviar")) { Icon(Ico.Compartir, "Reenviar") }
+                        IconButton({ borrando = true }, Modifier.testTag("accion_borrar")) { Icon(Ico.Borrar, "Borrar") }
+                        Box {
+                            var mas by remember { mutableStateOf(false) }
+                            IconButton({ mas = true }, Modifier.testTag("accion_mas")) { Icon(Ico.Mas, "Más") }
+                            DropdownMenu(mas, { mas = false }) {
+                                if (unico != null && unico.esMio) DropdownMenuItem(text = { Text("Info del mensaje") }, onClick = { mas = false; infoDe = unico; infoCargada = null; scope.launch { infoCargada = vm.info(unico) } }, modifier = Modifier.testTag("accion_info"))
+                                if (unico != null) DropdownMenuItem(text = { Text("Olvidar este mensaje") }, onClick = { mas = false; olvidando = unico; limpiarSeleccion() }, modifier = Modifier.testTag("olvidar_mensaje"))
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                )
+            } else TopAppBar(
                 navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } },
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -162,7 +251,10 @@ fun PantallaChat(
                         Spacer(Modifier.width(Esp.m))
                         Column(Modifier.clip(RoundedCornerShape(12.dp)).clickable { haptica(Toque.Suave); alAbrirInfo() }.padding(vertical = 4.dp, horizontal = 4.dp).testTag("encabezado_info")) {
                             Text(chat?.nombre ?: "", Modifier.compartido("nombre-$jid", limites = true), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            if (chat != null && !chat.esGrupo) {
+                            val vivo = textoPresencia(vm.presencia)
+                            if (vivo.isNotEmpty()) {
+                                Text(vivo, Modifier.testTag("presencia"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+                            } else if (chat != null && !chat.esGrupo) {
                                 TextoUnaLinea(banderaTelefono(chat), estilo = MaterialTheme.typography.bodySmall)
                             } else if (chat != null) {
                                 TextoUnaLinea("Grupo", estilo = MaterialTheme.typography.bodySmall)
@@ -175,6 +267,7 @@ fun PantallaChat(
                     Box {
                         IconButton({ menu = true }) { Icon(Ico.Mas, "Más opciones") }
                         DropdownMenu(menu, { menu = false }) {
+                            DropdownMenuItem(text = { Text(if (vm.estadoChat.silenciado) "Activar notificaciones" else "Silenciar notificaciones") }, onClick = { menu = false; vm.silenciar(!vm.estadoChat.silenciado) }, modifier = Modifier.testTag("menu_silenciar"))
                             DropdownMenuItem(text = { Text("Borrar archivos de este chat") }, onClick = {
                                 menu = false
                                 haptica(Toque.Fuerte)
@@ -187,6 +280,27 @@ fun PantallaChat(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             )
         },
+        bottomBar = {
+            Column {
+                if (unico != null && escribirActivo) {
+                    Box(Modifier.fillMaxWidth().padding(bottom = 6.dp), Alignment.Center) {
+                        BarraReacciones(alElegir = { e -> haptica(Toque.Suave); vm.reaccionar(unico, e); limpiarSeleccion() })
+                    }
+                }
+                if (escribirActivo) {
+                    Compositor(
+                        valor = texto,
+                        alCambiar = { v -> val cambio = v.text != texto.text; texto = v; if (cambio && vm.editando == null) { vm.guardarBorrador(v.text); vm.teclea(v.text.isNotBlank()) } },
+                        citando = vm.citando, alQuitarCita = { vm.citando = null },
+                        editando = vm.editando, alCancelarEdicion = { vm.editando = null; texto = TextFieldValue("") },
+                        esGrupo = chat?.esGrupo == true, participantes = vm.participantes, enviando = vm.enviando,
+                        alEnviar = { t, men ->
+                            vm.enviar(t, men) { texto = TextFieldValue(""); scope.launch { estadoLista.animateScrollToItem(0) } }
+                        },
+                    )
+                }
+            }
+        },
         containerColor = MaterialTheme.colorScheme.surface,
     ) { relleno ->
         Box(Modifier.fillMaxSize().padding(relleno)) {
@@ -195,13 +309,20 @@ fun PantallaChat(
                 msgs.isEmpty() -> EstadoVacio(Ico.Documento, "Sin mensajes", "Todavía no hay mensajes en este chat.", Modifier.align(Alignment.Center))
                 else -> {
                     LazyColumn(
-                        Modifier.fillMaxSize(), state = estadoLista, reverseLayout = true,
+                        Modifier.fillMaxSize().testTag("lista_chat"), state = estadoLista, reverseLayout = true,
                         contentPadding = PaddingValues(horizontal = Esp.m, vertical = Esp.s), verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        items(items, key = { e -> when (e) { is Elem.Dia -> "dia-${e.ts}"; is Elem.Burbuja -> "m-${e.m.id}" } }) { e ->
+                        items(items, key = { e -> when (e) { is Elem.Dia -> "dia-${e.ts}"; is Elem.SinLeer -> "sinleer"; is Elem.Burbuja -> "m-${e.m.id}" } }) { e ->
                             when (e) {
                                 is Elem.Dia -> SeparadorDia(e.ts, Modifier.animateItem())
-                                is Elem.Burbuja -> Burbuja(e, vm, alAbrirVisor, alAbrirDocumento, Modifier.animateItem().apareceDesdeAbajo(vm.esNueva(e.m.id)), resaltado == e.m.id, alOlvidar = { olvidando = it })
+                                is Elem.SinLeer -> SeparadorSinLeer(e.cuantos, Modifier.animateItem())
+                                is Elem.Burbuja -> Burbuja(
+                                    e, vm, alAbrirVisor, alAbrirDocumento, Modifier.animateItem().apareceDesdeAbajo(vm.esNueva(e.m.id)),
+                                    resaltar = resaltado == e.m.id, seleccionado = e.m.id in seleccion, enSeleccion = seleccion.isNotEmpty(),
+                                    alAlternar = { seleccion = if (e.m.id in seleccion) seleccion - e.m.id else seleccion + e.m.id },
+                                    alResponder = { if (escribirActivo) vm.citando = e.m },
+                                    alIrACita = { id -> scope.launch { irAMensaje(id) } },
+                                )
                             }
                         }
                         if (vm.cargandoMas) item { Box(Modifier.fillMaxWidth().padding(Esp.l), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) } }
@@ -216,10 +337,31 @@ fun PantallaChat(
                             Text(etiquetaDia(diaArriba ?: 0), Modifier.padding(horizontal = 14.dp, vertical = 6.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
                         }
                     }
+                    AnimatedVisibility(lejosDelFinal, Modifier.align(Alignment.BottomEnd).padding(Esp.l), enter = fadeIn(), exit = fadeOut()) {
+                        SmallFloatingActionButton({ haptica(Toque.Suave); scope.launch { estadoLista.animateScrollToItem(0) } }, Modifier.testTag("bajar_al_final")) { Icon(Ico.Abajo, "Ir al último mensaje") }
+                    }
                 }
             }
         }
     }
+
+    if (borrando && elegidos.isNotEmpty()) {
+        val propios = elegidos.filter { it.esMio || chat?.esGrupo == true }
+        DialogoBorrar(
+            cuantos = elegidos.size, hayParaTodos = escribirActivo && propios.isNotEmpty(),
+            alParaMi = { borrando = false; vm.borrarParaMi(elegidos.map { it.id }); limpiarSeleccion() },
+            alParaTodos = { borrando = false; vm.borrarParaTodos(propios); limpiarSeleccion() },
+            alCerrar = { borrando = false },
+        )
+    }
+    if (reenviando && elegidos.isNotEmpty()) {
+        DialogoReenviar(vm.botId, jid, alReenviar = { destinos ->
+            reenviando = false
+            vm.reenviar(elegidos.map { it.id }, destinos) { Toast.makeText(ctx, it, Toast.LENGTH_LONG).show() }
+            limpiarSeleccion()
+        }, alCerrar = { reenviando = false })
+    }
+    if (infoDe != null) DialogoInfoMensaje(infoCargada, alCerrar = { infoDe = null; limpiarSeleccion() })
 
     confirmaArchivos?.let { lib ->
         AlertDialog(
@@ -259,6 +401,15 @@ fun PantallaChat(
 }
 
 @Composable
+private fun SeparadorSinLeer(cuantos: Int, modifier: Modifier) {
+    Box(modifier.fillMaxWidth().padding(vertical = Esp.s), contentAlignment = Alignment.Center) {
+        Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.primaryContainer) {
+            Text(if (cuantos == 1) "1 mensaje sin leer" else "$cuantos mensajes sin leer", Modifier.padding(horizontal = 12.dp, vertical = 4.dp).testTag("sin_leer"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+    }
+}
+
+@Composable
 private fun CargaDeMensajes() {
     Column(Modifier.fillMaxSize().padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
         listOf(0.55f to false, 0.4f to true, 0.7f to false, 0.3f to true, 0.5f to false).forEach { (ancho, mio) ->
@@ -280,9 +431,14 @@ private fun SeparadorDia(ts: Long, modifier: Modifier) {
 
 // ---------- burbujas ----------
 
+
 @OptIn(UnstableApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun Burbuja(e: Elem.Burbuja, vm: ChatVm, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit, modifier: Modifier, resaltar: Boolean = false, alOlvidar: (Msg) -> Unit = {}) {
+private fun Burbuja(
+    e: Elem.Burbuja, vm: ChatVm, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit, modifier: Modifier,
+    resaltar: Boolean = false, seleccionado: Boolean = false, enSeleccion: Boolean = false,
+    alAlternar: () -> Unit = {}, alResponder: () -> Unit = {}, alIrACita: (String) -> Unit = {},
+) {
     val m = e.m
     val esquema = MaterialTheme.colorScheme
     val fondo = if (resaltar) esquema.tertiaryContainer else if (m.esMio) esquema.primaryContainer else esquema.surfaceContainerHigh
@@ -290,25 +446,47 @@ private fun Burbuja(e: Elem.Burbuja, vm: ChatVm, alAbrirVisor: (String) -> Unit,
     val g = 18.dp
     val p = 5.dp
     val forma = if (m.esMio) RoundedCornerShape(g, g, if (e.ultimoDelGrupo) p else g, g) else RoundedCornerShape(g, g, g, if (e.ultimoDelGrupo) p else g)
-    var menu by remember { mutableStateOf(false) }
     val haptica = rememberHaptica()
-    Row(modifier.fillMaxWidth(), horizontalArrangement = if (m.esMio) Arrangement.End else Arrangement.Start) {
-        Box {
-        Surface(color = fondo, contentColor = tinta, shape = forma, modifier = Modifier.widthIn(max = 300.dp).clip(forma).combinedClickable(onClick = {}, onLongClick = { haptica(Toque.Fuerte); menu = true }).testTag("burbuja_${m.id}")) {
-            Column(Modifier.padding(horizontal = 10.dp, vertical = 7.dp)) {
-                if (e.mostrarRemitente && m.remitente.isNotEmpty()) {
-                    Text(m.remitente, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = colorEstable(m.remitenteId, androidx.compose.foundation.isSystemInDarkTheme()).let { c -> androidx.compose.ui.graphics.lerp(c, tinta, 0.35f) }, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    // Deslizar a la derecha = responder.
+    var desplazado by remember { mutableStateOf(0f) }
+    val umbral = with(androidx.compose.ui.platform.LocalDensity.current) { 56.dp.toPx() }
+    val nav = androidx.compose.animation.core.animateFloatAsState(desplazado, label = "desliza").value
+    Box(modifier.fillMaxWidth().then(if (seleccionado) Modifier.background(esquema.primary.copy(alpha = 0.18f)) else Modifier)) {
+        if (nav > 8f) Icon(Ico.Responder, null, Modifier.align(Alignment.CenterStart).padding(start = 8.dp).size(22.dp), tint = esquema.primary.copy(alpha = (nav / umbral).coerceIn(0f, 1f)))
+        Row(
+            Modifier.fillMaxWidth().graphicsLayer { translationX = nav }
+                .pointerInput(enSeleccion) {
+                    if (!enSeleccion) detectHorizontalDragGestures(
+                        onDragEnd = { if (desplazado >= umbral) { haptica(Toque.Suave); alResponder() }; desplazado = 0f },
+                        onDragCancel = { desplazado = 0f },
+                    ) { _, dx -> desplazado = (desplazado + dx).coerceIn(0f, umbral * 1.4f) }
+                },
+            horizontalArrangement = if (m.esMio) Arrangement.End else Arrangement.Start,
+        ) {
+            Column(horizontalAlignment = if (m.esMio) Alignment.End else Alignment.Start) {
+                Surface(
+                    color = fondo, contentColor = tinta, shape = forma,
+                    modifier = Modifier.widthIn(max = 300.dp).clip(forma).combinedClickable(onClick = { if (enSeleccion) alAlternar() }, onLongClick = { haptica(Toque.Fuerte); alAlternar() }).testTag("burbuja_${m.id}"),
+                ) {
+                    Column(Modifier.padding(horizontal = 10.dp, vertical = 7.dp)) {
+                        if (e.mostrarRemitente && m.remitente.isNotEmpty()) {
+                            Text(m.remitente, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = colorEstable(m.remitenteId, androidx.compose.foundation.isSystemInDarkTheme()).let { c -> androidx.compose.ui.graphics.lerp(c, tinta, 0.35f) }, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        if (m.reenviado) Text("Reenviado", Modifier.testTag("reenviado"), style = MaterialTheme.typography.labelSmall, fontStyle = FontStyle.Italic, color = tinta.copy(alpha = 0.65f))
+                        if (m.citaId.isNotEmpty() && !m.borrado) BloqueCita(m, tinta) { alIrACita(m.citaId) }
+                        ContenidoMensaje(m, vm, alAbrirVisor, alAbrirDocumento)
+                        FilaReacciones(m.reacciones, Modifier.padding(top = 3.dp))
+                        Row(Modifier.align(Alignment.End).padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            if (m.editado && !m.borrado) Text("(editado)  ", style = MaterialTheme.typography.labelSmall, color = tinta.copy(alpha = 0.65f))
+                            Text(horaDe(m.ts), style = MaterialTheme.typography.labelSmall, color = tinta.copy(alpha = 0.65f))
+                            if (m.esMio && m.estadoEnvio.isNotEmpty()) { Spacer(Modifier.width(4.dp)); Palomitas(m.estadoEnvio, tinta) }
+                        }
+                    }
                 }
-                ContenidoMensaje(m, vm, alAbrirVisor, alAbrirDocumento)
-                Row(Modifier.align(Alignment.End).padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (m.editado && !m.borrado) Text("(editado)  ", style = MaterialTheme.typography.labelSmall, color = tinta.copy(alpha = 0.65f))
-                    Text(horaDe(m.ts), style = MaterialTheme.typography.labelSmall, color = tinta.copy(alpha = 0.65f))
+                if (m.esMio && m.estadoEnvio == "fallido") {
+                    TextButton({ haptica(Toque.Suave); vm.reintentar(m) }, Modifier.testTag("reintentar_${m.id}")) { Text("No se envió · Reintentar", color = esquema.error) }
                 }
             }
-        }
-        DropdownMenu(menu, { menu = false }) {
-            DropdownMenuItem(text = { Text("Olvidar este mensaje") }, onClick = { menu = false; alOlvidar(m) }, modifier = Modifier.testTag("olvidar_mensaje"))
-        }
         }
     }
 }
@@ -384,15 +562,15 @@ private fun ContenidoBase(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit, al
         m.tipo == "sticker" && m.descargado -> StickerAnimado(m)
         m.categoria == "foto" || m.categoria == "video" -> {
             MiniaturaMedia(m, vm, alAbrirVisor)
-            if (m.texto.isNotBlank()) { Spacer(Modifier.size(4.dp)); Text(m.texto) }
+            if (m.texto.isNotBlank()) { Spacer(Modifier.size(4.dp)); TextoMensaje(m, grande = false) }
         }
-        m.categoria == "audio" -> { BurbujaAudio(m, vm); if (m.texto.isNotBlank()) Text(m.texto) }
-        m.categoria == "documento" -> { BurbujaDocumento(m, vm, alAbrirDocumento); if (m.texto.isNotBlank()) { Spacer(Modifier.size(4.dp)); Text(m.texto) } }
+        m.categoria == "audio" -> { BurbujaAudio(m, vm); if (m.texto.isNotBlank()) TextoMensaje(m, grande = false) }
+        m.categoria == "documento" -> { BurbujaDocumento(m, vm, alAbrirDocumento); if (m.texto.isNotBlank()) { Spacer(Modifier.size(4.dp)); TextoMensaje(m, grande = false) } }
         m.tipo == "contacto" -> TarjetaContacto(m)
         m.tipo == "ubicacion" -> TarjetaUbicacion(m)
         m.tipo == "encuesta" -> Text(m.texto)
         m.tipo == "otro" -> TarjetaEspecial()
-        else -> Text(m.texto)
+        else -> TextoMensaje(m)
     }
 }
 
@@ -558,4 +736,14 @@ fun FotoGrandeDialogo(botId: Long, chat: String, nombre: String, alCerrar: () ->
             }
         }
     }
+}
+
+
+/** Texto del mensaje con formato de WhatsApp, enlaces tocables, @menciones por nombre y emojis grandes cuando es solo emojis. */
+@Composable
+private fun TextoMensaje(m: Msg, grande: Boolean = true) {
+    val esquema = MaterialTheme.colorScheme
+    val formateado = remember(m.texto, m.menciones, esquema.primary) { FormatoWhatsApp.construir(m.texto, m.menciones, esquema.primary, esquema.primary) }
+    val soloEmojis = grande && m.citaId.isEmpty() && FormatoWhatsApp.esSoloEmojis(m.texto)
+    Text(formateado, Modifier.testTag("texto_${m.id}"), style = if (soloEmojis) MaterialTheme.typography.displaySmall else MaterialTheme.typography.bodyLarge)
 }

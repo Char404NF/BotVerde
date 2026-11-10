@@ -44,6 +44,15 @@ data class Msg(
     val puedeBajarse: Boolean,
     val eliminadoEn: Long = 0,
     val eliminadoPor: String = "",
+    val estadoEnvio: String = "",
+    val entregados: Int = 0,
+    val leidos: Int = 0,
+    val citaId: String = "",
+    val citaAutor: String = "",
+    val citaTexto: String = "",
+    val menciones: List<Mencion> = emptyList(),
+    val reenviado: Boolean = false,
+    val reacciones: List<Reaccion> = emptyList(),
 ) {
     val categoria: String get() = categoriaDe(tipo)
     val descargado: Boolean get() = estado == "descargado" && ruta.isNotEmpty()
@@ -51,6 +60,16 @@ data class Msg(
     /** Eliminado por su autor (o un admin) pero todavía se puede mostrar su contenido. */
     val contenidoDisponible: Boolean get() = !borrado || texto.isNotBlank() || descargado
 }
+
+data class Mencion(val usuario: String, val nombre: String)
+data class Reaccion(val emoji: String, val cantidad: Int, val mia: Boolean)
+data class Participante(val jid: String, val usuario: String, val nombre: String, val telefono: String, val esAdmin: Boolean)
+data class AcuseDe(val jid: String, val nombre: String, val entregado: Long, val leido: Long, val reproducido: Long)
+data class InfoMsg(val enviado: Long, val estado: String, val esGrupo: Boolean, val personas: List<AcuseDe>, val editado: Boolean, val reenviado: Boolean)
+data class ResultadoEnvio(val id: String, val estado: String, val ts: Long)
+data class PresenciaChat(val escribiendo: Boolean = false, val enLinea: Boolean = false, val ultimaVez: Long = 0)
+data class ReenvioResultado(val enviados: Int, val omitidos: Int, val fallidos: Int)
+data class EstadoChat(val silenciado: Boolean = false, val botPausaHasta: Long = 0, val botActivo: Boolean = true)
 
 /** Qué mensajes de un chat se quieren ver (mismo formato que el filtro del módulo Go). */
 data class FiltroLista(
@@ -221,6 +240,25 @@ object Json {
             it.optString("estado"), it.optLong("bytes"), it.optString("mime"), it.optString("nombre"), it.optString("ruta"),
             it.optString("miniatura"), it.optInt("ancho"), it.optInt("alto"), it.optInt("dur"), it.optBoolean("notaVoz"), it.optBoolean("puedeBajarse"),
             it.optLong("eliminadoEn"), it.optString("eliminadoPor"),
+            it.optString("estadoEnvio"), it.optInt("entregados"), it.optInt("leidos"), it.optString("citaId"), it.optString("citaAutor"), it.optString("citaTexto"),
+            it.optJSONArray("menciones").let { a -> List(a?.length() ?: 0) { i -> a!!.getJSONObject(i).let { m -> Mencion(m.optString("usuario"), m.optString("nombre")) } } },
+            it.optBoolean("reenviado"),
+            it.optJSONArray("reacciones").let { a -> List(a?.length() ?: 0) { i -> a!!.getJSONObject(i).let { r -> Reaccion(r.optString("emoji"), r.optInt("cantidad"), r.optBoolean("mia")) } } },
+        )
+    }
+
+    fun envio(json: String): ResultadoEnvio { val o = JSONObject(json); return ResultadoEnvio(o.optString("id"), o.optString("estado"), o.optLong("ts")) }
+    fun presencia(json: String): PresenciaChat = runCatching { JSONObject(json).let { PresenciaChat(it.optBoolean("escribiendo"), it.optBoolean("enLinea"), it.optLong("ultimaVez")) } }.getOrDefault(PresenciaChat())
+    fun reenvio(json: String): ReenvioResultado { val o = JSONObject(json); return ReenvioResultado(o.optInt("enviados"), o.optInt("omitidos"), o.optInt("fallidos")) }
+    fun estadoChat(json: String): EstadoChat = runCatching { JSONObject(json).let { EstadoChat(it.optBoolean("silenciado"), it.optLong("botPausaHasta"), it.optBoolean("botActivo", true)) } }.getOrDefault(EstadoChat())
+    fun participantes(json: String) = lista(json) { Participante(it.optString("jid"), it.optString("usuario"), it.optString("nombre"), it.optString("telefono"), it.optBoolean("esAdmin")) }
+    fun infoMensaje(json: String): InfoMsg {
+        val o = JSONObject(json)
+        val a = o.optJSONArray("personas")
+        return InfoMsg(
+            o.optLong("enviado"), o.optString("estado"), o.optBoolean("esGrupo"),
+            List(a?.length() ?: 0) { i -> a!!.getJSONObject(i).let { AcuseDe(it.optString("jid"), it.optString("nombre"), it.optLong("entregado"), it.optLong("leido"), it.optLong("reproducido")) } },
+            o.optBoolean("editado"), o.optBoolean("reenviado"),
         )
     }
 

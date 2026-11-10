@@ -71,6 +71,11 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
     val bot = vm.bot ?: return
     val ctx = LocalContext.current
     val haptica = rememberHaptica()
+    // Una notificación de mensaje abre el chat correspondiente.
+    val pedido by com.botchat.app.NavegarA.chat.collectAsState()
+    LaunchedEffect(pedido) {
+        pedido?.let { j -> com.botchat.app.NavegarA.chat.value = null; nav.navigate("chat/${enc(j)}") { launchSingleTop = true } }
+    }
     val entrada by nav.currentBackStackEntryAsState()
     val rutaActual = entrada?.destination?.route
     val principal = rutaActual in RUTAS_PRINCIPALES

@@ -89,6 +89,16 @@ class Ajustes private constructor(ctx: Context) {
     val notificacionesMensajes: StateFlow<Boolean> = _notifs
     fun fijarNotificacionesMensajes(v: Boolean) { p.edit().putBoolean("notif_mensajes", v).apply(); _notifs.value = v }
 
+    private val _leido = MutableStateFlow(p.getBoolean("marcar_leido", true))
+    /** Marcar como leído al abrir un chat (respeta la configuración de confirmaciones de lectura de la cuenta). */
+    val marcarLeidoAlAbrir: StateFlow<Boolean> = _leido
+    fun fijarMarcarLeidoAlAbrir(v: Boolean) { p.edit().putBoolean("marcar_leido", v).apply(); _leido.value = v }
+
+    private val _pausaBot = MutableStateFlow(p.getInt("pausa_bot_min", 30))
+    /** Minutos que el bot calla en un chat después de que escribo yo (a mano o desde el teléfono). */
+    val pausaBotMin: StateFlow<Int> = _pausaBot
+    fun fijarPausaBotMin(v: Int) { p.edit().putInt("pausa_bot_min", v).apply(); _pausaBot.value = v; aplicarAGo() }
+
     private val _enLinea = MutableStateFlow(p.getBoolean("mostrar_en_linea", false))
     /** Mostrarse "en línea" mientras hay un chat abierto (apagado por defecto: puede dejar sin avisos al teléfono principal). */
     val mostrarEnLinea: StateFlow<Boolean> = _enLinea
@@ -145,6 +155,7 @@ class Ajustes private constructor(ctx: Context) {
     fun aplicarAGo() {
         runCatching { Wabot.configurarDescargas(jsonDescargas(_descargas.value)) }
         runCatching { Wabot.conservarEliminados(_conservar.value) }
+        runCatching { Wabot.configurarEnvio(_pausaBot.value.toLong()) }
     }
 
     companion object {

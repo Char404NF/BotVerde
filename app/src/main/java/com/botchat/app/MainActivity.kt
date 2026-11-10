@@ -31,7 +31,19 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+        pideChatDe(intent)
         setContent { BotChatTema { Raiz() } }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pideChatDe(intent)
+    }
+
+    /** Si la app se abrió desde una notificación de mensaje, abre ese chat. */
+    private fun pideChatDe(i: android.content.Intent?) {
+        i?.getStringExtra(Notificador.EXTRA_CHAT)?.let { NavegarA.chat.value = it; i.removeExtra(Notificador.EXTRA_CHAT) }
     }
 
     override fun onStop() {

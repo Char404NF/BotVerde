@@ -47,11 +47,14 @@ class BotService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private var redCallback: ConnectivityManager.NetworkCallback? = null
+    private val ambito = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
 
     override fun onCreate() {
         super.onCreate()
         BotState.corriendo.value = true
         creaCanal()
+        Notificador.crearCanal(this)
+        Notificador.iniciar(this, ambito)
         vigilaRed()
     }
 
@@ -155,6 +158,7 @@ class BotService : Service() {
 
     override fun onDestroy() {
         BotState.corriendo.value = false
+        ambito.coroutineContext[kotlinx.coroutines.Job]?.cancel()
         redCallback?.let { cb -> runCatching { getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(cb) } }
         hilo.execute { Wabot.stop() }
         hilo.shutdown()

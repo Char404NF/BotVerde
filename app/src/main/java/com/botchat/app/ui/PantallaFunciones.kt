@@ -1,6 +1,14 @@
 package com.botchat.app.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -27,11 +35,17 @@ import com.botchat.app.datos.Ajustes
 fun PantallaFunciones(ajustes: Ajustes, alVolver: () -> Unit) {
     val barra = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val haptica = rememberHaptica()
+    val ctx = LocalContext.current
+    val permiso = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        if (ok) ajustes.fijarNotificacionesMensajes(true) else Toast.makeText(ctx, "Sin permiso, no se pueden mostrar avisos", Toast.LENGTH_LONG).show()
+    }
     val motor by ajustes.motorAutomatico.collectAsState()
     val escribir by ajustes.escribirDesdeApp.collectAsState()
     val notifs by ajustes.notificacionesMensajes.collectAsState()
     val conservar by ajustes.conservarEliminados.collectAsState()
     val enLinea by ajustes.mostrarEnLinea.collectAsState()
+    val leido by ajustes.marcarLeidoAlAbrir.collectAsState()
+    val pausa by ajustes.pausaBotMin.collectAsState()
     Scaffold(
         modifier = Modifier.nestedScroll(barra.nestedScrollConnection),
         topBar = { LargeTopAppBar(scrollBehavior = barra, navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text("Funciones") }) },
@@ -40,8 +54,15 @@ fun PantallaFunciones(ajustes: Ajustes, alVolver: () -> Unit) {
             Seccion("Se pueden apagar sin reinstalar") {
                 Interruptor("Motor de automatización", "Las respuestas automáticas del bot (el bot solo responde, nunca escribe primero)", motor, true, Ico.Chats) { haptica(Toque.Suave); ajustes.fijarMotorAutomatico(it) }
                 Interruptor("Escribir desde la app", "Poder mandar mensajes a mano desde los chats", escribir, true, Ico.Compartir) { haptica(Toque.Suave); ajustes.fijarEscribirDesdeApp(it) }
-                Interruptor("Notificaciones de mensajes", "Avisar cuando llega un mensaje nuevo (apagado por defecto)", notifs, true, Ico.Aviso) { haptica(Toque.Suave); ajustes.fijarNotificacionesMensajes(it) }
+                Interruptor("Notificaciones de mensajes", "Avisar cuando llega un mensaje nuevo. En la pantalla bloqueada solo dice “Mensaje nuevo”. Puedes silenciar chats concretos desde el chat.", notifs, true, Ico.Aviso) {
+                    haptica(Toque.Suave)
+                    if (!it) ajustes.fijarNotificacionesMensajes(false)
+                    else if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) permiso.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    else ajustes.fijarNotificacionesMensajes(true)
+                }
                 Interruptor("Conservar eliminados", "Guardar lo que otros eliminan para poder verlo", conservar, true, Ico.Candado) { haptica(Toque.Suave); ajustes.fijarConservarEliminados(it) }
+                Interruptor("Marcar como leído al abrir", "Al abrir un chat se avisa “leído”. Si en WhatsApp tienes desactivadas las confirmaciones de lectura, nunca se envían.", leido, true, Ico.Listo) { haptica(Toque.Suave); ajustes.fijarMarcarLeidoAlAbrir(it) }
+                Deslizador("Pausa del bot cuando escribo yo", if (pausa == 0) "Nunca" else "$pausa min", pausa.toFloat(), 0f..120f, 7, "Si escribes en un chat (desde la app o desde el teléfono), el bot calla ahí este tiempo.") { ajustes.fijarPausaBotMin((it / 10f).toInt() * 10) }
                 Interruptor("Mostrar en línea", "Con un chat abierto, tus contactos pueden verte “en línea”. Puede hacer que tu teléfono principal deje de avisarte de mensajes mientras tanto.", enLinea, true, Ico.Info) { haptica(Toque.Suave); ajustes.fijarMostrarEnLinea(it) }
             }
         }

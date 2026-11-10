@@ -7,15 +7,25 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.botchat.app.Datos
+import com.botchat.app.datos.Ajustes
 import com.botchat.app.datos.ChatItem
+import com.botchat.app.datos.EstadoChat
+import com.botchat.app.datos.InfoMsg
 import com.botchat.app.datos.Json
 import com.botchat.app.datos.Msg
+import com.botchat.app.datos.Participante
+import com.botchat.app.datos.PresenciaChat
 import com.botchat.app.datos.Repo
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** Estado de un chat abierto: encabezado y mensajes (del más nuevo al más viejo), con carga por páginas y cambios en vivo. */
+/** Qué chat está abierto en pantalla ahora (para no avisar con notificación de lo que ya se está viendo). */
+object ChatAbierto {
+    @Volatile var jid: String = ""
+}
+
+/** Estado de un chat abierto: encabezado y mensajes (del más nuevo al más viejo), con carga por páginas, cambios en vivo y envío manual. */
 class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
     val botId: Long = Datos.get(app).primero()?.id ?: 0L
 
@@ -29,21 +39,54 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
         private set
     var aviso by mutableStateOf<String?>(null)
 
+    // ---- escribir ----
+    var citando by mutableStateOf<Msg?>(null)
+    var editando by mutableStateOf<Msg?>(null)
+    var enviando by mutableStateOf(false)
+        private set
+    var borradorInicial by mutableStateOf<String?>(null) // null = todavía cargando
+        private set
+    var participantes by mutableStateOf<List<Participante>>(emptyList())
+        private set
+    var presencia by mutableStateOf(PresenciaChat())
+        private set
+    var estadoChat by mutableStateOf(EstadoChat())
+        private set
+    var plazoEdicionSeg by mutableStateOf(1200L)
+        private set
+
+    /** Hora (segundos) hasta la que ya se había visto este chat antes de abrirlo: lo posterior es "sin leer". */
+    val vistoAntes: Long
+
     private var trabajo: Job? = null
+    private var tecleo: Job? = null
+    private var borradorJob: Job? = null
+    private var leidoJob: Job? = null
     private val pagina = 60
 
-    private val ajustes = com.botchat.app.datos.Ajustes.get(app)
+    private val ajustes = Ajustes.get(app)
 
     init {
+        vistoAntes = ajustes.visto(jid)
         ajustes.marcarVisto(jid)
         recargar()
+        cargarExtras()
         viewModelScope.launch {
             Repo.cambios.collect { evs ->
                 if (evs.any { it == "chat:$jid" || it.startsWith("archivo:$jid:") || it == "chats" }) {
                     trabajo?.cancel()
                     trabajo = launch { delay(80); recargar() }
                 }
+                if (evs.any { it == "presencia:$jid" }) actualizarPresencia()
             }
+        }
+    }
+
+    private fun cargarExtras() {
+        viewModelScope.launch {
+            borradorInicial = runCatching { Repo.borrador(botId, jid) }.getOrDefault("")
+            estadoChat = runCatching { Repo.estadoChat(botId, jid) }.getOrDefault(EstadoChat())
+            plazoEdicionSeg = runCatching { Repo.plazoEdicionSeg() }.getOrDefault(1200L).takeIf { it > 0 } ?: 1200L
         }
     }
 
@@ -55,6 +98,8 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
         mensajes = m
         hayMas = m.size >= cuantos
         ajustes.marcarVisto(jid) // el chat está abierto: lo que llega ahora ya se ve
+        if (c?.esGrupo == true && participantes.isEmpty()) cargarParticipantes()
+        programarLeido()
     }
 
     private var iniciales: Set<String>? = null
@@ -62,7 +107,11 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
     /** Un mensaje es "nuevo" si llegó con el chat ya abierto (para animar su entrada). */
     fun esNueva(id: String): Boolean = iniciales?.let { id !in it } ?: false
 
-    override fun onCleared() { ajustes.marcarVisto(jid); super.onCleared() }
+    override fun onCleared() {
+        ajustes.marcarVisto(jid)
+        if (ChatAbierto.jid == jid) ChatAbierto.jid = ""
+        super.onCleared()
+    }
 
     fun recargar() {
         viewModelScope.launch {
@@ -131,5 +180,137 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
 
     fun borrarChat(alTerminar: () -> Unit) {
         viewModelScope.launch { runCatching { Repo.borrarChat(botId, jid) }.onSuccess { alTerminar() }.onFailure { aviso = it.message } }
+    }
+
+    // ---------- escribir ----------
+
+    /** Manda un texto escrito a mano (o guarda la edición si se está editando). `menciones` son JIDs de grupo. */
+    fun enviar(texto: String, menciones: List<String>, alTerminar: () -> Unit = {}) {
+        if (enviando) return
+        val t = texto.trim()
+        if (t.isEmpty()) return
+        enviando = true
+        val edicion = editando
+        val cita = citando
+        viewModelScope.launch {
+            try {
+                if (edicion != null) Repo.editar(botId, jid, edicion.id, t)
+                else Repo.enviarTexto(botId, jid, t, cita?.id ?: "", menciones)
+                editando = null; citando = null
+                guardarBorrador("")
+                alTerminar()
+            } catch (e: Exception) {
+                aviso = e.message ?: "No se pudo enviar"
+                if (edicion == null) { citando = null; alTerminar() } // el mensaje quedó guardado como fallido, con "Reintentar"
+            } finally {
+                enviando = false
+                escribiendoSi(false)
+            }
+        }
+    }
+
+    fun reintentar(m: Msg) {
+        viewModelScope.launch { runCatching { Repo.reintentarEnvio(botId, jid, m.id) }.onFailure { aviso = it.message ?: "No se pudo enviar" } }
+    }
+
+    fun reaccionar(m: Msg, emoji: String) {
+        val quitar = m.reacciones.any { it.mia && it.emoji == emoji }
+        viewModelScope.launch { runCatching { Repo.reaccionar(botId, jid, m.id, if (quitar) "" else emoji) }.onFailure { aviso = it.message ?: "No se pudo reaccionar" } }
+    }
+
+    fun borrarParaMi(ids: List<String>) {
+        viewModelScope.launch { runCatching { Repo.borrarParaMi(botId, jid, ids) }.onFailure { aviso = it.message } }
+    }
+
+    fun borrarParaTodos(ms: List<Msg>) {
+        viewModelScope.launch {
+            for (m in ms) runCatching { Repo.borrarParaTodos(botId, jid, m.id) }.onFailure { aviso = "WhatsApp no permitió borrarlo para todos: ${it.message}" }
+        }
+    }
+
+    fun reenviar(ids: List<String>, destinos: List<String>, alTerminar: (String) -> Unit) {
+        viewModelScope.launch {
+            runCatching { Repo.reenviar(botId, jid, ids, destinos) }
+                .onSuccess { r ->
+                    alTerminar(buildString {
+                        append(if (r.enviados == 1) "Se reenvió 1 mensaje" else "Se reenviaron ${r.enviados} mensajes")
+                        if (r.omitidos > 0) append(". Los que no son de texto todavía no se pueden reenviar")
+                        if (r.fallidos > 0) append(". Fallaron ${r.fallidos}")
+                    })
+                }
+                .onFailure { aviso = it.message ?: "No se pudo reenviar" }
+        }
+    }
+
+    suspend fun info(m: Msg): InfoMsg? = runCatching { Repo.infoMensaje(botId, jid, m.id) }.getOrNull()
+
+    fun silenciar(si: Boolean) {
+        viewModelScope.launch { runCatching { Repo.silenciar(botId, jid, si); estadoChat = estadoChat.copy(silenciado = si) } }
+    }
+
+    // ---------- borrador y "escribiendo…" ----------
+
+    fun guardarBorrador(texto: String) {
+        borradorJob?.cancel()
+        borradorJob = viewModelScope.launch { delay(400); runCatching { Repo.guardarBorrador(botId, jid, texto) } }
+    }
+
+    /** Se llama en cada cambio del texto: manda "escribiendo…" (máximo uno cada 4 s) y lo quita a los 3 s sin teclear. */
+    fun teclea(hayTexto: Boolean) {
+        if (!hayTexto) { escribiendoSi(false); return }
+        tecleo?.cancel()
+        tecleo = viewModelScope.launch {
+            if (!enviadoEscribiendo || System.currentTimeMillis() - ultimoEscribiendo > 4000) {
+                enviadoEscribiendo = true; ultimoEscribiendo = System.currentTimeMillis()
+                runCatching { Repo.escribiendo(botId, jid, true) }
+            }
+            delay(3000)
+            escribiendoSi(false)
+        }
+    }
+
+    private var enviadoEscribiendo = false
+    private var ultimoEscribiendo = 0L
+
+    private fun escribiendoSi(si: Boolean) {
+        if (si) return
+        tecleo?.cancel()
+        if (enviadoEscribiendo) { enviadoEscribiendo = false; viewModelScope.launch { runCatching { Repo.escribiendo(botId, jid, false) } } }
+    }
+
+    // ---------- presencia, leído y participantes ----------
+
+    private fun actualizarPresencia() {
+        viewModelScope.launch { presencia = runCatching { Repo.presencia(jid) }.getOrDefault(PresenciaChat()) }
+    }
+
+    /** Con el chat a la vista: se pide la presencia del contacto y, si el usuario lo permitió, se marca "en línea". */
+    fun alMostrar(mostrarEnLinea: Boolean) {
+        ChatAbierto.jid = jid
+        com.botchat.app.Notificador.quitar(getApplication(), jid)
+        viewModelScope.launch {
+            if (mostrarEnLinea) {
+                runCatching { Repo.enLinea(botId, true) }
+                runCatching { Repo.suscribirPresencia(botId, jid) }
+            }
+            actualizarPresencia()
+        }
+        programarLeido()
+    }
+
+    fun alOcultar(mostrarEnLinea: Boolean) {
+        if (ChatAbierto.jid == jid) ChatAbierto.jid = ""
+        escribiendoSi(false)
+        if (mostrarEnLinea) viewModelScope.launch { runCatching { Repo.enLinea(botId, false) } }
+    }
+
+    private fun programarLeido() {
+        if (!ajustes.marcarLeidoAlAbrir.value || ChatAbierto.jid != jid) return
+        leidoJob?.cancel()
+        leidoJob = viewModelScope.launch { delay(600); runCatching { Repo.marcarLeido(botId, jid) } }
+    }
+
+    private fun cargarParticipantes() {
+        viewModelScope.launch { participantes = runCatching { Repo.participantes(botId, jid) }.getOrDefault(emptyList()) }
     }
 }

@@ -87,6 +87,28 @@ object Repo {
     suspend fun personas(bot: Long, chat: String) = io { Json.personas(motor.personasChat(bot, chat)) }
     suspend fun olvidar(bot: Long, chat: String, id: String) = io { motor.olvidarMensaje(bot, chat, id) }
 
+    suspend fun enviarTexto(bot: Long, chat: String, texto: String, citaId: String = "", menciones: List<String> = emptyList()) =
+        io { Json.envio(motor.enviarTexto(bot, chat, texto, citaId, JSONArray(menciones).toString())) }
+    suspend fun reintentarEnvio(bot: Long, chat: String, id: String) = io { Json.envio(motor.reintentarEnvio(bot, chat, id)) }
+    suspend fun reaccionar(bot: Long, chat: String, id: String, emoji: String) = io { motor.reaccionar(bot, chat, id, emoji) }
+    suspend fun editar(bot: Long, chat: String, id: String, texto: String) = io { motor.editarMensaje(bot, chat, id, texto) }
+    suspend fun borrarParaTodos(bot: Long, chat: String, id: String) = io { motor.borrarParaTodos(bot, chat, id) }
+    suspend fun borrarParaMi(bot: Long, chat: String, ids: List<String>) = io { motor.borrarParaMi(bot, chat, JSONArray(ids).toString()) }
+    suspend fun reenviar(bot: Long, origen: String, ids: List<String>, destinos: List<String>) =
+        io { Json.reenvio(motor.reenviarTexto(bot, origen, JSONArray(ids).toString(), JSONArray(destinos).toString())) }
+    suspend fun marcarLeido(bot: Long, chat: String) = io { motor.marcarLeido(bot, chat) }
+    suspend fun escribiendo(bot: Long, chat: String, si: Boolean) = io { motor.escribiendo(bot, chat, si) }
+    suspend fun enLinea(bot: Long, si: Boolean) = io { motor.enLinea(bot, si) }
+    suspend fun suscribirPresencia(bot: Long, chat: String) = io { motor.suscribirPresencia(bot, chat) }
+    suspend fun presencia(chat: String) = io { Json.presencia(motor.presenciaDe(chat)) }
+    suspend fun participantes(bot: Long, chat: String) = io { Json.participantes(motor.participantesGrupo(bot, chat)) }
+    suspend fun infoMensaje(bot: Long, chat: String, id: String) = io { Json.infoMensaje(motor.infoMensaje(bot, chat, id)) }
+    suspend fun guardarBorrador(bot: Long, chat: String, texto: String) = io { motor.guardarBorrador(bot, chat, texto) }
+    suspend fun borrador(bot: Long, chat: String) = io { motor.leerBorrador(bot, chat) }
+    suspend fun silenciar(bot: Long, chat: String, si: Boolean) = io { motor.silenciarChat(bot, chat, si) }
+    suspend fun estadoChat(bot: Long, chat: String) = io { Json.estadoChat(motor.estadoDelChat(bot, chat)) }
+    suspend fun plazoEdicionSeg() = io { motor.plazoEdicionSeg() }
+
     suspend fun estadisticasChat(bot: Long, chat: String) = io { Json.resumenChat(motor.estadisticasChat(bot, chat)) }
     suspend fun calendario(bot: Long, chat: String, mes: String) = io { Json.calendario(motor.calendarioChat(bot, chat, mes)) }
     suspend fun mensajesDia(bot: Long, chat: String, dia: String) = io { Json.mensajes(motor.mensajesDia(bot, chat, dia)) }
