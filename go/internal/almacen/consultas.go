@@ -171,6 +171,9 @@ type MensajeVista struct {
 	Menciones   []MencionVista  `json:"menciones"`
 	Reenviado   bool            `json:"reenviado"`
 	Reacciones  []ReaccionVista `json:"reacciones"`
+	VerEstado   string          `json:"verEstado"`
+	VerTipo     string          `json:"verTipo"`
+	VerExpira   int64           `json:"verExpira"`
 
 	bot int64
 }
@@ -203,6 +206,7 @@ func (a *Almacen) vista(m *Mensaje) MensajeVista {
 	for _, j := range m.Menciones {
 		v.Menciones = append(v.Menciones, MencionVista{Usuario: usuarioDe(j), Nombre: a.nombreParaMostrar(m.BotID, m.ChatJID, j)})
 	}
+	v.VerEstado, v.VerTipo, v.VerExpira = m.VerEstado, m.VerTipo, m.VerExpira
 	v.EstadoEnvio = estadoDe(m.EstadoEnvio, m.EsMio, 0, 0)
 	v.Reacciones = []ReaccionVista{}
 	v.PuedeBajarse = CategoriaDe(m.Tipo) != "" && len(m.ArchivoInfo) > 0 &&

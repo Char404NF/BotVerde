@@ -72,7 +72,7 @@ func TestTextoYMultimedia(t *testing.T) {
 	}
 }
 
-func TestVerUnaVezNoConservaNada(t *testing.T) {
+func TestVerUnaVezConContenidoGuardaSoloLoNecesarioYRedactadoSoloElAviso(t *testing.T) {
 	casos := map[string]*waE2E.Message{
 		"marca en la imagen": {ImageMessage: imagen(true)},
 		"marca en el video":  {VideoMessage: &waE2E.VideoMessage{ViewOnce: proto.Bool(true), JPEGThumbnail: []byte("MINI"), MediaKey: []byte("k"), DirectPath: proto.String("/v")}},
@@ -87,11 +87,22 @@ func TestVerUnaVezNoConservaNada(t *testing.T) {
 			t.Errorf("%s: no se detectó", nombre)
 		}
 		c := Clasificar(e)
-		if c.Tipo != almacen.TipoVerUnaVez || c.Texto != almacen.TextoVerUnaVez {
-			t.Errorf("%s: %+v", nombre, c)
+		if c.Tipo != almacen.TipoVerUnaVez || c.VerTipo == "" || len(c.Info) == 0 {
+			t.Errorf("%s: llegó completo y debía guardarse para abrirlo: %+v", nombre, c)
 		}
-		if len(c.Info) != 0 || len(c.Miniatura) != 0 || c.Mime != "" || c.Bytes != 0 || c.Nombre != "" || c.Ancho != 0 {
-			t.Errorf("%s: conserva datos del archivo: %+v", nombre, c)
+		if len(c.Miniatura) != 0 || c.Texto != "" || c.Nombre != "" {
+			t.Errorf("%s: no se guarda miniatura, pie ni nombre: %+v", nombre, c)
+		}
+	}
+	// Redactado (sin datos para descargar): solo el aviso, sin intentar sortear nada.
+	redactados := map[string]*waE2E.Message{
+		"imagen sin claves": {ImageMessage: &waE2E.ImageMessage{ViewOnce: proto.Bool(true), Mimetype: proto.String("image/jpeg"), JPEGThumbnail: []byte("MINI")}},
+		"envoltura vacía":   {ViewOnceMessageV2: &waE2E.FutureProofMessage{Message: &waE2E.Message{}}},
+	}
+	for nombre, m := range redactados {
+		c := Clasificar(evt(m))
+		if c.Tipo != almacen.TipoVerUnaVez || c.Texto != almacen.TextoVerUnaVez || len(c.Info) != 0 || len(c.Miniatura) != 0 || c.Mime != "" || c.VerTipo != "" {
+			t.Errorf("%s: %+v", nombre, c)
 		}
 	}
 }

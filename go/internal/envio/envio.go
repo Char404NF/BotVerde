@@ -6,6 +6,7 @@ package envio
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"sync"
 	"time"
@@ -30,6 +31,8 @@ type Cliente interface {
 	SendPresence(ctx context.Context, state types.Presence) error
 	SubscribePresence(ctx context.Context, jid types.JID) error
 	GetGroupInfo(ctx context.Context, jid types.JID) (*types.GroupInfo, error)
+	UploadReader(ctx context.Context, plaintext io.Reader, tempFile io.ReadWriteSeeker, appInfo whatsmeow.MediaType) (whatsmeow.UploadResponse, error)
+	ConfirmacionesLectura(ctx context.Context) bool
 	Conectado() bool
 	Propio() (pn types.JID, lid types.JID)
 }
@@ -39,6 +42,11 @@ type Real struct{ *whatsmeow.Client }
 
 // Conectado dice si hay conexión y sesión.
 func (r Real) Conectado() bool { return r.IsConnected() && r.IsLoggedIn() }
+
+// ConfirmacionesLectura dice si la cuenta tiene activadas las confirmaciones de lectura.
+func (r Real) ConfirmacionesLectura(ctx context.Context) bool {
+	return r.GetPrivacySettings(ctx).ReadReceipts != types.PrivacySettingNone
+}
 
 // Propio devuelve el teléfono y el LID de la cuenta.
 func (r Real) Propio() (types.JID, types.JID) {
@@ -425,7 +433,7 @@ func (s *Servicio) Reintentar(ctx context.Context, chat, id string) (Resultado, 
 	if err != nil {
 		return Resultado{}, err
 	}
-	if m == nil || !m.EsMio || m.EstadoEnvio != "fallido" || m.Tipo != almacen.TipoTexto {
+	if m == nil || !m.EsMio || m.EstadoEnvio != "fallido" {
 		return Resultado{}, ErrNoExiste
 	}
 	j, err := parsea(chat)
@@ -438,6 +446,9 @@ func (s *Servicio) Reintentar(ctx context.Context, chat, id string) (Resultado, 
 	_ = s.Alm.EstadoDeEnvio(s.BotID, chat, id, "enviando")
 	m.EstadoEnvio = "enviando"
 	s.RegistrarEnvio(id)
+	if m.Tipo != almacen.TipoTexto {
+		return s.transmitirMedio(ctx, j, m, nil)
+	}
 	return s.transmitir(ctx, j, m)
 }
 
@@ -563,7 +574,7 @@ type Reenviado struct {
 	Fallidos int `json:"fallidos"`
 }
 
-// ReenviarTexto manda los mensajes de texto elegidos a hasta 5 chats con la marca "Reenviado".
+// ReenviarTexto manda los mensajes elegidos (texto, y fotos, videos, audios o documentos ya descargados) a hasta 5 chats con la marca "Reenviado".
 func (s *Servicio) ReenviarTexto(ctx context.Context, origen string, ids, destinos []string) (Reenviado, error) {
 	var r Reenviado
 	if len(destinos) > maxReenvios {
@@ -575,7 +586,7 @@ func (s *Servicio) ReenviarTexto(ctx context.Context, origen string, ids, destin
 		if err != nil {
 			return r, err
 		}
-		if m == nil || m.Tipo != almacen.TipoTexto || strings.TrimSpace(m.Texto) == "" || m.Borrado && m.Texto == "" {
+		if !puedeReenviarse(m) {
 			r.Omitidos++
 			continue
 		}
@@ -588,6 +599,14 @@ func (s *Servicio) ReenviarTexto(ctx context.Context, origen string, ids, destin
 			continue
 		}
 		for _, o := range textos {
+			if o.Tipo != almacen.TipoTexto {
+				if err := s.reenviarMedio(ctx, o, d); err != nil {
+					r.Fallidos++
+				} else {
+					r.Enviados++
+				}
+				continue
+			}
 			if !s.tomarFicha() {
 				r.Fallidos++
 				continue

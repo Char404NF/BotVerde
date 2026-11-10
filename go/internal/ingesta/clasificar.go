@@ -45,6 +45,8 @@ type Clasificado struct {
 	Menciones []string  // JIDs mencionados con @
 	Reenviado bool      // viene con la marca "Reenviado"
 	Reaccion  *Reaccion // es una reacción a otro mensaje (Emoji vacío = la quitó)
+
+	VerTipo string // en un "ver una vez" con contenido: imagen, video o audio
 }
 
 // Reaccion es una reacción con emoji a un mensaje.
@@ -219,10 +221,22 @@ func clasificar(evt *events.Message) Clasificado {
 	if evt == nil || evt.Message == nil && evt.RawMessage == nil {
 		return Clasificado{Omitir: true}
 	}
-	// Los "ver una vez" se resuelven primero y no conservan NADA del contenido: ni miniatura, ni claves, ni rutas.
+	// Los "ver una vez" se resuelven primero. Si el contenido llega completo (con sus datos de descarga) se guarda para abrirlo
+	// una sola vez, sin miniatura ni pie de foto; si llega redactado, solo queda el aviso y no se intenta sortear nada.
 	if EsVerUnaVez(evt) {
+		if evt.Message != nil {
+			inner := clasificarContenido(evt)
+			if (inner.Tipo == almacen.TipoImagen || inner.Tipo == almacen.TipoVideo || inner.Tipo == almacen.TipoAudio) && len(inner.Info) > 0 {
+				return Clasificado{Tipo: almacen.TipoVerUnaVez, VerTipo: inner.Tipo, Mime: inner.Mime, Bytes: inner.Bytes, Ancho: inner.Ancho, Alto: inner.Alto, DurS: inner.DurS, Info: inner.Info}
+			}
+		}
 		return Clasificado{Tipo: almacen.TipoVerUnaVez, Texto: almacen.TextoVerUnaVez}
 	}
+	return clasificarContenido(evt)
+}
+
+// clasificarContenido clasifica el contenido ya sin la envoltura de "ver una vez".
+func clasificarContenido(evt *events.Message) Clasificado {
 	m := evt.Message
 	if m == nil {
 		return Clasificado{Omitir: true}

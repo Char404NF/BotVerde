@@ -187,6 +187,9 @@ func (g *Gestor) procesar(it item) {
 	if err != nil || m == nil || m.ArchivoEstado != almacen.EstadoPendiente {
 		return
 	}
+	if m.Tipo == almacen.TipoVerUnaVez {
+		it.manual = true // un "ver una vez" siempre se baja al llegar, sin importar las reglas de descarga automática
+	}
 	if !it.manual {
 		if p := g.cfg.Politica(); p.PisoLibre > 0 && g.cfg.Libre() > 0 && g.cfg.Libre() < p.PisoLibre {
 			_ = alm.FijarEstado(bot, it.chat, it.id, almacen.EstadoNinguno) // poco espacio: queda con botón

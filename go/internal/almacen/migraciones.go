@@ -126,6 +126,12 @@ var migraciones = [][]string{
 			PRIMARY KEY (bot_id, chat_jid)
 		) WITHOUT ROWID`,
 	},
+	// 5: "ver una vez" que llega completo: se guarda cifrado, se abre una sola vez y luego se borra (o caduca).
+	{
+		`ALTER TABLE messages ADD COLUMN ver_estado TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE messages ADD COLUMN ver_tipo TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE messages ADD COLUMN ver_expira INTEGER NOT NULL DEFAULT 0`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

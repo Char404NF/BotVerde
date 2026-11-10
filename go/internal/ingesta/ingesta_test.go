@@ -307,7 +307,7 @@ func TestDescargaAutomaticaSegunPolitica(t *testing.T) {
 	}
 }
 
-func TestVerUnaVezNoDejaNadaEnDisco(t *testing.T) {
+func TestVerUnaVezCompletoSeGuardaParaAbrirloUnaVez(t *testing.T) {
 	e := nuevoEntorno(t)
 	pn := jid("525512345678@s.whatsapp.net")
 	ctx := context.Background()
@@ -320,37 +320,62 @@ func TestVerUnaVezNoDejaNadaEnDisco(t *testing.T) {
 	for id, m := range casos {
 		e.g.Mensaje(ctx, mensajeEvt(pn, pn, id, false, m), false)
 		m2, _ := e.alm.ObtenerMensaje(1, pn.String(), id)
-		if m2 == nil || m2.Tipo != almacen.TipoVerUnaVez || m2.Texto != almacen.TextoVerUnaVez || m2.ArchivoEstado != almacen.EstadoOmitido {
+		if m2 == nil || m2.Tipo != almacen.TipoVerUnaVez || m2.VerEstado != almacen.VerPendiente || m2.VerTipo == "" || m2.ArchivoEstado != almacen.EstadoPendiente || len(m2.ArchivoInfo) == 0 {
 			t.Fatalf("%s: %+v", id, m2)
 		}
-		if len(m2.ArchivoInfo) != 0 || m2.ArchivoRuta != "" || m2.MiniaturaRuta != "" || m2.ArchivoMime != "" || m2.ArchivoBytes != 0 || m2.Ancho != 0 {
-			t.Fatalf("%s conserva datos del archivo: %+v", id, m2)
+		if m2.Texto != "" || m2.MiniaturaRuta != "" || m2.VerExpira != m2.TS+14*86400 {
+			t.Fatalf("%s: no lleva pie ni miniatura y caduca a los 14 días: %+v", id, m2)
 		}
 	}
-	if len(e.srv.descs) != 0 {
-		t.Fatal("un ver-una-vez no se descarga")
+	if len(e.srv.descs) != 4 {
+		t.Fatalf("se baja al llegar: %v", e.srv.descs)
 	}
-	// Nada de multimedia en disco: ni archivos, ni miniaturas, ni claves.
-	hallados := 0
-	_ = filepath.WalkDir(e.alm.Raiz(), func(p string, d os.DirEntry, err error) error {
-		if err == nil && !d.IsDir() && filepath.Base(filepath.Dir(p)) != filepath.Base(e.alm.Raiz()) {
-			hallados++
-		}
-		return nil
-	})
-	if hallados != 0 {
-		t.Fatalf("quedaron %d archivos en subcarpetas", hallados)
-	}
+	// Antes de bajarse no hay nada en disco y en la base no se lee ni la miniatura ni la ruta de descarga.
 	if _, err := os.Stat(filepath.Join(e.alm.Raiz(), "media")); !os.IsNotExist(err) {
-		t.Fatal("no debe existir carpeta de multimedia")
+		t.Fatal("no debe existir carpeta de multimedia antes de bajar")
 	}
-	// Ni en la base: ninguna columna de clave, ruta o miniatura con contenido.
 	crudo, _ := os.ReadFile(filepath.Join(e.alm.Raiz(), "messages.db"))
 	wal, _ := os.ReadFile(filepath.Join(e.alm.Raiz(), "messages.db-wal"))
-	for _, secreto := range []string{"MINIVIDEO", "MINI", "/v/x", "clave"} {
+	for _, secreto := range []string{"MINIVIDEO", "MINI", "/v/x"} {
 		if contiene(crudo, secreto) || contiene(wal, secreto) {
 			t.Fatalf("%q aparece en la base", secreto)
 		}
+	}
+}
+
+func TestVerUnaVezRedactadoSoloGuardaElAviso(t *testing.T) {
+	e := nuevoEntorno(t)
+	pn := jid("525512345678@s.whatsapp.net")
+	ctx := context.Background()
+	e.g.Mensaje(ctx, mensajeEvt(pn, pn, "R1", false, &waE2E.Message{ImageMessage: &waE2E.ImageMessage{ViewOnce: proto.Bool(true), Mimetype: proto.String("image/jpeg"), JPEGThumbnail: []byte("MINI")}}), false)
+	m2, _ := e.alm.ObtenerMensaje(1, pn.String(), "R1")
+	if m2 == nil || m2.Tipo != almacen.TipoVerUnaVez || m2.Texto != almacen.TextoVerUnaVez || m2.VerEstado != "" || m2.ArchivoEstado != almacen.EstadoOmitido || len(m2.ArchivoInfo) != 0 {
+		t.Fatalf("%+v", m2)
+	}
+	if len(e.srv.descs) != 0 {
+		t.Fatal("no hay nada que bajar")
+	}
+	// Aviso sin contenido (UndecryptableMessage "view_once") y después llega completo: se completa el mismo mensaje.
+	info := types.MessageInfo{MessageSource: types.MessageSource{Chat: pn, Sender: pn}, ID: "R2", Timestamp: time.Unix(1_800_000_000, 0)}
+	e.g.VerUnaVezSinContenido(ctx, info)
+	a, _ := e.alm.ObtenerMensaje(1, pn.String(), "R2")
+	if a == nil || a.Tipo != almacen.TipoVerUnaVez || a.VerEstado != "" {
+		t.Fatalf("aviso: %+v", a)
+	}
+	e.g.Mensaje(ctx, mensajeEvt(pn, pn, "R2", false, imagenConMedia(true)), false)
+	b, _ := e.alm.ObtenerMensaje(1, pn.String(), "R2")
+	if b.VerEstado != almacen.VerPendiente || len(b.ArchivoInfo) == 0 || len(e.srv.descs) != 1 {
+		t.Fatalf("completado: %+v", b)
+	}
+	r, _ := e.alm.ResumenDeChat(1, pn.String())
+	var cuenta int64
+	for _, t := range r.PorTipo {
+		if t.Tipo == almacen.TipoVerUnaVez {
+			cuenta = t.Recibidos
+		}
+	}
+	if cuenta != 2 {
+		t.Fatalf("el mismo mensaje no se cuenta dos veces en las estadísticas: %d", cuenta)
 	}
 }
 

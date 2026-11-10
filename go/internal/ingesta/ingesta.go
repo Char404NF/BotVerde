@@ -46,6 +46,8 @@ type Config struct {
 	Libre     func() int64
 	// EsPropio dice si un JID es el del propio bot (teléfono o LID). Puede ser nil.
 	EsPropio func(types.JID) bool
+	// VerUnaVezDias son los días que un "ver una vez" espera a que lo abran antes de borrarse (0 = 14).
+	VerUnaVezDias func() int
 	// Log recibe avisos sin datos personales (nunca texto de mensajes, nombres ni nombres de archivo).
 	Log func(string)
 }
@@ -291,8 +293,27 @@ func (g *Ingesta) preparar(ctx context.Context, evt *events.Message, historial b
 	cat := almacen.CategoriaDe(c.Tipo)
 	l := &listo{msg: m, miniatura: c.Miniatura}
 	switch {
+	case c.Tipo == almacen.TipoVerUnaVez && len(c.Info) > 0 && !historial:
+		// Llegó completo: se baja al llegar (sin importar las reglas de descarga) y queda cifrado hasta que se abra.
+		dias := 14
+		if g.VerUnaVezDias != nil && g.VerUnaVezDias() > 0 {
+			dias = g.VerUnaVezDias()
+		}
+		m.VerEstado, m.VerTipo, m.VerExpira = almacen.VerPendiente, c.VerTipo, m.TS+int64(dias)*86400
+		m.ArchivoEstado = almacen.EstadoPendiente
+		l.auto = true
+		if ok, _ := g.Alm.PromoverVerUnaVez(m); ok {
+			// ya había un aviso sin contenido de este mensaje: se completó
+			if g.Servicios != nil {
+				g.Servicios.EncolarDescarga(jid, m.ID)
+			}
+			return nil, nil
+		}
 	case c.Tipo == almacen.TipoVerUnaVez:
+		// Sin contenido (aviso) o venido del historial: no se guarda nada del archivo.
 		m.ArchivoEstado = almacen.EstadoOmitido
+		m.Texto, m.ArchivoInfo, m.ArchivoMime, m.ArchivoBytes, m.Ancho, m.Alto, m.DuracionS = almacen.TextoVerUnaVez, nil, "", 0, 0, 0, 0
+		l.miniatura = nil
 	case cat != "" && len(c.Info) == 0:
 		m.ArchivoEstado = almacen.EstadoOmitido
 	case cat != "" && historial:
@@ -305,6 +326,35 @@ func (g *Ingesta) preparar(ctx context.Context, evt *events.Message, historial b
 		}
 	}
 	return l, nil
+}
+
+// VerUnaVezSinContenido guarda el aviso de un "ver una vez" que WhatsApp no entregó a este dispositivo.
+func (g *Ingesta) VerUnaVezSinContenido(ctx context.Context, info types.MessageInfo) {
+	defer func() {
+		if r := recover(); r != nil {
+			g.Log(fmt.Sprintf("error interno al guardar un aviso: %v", r))
+		}
+	}()
+	chat, lid, esGrupo, ok := g.chatDe(ctx, info)
+	if !ok {
+		return
+	}
+	nuevo, err := g.asegurarChat(ctx, chat, lid, esGrupo, "")
+	if err != nil {
+		return
+	}
+	if nuevo && esGrupo && g.Servicios != nil {
+		g.Servicios.PedirAsunto(chat.String())
+	}
+	rem, nombre := g.remitente(ctx, info, chat, esGrupo)
+	m := &almacen.Mensaje{
+		ID: info.ID, ChatJID: chat.String(), BotID: g.BotID, RemitenteJID: rem, RemitenteNombre: nombre, EsMio: info.IsFromMe,
+		Tipo: almacen.TipoVerUnaVez, Texto: almacen.TextoVerUnaVez, TS: info.Timestamp.Unix(), ArchivoEstado: almacen.EstadoOmitido,
+	}
+	if m.TS <= 0 {
+		m.TS = time.Now().Unix()
+	}
+	g.guardarLote(ctx, []*listo{{msg: m}})
 }
 
 // ChatDe da la clave del chat a la que pertenece un evento (acuses, presencia) con las mismas reglas que los mensajes.

@@ -144,7 +144,7 @@ func (s *estado) armar() {
 	s.fotos = fotos.Nuevo(fotos.Config{BotID: s.botID, Alm: alm, Cliente: func() (fotos.Cliente, bool) { return s.cli, conectado() }, Log: s.log})
 	s.grupos = nuevaColaGrupos(s)
 	s.ing = ingesta.Nueva(ingesta.Config{BotID: s.botID, Alm: alm, Contactos: s.cli.Store.Contacts, Mapa: s.cli.Store.LIDs,
-		Servicios: servicios{s}, EsPropio: s.esPropio, Politica: politicaActual, Red: redActual, Libre: func() int64 { l, _ := alm.Libre(); return l }, Log: s.log})
+		Servicios: servicios{s}, EsPropio: s.esPropio, VerUnaVezDias: func() int { return int(verUnaVezDias.Load()) }, Politica: politicaActual, Red: redActual, Libre: func() int64 { l, _ := alm.Libre(); return l }, Log: s.log})
 	s.envio = envio.Nuevo(s.botID, alm, envio.Real{Client: s.cli}, s.log)
 	s.envio.PausaBot = pausaTrasEscribir
 	s.descargas.Iniciar(s.ctx)
@@ -337,6 +337,12 @@ func (s *estado) evento(e any) {
 			s.pausaPorTelefono(v)
 		})
 		s.responder(v)
+	case *events.UndecryptableMessage:
+		// WhatsApp no entrega a los dispositivos vinculados el contenido de algunos "ver una vez": solo queda el aviso.
+		if v.IsUnavailable && v.UnavailableType == events.UnavailableTypeViewOnce {
+			info := v.Info
+			s.encola(func() { s.ing.VerUnaVezSinContenido(s.ctx, info) })
+		}
 	case *events.Receipt:
 		s.alRecibirAcuse(v)
 	case *events.ChatPresence:

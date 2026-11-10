@@ -39,7 +39,7 @@ func (a *Almacen) MarcarEliminado(botID int64, chat, id, por string, ts int64) (
 	if _, err := a.db.Exec("UPDATE messages SET borrado=1, eliminado_en=?, eliminado_por=? WHERE bot_id=? AND chat_jid=? AND id=?", ts, por, botID, chat, id); err != nil {
 		return false, err
 	}
-	if !a.ConservarEliminados() && !m.EsMio {
+	if m.Tipo == TipoVerUnaVez || (!a.ConservarEliminados() && !m.EsMio) { // un "ver una vez" que el remitente borra nunca se conserva
 		if err := a.olvidar(m); err != nil {
 			return false, err
 		}

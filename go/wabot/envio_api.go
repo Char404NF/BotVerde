@@ -351,3 +351,68 @@ func (s *estado) alRecibirAcuse(v *events.Receipt) {
 		}
 	})
 }
+
+// ---------- adjuntos, notas de voz y "ver una vez" ----------
+
+// EnviarMedio manda un archivo (tipo: imagen, video, audio o documento) desde una copia temporal en claro, que se borra al terminar.
+// ancho/alto/durS son opcionales; miniatura es un JPEG pequeño; onda es la forma de onda de una nota de voz. Devuelve (JSON) {id, estado, ts}.
+func EnviarMedio(botID int64, chat, tipo, ruta, mime, nombre, pie, citaID string, ancho, alto, durS int, notaVoz bool, miniatura, onda []byte) (string, error) {
+	sv, err := servicioEnvio(botID)
+	if err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+	r, err := sv.EnviarMedio(ctx, chat, envio.Adjunto{Tipo: tipo, Ruta: ruta, Mime: mime, Nombre: nombre, Pie: pie, Ancho: ancho, Alto: alto, DurS: durS, NotaVoz: notaVoz, Miniatura: miniatura, Onda: onda}, citaID)
+	return js(r, err)
+}
+
+var verUnaVezDias atomic.Int32
+
+func init() { verUnaVezDias.Store(14) }
+
+// ConfigurarVerUnaVez fija cuántos días espera un "ver una vez" a que lo abran antes de borrarse.
+func ConfigurarVerUnaVez(dias int) {
+	if dias < 1 {
+		dias = 14
+	}
+	verUnaVezDias.Store(int32(dias))
+}
+
+// AbrirVerUnaVez deja ver el contenido de un "ver una vez" una sola vez. Devuelve (JSON) {ruta, tipo, mime}; después hay que llamar a CerrarVerUnaVez.
+func AbrirVerUnaVez(botID int64, chat, id string) (string, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return "", err
+	}
+	ruta, tipo, mime, err := a.AbrirVerUnaVez(botID, chat, id, time.Now())
+	if err != nil {
+		return "", err
+	}
+	return js(map[string]string{"ruta": ruta, "tipo": tipo, "mime": mime}, nil)
+}
+
+// CerrarVerUnaVez termina de ver un "ver una vez": borra el contenido y el archivo para siempre.
+func CerrarVerUnaVez(botID int64, chat, id string) error {
+	if sv, err := servicioEnvio(botID); err == nil {
+		ctx, cancel := ctxEnvio()
+		defer cancel()
+		return sv.CerrarVerUnaVez(ctx, chat, id)
+	}
+	a, err := almacenAbierto()
+	if err != nil {
+		return err
+	}
+	_, err = a.CerrarVerUnaVez(botID, chat, id)
+	return err
+}
+
+// BarrerVerUnaVez borra los "ver una vez" que quedaron a medias o que caducaron. Devuelve cuántos se cerraron.
+func BarrerVerUnaVez(botID int64) (int, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return 0, err
+	}
+	c, x, err := a.BarrerVerUnaVez(botID, time.Now())
+	return c + x, err
+}
