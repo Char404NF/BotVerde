@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -174,6 +175,45 @@ func (a *Almacen) EscribirCifrado(rel string, contenido []byte) error {
 		return err
 	}
 	return os.Rename(tmp, abs)
+}
+
+// EscribirCifradoDesde cifra en flujo lo que entrega r y lo deja en rel, de forma atómica. Nunca escribe el contenido en claro.
+// Devuelve cuántos bytes de contenido (sin cifrar) se guardaron.
+func (a *Almacen) EscribirCifradoDesde(rel string, r io.Reader) (int64, error) {
+	abs, err := a.Abs(rel)
+	if err != nil {
+		return 0, err
+	}
+	if err := os.MkdirAll(filepath.Dir(abs), 0o700); err != nil {
+		return 0, err
+	}
+	tmp := abs + ".tmp"
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return 0, err
+	}
+	w, err := cifrado.NuevoEscritor(f, a.clave)
+	if err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return 0, err
+	}
+	n, err := io.Copy(w, r)
+	if err == nil {
+		err = w.Close()
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		os.Remove(tmp)
+		return 0, err
+	}
+	if err := os.Rename(tmp, abs); err != nil {
+		os.Remove(tmp)
+		return 0, err
+	}
+	return n, nil
 }
 
 // LeerCifrado lee y descifra un archivo completo (para fotos pequeñas y miniaturas).

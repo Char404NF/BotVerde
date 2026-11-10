@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -576,3 +578,44 @@ func TestEliminarBot(t *testing.T) {
 }
 
 var _ = sql.ErrNoRows
+
+func TestEscribirCifradoDesdeNoDejaNadaEnClaro(t *testing.T) {
+	a := nuevo(t)
+	secreto := bytes.Repeat([]byte("CONTENIDO-SECRETO-"), 20000) // varios bloques
+	n, err := a.EscribirCifradoDesde("media/1/abc/X.enc", bytes.NewReader(secreto))
+	if err != nil || n != int64(len(secreto)) {
+		t.Fatalf("%d %v", n, err)
+	}
+	abs, _ := a.Abs("media/1/abc/X.enc")
+	crudo, _ := os.ReadFile(abs)
+	if bytes.Contains(crudo, []byte("CONTENIDO-SECRETO")) {
+		t.Fatal("el archivo está en claro")
+	}
+	if int64(len(crudo)) != TamCifrado(n) {
+		t.Fatalf("tamaño %d vs %d", len(crudo), TamCifrado(n))
+	}
+	if _, err := os.Stat(abs + ".tmp"); !os.IsNotExist(err) {
+		t.Fatal("quedó un .tmp")
+	}
+	back, err := a.LeerCifrado("media/1/abc/X.enc")
+	if err != nil || !bytes.Equal(back, secreto) {
+		t.Fatalf("ida y vuelta: %v", err)
+	}
+	// Si la lectura falla a medias no queda archivo.
+	_, err = a.EscribirCifradoDesde("media/1/abc/Y.enc", io.MultiReader(bytes.NewReader([]byte("abc")), errReader{}))
+	if err == nil {
+		t.Fatal("debía fallar")
+	}
+	if y, _ := a.Abs("media/1/abc/Y.enc"); true {
+		if _, err := os.Stat(y); !os.IsNotExist(err) {
+			t.Fatal("no debe quedar archivo a medias")
+		}
+		if _, err := os.Stat(y + ".tmp"); !os.IsNotExist(err) {
+			t.Fatal("no debe quedar .tmp")
+		}
+	}
+}
+
+type errReader struct{}
+
+func (errReader) Read([]byte) (int, error) { return 0, errors.New("se cortó la red") }
