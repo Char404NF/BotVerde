@@ -10,11 +10,13 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import wabot.Observador
-import wabot.Wabot
 import java.io.File
 
 /** Acceso a los mensajes guardados (módulo Go). Todo corre fuera del hilo principal. */
 object Repo {
+    /** El motor de datos (el módulo Go). Las pruebas lo cambian por uno de ejemplo. */
+    @Volatile var motor: Motor = MotorGo
+
     private lateinit var raiz: File
     private val cambiosInternos = MutableSharedFlow<List<String>>(extraBufferCapacity = 64)
 
@@ -40,7 +42,7 @@ object Repo {
         if (abierto) return true
         return try {
             raiz = ctx.applicationContext.filesDir
-            Wabot.abrirAlmacen(raiz.absolutePath, ClaveDatos.obtener(ctx), observador)
+            motor.abrirAlmacen(raiz.absolutePath, ClaveDatos.obtener(ctx), observador)
             abierto = true
             error.value = null
             true
@@ -52,34 +54,40 @@ object Repo {
 
     fun archivo(rutaRelativa: String): File = File(raiz, rutaRelativa)
 
+    /** Solo para pruebas: indica la carpeta de datos y que el almacén está abierto. */
+    fun paraPruebas(carpeta: File, m: Motor) { raiz = carpeta; motor = m; abierto = true; error.value = null }
+
+    /** Solo para pruebas: simula un aviso de cambio que normalmente manda el módulo Go. */
+    fun emitirParaPruebas(vararg eventos: String) { cambiosInternos.tryEmit(eventos.toList()) }
+
     private suspend fun <T> io(f: () -> T): T = withContext(Dispatchers.IO) { f() }
 
-    suspend fun chat(bot: Long, jid: String) = io { Json.chatOpt(Wabot.obtenerChat(bot, jid)) }
+    suspend fun chat(bot: Long, jid: String) = io { Json.chatOpt(motor.obtenerChat(bot, jid)) }
 
     suspend fun chats(bot: Long, grupos: Boolean, consulta: String, limite: Int = 300, desde: Int = 0) =
-        io { Json.chats(Wabot.listarChats(bot, grupos, consulta, limite.toLong(), desde.toLong())) }
+        io { Json.chats(motor.listarChats(bot, grupos, consulta, limite.toLong(), desde.toLong())) }
 
     /** Del más nuevo al más viejo. Para la página siguiente se pasan hora e id del último recibido. */
     suspend fun mensajes(bot: Long, chat: String, antesTs: Long = 0, antesId: String = "", limite: Int = 60) =
-        io { Json.mensajes(Wabot.listarMensajes(bot, chat, antesTs, antesId, limite.toLong())) }
+        io { Json.mensajes(motor.listarMensajes(bot, chat, antesTs, antesId, limite.toLong())) }
 
     suspend fun archivos(bot: Long, chat: String, categoria: String, soloDescargados: Boolean, limite: Int = 300, desde: Int = 0) =
-        io { Json.mensajes(Wabot.listarArchivos(bot, chat, categoria, soloDescargados, limite.toLong(), desde.toLong())) }
+        io { Json.mensajes(motor.listarArchivos(bot, chat, categoria, soloDescargados, limite.toLong(), desde.toLong())) }
 
-    suspend fun espacioTotal(bot: Long) = io { Json.espacioTotal(Wabot.espacioTotal(bot)) }
-    suspend fun espacioPorTipo(bot: Long) = io { Json.espacioPorTipo(Wabot.espacioPorTipo(bot)) }
-    suspend fun espacioPorChat(bot: Long) = io { Json.espacioPorChat(Wabot.espacioPorChat(bot)) }
+    suspend fun espacioTotal(bot: Long) = io { Json.espacioTotal(motor.espacioTotal(bot)) }
+    suspend fun espacioPorTipo(bot: Long) = io { Json.espacioPorTipo(motor.espacioPorTipo(bot)) }
+    suspend fun espacioPorChat(bot: Long) = io { Json.espacioPorChat(motor.espacioPorChat(bot)) }
 
     suspend fun estimarBorrado(bot: Long, chat: String = "", categoria: String = "", diasMin: Int = 0) =
-        io { Json.liberado(Wabot.estimarBorrado(bot, Json.filtro(chat, categoria, diasMin))) }
+        io { Json.liberado(motor.estimarBorrado(bot, Json.filtro(chat, categoria, diasMin))) }
 
     suspend fun borrarArchivos(bot: Long, chat: String = "", categoria: String = "", diasMin: Int = 0) =
-        io { Json.liberado(Wabot.borrarArchivos(bot, Json.filtro(chat, categoria, diasMin))) }
+        io { Json.liberado(motor.borrarArchivos(bot, Json.filtro(chat, categoria, diasMin))) }
 
-    suspend fun estimarLista(bot: Long, items: List<Pair<String, String>>) = io { Json.liberado(Wabot.estimarLista(bot, Json.items(items))) }
-    suspend fun borrarLista(bot: Long, items: List<Pair<String, String>>) = io { Json.liberado(Wabot.borrarLista(bot, Json.items(items))) }
-    suspend fun borrarChat(bot: Long, chat: String) = io { Json.liberado(Wabot.borrarChat(bot, chat)) }
-    suspend fun reparar(bot: Long) = io { Json.reporte(Wabot.reparar(bot)) }
-    suspend fun descargar(bot: Long, chat: String, id: String) = io { Wabot.descargar(bot, chat, id) }
-    suspend fun fotoGrande(bot: Long, chat: String) = io { Wabot.fotoGrande(bot, chat) }
+    suspend fun estimarLista(bot: Long, items: List<Pair<String, String>>) = io { Json.liberado(motor.estimarLista(bot, Json.items(items))) }
+    suspend fun borrarLista(bot: Long, items: List<Pair<String, String>>) = io { Json.liberado(motor.borrarLista(bot, Json.items(items))) }
+    suspend fun borrarChat(bot: Long, chat: String) = io { Json.liberado(motor.borrarChat(bot, chat)) }
+    suspend fun reparar(bot: Long) = io { Json.reporte(motor.reparar(bot)) }
+    suspend fun descargar(bot: Long, chat: String, id: String) = io { motor.descargar(bot, chat, id) }
+    suspend fun fotoGrande(bot: Long, chat: String) = io { motor.fotoGrande(bot, chat) }
 }

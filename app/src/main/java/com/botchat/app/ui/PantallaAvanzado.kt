@@ -50,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -179,7 +180,7 @@ private fun Fila(titulo: String, texto: String, icono: androidx.compose.ui.graph
 
 @Composable
 private fun Interruptor(titulo: String, texto: String, valor: Boolean, activo: Boolean, icono: androidx.compose.ui.graphics.vector.ImageVector, alCambiar: (Boolean) -> Unit) {
-    Fila(titulo, texto, icono) { Switch(valor, alCambiar, enabled = activo) }
+    Fila(titulo, texto, icono) { Switch(valor, alCambiar, Modifier.testTag("sw_" + titulo), enabled = activo) }
 }
 
 @Composable
@@ -188,8 +189,8 @@ private fun FilaDescarga(titulo: String, icono: androidx.compose.ui.graphics.vec
         Icon(icono, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(Esp.m))
         Text(titulo, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        Box72 { Switch(r.wifi, { alCambiar(r.copy(wifi = it)) }) }
-        Box72 { Switch(r.datos, { alCambiar(r.copy(datos = it)) }) }
+        Box72 { Switch(r.wifi, { alCambiar(r.copy(wifi = it)) }, Modifier.testTag("wifi_$titulo")) }
+        Box72 { Switch(r.datos, { alCambiar(r.copy(datos = it)) }, Modifier.testTag("datos_$titulo")) }
     }
 }
 

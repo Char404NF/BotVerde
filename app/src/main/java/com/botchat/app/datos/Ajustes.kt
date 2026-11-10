@@ -77,6 +77,10 @@ class Ajustes private constructor(ctx: Context) {
         }
 
         @Volatile private var inst: Ajustes? = null
+
+        /** Solo para pruebas: olvida la instancia para empezar con ajustes limpios. */
+        fun reiniciarParaPruebas() { inst = null }
+
         fun get(ctx: Context): Ajustes = inst ?: synchronized(this) { inst ?: Ajustes(ctx.applicationContext).also { inst = it } }
     }
 }

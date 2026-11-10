@@ -14,7 +14,6 @@ import com.botchat.app.datos.Repo
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import wabot.Wabot
 
 /** Estado de un chat abierto: encabezado y mensajes (del más nuevo al más viejo), con carga por páginas y cambios en vivo. */
 class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
@@ -46,7 +45,7 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
     }
 
     private suspend fun cargar(cuantos: Int) {
-        val c = Json.chatOpt(runCatching { Wabot.obtenerChat(botId, jid) }.getOrDefault("null"))
+        val c = runCatching { Repo.chat(botId, jid) }.getOrNull()
         chat = c
         val m = Repo.mensajes(botId, jid, limite = cuantos)
         mensajes = m

@@ -65,6 +65,9 @@ object ClaveDatos {
         return clave.copyOf()
     }
 
+    /** Solo para pruebas: fija una llave sin usar el Keystore. */
+    fun paraPruebas(clave: ByteArray?) { enMemoria = clave }
+
     /** ¿Ya existe una llave guardada? (para saber si hay datos que dependen de ella) */
     fun existe(ctx: Context): Boolean = File(ctx.filesDir, ARCHIVO).exists()
 }

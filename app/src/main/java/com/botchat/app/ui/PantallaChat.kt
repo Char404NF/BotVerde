@@ -317,19 +317,24 @@ private fun MiniaturaMedia(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit) {
     val ctx = LocalContext.current
     val densidad = androidx.compose.ui.platform.LocalDensity.current
     val relacion = if (m.ancho > 0 && m.alto > 0) (m.ancho.toFloat() / m.alto).coerceIn(0.6f, 1.8f) else 1.33f
-    val ruta = if (m.descargado) m.ruta else m.miniatura
-    var imagen by remember(ruta) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    var miniatura by remember(m.miniatura) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    var imagen by remember(m.ruta, m.descargado) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     val px = with(densidad) { 300.dp.roundToPx() }
-    LaunchedEffect(ruta) {
-        imagen = if (ruta.isEmpty()) null else CacheImagenes.cargar(ctx, Repo.archivo(ruta), px)?.asImageBitmap()
+    // Primero la miniatura (llega al instante), después la imagen reducida; todo se decodifica fuera del hilo principal.
+    LaunchedEffect(m.miniatura) {
+        miniatura = if (m.miniatura.isEmpty()) null else CacheImagenes.cargar(ctx, Repo.archivo(m.miniatura), 320)?.asImageBitmap()
     }
+    LaunchedEffect(m.ruta, m.descargado) {
+        imagen = if (!m.descargado) null else CacheImagenes.cargar(ctx, Repo.archivo(m.ruta), px)?.asImageBitmap()
+    }
+    val ruta = if (m.descargado) m.ruta else m.miniatura
     val haptica = rememberHaptica()
     Box(
         Modifier.widthIn(max = 280.dp).aspectRatio(relacion).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .clickable(enabled = m.descargado) { alAbrirVisor(m.id) },
         contentAlignment = Alignment.Center,
     ) {
-        val img = imagen
+        val img = imagen ?: miniatura
         if (img != null) Image(img, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) else if (m.estado == "pendiente" || ruta.isNotEmpty()) Box(Modifier.fillMaxSize().shimmer())
         if (m.categoria == "video" && m.descargado) {
             Box(Modifier.size(48.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.45f)), contentAlignment = Alignment.Center) { Icon(Ico.Reproducir, null, tint = Color.White, modifier = Modifier.size(30.dp)) }

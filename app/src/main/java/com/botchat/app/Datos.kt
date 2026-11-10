@@ -90,6 +90,10 @@ class Datos private constructor(private val ctx: Context) : SQLiteOpenHelper(ctx
 
     companion object {
         @Volatile private var inst: Datos? = null
+
+        /** Solo para pruebas: olvida la instancia para empezar con una base limpia. */
+        fun reiniciarParaPruebas() { inst?.close(); inst = null }
+
         fun get(ctx: Context): Datos = inst ?: synchronized(this) {
             inst ?: Datos(ctx.applicationContext).also { inst = it }
         }
