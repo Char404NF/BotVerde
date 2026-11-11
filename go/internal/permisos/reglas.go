@@ -104,10 +104,20 @@ func MenuVisible(r *almacen.Rol, menuID string, opcion string) bool {
 			if m == menuID || (opcion != "" && m == menuID+":"+opcion) {
 				return true
 			}
+			// sin pedir una opción: el menú se ve si el rango ve al menos una de sus opciones sueltas ("menú:opción")
+			if opcion == "" && strings.HasPrefix(m, menuID+":") {
+				return true
+			}
 		}
 		return false
 	}
 	return true
+}
+
+// OpcionVisible dice si el rango ve esa opción de un menú: si ve el menú entero (el id solo) las ve todas; si solo tiene opciones
+// sueltas ("idMenu:idOpción"), solo esas.
+func OpcionVisible(r *almacen.Rol, menuID, opcionID string) bool {
+	return MenuVisible(r, menuID, opcionID)
 }
 
 // ValidarRol revisa un rango antes de guardarlo: casillas que existen, alcances coherentes y colores bien escritos.

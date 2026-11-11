@@ -16,12 +16,19 @@ const (
 	PasoPedir     = "pedir"     // hace una pregunta y guarda la respuesta libre en una variable cifrada
 	PasoHumano    = "humano"    // pasa la conversación a una persona
 	PasoFin       = "fin"
+	PasoForm      = "formulario" // formulario paso a paso con validación, resumen y corrección
 )
 
 // Opcion de un menú: lleva a otro paso.
 type Opcion struct {
+	// ID es la clave estable de la opción (o1, o2…). El rango "ve" opciones sueltas con "idMenu:ID" (etapa A).
+	ID      string `json:"id,omitempty"`
 	Texto   string `json:"texto"`
 	Destino string `json:"destino"`
+	// Ambito: "" o "todos" (en privado y en grupos), "privado" (en un grupo avisa "escríbeme al privado") o "grupo" (solo en grupos).
+	Ambito string `json:"ambito,omitempty"`
+	// Horario: la opción solo se ofrece dentro de este horario (vacío = siempre).
+	Horario *Horario `json:"horario,omitempty"`
 }
 
 // Paso es una pieza de la conversación.
@@ -36,6 +43,17 @@ type Paso struct {
 	Siguiente string   `json:"siguiente,omitempty"` // respuesta y pedir: a dónde sigue ("" = termina)
 	Notificar bool     `json:"notificar,omitempty"` // respuesta: avisa con una notificación local
 	Aviso     string   `json:"aviso,omitempty"`     // texto del aviso (admite variables)
+
+	// Respuesta: archivos, ubicación y tarjeta de contacto que se mandan junto con el texto (bloque C).
+	Adjuntos  []AdjuntoMenu `json:"adjuntos,omitempty"`
+	Ubicacion *Ubicacion    `json:"ubicacion,omitempty"`
+	Contacto  *Contacto     `json:"contacto,omitempty"`
+	// Humano: texto cuando es fuera de horario (vacío = el general).
+	TextoFuera string `json:"textoFuera,omitempty"`
+	// Formulario: los campos que se piden uno por uno. Titulo es la introducción, Texto el mensaje de agradecimiento al confirmar.
+	Campos        []Campo `json:"campos,omitempty"`
+	MaxReintentos int     `json:"maxReintentos,omitempty"` // intentos por campo antes de cancelar (3 por defecto)
+	SinResumen    bool    `json:"sinResumen,omitempty"`    // no pedir "¿Es correcto?" al final
 }
 
 // Disparadores dicen cuándo se activa. Basta que se cumpla uno.
@@ -75,6 +93,8 @@ type Def struct {
 	Disparadores Disparadores `json:"disparadores"`
 	Alcance      Alcance      `json:"alcance"`
 	Horario      Horario      `json:"horario"`
+	// Ajustes de este menú que reemplazan a los generales (escalera de errores, caducidad, grupos…).
+	Ajustes *AjustesMenu `json:"ajustes,omitempty"`
 	// Propio marca un comando propio creado en Ajustes → Comandos propios (!horario, !precios…). Sus pasos y disparadores se generan
 	// a partir de estos datos (ConstruirPropio) y no salen en la lista normal de automatizaciones.
 	Propio *DatosPropio `json:"propio,omitempty"`
@@ -153,6 +173,7 @@ func (d *Def) Normalizar() {
 	if d.Inicio == "" && len(d.Pasos) > 0 {
 		d.Inicio = d.Pasos[0].ID
 	}
+	d.normalizarExtras()
 	d.Nombre = strings.TrimSpace(d.Nombre)
 	if d.Nombre == "" {
 		d.Nombre = "Automatización sin nombre"
@@ -170,7 +191,7 @@ func (p *Paso) esFinal() bool {
 	switch p.Tipo {
 	case PasoFin, PasoHumano:
 		return true
-	case PasoRespuesta, PasoPedir:
+	case PasoRespuesta, PasoPedir, PasoForm:
 		return p.Siguiente == ""
 	}
 	return false
@@ -185,7 +206,7 @@ func (p *Paso) destinos() []string {
 				out = append(out, o.Destino)
 			}
 		}
-	case PasoRespuesta, PasoPedir:
+	case PasoRespuesta, PasoPedir, PasoForm:
 		if p.Siguiente != "" {
 			out = append(out, p.Siguiente)
 		}
@@ -232,21 +253,22 @@ func (d *Def) Validar() []Aviso {
 				}
 			}
 		case PasoRespuesta:
-			if strings.TrimSpace(p.Texto) == "" {
+			if strings.TrimSpace(p.Texto) == "" && len(p.Adjuntos) == 0 && p.Ubicacion == nil && p.Contacto == nil {
 				add(p.ID, "La respuesta está vacía.", true)
 			}
 		case PasoPedir:
 			if strings.TrimSpace(p.Pregunta) == "" {
 				add(p.ID, "El paso no tiene pregunta.", true)
 			}
-		case PasoHumano, PasoFin:
+		case PasoHumano, PasoFin, PasoForm:
 		default:
 			add(p.ID, "Tipo de paso desconocido.", true)
 		}
-		if (p.Tipo == PasoRespuesta || p.Tipo == PasoPedir) && p.Siguiente != "" && !ids[p.Siguiente] {
+		if (p.Tipo == PasoRespuesta || p.Tipo == PasoPedir || p.Tipo == PasoForm) && p.Siguiente != "" && !ids[p.Siguiente] {
 			add(p.ID, "Sigue a un paso que ya no existe.", true)
 		}
 	}
+	d.validarExtras(add)
 	// pasos que nadie alcanza desde el inicio
 	visto := map[string]bool{}
 	cola := []string{d.Inicio}

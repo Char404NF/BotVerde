@@ -61,16 +61,16 @@ func (s *Servicio) carpetaTmp() string {
 
 // EnviarMedio manda una foto, un video, un audio, una nota de voz o un documento. Se guarda primero (cifrado) para verlo de inmediato.
 func (s *Servicio) EnviarMedio(ctx context.Context, chat string, a Adjunto, citaID string) (Resultado, error) {
-	return s.enviarMedio(ctx, chat, a, citaID, true)
+	return s.enviarMedio(ctx, chat, a, citaID, "", nil, true)
 }
 
 // EnviarMedioAuto manda un archivo por iniciativa de un módulo: igual que EnviarMedio, pero sin el tope de envíos manuales, sin
 // pausar al bot en ese chat y sin contarlo como escrito a mano. Solo lo usa la cola de iniciativas.
 func (s *Servicio) EnviarMedioAuto(ctx context.Context, chat string, a Adjunto, citaID string) (Resultado, error) {
-	return s.enviarMedio(ctx, chat, a, citaID, false)
+	return s.enviarMedio(ctx, chat, a, citaID, "", nil, false)
 }
 
-func (s *Servicio) enviarMedio(ctx context.Context, chat string, a Adjunto, citaID string, manual bool) (Resultado, error) {
+func (s *Servicio) enviarMedio(ctx context.Context, chat string, a Adjunto, citaID, autorWA string, menciones []string, manual bool) (Resultado, error) {
 	defer func() { _ = os.Remove(a.Ruta) }() // la copia en claro nunca se queda
 	if _, err := tipoSubida(a.Tipo); err != nil {
 		return Resultado{}, err
@@ -99,7 +99,7 @@ func (s *Servicio) enviarMedio(ctx context.Context, chat string, a Adjunto, cita
 	m := &almacen.Mensaje{
 		ID: string(s.Cli.GenerateMessageID()), ChatJID: chat, BotID: s.BotID, RemitenteJID: almacen.QuienYo, EsMio: true, Tipo: a.Tipo,
 		Texto: strings.TrimSpace(a.Pie), TS: s.ahora().Unix(), EstadoEnvio: "enviando", ArchivoMime: a.Mime, ArchivoNombre: a.Nombre, ArchivoBytes: st.Size(),
-		Ancho: a.Ancho, Alto: a.Alto, DuracionS: a.DurS, NotaVoz: a.NotaVoz,
+		Ancho: a.Ancho, Alto: a.Alto, DuracionS: a.DurS, NotaVoz: a.NotaVoz, Menciones: menciones,
 	}
 	if m.ArchivoMime == "" {
 		m.ArchivoMime = "application/octet-stream"
@@ -117,6 +117,7 @@ func (s *Servicio) enviarMedio(ctx context.Context, chat string, a Adjunto, cita
 		return Resultado{}, err
 	}
 	s.RegistrarEnvio(m.ID)
+	s.recordarAutor(m.ID, autorWA)
 	if manual {
 		s.pausarBot(chat)
 		s.Alm.RegistrarActividad(s.BotID, almacen.ActManual, "", chat, a.Tipo)
@@ -193,14 +194,9 @@ func (s *Servicio) transmitirMedio(ctx context.Context, j types.JID, m *almacen.
 		mini, _ = s.Alm.LeerCifrado(m.MiniaturaRuta)
 	}
 	var ci *waE2E.ContextInfo
-	if m.CitaID != "" || m.Reenviado {
-		var autor types.JID
-		if m.CitaID != "" {
-			if o, _ := s.Alm.ObtenerMensaje(s.BotID, m.ChatJID, m.CitaID); o != nil {
-				autor = s.autorEnWhatsApp(ctx, j, o)
-			}
-		}
-		ci = contexto(m.CitaID, autor, m.CitaTexto, nil, m.Reenviado)
+	if m.CitaID != "" || m.Reenviado || len(m.Menciones) > 0 {
+		autor := s.autorDeCita(ctx, j, m)
+		ci = contexto(m.CitaID, autor, m.CitaTexto, m.Menciones, m.Reenviado)
 	}
 	pie := proto.String(m.Texto)
 	if m.Texto == "" {

@@ -130,6 +130,34 @@ var ajustesBotDefecto = map[string]string{
 	"resumen_hora":     "20:00", // HH:MM de la zona del teléfono
 	"resumen_ultimo":   "",      // último día (AAAA-MM-DD) en que se avisó
 	"avisos_exactos":   "1",     // pedir alarmas exactas cuando el sistema lo permita
+	// Menús ampliados (bloque C). Cada menú puede traer los suyos; estos son los generales.
+	"menu_err_max":       "3", // errores seguidos para que el menú se detenga y reinicie la conversación
+	"menu_txt_n1":        "No entendí esa opción. Estas son las opciones:",
+	"menu_txt_n2":        "Sigo sin entender. Puedes escribir *persona* para hablar con alguien, o elegir una opción:",
+	"menu_txt_n3":        "Parece que no nos estamos entendiendo, así que dejo la conversación aquí. Cuando quieras empezar de nuevo, escribe *menú*.",
+	"menu_txt_notexto":   "Por ahora solo entiendo mensajes escritos. Escríbeme el número de la opción, por favor.",
+	"menu_txt_ambiguo":   "Encontré varias opciones parecidas. ¿Cuál quieres? Escribe el número:",
+	"menu_txt_salir":     "Listo. Cuando necesites algo, escribe *menú*.",
+	"menu_txt_cancelar":  "Cancelado. Cuando quieras, escribe *menú*.",
+	"menu_saludos":       "hola, buenas, buenos dias, buenas tardes, buenas noches, gracias, muchas gracias, ok, vale, listo, enterado, de acuerdo, perfecto, saludos, que tal, hey, buen dia",
+	"menu_expira_min":    "120",       // privado: minutos sin actividad para que caduque en silencio
+	"menu_volver":        "reiniciar", // al volver a escribir tras caducar: reiniciar | retomar
+	"menu_retoma_horas":  "24",
+	"menu_humano_dentro": "Gracias. Una persona te atenderá en cuanto pueda.",
+	"menu_humano_fuera":  "Ahora estamos fuera de horario ({horario}). Dejé tu aviso y te responderemos en cuanto abramos.",
+	"menu_horario":       "",   // horario de atención general (JSON); vacío = siempre
+	"menu_region":        "MX", // país para validar teléfonos de los formularios cuando no traen +
+	"noentendio_activo":  "1",
+	"noentendio_dias":    "30", // cuánto se guarda lo que no entendió (0 = no se borra solo)
+	// Menús en grupos
+	"grupo_max_sesiones": "5",  // personas usando un menú a la vez en un grupo
+	"grupo_expira_min":   "10", // caducidad en silencio dentro de un grupo
+	"grupo_msgs_min":     "8",  // mensajes del bot por minuto en un mismo grupo
+	"grupo_cualquiera":   "0",  // cualquiera puede contestar el menú de otra persona
+	"grupo_cola_min":     "10", // cuánto espera alguien en la fila antes de descartarse
+	"grupo_txt_turno":    "Hay varias personas usando el menú. Estás en el turno {n}; te atiendo en cuanto se libere un lugar.",
+	"grupo_txt_vencido":  "Esa conversación terminó. Escribe {prefijo}menu para empezar otra.",
+	"grupo_txt_privado":  "Esa opción es solo en privado: escríbeme al privado.",
 }
 
 // AjusteBot devuelve un ajuste del bot (su valor por defecto si nunca se fijó).

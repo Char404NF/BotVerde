@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -173,6 +174,13 @@ func (s *estado) armar() {
 		// Los envíos fallidos seguidos que frenan al motor también activan el modo seguro de los módulos de iniciativa.
 		AlFrenar: func() { s.avisaCambio("motor:freno"); s.mods.ModoSeguro("errores") },
 		AlHumano: func(chat, aviso string) { s.avisaCambio("humano:" + chat) },
+		// Menús en grupos: tope de mensajes por minuto en un grupo y a qué conversación pertenece cada mensaje del menú que sale.
+		LimiteGrupo: func() int { return alm.AjusteBotInt(s.botID, "grupo_msgs_min") },
+		AlEnviado: func(chat, id string, ref *motor.RefSesion) {
+			if strings.HasSuffix(chat, "@g.us") {
+				_ = alm.GuardarMsgBot(s.botID, chat, id, ref.ID, ref.Persona, ref.MenuID, time.Now())
+			}
+		},
 	})
 	s.envio.AlEscribirYo = func(chat string) { s.alEscribirYo(chat, time.Now()) }
 	s.motor.Iniciar(s.ctx)

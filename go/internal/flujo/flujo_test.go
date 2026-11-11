@@ -134,30 +134,36 @@ func TestCeroVuelveAlMenuPrincipal(t *testing.T) {
 	}
 }
 
-func TestDosInvalidasReenvianElMenuYLaTerceraCortaElCiclo(t *testing.T) {
+func TestEscaleraDeErroresPrimeraReconoceSegundaOfreceHumanoTerceraParaYReinicia(t *testing.T) {
 	e := nuevo(t)
 	e.crea(t, ventas(), true)
 	e.dice(t, ana, ana, ".menu")
 	d := e.dice(t, ana, ana, "blablabla")
-	if textos(d) != textoNoEntendi {
-		t.Fatalf("1ª inválida: %q", textos(d))
+	if !strings.HasPrefix(textos(d), "No entendí esa opción. Estas son las opciones:\nHola Ana") || !strings.Contains(textos(d), "1. Precios") {
+		t.Fatalf("1.ª: reconoce y ofrece las opciones: %q", textos(d))
 	}
 	d = e.dice(t, ana, ana, "xyz")
-	if !strings.HasPrefix(textos(d), "Hola Ana") {
-		t.Fatalf("la 2ª reenvía el menú: %q", textos(d))
+	if !strings.Contains(textos(d), "*persona*") || !strings.Contains(textos(d), "1. Precios") {
+		t.Fatalf("2.ª: ofrece hablar con una persona: %q", textos(d))
 	}
 	d = e.dice(t, ana, ana, "otra cosa")
-	if len(d.Respuestas) != 0 || d.Omitir != "ciclo cortado" {
-		t.Fatalf("la 3ª corta el ciclo: %+v", d)
+	if !strings.Contains(textos(d), "empezar de nuevo") || strings.Contains(textos(d), "1. Precios") || d.Omitir != "" {
+		t.Fatalf("3.ª: para y avisa: %+v", d)
 	}
-	// después de cortado, un disparador vuelve a empezar
+	if s, _ := e.alm.SesionVigente(1, ana, ana, false, e.rel.t, 2*time.Hour); s != nil {
+		t.Fatalf("la sesión quedó cerrada, sin ciclos: %+v", s)
+	}
+	// después de cortado, el texto sin sentido ya no responde nada; un disparador vuelve a empezar desde cero
+	if d := e.dice(t, ana, ana, "sigo sin entender"); len(d.Respuestas) != 0 {
+		t.Fatalf("sin sesión y sin disparador no hay respuesta: %+v", d)
+	}
 	if d := e.dice(t, ana, ana, ".menu"); !strings.HasPrefix(textos(d), "Hola Ana") {
 		t.Fatalf("%q", textos(d))
 	}
 	// una opción válida pone la cuenta en cero
 	e.dice(t, ana, ana, "zzz")
 	e.dice(t, ana, ana, "1")
-	if d := e.dice(t, ana, ana, "zzz"); textos(d) != textoNoEntendi {
+	if d := e.dice(t, ana, ana, "zzz"); !strings.HasPrefix(textos(d), "No entendí") {
 		t.Fatalf("tras una opción válida vuelve a empezar la cuenta: %q", textos(d))
 	}
 	est, _ := e.alm.EstadisticasMenu(1, 1, "2026-01-01", "2026-12-31", false)
@@ -460,8 +466,8 @@ func TestValidacion(t *testing.T) {
 			}
 		}
 	}
-	if len(Plantillas()) != 3 {
-		t.Fatal("tres plantillas de arranque")
+	if len(Plantillas()) != 8 { // las 3 de siempre + refacciones, soporte, citas, preguntas frecuentes y grupo (etapa C)
+		t.Fatal("ocho plantillas de arranque")
 	}
 }
 
@@ -536,7 +542,7 @@ func TestConMenuActivoEIntervencionManualSoloRespondeAOpcionesOComandos(t *testi
 	if e.alm.SesionIntervenida(s.ID) {
 		t.Fatal("tras una opción válida la marca se quita")
 	}
-	if d := e.dice(t, ana, ana, "zzz"); textos(d) != textoNoEntendi {
+	if d := e.dice(t, ana, ana, "zzz"); !strings.HasPrefix(textos(d), "No entendí") {
 		t.Fatalf("sin intervención vuelve el comportamiento normal: %q", textos(d))
 	}
 	// El comando vuelve a abrir el menú aun con intervención.

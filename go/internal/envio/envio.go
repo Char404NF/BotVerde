@@ -110,6 +110,7 @@ type Servicio struct {
 	propios   map[string]time.Time
 	grupos    map[string]grupoCache
 	escr      map[string]escribiendo
+	autores   map[string]string // id de mi mensaje -> autor exacto del mensaje que cita (JID tal como lo mandó WhatsApp)
 }
 
 type grupoCache struct {
@@ -125,7 +126,7 @@ func Nuevo(botID int64, alm *almacen.Almacen, cli Cliente, log func(string)) *Se
 		log = func(string) {}
 	}
 	return &Servicio{BotID: botID, Alm: alm, Cli: cli, Log: log, Ahora: time.Now, fichas: topeRafaga,
-		propios: map[string]time.Time{}, grupos: map[string]grupoCache{}, escr: map[string]escribiendo{}}
+		propios: map[string]time.Time{}, grupos: map[string]grupoCache{}, escr: map[string]escribiendo{}, autores: map[string]string{}}
 }
 
 func (s *Servicio) ahora() time.Time {
@@ -377,16 +378,16 @@ func mensajeTexto(texto string, ci *waE2E.ContextInfo) *waE2E.Message {
 // EnviarTexto escribe un mensaje en un chat. Si citaID no está vacío, responde a ese mensaje; menciones son JIDs (grupos).
 // Siempre se guarda primero en el teléfono (se ve de inmediato); si el envío falla queda como "fallido" y se puede reintentar.
 func (s *Servicio) EnviarTexto(ctx context.Context, chat, texto, citaID string, menciones []string) (Resultado, error) {
-	return s.enviarTexto(ctx, chat, texto, citaID, menciones, true)
+	return s.enviarTexto(ctx, chat, texto, citaID, "", menciones, true)
 }
 
 // EnviarAuto manda una respuesta del bot automático: igual que EnviarTexto, pero no usa el tope de envíos manuales,
 // no pausa al bot en ese chat y se registra como automática (no como manual).
 func (s *Servicio) EnviarAuto(ctx context.Context, chat, texto, citaID string, menciones []string) (Resultado, error) {
-	return s.enviarTexto(ctx, chat, texto, citaID, menciones, false)
+	return s.enviarTexto(ctx, chat, texto, citaID, "", menciones, false)
 }
 
-func (s *Servicio) enviarTexto(ctx context.Context, chat, texto, citaID string, menciones []string, manual bool) (Resultado, error) {
+func (s *Servicio) enviarTexto(ctx context.Context, chat, texto, citaID, autorWA string, menciones []string, manual bool) (Resultado, error) {
 	texto = strings.TrimSpace(texto)
 	if texto == "" {
 		return Resultado{}, ErrMensajeVacio
@@ -423,6 +424,7 @@ func (s *Servicio) enviarTexto(ctx context.Context, chat, texto, citaID string, 
 		return Resultado{}, err
 	}
 	s.RegistrarEnvio(m.ID)
+	s.recordarAutor(m.ID, autorWA)
 	if manual {
 		s.pausarBot(chat)
 		s.Alm.RegistrarActividad(s.BotID, almacen.ActManual, "", chat, "texto")
@@ -440,12 +442,7 @@ func (s *Servicio) transmitir(ctx context.Context, j types.JID, m *almacen.Mensa
 	}
 	var ci *waE2E.ContextInfo
 	if m.CitaID != "" || len(m.Menciones) > 0 || m.Reenviado {
-		var autor types.JID
-		if m.CitaID != "" {
-			if o, _ := s.Alm.ObtenerMensaje(s.BotID, m.ChatJID, m.CitaID); o != nil {
-				autor = s.autorEnWhatsApp(ctx, j, o)
-			}
-		}
+		autor := s.autorDeCita(ctx, j, m)
 		ci = contexto(m.CitaID, autor, m.CitaTexto, m.Menciones, m.Reenviado)
 	}
 	_, err := s.Cli.SendMessage(ctx, j, mensajeTexto(m.Texto, ci), whatsmeow.SendRequestExtra{ID: types.MessageID(m.ID)})

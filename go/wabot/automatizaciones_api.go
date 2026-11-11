@@ -48,6 +48,19 @@ func (s *estado) nuevoFlujo() *flujo.Motor {
 			}
 			return permisos.MenuVisible(s.perm.RolDe(sender), fmt.Sprint(menuID), "")
 		},
+		OpcionVisible: func(sender string, menuID int64, opcionID string) bool {
+			if s.perm == nil {
+				return true
+			}
+			return permisos.OpcionVisible(s.perm.RolDe(sender), fmt.Sprint(menuID), opcionID)
+		},
+		// Las conversaciones de grupo van por (grupo, persona canónica): el número y el LID de la misma persona son una sola.
+		Persona: func(p string) string {
+			if s.perm == nil {
+				return p
+			}
+			return s.perm.Persona(p)
+		},
 		AlAviso: func(chat, tipo, titulo, detalle string) {
 			if _, err := alm.CrearAviso(s.botID, tipo, chat, titulo, detalle); err == nil {
 				s.log("Aviso local: " + titulo + ".")
@@ -473,7 +486,8 @@ func EstadisticasAutomatizacion(botID, id int64, desde, hasta string, incluirPru
 		Texto  string `json:"texto"`
 	}
 	res := map[string]int64{}
-	var embudo, invalidas, opciones []paso
+	var embudo, invalidas, opciones, abandonos []paso
+	var formEnviados, formCancelados int64
 	for _, f := range filas {
 		if f.Paso == "" {
 			res[f.Opcion] += f.Cuenta
@@ -493,6 +507,12 @@ func EstadisticasAutomatizacion(botID, id int64, desde, hasta string, incluirPru
 			embudo = append(embudo, paso{f.Paso, t, f.Cuenta, "", ""})
 		case "invalida":
 			invalidas = append(invalidas, paso{f.Paso, t, f.Cuenta, "", ""})
+		case "abandono":
+			abandonos = append(abandonos, paso{f.Paso, t, f.Cuenta, "", ""})
+		case "enviado":
+			formEnviados += f.Cuenta
+		case "cancelado":
+			formCancelados += f.Cuenta
 		default:
 			opciones = append(opciones, paso{f.Paso, t, f.Cuenta, f.Opcion, txt})
 		}
@@ -514,6 +534,8 @@ func EstadisticasAutomatizacion(botID, id int64, desde, hasta string, incluirPru
 	return js(map[string]any{
 		"iniciados": res["iniciado"], "completados": res["completado"], "abandonados": res["abandonado"] + res["expirado"], "humano": res["humano"], "expirados": res["expirado"],
 		"opciones": nonNil(opciones), "embudo": nonNil(embudo), "invalidas": nonNil(invalidas),
+		"abandonos": nonNil(abandonos), "formulariosEnviados": formEnviados, "formulariosCancelados": formCancelados,
+		"noEntendio": a.ContarNoEntendio(botID, id), "formularios": a.ContarFormularios(botID, id),
 	}, nil)
 }
 

@@ -68,3 +68,32 @@ func Normalizar(s string) string {
 	}
 	return strings.ToLower(strings.TrimSpace(out))
 }
+
+// ValidarTelefono revisa un teléfono escrito por una persona (con o sin "+", con espacios, guiones o paréntesis) y lo deja en
+// formato E.164 (+5215512345678). `region` es el país (MX, US…) que se usa cuando el número no trae código de país. Si la
+// librería no reconoce el número pero trae "+" y entre 8 y 15 dígitos, se acepta con un formato razonable.
+func ValidarTelefono(texto, region string) (string, bool) {
+	t := strings.TrimSpace(texto)
+	if t == "" || len(t) > 30 {
+		return "", false
+	}
+	for _, r := range t {
+		if !(r >= '0' && r <= '9' || r == '+' || r == ' ' || r == '-' || r == '(' || r == ')' || r == '.') {
+			return "", false
+		}
+	}
+	d := Digitos(t)
+	if len(d) < 7 || len(d) > 15 {
+		return "", false
+	}
+	if region == "" {
+		region = "MX"
+	}
+	if num, err := phonenumbers.Parse(t, region); err == nil && phonenumbers.IsValidNumber(num) {
+		return phonenumbers.Format(num, phonenumbers.E164), true
+	}
+	if strings.HasPrefix(t, "+") && len(d) >= 8 {
+		return "+" + d, true
+	}
+	return "", false
+}

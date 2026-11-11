@@ -45,8 +45,43 @@ type Mensaje struct {
 	CitaID       string   // id del mensaje citado, si cita alguno
 }
 
-// Salida es una respuesta lista para mandar.
-type Salida struct{ Texto string }
+// Salida es una respuesta lista para mandar: un texto y, si la trae, un archivo, una ubicación o una tarjeta de contacto.
+type Salida struct {
+	Texto     string
+	Medio     *Medio     // archivo guardado (cifrado) que se manda; el texto va de pie de foto
+	Ubicacion *Ubicacion // punto del mapa
+	Contacto  *Contacto  // tarjeta de contacto
+}
+
+// Medio es un archivo guardado en el teléfono (adjunto de menú) que se manda con la respuesta.
+type Medio struct{ ID, Tipo, Mime, Nombre string }
+
+// Ubicacion es un punto del mapa para mandar.
+type Ubicacion struct {
+	Lat, Lon          float64
+	Nombre, Direccion string
+}
+
+// Contacto es una tarjeta de contacto (vCard) para mandar.
+type Contacto struct{ Nombre, Telefono string }
+
+// RefSesion liga lo que manda el bot con la conversación de menú que lo originó (para citar el menú en un grupo).
+type RefSesion struct {
+	ID      int64
+	Persona string
+	MenuID  int64
+}
+
+// Diferida es una respuesta que no nace de un mensaje nuevo sino de que se liberó un lugar (la fila de espera de un grupo): se
+// manda citando el mensaje que la persona escribió antes y mencionándola.
+type Diferida struct {
+	Chat        string
+	CitaID      string
+	CitaAutorWA string
+	MencionWA   string
+	TS          time.Time
+	D           Decision
+}
 
 // Decision es lo que resuelve el decisor para un mensaje (o un bloque de mensajes).
 type Decision struct {
@@ -55,11 +90,32 @@ type Decision struct {
 	PasarAHumano bool   // calla en ese chat (privado) hasta que se reactive o pasen 12 h; en grupos el motor de menús calla solo con esa persona
 	Omitir       string // no responder y anotar este motivo en el registro (por ejemplo "esperando a una persona")
 	Aviso        string // texto neutro para una notificación local ("" = ninguna)
+	// Sesion liga lo que se responde con la conversación de menú que lo originó: el id de cada mensaje que salga se anota para poder
+	// reconocer, en un grupo, a qué conversación pertenece un mensaje del bot que citan.
+	Sesion *RefSesion
 }
 
 // Decisor decide qué responder. `lote` trae todos los mensajes juntados (en privado) y `ultimo` es el último.
 type Decisor interface {
 	Decidir(ctx context.Context, ultimo Mensaje, lote []Mensaje) (Decision, error)
+}
+
+// EnviadorSalida es un Enviador que también sabe mandar archivos, ubicaciones y contactos, y devuelve el id del mensaje que salió.
+// `citaAutorWA` es el JID de quien escribió el mensaje citado, tal como lo mandó WhatsApp (no se reemplaza por otro).
+type EnviadorSalida interface {
+	EnviarSalida(ctx context.Context, chat string, s Salida, citaID, citaAutorWA, mencion string) (string, error)
+}
+
+// Admisor lo implementa un decisor que sabe qué mensajes le interesan aunque no mencionen al bot: los de una persona con una
+// conversación de menú abierta en un grupo, y los que no son texto cuando hay un menú esperando.
+type Admisor interface {
+	AdmiteEnGrupo(msg Mensaje) bool
+	EsperaTexto(msg Mensaje) bool
+}
+
+// ConDiferidas lo implementa un decisor con fila de espera: cada cierto tiempo entrega las respuestas que se liberaron.
+type ConDiferidas interface {
+	Diferidas(ahora time.Time) []Diferida
 }
 
 // Enviador manda lo que decide el motor.
@@ -107,6 +163,13 @@ type Config struct {
 	Baja func(chat, texto string) (bool, func() string)
 	// EsAdminGrupo dice si una persona administra el grupo (solo se pregunta si la política del grupo es "solo administradores").
 	EsAdminGrupo func(chat, persona string) bool
+	// LimiteGrupo son los mensajes del bot por minuto en un mismo grupo (0 o nil = LimiteChat).
+	LimiteGrupo func() int
+	// AlEnviado se llama con el id del mensaje que acaba de salir cuando pertenece a una conversación de menú (así, en un grupo, se
+	// sabe a qué conversación y de quién es un mensaje del bot que citan).
+	AlEnviado func(chat, id string, ref *RefSesion)
+	// TickDiferidas es cada cuánto se revisa la fila de espera de los grupos (20 s por defecto).
+	TickDiferidas time.Duration
 }
 
 // Motor es el bot automático.
@@ -139,7 +202,10 @@ type carril struct {
 
 type pedido struct {
 	chat, texto, citaID, mencion string
-	ts                           time.Time // hora del mensaje al que se responde
+	citaAutor                    string     // quien escribió el mensaje citado, tal como lo mandó WhatsApp
+	salida                       *Salida    // si trae archivo, ubicación o contacto
+	ref                          *RefSesion // conversación de menú a la que pertenece
+	ts                           time.Time  // hora del mensaje al que se responde
 	res                          chan error
 }
 
@@ -206,6 +272,31 @@ func (m *Motor) Iniciar(ctx context.Context) {
 	go m.colaDeSalida()
 	m.c.Alm.LimpiarVistos(m.c.BotID, 7)
 	m.c.Alm.LimpiarActividad(m.c.BotID, 7)
+	m.c.Alm.LimpiarMsgBot(m.c.BotID, 7, m.c.Ahora())
+	m.c.Alm.LimpiarNoEntendio(m.c.BotID, m.c.Alm.AjusteBotInt(m.c.BotID, "noentendio_dias"), m.c.Ahora())
+	if _, ok := m.c.Decisor.(ConDiferidas); ok {
+		m.wg.Add(1)
+		go m.cicloDiferidas()
+	}
+}
+
+// cicloDiferidas revisa cada cierto tiempo si se liberó un lugar para alguien que espera en la fila de un grupo.
+func (m *Motor) cicloDiferidas() {
+	defer m.wg.Done()
+	every := m.c.TickDiferidas
+	if every <= 0 {
+		every = 20 * time.Second
+	}
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-m.ctx.Done():
+			return
+		case <-t.C:
+			m.ProcesarDiferidas()
+		}
+	}
 }
 
 // Detener para el motor y espera a que terminen sus tareas.
@@ -262,6 +353,8 @@ func (m *Motor) Entrar(msg Mensaje) {
 	case !m.c.Activo():
 		m.omite(msg, almacen.MotApagado)
 		return
+	case !msg.EsTexto && m.menuEspera(msg):
+		// una foto, un audio, un sticker o un archivo cuando un menú espera texto: el menú contesta con su mensaje propio
 	case !msg.EsTexto || strings.TrimSpace(msg.Texto) == "":
 		m.omite(msg, almacen.MotNoTexto)
 		return
@@ -283,8 +376,11 @@ func (m *Motor) Entrar(msg Mensaje) {
 			return
 		}
 		if !(msg.Mencionado || msg.CitaEsMia || esComando(msg.Texto) || (m.c.Cmd != nil && m.c.Cmd.EsComando(msg.Texto))) {
-			m.omite(msg, almacen.MotGrupo)
-			return
+			// sin mención, cita ni comando: solo si esa persona tiene un menú abierto en el grupo y escribe una opción o un comando válido
+			if ad, ok := m.c.Decisor.(Admisor); !ok || !ad.AdmiteEnGrupo(msg) {
+				m.omite(msg, almacen.MotGrupo)
+				return
+			}
 		}
 	}
 	// Bloqueados, desconocidos (privado) y política de cada grupo.
@@ -362,6 +458,12 @@ func (m *Motor) Entrar(msg Mensaje) {
 		m.wg.Add(1)
 		go m.trabajaCarril(msg.Chat)
 	}
+}
+
+// menuEspera: hay una conversación de menú abierta que espera texto (y, en un grupo, le hablan al bot).
+func (m *Motor) menuEspera(msg Mensaje) bool {
+	ad, ok := m.c.Decisor.(Admisor)
+	return ok && ad.EsperaTexto(msg)
 }
 
 // yaContesto: escribí yo en ese chat a la hora del mensaje o después (la respuesta automática ya no hace falta).
@@ -576,23 +678,26 @@ func (m *Motor) atiende(chat string, lote []Mensaje) {
 	if m.c.AlCoincidir != nil {
 		m.c.AlCoincidir(chat, d)
 	}
+	citaAutor := ""
+	if ultimo.EsGrupo {
+		citaAutor = ultimo.RemitenteWA
+	}
 	for _, r := range d.Respuestas {
-		texto := r.Texto
-		if m.c.Firma != nil {
+		if r.Texto != "" && m.c.Firma != nil {
 			if f := strings.TrimSpace(m.c.Firma()); f != "" {
-				texto += "\n\n" + f
+				r.Texto += "\n\n" + f
 			}
 		}
 		mencion := ""
-		if ultimo.EsGrupo && ultimo.RemitenteWA != "" {
+		if ultimo.EsGrupo && ultimo.RemitenteWA != "" && r.Texto != "" {
 			mencion = ultimo.RemitenteWA
-			texto = "@" + usuarioDe(mencion) + " " + texto
+			r.Texto = "@" + usuarioDe(mencion) + " " + r.Texto
 		}
 		if m.yaContesto(chat, ultimo.TS) {
 			m.omite(ultimo, almacen.MotYaContesto)
 			return
 		}
-		err := m.enviar(chat, texto, ultimo.ID, mencion, ultimo.TS)
+		err := m.enviarSalida(chat, r, ultimo.ID, citaAutor, mencion, ultimo.TS, d.Sesion)
 		switch {
 		case err == nil:
 			m.c.Alm.RegistrarActividad(m.c.BotID, almacen.ActRespondio, "", chat, "respondido a "+ultimo.ID)
@@ -632,7 +737,15 @@ func usuarioDe(j string) string {
 
 // enviar pone una respuesta en la cola de salida y espera su resultado (así las respuestas de un chat salen en orden).
 func (m *Motor) enviar(chat, texto, citaID, mencion string, ts time.Time) error {
-	p := &pedido{chat: chat, texto: texto, citaID: citaID, mencion: mencion, ts: ts, res: make(chan error, 1)}
+	return m.enviarSalida(chat, Salida{Texto: texto}, citaID, "", mencion, ts, nil)
+}
+
+// enviarSalida pone en la cola de salida una respuesta (texto y, si trae, archivo, ubicación o contacto) y espera su resultado.
+func (m *Motor) enviarSalida(chat string, sal Salida, citaID, citaAutor, mencion string, ts time.Time, ref *RefSesion) error {
+	p := &pedido{chat: chat, texto: sal.Texto, citaID: citaID, citaAutor: citaAutor, mencion: mencion, ts: ts, ref: ref, res: make(chan error, 1)}
+	if sal.Medio != nil || sal.Ubicacion != nil || sal.Contacto != nil {
+		p.salida = &sal
+	}
 	select {
 	case m.salida <- p:
 	case <-m.ctx.Done():
@@ -670,7 +783,13 @@ func (m *Motor) permiso(chat string) error {
 	}
 	m.marcasG = corta(m.marcasG)
 	m.marcasC[chat] = corta(m.marcasC[chat])
-	if len(m.marcasG) >= m.c.LimiteGlobal || len(m.marcasC[chat]) >= m.c.LimiteChat {
+	limite := m.c.LimiteChat
+	if strings.HasSuffix(chat, "@g.us") && m.c.LimiteGrupo != nil {
+		if n := m.c.LimiteGrupo(); n > 0 {
+			limite = n
+		}
+	}
+	if len(m.marcasG) >= m.c.LimiteGlobal || len(m.marcasC[chat]) >= limite {
 		return ErrLimite
 	}
 	m.marcasG = append(m.marcasG, now)
@@ -711,8 +830,22 @@ func (m *Motor) salirUno(p *pedido) error {
 		m.c.Enviador.Escribiendo(m.ctx, p.chat, false)
 		return ErrYaContesto
 	}
-	err := m.c.Enviador.Enviar(m.ctx, p.chat, p.texto, p.citaID, p.mencion)
+	var err error
+	id := ""
+	if es, ok := m.c.Enviador.(EnviadorSalida); ok {
+		sal := Salida{Texto: p.texto}
+		if p.salida != nil {
+			sal = *p.salida
+			sal.Texto = p.texto
+		}
+		id, err = es.EnviarSalida(m.ctx, p.chat, sal, p.citaID, p.citaAutor, p.mencion)
+	} else if p.salida == nil || p.texto != "" {
+		err = m.c.Enviador.Enviar(m.ctx, p.chat, p.texto, p.citaID, p.mencion)
+	}
 	m.c.Enviador.Escribiendo(m.ctx, p.chat, false)
+	if err == nil && id != "" && p.ref != nil && m.c.AlEnviado != nil {
+		m.c.AlEnviado(p.chat, id, p.ref)
+	}
 	m.mu.Lock()
 	if err == nil {
 		m.fallos = 0
@@ -787,4 +920,32 @@ func (m *Motor) ResponderA(chat, citaID, texto string) error {
 		return errors.New("el motor no está iniciado")
 	}
 	return m.enviar(chat, m.sinPrefijo(texto), citaID, "", time.Time{})
+}
+
+// ProcesarDiferidas entrega las respuestas que se liberaron en la fila de espera de los grupos (se llama solo cada TickDiferidas; las
+// pruebas la llaman a mano). Cada una es la respuesta, que quedó pendiente, a un mensaje de esa persona: sale citándolo y mencionándola.
+func (m *Motor) ProcesarDiferidas() {
+	cd, ok := m.c.Decisor.(ConDiferidas)
+	if !ok || m.ctx == nil || m.ctx.Err() != nil || !m.c.Activo() {
+		return
+	}
+	for _, df := range cd.Diferidas(m.c.Ahora()) {
+		if est := m.c.Alm.EstadoDeChat(m.c.BotID, df.Chat); !est.BotActivo || est.BotPausaHasta > m.c.Ahora().Unix() {
+			continue
+		}
+		for i, r := range df.D.Respuestas {
+			mencion := ""
+			if df.MencionWA != "" && r.Texto != "" {
+				mencion = df.MencionWA
+				r.Texto = "@" + usuarioDe(mencion) + " " + r.Texto
+			}
+			if err := m.enviarSalida(df.Chat, r, df.CitaID, df.CitaAutorWA, mencion, time.Time{}, df.D.Sesion); err != nil {
+				m.c.Log("No se pudo atender a alguien de la fila de un grupo: " + err.Error())
+				break
+			}
+			if i == 0 {
+				m.c.Alm.RegistrarActividad(m.c.BotID, almacen.ActRespondio, "", df.Chat, "turno en la fila")
+			}
+		}
+	}
 }

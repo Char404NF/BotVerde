@@ -229,14 +229,21 @@ type Sesion struct {
 	HastaTS     int64  `json:"hasta"`
 	Estado      string `json:"estado"`
 	Prueba      bool   `json:"prueba"`
+	// Menús ampliados (v0.5.0, bloque C).
+	ExpiraSeg int64  `json:"expiraSeg"` // sin actividad por este tiempo la conversación caduca en silencio (0 = el valor general)
+	Pila      string `json:"pila"`      // pasos de menú por los que pasó (separados por coma) para "atrás"
+	Fase      string `json:"fase"`      // en un formulario: preguntando, resumen, eligiendo, corrigiendo
+	Campo     int    `json:"campo"`     // en un formulario: el campo en que va
+	Reint     int    `json:"reint"`     // en un formulario: intentos fallidos del campo actual
+	Cierre    string `json:"cierre"`    // por qué terminó (errores, salio, persona, cancelo…)
 }
 
-const colsSesion = "id, chat, sender, menu_id, menu_version, paso, espera_dato, invalidas, cortado, inicio_ts, ultima_ts, hasta_ts, estado, prueba"
+const colsSesion = "id, chat, sender, menu_id, menu_version, paso, espera_dato, invalidas, cortado, inicio_ts, ultima_ts, hasta_ts, estado, prueba, expira_seg, pila, fase, campo, reint, cierre"
 
 func escanearSesion(s interface{ Scan(...any) error }) (*Sesion, error) {
 	var x Sesion
 	var esp, cor, pru int
-	if err := s.Scan(&x.ID, &x.Chat, &x.Sender, &x.MenuID, &x.MenuVersion, &x.Paso, &esp, &x.Invalidas, &cor, &x.InicioTS, &x.UltimaTS, &x.HastaTS, &x.Estado, &pru); err != nil {
+	if err := s.Scan(&x.ID, &x.Chat, &x.Sender, &x.MenuID, &x.MenuVersion, &x.Paso, &esp, &x.Invalidas, &cor, &x.InicioTS, &x.UltimaTS, &x.HastaTS, &x.Estado, &pru, &x.ExpiraSeg, &x.Pila, &x.Fase, &x.Campo, &x.Reint, &x.Cierre); err != nil {
 		return nil, err
 	}
 	x.EsperaDato, x.Cortado, x.Prueba = esp == 1, cor == 1, pru == 1
@@ -262,16 +269,25 @@ func (a *Almacen) SesionVigente(botID int64, chat, sender string, prueba bool, a
 	vencida := false
 	switch x.Estado {
 	case SesActiva:
+		if x.ExpiraSeg > 0 {
+			expira = time.Duration(x.ExpiraSeg) * time.Second
+		}
 		vencida = ahora.Sub(time.Unix(x.UltimaTS, 0)) > expira
 	default: // humano o pausada: duran hasta su hora
 		vencida = x.HastaTS > 0 && ahora.Unix() > x.HastaTS
 	}
 	if vencida {
-		if _, err := tx.Exec(`UPDATE flow_sessions SET estado=?, ultima_ts=? WHERE id=?`, SesExpirada, ahora.Unix(), x.ID); err != nil {
+		// ultima_ts se conserva: es la última vez que la persona escribió (sirve para decidir si todavía se puede retomar)
+		if _, err := tx.Exec(`UPDATE flow_sessions SET estado=? WHERE id=?`, SesExpirada, x.ID); err != nil {
 			return nil, err
 		}
 		if err := a.sumaStat(tx, botID, x.MenuID, "", "expirado", prueba, ahora, 1); err != nil {
 			return nil, err
+		}
+		if x.Estado == SesActiva && x.Paso != "" {
+			if err := a.sumaStat(tx, botID, x.MenuID, x.Paso, "abandono", prueba, ahora, 1); err != nil {
+				return nil, err
+			}
 		}
 		if err := tx.Commit(); err != nil {
 			return nil, err
@@ -283,6 +299,11 @@ func (a *Almacen) SesionVigente(botID int64, chat, sender string, prueba bool, a
 
 // NuevaSesion abre una conversación (cerrando cualquier otra abierta de la misma persona) y cuenta el inicio.
 func (a *Almacen) NuevaSesion(botID int64, chat, sender string, menuID int64, version int, paso string, prueba bool, ahora time.Time) (int64, error) {
+	return a.NuevaSesionConExpira(botID, chat, sender, menuID, version, paso, prueba, ahora, 0)
+}
+
+// NuevaSesionConExpira es NuevaSesion con cuánto tiempo sin actividad hace caducar la conversación (0 = el valor general).
+func (a *Almacen) NuevaSesionConExpira(botID int64, chat, sender string, menuID int64, version int, paso string, prueba bool, ahora time.Time, expira time.Duration) (int64, error) {
 	tx, err := a.db.Begin()
 	if err != nil {
 		return 0, err
@@ -292,8 +313,8 @@ func (a *Almacen) NuevaSesion(botID int64, chat, sender string, menuID int64, ve
 		SesAbandonada, ahora.Unix(), botID, chat, sender, b2i(prueba), SesActiva, SesHumano, SesPausada); err != nil {
 		return 0, err
 	}
-	r, err := tx.Exec(`INSERT INTO flow_sessions(bot_id, chat, sender, menu_id, menu_version, paso, inicio_ts, ultima_ts, prueba) VALUES(?,?,?,?,?,?,?,?,?)`,
-		botID, chat, sender, menuID, version, paso, ahora.Unix(), ahora.Unix(), b2i(prueba))
+	r, err := tx.Exec(`INSERT INTO flow_sessions(bot_id, chat, sender, menu_id, menu_version, paso, inicio_ts, ultima_ts, prueba, expira_seg) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+		botID, chat, sender, menuID, version, paso, ahora.Unix(), ahora.Unix(), b2i(prueba), int64(expira.Seconds()))
 	if err != nil {
 		return 0, err
 	}
@@ -365,6 +386,12 @@ func (a *Almacen) CerrarSesion(botID int64, s *Sesion, estado string, hasta int6
 	ev := map[string]string{SesCompletada: "completado", SesAbandonada: "abandonado", SesHumano: "humano", SesExpirada: "expirado"}[estado]
 	if ev != "" {
 		if err := a.sumaStat(tx, botID, s.MenuID, "", ev, s.Prueba, ahora, 1); err != nil {
+			return err
+		}
+	}
+	// dónde se quedó quien abandona (para "dónde abandonan"); el paso solo se cuenta si estaba en uno
+	if (estado == SesAbandonada || estado == SesExpirada) && s.Estado == SesActiva && s.Paso != "" {
+		if err := a.sumaStat(tx, botID, s.MenuID, s.Paso, "abandono", s.Prueba, ahora, 1); err != nil {
 			return err
 		}
 	}

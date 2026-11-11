@@ -439,6 +439,72 @@ var migraciones = [][]string{
 		`ALTER TABLE avisos ADD COLUMN persona TEXT NOT NULL DEFAULT ''`,
 		`CREATE INDEX idx_stats_sender ON daily_stats(bot_id, sender)`,
 	},
+	// 13 (v0.5.0, etapa C): menús ampliados. flow_sessions guarda cuánto dura cada conversación (privado y grupo), la pila de menús
+	// para "atrás", la fase de un formulario y los errores seguidos; msg_bot_sesion liga cada mensaje del bot en un grupo con su
+	// conversación y su dueña; flow_cola es la fila de espera de un grupo lleno; flow_vencido evita repetir "esa conversación terminó";
+	// flow_noentendio guarda (cifrado) lo que el menú no entendió; formularios guarda (cifrado) los formularios completos.
+	{
+		`ALTER TABLE flow_sessions ADD COLUMN expira_seg INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE flow_sessions ADD COLUMN pila TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE flow_sessions ADD COLUMN fase TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE flow_sessions ADD COLUMN campo INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE flow_sessions ADD COLUMN reint INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE flow_sessions ADD COLUMN cierre TEXT NOT NULL DEFAULT ''`,
+		`CREATE INDEX idx_sesiones_chat ON flow_sessions(bot_id, chat, prueba, estado)`,
+		`CREATE TABLE msg_bot_sesion (
+			bot_id INTEGER NOT NULL,
+			chat TEXT NOT NULL,
+			msg_id TEXT NOT NULL,
+			sesion_id INTEGER NOT NULL,
+			persona TEXT NOT NULL,
+			menu_id INTEGER NOT NULL,
+			ts INTEGER NOT NULL,
+			PRIMARY KEY (bot_id, chat, msg_id)
+		) WITHOUT ROWID`,
+		`CREATE INDEX idx_msg_bot_ts ON msg_bot_sesion(bot_id, ts)`,
+		`CREATE TABLE flow_cola (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			chat TEXT NOT NULL,
+			persona TEXT NOT NULL,
+			mencion_wa TEXT NOT NULL DEFAULT '',
+			msg_id TEXT NOT NULL DEFAULT '',
+			menu_id INTEGER NOT NULL,
+			ts INTEGER NOT NULL
+		)`,
+		`CREATE INDEX idx_flow_cola ON flow_cola(bot_id, chat, ts)`,
+		`CREATE TABLE flow_vencido (
+			bot_id INTEGER NOT NULL,
+			chat TEXT NOT NULL,
+			persona TEXT NOT NULL,
+			menu_id INTEGER NOT NULL,
+			ts INTEGER NOT NULL,
+			PRIMARY KEY (bot_id, chat, persona, menu_id)
+		) WITHOUT ROWID`,
+		`CREATE TABLE flow_noentendio (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			menu_id INTEGER NOT NULL,
+			paso TEXT NOT NULL DEFAULT '',
+			ts INTEGER NOT NULL,
+			texto_cifrado BLOB
+		)`,
+		`CREATE INDEX idx_noentendio ON flow_noentendio(bot_id, menu_id, ts)`,
+		`CREATE TABLE formularios (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			menu_id INTEGER NOT NULL,
+			paso TEXT NOT NULL DEFAULT '',
+			titulo TEXT NOT NULL DEFAULT '',
+			sesion_id INTEGER NOT NULL DEFAULT 0,
+			chat TEXT NOT NULL DEFAULT '',
+			persona TEXT NOT NULL DEFAULT '',
+			ts INTEGER NOT NULL,
+			nombre_cifrado BLOB,
+			datos_cifrado BLOB NOT NULL
+		)`,
+		`CREATE INDEX idx_formularios ON formularios(bot_id, menu_id, ts)`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

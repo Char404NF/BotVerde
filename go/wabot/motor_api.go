@@ -107,6 +107,8 @@ func (e enviadorMotor) Escribiendo(ctx context.Context, chat string, si bool) {
 	_ = e.s.envio.Escribiendo(ctx, chat, si)
 }
 
+var _ motor.EnviadorSalida = enviadorMotor{}
+
 var errNoEnviado = errNoSalio{}
 
 type errNoSalio struct{}
