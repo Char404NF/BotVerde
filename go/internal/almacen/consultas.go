@@ -50,18 +50,20 @@ func tiposDe(cat string) []string {
 
 // ChatLista es una fila de la lista de chats.
 type ChatLista struct {
-	JID           string `json:"jid"` // clave interna: la app nunca la muestra
-	Nombre        string `json:"nombre"`
-	Telefono      string `json:"telefono"`
-	Pais          string `json:"pais"`
-	EsGrupo       bool   `json:"esGrupo"`
-	Foto          string `json:"foto"`
-	FotoTS        int64  `json:"fotoTs"`
-	UltimoTS      int64  `json:"ultimoTs"`
-	UltimoTexto   string `json:"ultimoTexto"`
-	UltimoTipo    string `json:"ultimoTipo"`
-	UltimoBorrado bool   `json:"ultimoBorrado"`
-	UltimoMio     bool   `json:"ultimoMio"`
+	JID           string  `json:"jid"` // clave interna: la app nunca la muestra
+	Nombre        string  `json:"nombre"`
+	Telefono      string  `json:"telefono"`
+	Pais          string  `json:"pais"`
+	EsGrupo       bool    `json:"esGrupo"`
+	Foto          string  `json:"foto"`
+	FotoTS        int64   `json:"fotoTs"`
+	UltimoTS      int64   `json:"ultimoTs"`
+	UltimoTexto   string  `json:"ultimoTexto"`
+	UltimoTipo    string  `json:"ultimoTipo"`
+	UltimoBorrado bool    `json:"ultimoBorrado"`
+	UltimoMio     bool    `json:"ultimoMio"`
+	EstadoTrabajo string  `json:"estadoTrabajo"` // "", "pendiente" o "resuelto"
+	Etiquetas     []int64 `json:"etiquetas"`     // ids de las etiquetas del chat
 }
 
 // ListarChats devuelve los chats de personas o de grupos, del más reciente al más viejo.
@@ -81,9 +83,10 @@ func (a *Almacen) ListarChats(botID int64, grupos bool, consulta string, limite,
 // listaChats arma la consulta de chats con su último mensaje. Con ignoraTipo se devuelven personas y grupos por igual.
 func (a *Almacen) listaChats(extra string, extraArgs []any, botID int64, esGrupo, limite, desde int, ignoraTipo bool) ([]ChatLista, error) {
 	q := `SELECT c.jid,c.nombre_mostrado,c.telefono_mostrado,c.pais_iso,c.es_grupo,c.foto_ruta,c.foto_ts,c.ultimo_ts,
-		m.tipo,m.texto_cifrado,m.borrado,m.es_mio
+		m.tipo,m.texto_cifrado,m.borrado,m.es_mio,COALESCE(e.estado_trabajo,'')
 		FROM chats c LEFT JOIN messages m ON m.rowid = (
 			SELECT rowid FROM messages WHERE bot_id=c.bot_id AND chat_jid=c.jid ORDER BY ts DESC, id DESC LIMIT 1)
+		LEFT JOIN chat_estado e ON e.bot_id=c.bot_id AND e.chat_jid=c.jid
 		WHERE c.bot_id=?`
 	args := []any{botID}
 	if !ignoraTipo {
@@ -106,7 +109,7 @@ func (a *Almacen) listaChats(extra string, extraArgs []any, botID int64, esGrupo
 		var g, borrado, mio int
 		var tipo *string
 		var texto []byte
-		if err := filas.Scan(&c.JID, &c.Nombre, &c.Telefono, &c.Pais, &g, &c.Foto, &c.FotoTS, &c.UltimoTS, &tipo, &texto, &borrado, &mio); err != nil {
+		if err := filas.Scan(&c.JID, &c.Nombre, &c.Telefono, &c.Pais, &g, &c.Foto, &c.FotoTS, &c.UltimoTS, &tipo, &texto, &borrado, &mio, &c.EstadoTrabajo); err != nil {
 			return nil, err
 		}
 		c.EsGrupo, c.UltimoBorrado, c.UltimoMio = g == 1, borrado == 1, mio == 1
@@ -121,7 +124,24 @@ func (a *Almacen) listaChats(extra string, extraArgs []any, botID int64, esGrupo
 		}
 		out = append(out, c)
 	}
-	return out, filas.Err()
+	if err := filas.Err(); err != nil {
+		return nil, err
+	}
+	filas.Close()
+	if len(out) > 0 {
+		jids := make([]string, len(out))
+		for i := range out {
+			jids[i] = out[i].JID
+		}
+		et := a.etiquetasPorChat(botID, jids)
+		for i := range out {
+			out[i].Etiquetas = et[out[i].JID]
+			if out[i].Etiquetas == nil {
+				out[i].Etiquetas = []int64{}
+			}
+		}
+	}
+	return out, nil
 }
 
 // ChatPorJID devuelve un chat con su último mensaje (o nil si no existe), con el mismo formato que la lista.

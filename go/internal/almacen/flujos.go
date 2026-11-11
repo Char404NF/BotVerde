@@ -577,15 +577,21 @@ type Aviso struct {
 	Chat    string `json:"chat"`
 	Titulo  string `json:"titulo"`
 	Detalle string `json:"detalle"`
+	Persona string `json:"persona"` // persona a la que se refiere (para abrir su ficha), si la hay
 }
 
 // CrearAviso guarda un aviso (el detalle va cifrado) y devuelve su id.
 func (a *Almacen) CrearAviso(botID int64, tipo, chat, titulo, detalle string) (int64, error) {
+	return a.CrearAvisoDe(botID, tipo, chat, "", titulo, detalle)
+}
+
+// CrearAvisoDe es CrearAviso con la persona a la que se refiere el aviso.
+func (a *Almacen) CrearAvisoDe(botID int64, tipo, chat, persona, titulo, detalle string) (int64, error) {
 	sel, err := cifrado.SellarTexto(a.clave, "aviso", []byte(detalle))
 	if err != nil {
 		return 0, err
 	}
-	r, err := a.db.Exec(`INSERT INTO avisos(bot_id, ts, tipo, chat, titulo, detalle_cifrado) VALUES(?,?,?,?,?,?)`, botID, time.Now().Unix(), tipo, chat, titulo, sel)
+	r, err := a.db.Exec(`INSERT INTO avisos(bot_id, ts, tipo, chat, titulo, detalle_cifrado, persona) VALUES(?,?,?,?,?,?,?)`, botID, time.Now().Unix(), tipo, chat, titulo, sel, persona)
 	if err != nil {
 		return 0, err
 	}
@@ -598,7 +604,7 @@ func (a *Almacen) CrearAviso(botID int64, tipo, chat, titulo, detalle string) (i
 func (a *Almacen) ObtenerAviso(botID, id int64) (*Aviso, error) {
 	var x Aviso
 	var d []byte
-	err := a.db.QueryRow(`SELECT id, ts, tipo, chat, titulo, detalle_cifrado FROM avisos WHERE bot_id=? AND id=?`, botID, id).Scan(&x.ID, &x.TS, &x.Tipo, &x.Chat, &x.Titulo, &d)
+	err := a.db.QueryRow(`SELECT id, ts, tipo, chat, titulo, detalle_cifrado, persona FROM avisos WHERE bot_id=? AND id=?`, botID, id).Scan(&x.ID, &x.TS, &x.Tipo, &x.Chat, &x.Titulo, &d, &x.Persona)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -631,4 +637,30 @@ func (a *Almacen) Zona() *time.Location { return a.loc() }
 func (a *Almacen) ReactivarSesiones(botID int64, chat string) {
 	_, _ = a.db.Exec(`UPDATE flow_sessions SET estado=?, ultima_ts=? WHERE bot_id=? AND chat=? AND estado IN (?,?)`, SesAbandonada, time.Now().Unix(), botID, chat, SesHumano, SesPausada)
 	a.avisa("sesiones")
+}
+
+// AvisosRecientes devuelve los últimos avisos locales (el más nuevo primero), con su detalle descifrado.
+func (a *Almacen) AvisosRecientes(botID int64, limite int) ([]Aviso, error) {
+	if limite <= 0 {
+		limite = 50
+	}
+	filas, err := a.db.Query(`SELECT id FROM avisos WHERE bot_id=? ORDER BY id DESC LIMIT ?`, botID, limite)
+	if err != nil {
+		return nil, err
+	}
+	var ids []int64
+	for filas.Next() {
+		var id int64
+		if filas.Scan(&id) == nil {
+			ids = append(ids, id)
+		}
+	}
+	filas.Close()
+	out := []Aviso{}
+	for _, id := range ids {
+		if x, err := a.ObtenerAviso(botID, id); err == nil && x != nil {
+			out = append(out, *x)
+		}
+	}
+	return out, nil
 }

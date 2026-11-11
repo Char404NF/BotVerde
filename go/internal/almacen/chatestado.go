@@ -11,11 +11,12 @@ import (
 
 // EstadoChat es lo que la app guarda de cada chat aparte de sus mensajes.
 type EstadoChat struct {
-	LeidoEnviadoTS int64 `json:"leidoEnviadoTs"` // hasta qué hora se avisó "leído" a WhatsApp
-	Silenciado     bool  `json:"silenciado"`     // sin notificaciones de este chat
-	BotPausaHasta  int64 `json:"botPausaHasta"`  // el bot calla en este chat hasta esta hora (0 = no)
-	BotActivo      bool  `json:"botActivo"`      // interruptor del bot en este chat (para grupos)
-	PausaHumano    bool  `json:"pausaHumano"`    // la pausa es porque alguien pidió hablar con una persona (no porque escribí yo)
+	LeidoEnviadoTS int64  `json:"leidoEnviadoTs"` // hasta qué hora se avisó "leído" a WhatsApp
+	Silenciado     bool   `json:"silenciado"`     // sin notificaciones de este chat
+	BotPausaHasta  int64  `json:"botPausaHasta"`  // el bot calla en este chat hasta esta hora (0 = no)
+	BotActivo      bool   `json:"botActivo"`      // interruptor del bot en este chat (para grupos)
+	PausaHumano    bool   `json:"pausaHumano"`    // la pausa es porque alguien pidió hablar con una persona (no porque escribí yo)
+	EstadoTrabajo  string `json:"estadoTrabajo"`  // "" (sin marca), "pendiente" o "resuelto"
 }
 
 func (a *Almacen) asegurarEstado(botID int64, chat string) {
@@ -26,8 +27,8 @@ func (a *Almacen) asegurarEstado(botID int64, chat string) {
 func (a *Almacen) EstadoDeChat(botID int64, chat string) EstadoChat {
 	var e EstadoChat
 	var sil, act, hum int
-	err := a.db.QueryRow(`SELECT leido_enviado_ts, silenciado, bot_pausa_hasta, bot_activo, pausa_humano FROM chat_estado WHERE bot_id=? AND chat_jid=?`, botID, chat).
-		Scan(&e.LeidoEnviadoTS, &sil, &e.BotPausaHasta, &act, &hum)
+	err := a.db.QueryRow(`SELECT leido_enviado_ts, silenciado, bot_pausa_hasta, bot_activo, pausa_humano, estado_trabajo FROM chat_estado WHERE bot_id=? AND chat_jid=?`, botID, chat).
+		Scan(&e.LeidoEnviadoTS, &sil, &e.BotPausaHasta, &act, &hum, &e.EstadoTrabajo)
 	if errors.Is(err, sql.ErrNoRows) {
 		return EstadoChat{BotActivo: true}
 	}

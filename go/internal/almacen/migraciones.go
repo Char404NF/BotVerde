@@ -366,6 +366,79 @@ var migraciones = [][]string{
 			PRIMARY KEY (bot_id, persona)
 		) WITHOUT ROWID`,
 	},
+	// 12 (v0.5.0, etapa B): personas, chat y avisos para mí. persona_silencio (el bot calla con esa persona; hasta_ts 0 = siempre),
+	// advertencias y notas_persona (motivo y texto cifrados), etiquetas locales y chat_etiqueta, estado_trabajo (pendiente/resuelto) en
+	// chat_estado, recordatorios (texto cifrado), alertas_palabra (palabra cifrada) y la persona en los avisos. Bloquear en el bot NO
+	// tiene tabla propia: es el estado "bloqueada" de solicitudes (una sola fuente de verdad). Los ajustes (tope de advertencias,
+	// resumen diario…) viven en bot_ajustes.
+	{
+		`CREATE TABLE persona_silencio (
+			bot_id INTEGER NOT NULL,
+			persona TEXT NOT NULL,
+			hasta_ts INTEGER NOT NULL DEFAULT 0,
+			motivo TEXT NOT NULL DEFAULT '',
+			creado_ts INTEGER NOT NULL DEFAULT 0,
+			por TEXT NOT NULL DEFAULT '',
+			PRIMARY KEY (bot_id, persona)
+		) WITHOUT ROWID`,
+		`CREATE TABLE advertencias (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			persona TEXT NOT NULL,
+			chat TEXT NOT NULL DEFAULT '',
+			motivo_cifrado BLOB,
+			ts INTEGER NOT NULL,
+			por TEXT NOT NULL DEFAULT ''
+		)`,
+		`CREATE INDEX idx_advertencias ON advertencias(bot_id, persona, ts)`,
+		`CREATE TABLE notas_persona (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			persona TEXT NOT NULL,
+			texto_cifrado BLOB NOT NULL,
+			ts INTEGER NOT NULL,
+			por TEXT NOT NULL DEFAULT ''
+		)`,
+		`CREATE INDEX idx_notas_persona ON notas_persona(bot_id, persona, ts)`,
+		`CREATE TABLE etiquetas (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			nombre TEXT NOT NULL,
+			color TEXT NOT NULL DEFAULT '#2EC4CB',
+			posicion INTEGER NOT NULL DEFAULT 0,
+			creado_ts INTEGER NOT NULL DEFAULT 0
+		)`,
+		`CREATE TABLE chat_etiqueta (
+			bot_id INTEGER NOT NULL,
+			chat_jid TEXT NOT NULL,
+			etiqueta_id INTEGER NOT NULL REFERENCES etiquetas(id) ON DELETE CASCADE,
+			PRIMARY KEY (bot_id, chat_jid, etiqueta_id)
+		) WITHOUT ROWID`,
+		`CREATE INDEX idx_chat_etiqueta ON chat_etiqueta(bot_id, etiqueta_id)`,
+		`ALTER TABLE chat_estado ADD COLUMN estado_trabajo TEXT NOT NULL DEFAULT ''`,
+		`CREATE TABLE recordatorios (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			texto_cifrado BLOB NOT NULL,
+			proxima_ts INTEGER NOT NULL,
+			repetir TEXT NOT NULL DEFAULT '',
+			estado TEXT NOT NULL DEFAULT 'pendiente',
+			creado_ts INTEGER NOT NULL DEFAULT 0,
+			avisado_ts INTEGER NOT NULL DEFAULT 0
+		)`,
+		`CREATE INDEX idx_recordatorios ON recordatorios(bot_id, estado, proxima_ts)`,
+		`CREATE TABLE alertas_palabra (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			palabra_cifrada BLOB NOT NULL,
+			clave TEXT NOT NULL DEFAULT '',
+			chats TEXT NOT NULL DEFAULT '[]',
+			activa INTEGER NOT NULL DEFAULT 1,
+			creado_ts INTEGER NOT NULL DEFAULT 0
+		)`,
+		`ALTER TABLE avisos ADD COLUMN persona TEXT NOT NULL DEFAULT ''`,
+		`CREATE INDEX idx_stats_sender ON daily_stats(bot_id, sender)`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

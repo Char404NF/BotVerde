@@ -118,6 +118,18 @@ var ajustesBotDefecto = map[string]string{
 	"limite_sin_rango":   "5",
 	"grupo_modo_defecto": "todos",
 	"registro_dias":      "90",
+	// Personas y avisos (bloque B)
+	"adv_tope":         "3",      // advertencias para que actúe la regla (0 = nunca)
+	"adv_accion":       "avisar", // avisar | silenciar | borrar | expulsar
+	"adv_silencio_min": "1440",   // cuánto dura el silencio de la regla "silenciar"
+	"reportar_gracias": "0",      // contestar "Gracias, ya avisé" a !reportar (apagado)
+	"reportar_texto":   "Gracias, ya avisé.",
+	"alertas_activas":  "1",     // alertas por palabra clave
+	"alerta_fragmento": "0",     // incluir un fragmento del mensaje en la alerta (apagado)
+	"resumen_activo":   "0",     // resumen diario
+	"resumen_hora":     "20:00", // HH:MM de la zona del teléfono
+	"resumen_ultimo":   "",      // último día (AAAA-MM-DD) en que se avisó
+	"avisos_exactos":   "1",     // pedir alarmas exactas cuando el sistema lo permita
 }
 
 // AjusteBot devuelve un ajuste del bot (su valor por defecto si nunca se fijó).
@@ -761,8 +773,33 @@ func fusionarPersona(tx *sql.Tx, botID int64, desde, hacia string) error {
 			return err
 		}
 	}
-	_, err := tx.Exec(`UPDATE codigos_confirmacion SET persona=? WHERE bot_id=? AND persona=?`, hacia, botID, desde)
-	return err
+	if _, err := tx.Exec(`UPDATE codigos_confirmacion SET persona=? WHERE bot_id=? AND persona=?`, hacia, botID, desde); err != nil {
+		return err
+	}
+	// v0.5.0 B: advertencias y notas pasan a la persona canónica; del silencio se queda el más largo (0 = siempre).
+	for _, t := range []string{"advertencias", "notas_persona"} {
+		if _, err := tx.Exec(`UPDATE `+t+` SET persona=? WHERE bot_id=? AND persona=?`, hacia, botID, desde); err != nil {
+			return err
+		}
+	}
+	var hD, hH sql.NullInt64
+	sD := tx.QueryRow(`SELECT hasta_ts FROM persona_silencio WHERE bot_id=? AND persona=?`, botID, desde).Scan(&hD) == nil
+	sH := tx.QueryRow(`SELECT hasta_ts FROM persona_silencio WHERE bot_id=? AND persona=?`, botID, hacia).Scan(&hH) == nil
+	if sD {
+		mas := !sH || hD.Int64 == 0 || (hH.Int64 != 0 && hD.Int64 > hH.Int64)
+		if mas {
+			if sH {
+				if _, err := tx.Exec(`DELETE FROM persona_silencio WHERE bot_id=? AND persona=?`, botID, hacia); err != nil {
+					return err
+				}
+			}
+			_, err := tx.Exec(`UPDATE persona_silencio SET persona=? WHERE bot_id=? AND persona=?`, hacia, botID, desde)
+			return err
+		}
+		_, err := tx.Exec(`DELETE FROM persona_silencio WHERE bot_id=? AND persona=?`, botID, desde)
+		return err
+	}
+	return nil
 }
 
 // ---------- solicitudes ----------
