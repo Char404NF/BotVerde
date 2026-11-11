@@ -30,6 +30,8 @@ type Acciones interface {
 	Expulsar(ctx context.Context, chat, persona string) error
 	Enlace(ctx context.Context, chat string) (string, error)
 	Agregar(ctx context.Context, chat, persona string) (string, error)
+	// RechazarLlamada rechaza una llamada entrante (whatsmeow: Client.RejectCall). HACER llamadas no existe en la librería.
+	RechazarLlamada(ctx context.Context, de, id string) error
 }
 
 // ---------- ayudas comunes de los módulos H ----------

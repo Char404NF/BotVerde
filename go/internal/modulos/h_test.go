@@ -23,6 +23,8 @@ type accFalsa struct {
 	enlace      string
 	errEnlace   error
 	errExpulsar error
+	rechazadas  []string
+	errRechazar error
 }
 
 func (a *accFalsa) EsAdmin(_ context.Context, _ string) (bool, error) { return a.admin, nil }
@@ -33,6 +35,15 @@ func (a *accFalsa) Expulsar(_ context.Context, chat, p string) error {
 		return a.errExpulsar
 	}
 	a.expulsados = append(a.expulsados, chat+"|"+p)
+	return nil
+}
+func (a *accFalsa) RechazarLlamada(_ context.Context, de, id string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.errRechazar != nil {
+		return a.errRechazar
+	}
+	a.rechazadas = append(a.rechazadas, de+"|"+id)
 	return nil
 }
 func (a *accFalsa) Enlace(_ context.Context, chat string) (string, error) {

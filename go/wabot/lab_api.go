@@ -89,8 +89,8 @@ type estadoLab struct {
 	Activo         bool         `json:"activo"`
 	AvisoAceptado  bool         `json:"avisoAceptado"`
 	AvisoTS        int64        `json:"avisoTs"`
-	Modo           string       `json:"modo"`      // lo elegido (texto, encuesta, botones)
-	ModoEfectivo   string       `json:"modoReal"`  // lo que vale ahora (texto si el Laboratorio está apagado)
+	Modo           string       `json:"modo"`     // lo elegido (texto, encuesta, botones)
+	ModoEfectivo   string       `json:"modoReal"` // lo que vale ahora (texto si el Laboratorio está apagado)
 	Grupos         bool         `json:"grupos"`
 	EncMax         int          `json:"encMax"`
 	ExpiraMin      int          `json:"expiraMin"`

@@ -169,7 +169,7 @@ func (s *estado) alMotor(v *events.Message, sincronizando bool) {
 	}
 	if !sincronizando {
 		s.mods.Evento(modulos.Evento{Tipo: modulos.EvMensaje, Hora: m.TS, Chat: m.Chat, EsGrupo: m.EsGrupo, Persona: m.Remitente, Nombre: m.Nombre,
-			Texto: m.Texto, MensajeID: m.ID, EsMio: m.EsMio, Cita: m.CitaID})
+			Texto: m.Texto, MensajeID: m.ID, EsMio: m.EsMio, Cita: m.CitaID, JID: m.RemitenteWA, Mencionado: m.Mencionado, CitaEsMia: m.CitaEsMia})
 	}
 	s.motor.Entrar(m)
 }

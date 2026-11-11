@@ -12,6 +12,7 @@ import (
 	"botchat/internal/grupos"
 	"botchat/internal/modulos"
 
+	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 )
 
@@ -98,6 +99,18 @@ func (a accionesModulos) Agregar(ctx context.Context, chat, persona string) (str
 	return g.AgregarMiembro(ctx, chat, persona)
 }
 
+// RechazarLlamada rechaza una llamada entrante con la acción real de whatsmeow (Client.RejectCall). Hacer llamadas no existe.
+func (a accionesModulos) RechazarLlamada(ctx context.Context, de, id string) error {
+	j, err := types.ParseJID(de)
+	if err != nil {
+		return errors.New("no entendí de quién es la llamada")
+	}
+	if a.s.cli == nil || !a.s.cli.IsConnected() {
+		return errors.New("sin conexión con WhatsApp")
+	}
+	return a.s.cli.RejectCall(ctx, j, id)
+}
+
 var registroModulosH sync.Once
 
 // registrarModulosH deja registrados en el marco los módulos opcionales H1–H5 (apagados: registrar no enciende nada). Se llama al
@@ -156,8 +169,21 @@ func (s *estado) alEntrarAlGrupo(v *events.GroupInfo) {
 // alLlamar avisa a los módulos de una llamada entrante.
 func (s *estado) alLlamar(v *events.CallOffer) {
 	from := v.From
+	de := v.CallCreator
+	if de.IsEmpty() {
+		de = from
+	}
+	id := v.CallID
+	video := false
+	if v.Data != nil && v.Data.GetChildByTag("video").Tag != "" {
+		video = true
+	}
+	if s.esPropio(from) {
+		return
+	}
 	s.encola(func() {
-		s.mods.Evento(modulos.Evento{Tipo: modulos.EvLlamada, Chat: s.ing.Persona(s.ctx, from), Persona: s.ing.Persona(s.ctx, from)})
+		s.mods.Evento(modulos.Evento{Tipo: modulos.EvLlamada, Chat: s.ing.Persona(s.ctx, from), Persona: s.ing.Persona(s.ctx, from),
+			LlamadaID: id, LlamadaDe: de.ToNonAD().String(), LlamadaVideo: video})
 	})
 }
 

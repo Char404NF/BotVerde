@@ -16,6 +16,9 @@ const (
 	CampoInterruptor = "interruptor"
 	CampoLista       = "lista"
 	CampoHora        = "hora" // "HH:MM"
+	// CampoSecreto es una llave o contraseña: la app la guarda en el Android Keystore y se la pasa a Go solo en memoria. NUNCA entra a la
+	// configuración ni a la base: guardar una configuración que la traiga es un error.
+	CampoSecreto = "secreto"
 )
 
 // Opcion es una entrada de un campo de tipo lista.
@@ -62,6 +65,8 @@ func (c Campo) valorPorDefecto() any {
 	return ""
 }
 
+func (c Campo) secreto() bool { return c.Tipo == CampoSecreto }
+
 // validar revisa un valor y lo deja normalizado (número como float64, texto recortado…).
 func (c Campo) validar(v any) (any, error) {
 	nombre := c.Titulo
@@ -69,6 +74,8 @@ func (c Campo) validar(v any) (any, error) {
 		nombre = c.Clave
 	}
 	switch c.Tipo {
+	case CampoSecreto:
+		return nil, fmt.Errorf("«%s» es una llave: se guarda aparte, en el Keystore del teléfono, no en la configuración", nombre)
 	case CampoTexto:
 		s, ok := v.(string)
 		if !ok {
@@ -138,7 +145,7 @@ func ValidarEsquema(campos []Campo) error {
 		}
 		vistos[c.Clave] = true
 		switch c.Tipo {
-		case CampoTexto, CampoNumero, CampoInterruptor, CampoHora:
+		case CampoTexto, CampoNumero, CampoInterruptor, CampoHora, CampoSecreto:
 		case CampoLista:
 			if len(c.Opciones) == 0 {
 				return fmt.Errorf("la lista %q no tiene opciones", c.Clave)
@@ -157,6 +164,9 @@ func configPorDefecto(m Modulo) map[string]any {
 		_ = json.Unmarshal([]byte(t), &out)
 	}
 	for _, c := range m.Esquema() {
+		if c.secreto() {
+			continue
+		}
 		if _, ok := out[c.Clave]; !ok {
 			out[c.Clave] = c.valorPorDefecto()
 		}

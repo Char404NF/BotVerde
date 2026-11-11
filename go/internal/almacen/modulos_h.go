@@ -522,6 +522,8 @@ func (a *Almacen) olvidarModulosPersona(botID int64, lista string, fs []string) 
 	for _, t := range []string{"mod_listas", "mod_dest", "mod_pendientes"} {
 		_, _ = a.db.Exec(`DELETE FROM `+t+` WHERE bot_id=? AND persona IN `+lista, args2(botID, fs)...)
 	}
+	// marcador de los juegos: la clave es «chat|persona»
+	_, _ = a.db.Exec(`DELETE FROM mod_datos WHERE bot_id=? AND modulo='juegos' AND coleccion='puntos' AND substr(clave, instr(clave,'|')+1) IN `+lista, args2(botID, fs)...)
 }
 
 // ContarRegistroModulo cuenta renglones del registro de un módulo con ese «qué» y ese resultado desde `desde` (que "" = cualquiera).
@@ -535,4 +537,111 @@ func (a *Almacen) ContarRegistroModulo(botID int64, modulo, que, resultado strin
 	var n int
 	_ = a.db.QueryRow(q, args...).Scan(&n)
 	return n
+}
+
+// ---------- datos propios de módulos (migración 19) ----------
+
+// DatoMod es una fila de mod_datos: Valor viene descifrado.
+type DatoMod struct {
+	Clave string
+	Num   int64
+	TS    int64
+	Valor string
+}
+
+// GuardarDatoMod crea o reemplaza un dato de un módulo (el valor se cifra con el cifrado de columna).
+func (a *Almacen) GuardarDatoMod(botID int64, modulo, coleccion, clave string, num int64, valor string, ts time.Time) error {
+	if modulo == "" || coleccion == "" || clave == "" {
+		return errors.New("falta el módulo, la colección o la clave")
+	}
+	sel, err := cifrado.SellarTexto(a.clave, "mod_dato", []byte(valor))
+	if err != nil {
+		return err
+	}
+	_, err = a.db.Exec(`INSERT INTO mod_datos(bot_id,modulo,coleccion,clave,num,ts,valor) VALUES(?,?,?,?,?,?,?)
+		ON CONFLICT(bot_id,modulo,coleccion,clave) DO UPDATE SET num=excluded.num, ts=excluded.ts, valor=excluded.valor`,
+		botID, modulo, coleccion, clave, num, ts.Unix(), sel)
+	if err == nil {
+		a.avisa("modulos")
+	}
+	return err
+}
+
+// ObtenerDatoMod devuelve un dato o nil.
+func (a *Almacen) ObtenerDatoMod(botID int64, modulo, coleccion, clave string) *DatoMod {
+	var d DatoMod
+	var v []byte
+	err := a.db.QueryRow(`SELECT clave,num,ts,valor FROM mod_datos WHERE bot_id=? AND modulo=? AND coleccion=? AND clave=?`, botID, modulo, coleccion, clave).Scan(&d.Clave, &d.Num, &d.TS, &v)
+	if err != nil {
+		return nil
+	}
+	if t, err := cifrado.AbrirTexto(a.clave, "mod_dato", v); err == nil {
+		d.Valor = string(t)
+	}
+	return &d
+}
+
+// ListarDatosMod devuelve los datos de una colección (orden: por num de mayor a menor si porNum, si no por clave).
+func (a *Almacen) ListarDatosMod(botID int64, modulo, coleccion string, porNum bool, limite int) []DatoMod {
+	if limite <= 0 || limite > 5000 {
+		limite = 1000
+	}
+	orden := "clave"
+	if porNum {
+		orden = "num DESC, clave"
+	}
+	filas, err := a.db.Query(`SELECT clave,num,ts,valor FROM mod_datos WHERE bot_id=? AND modulo=? AND coleccion=? ORDER BY `+orden+` LIMIT ?`, botID, modulo, coleccion, limite)
+	if err != nil {
+		return nil
+	}
+	defer filas.Close()
+	var out []DatoMod
+	for filas.Next() {
+		var d DatoMod
+		var v []byte
+		if filas.Scan(&d.Clave, &d.Num, &d.TS, &v) != nil {
+			continue
+		}
+		if t, err := cifrado.AbrirTexto(a.clave, "mod_dato", v); err == nil {
+			d.Valor = string(t)
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+// BorrarDatoMod borra un dato.
+func (a *Almacen) BorrarDatoMod(botID int64, modulo, coleccion, clave string) error {
+	_, err := a.db.Exec(`DELETE FROM mod_datos WHERE bot_id=? AND modulo=? AND coleccion=? AND clave=?`, botID, modulo, coleccion, clave)
+	if err == nil {
+		a.avisa("modulos")
+	}
+	return err
+}
+
+// SumarDatoMod suma delta al contador de un dato (lo crea si no existe) y devuelve el total.
+func (a *Almacen) SumarDatoMod(botID int64, modulo, coleccion, clave string, delta int64, ts time.Time) (int64, error) {
+	if _, err := a.db.Exec(`INSERT INTO mod_datos(bot_id,modulo,coleccion,clave,num,ts) VALUES(?,?,?,?,?,?)
+		ON CONFLICT(bot_id,modulo,coleccion,clave) DO UPDATE SET num=num+excluded.num, ts=excluded.ts`, botID, modulo, coleccion, clave, delta, ts.Unix()); err != nil {
+		return 0, err
+	}
+	var n int64
+	err := a.db.QueryRow(`SELECT num FROM mod_datos WHERE bot_id=? AND modulo=? AND coleccion=? AND clave=?`, botID, modulo, coleccion, clave).Scan(&n)
+	return n, err
+}
+
+// BorrarColeccionMod borra todos los datos de una colección.
+func (a *Almacen) BorrarColeccionMod(botID int64, modulo, coleccion string) error {
+	_, err := a.db.Exec(`DELETE FROM mod_datos WHERE bot_id=? AND modulo=? AND coleccion=?`, botID, modulo, coleccion)
+	if err == nil {
+		a.avisa("modulos")
+	}
+	return err
+}
+
+// UltimoRegistroModulo devuelve la hora (segundos) del renglón más reciente del registro con ese módulo, «qué» y chat (0 si no hay).
+func (a *Almacen) UltimoRegistroModulo(botID int64, modulo, que, chat string) int64 {
+	var ts sql.NullInt64
+	_ = a.db.QueryRow(`SELECT MAX(ts) FROM modulos_registro WHERE bot_id=? AND modulo=? AND que=? AND chat=?`, botID, modulo, que, chat).Scan(&ts)
+	return ts.Int64
 }

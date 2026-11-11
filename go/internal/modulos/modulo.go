@@ -46,6 +46,14 @@ type Evento struct {
 	Personas  []string // quienes entraron (solo EvMiembroEntra)
 	JIDs      []string // los mismos, tal como los mandó WhatsApp (teléfono o LID), para mencionarlos (solo EvMiembroEntra)
 	Cita      string   // id del mensaje citado, si lo hay (solo EvMensaje)
+	// Solo EvMensaje: JID de quien escribió tal como lo mandó WhatsApp (para mencionarlo), si me mencionaron y si citaron un mensaje mío.
+	JID        string
+	Mencionado bool
+	CitaEsMia  bool
+	// Solo EvLlamada: id de la llamada, de quién viene (JID, para rechazarla) y si es de video.
+	LlamadaID    string
+	LlamadaDe    string
+	LlamadaVideo bool
 }
 
 // Modulo es lo que un módulo ofrece al marco.

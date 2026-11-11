@@ -695,6 +695,20 @@ var migraciones = [][]string{
 			UNIQUE (bot_id, nombre)
 		)`,
 	},
+	// 19 · v0.5.0 etapa H (parte 2): datos propios de los módulos H6–H9 (personalidad de la IA por chat, marcador y preguntas de los
+	// juegos). El valor va CIFRADO; num es un contador simple (puntos).
+	{
+		`CREATE TABLE mod_datos (
+			bot_id INTEGER NOT NULL,
+			modulo TEXT NOT NULL,
+			coleccion TEXT NOT NULL,
+			clave TEXT NOT NULL,
+			num INTEGER NOT NULL DEFAULT 0,
+			ts INTEGER NOT NULL DEFAULT 0,
+			valor BLOB,
+			PRIMARY KEY (bot_id, modulo, coleccion, clave)
+		) WITHOUT ROWID`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

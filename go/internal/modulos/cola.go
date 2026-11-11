@@ -72,6 +72,9 @@ type Iniciativa struct {
 	// AlResultado (opcional) se llama cuando la iniciativa ya no está en la cola: "enviado", "fallido" o "descartado:<motivo>". No se
 	// llama con "diferido". Los módulos que guardan su propia agenda lo usan para saber qué pasó, porque la cola vive en memoria.
 	AlResultado func(resultado string)
+	// NoEscribe: la acción no le escribe a nadie (por ejemplo rechazar una llamada). No molestar y la pausa nocturna no aplican; el
+	// interruptor general, el modo seguro, los topes y el registro siguen valiendo.
+	NoEscribe bool
 }
 
 type item struct {
@@ -155,6 +158,9 @@ func (c *Cola) bloqueo(i Iniciativa) string {
 		return MotSeguro
 	}
 	for _, p := range c.personas(i) {
+		if i.NoEscribe {
+			break
+		}
 		if g.Alm.EstaNoMolestar(g.BotID, p) {
 			return MotNoMolestar
 		}
@@ -324,7 +330,7 @@ func (c *Cola) procesar(ctx context.Context, it *item, now time.Time) {
 		return
 	}
 	// 2) Pausa nocturna.
-	if dentro, fin := g.enPausaNocturna(now); dentro {
+	if dentro, fin := g.enPausaNocturna(now); dentro && !i.NoEscribe {
 		if i.Noche == NocheDescartar {
 			c.registrar(i, ResDescartado+MotNoche)
 			return
