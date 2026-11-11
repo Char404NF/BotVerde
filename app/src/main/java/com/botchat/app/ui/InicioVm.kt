@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.botchat.app.Datos
 import com.botchat.app.datos.ChatItem
+import com.botchat.app.datos.EtiquetaItem
 import com.botchat.app.datos.Repo
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -29,6 +30,22 @@ class InicioVm(app: Application) : AndroidViewModel(app) {
     val contadores: StateFlow<Map<String, Int>> = _contadores
     private val ajustes = com.botchat.app.datos.Ajustes.get(app)
 
+    /** Filtro de la lista: "" (todos), "pendiente" o "resuelto"; y una etiqueta (0 = todas). */
+    var filtroEstado by mutableStateOf("")
+        private set
+    var filtroEtiqueta by mutableStateOf(0L)
+        private set
+    private val _etiquetas = MutableStateFlow<List<EtiquetaItem>>(emptyList())
+    val etiquetas: StateFlow<List<EtiquetaItem>> = _etiquetas
+    private val _pendientes = MutableStateFlow(0)
+    val pendientes: StateFlow<Int> = _pendientes
+
+    fun filtrar(estado: String, etiqueta: Long) {
+        filtroEstado = estado
+        filtroEtiqueta = etiqueta
+        recargar()
+    }
+
     var consulta by mutableStateOf("")
         private set
     var buscando by mutableStateOf(false)
@@ -40,7 +57,7 @@ class InicioVm(app: Application) : AndroidViewModel(app) {
 
     init {
         recargar()
-        viewModelScope.launch { Repo.cambios.collect { if ("chats" in it) recargar() } }
+        viewModelScope.launch { Repo.cambios.collect { if ("chats" in it || "etiquetas" in it) recargar() } }
     }
 
     fun cambiarConsulta(q: String) {
@@ -75,8 +92,12 @@ class InicioVm(app: Application) : AndroidViewModel(app) {
     private suspend fun cargar() {
         try {
             val q = consulta
-            val p = Repo.chats(botId, false, q)
-            val g = Repo.chats(botId, true, q)
+            _etiquetas.value = runCatching { Repo.etiquetas(botId) }.getOrDefault(emptyList())
+            _pendientes.value = runCatching { Repo.contarPendientes(botId) }.getOrDefault(0)
+            if (filtroEtiqueta != 0L && _etiquetas.value.none { it.id == filtroEtiqueta }) filtroEtiqueta = 0L // la borraron
+            val filtrando = filtroEstado.isNotEmpty() || filtroEtiqueta != 0L
+            val p = if (filtrando) Repo.chatsFiltrados(botId, false, q, filtroEstado, filtroEtiqueta) else Repo.chats(botId, false, q)
+            val g = if (filtrando) Repo.chatsFiltrados(botId, true, q, filtroEstado, filtroEtiqueta) else Repo.chats(botId, true, q)
             _personales.value = p
             _grupos.value = g
             error = null

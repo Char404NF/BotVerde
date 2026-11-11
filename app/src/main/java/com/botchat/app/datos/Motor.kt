@@ -128,6 +128,48 @@ interface Motor {
     fun listarIniciativas(bot: Long, modulo: String, limite: Long, antesId: Long): String
     fun estadoModoSeguro(bot: Long): String
     fun reanudarModoSeguro(bot: Long)
+
+    // Personas, chat y avisos para mí (0.5.0, bloque B). Eventos: "personas", "persona:<persona>", "etiquetas", "recordatorios", "alertas".
+    fun fichaPersona(bot: Long, persona: String): String
+    fun estadisticasPersona(bot: Long, persona: String, dias: Long): String
+    fun silenciarPersona(bot: Long, persona: String, minutos: Long, motivo: String)
+    fun quitarSilencioPersona(bot: Long, persona: String): Boolean
+    fun listarSilencios(bot: Long): String
+    fun bloquearPersona(bot: Long, persona: String)
+    fun desbloquearPersona(bot: Long, persona: String): Boolean
+    fun advertirPersona(bot: Long, persona: String, chat: String, motivo: String): String
+    fun listarAdvertencias(bot: Long, persona: String): String
+    fun listarPersonasAdvertidas(bot: Long): String
+    fun quitarAdvertenciaPersona(bot: Long, persona: String, id: Long): Long
+    fun borrarAdvertenciasPersona(bot: Long, persona: String): Long
+    fun listarNotasPersona(bot: Long, persona: String): String
+    fun agregarNotaPersona(bot: Long, persona: String, texto: String)
+    fun borrarNotaPersona(bot: Long, persona: String, id: Long)
+    fun olvidarPersona(bot: Long, persona: String): String
+    fun exportarPersona(bot: Long, persona: String): String
+    fun marcarEstadoChat(bot: Long, chat: String, estado: String)
+    fun listarChatsFiltrados(bot: Long, grupos: Boolean, consulta: String, estado: String, etiqueta: Long, limite: Long, desde: Long): String
+    fun contarPendientes(bot: Long): Long
+    fun listarEtiquetas(bot: Long): String
+    fun crearEtiqueta(bot: Long, nombre: String, color: String): Long
+    fun editarEtiqueta(bot: Long, id: Long, nombre: String, color: String)
+    fun borrarEtiqueta(bot: Long, id: Long)
+    fun ponerEtiquetaChat(bot: Long, chat: String, id: Long, si: Boolean)
+    fun etiquetasDeChat(bot: Long, chat: String): String
+    fun listarAlertasPalabra(bot: Long): String
+    fun crearAlertaPalabra(bot: Long, palabra: String, chatsJson: String): Long
+    fun editarAlertaPalabra(bot: Long, id: Long, chatsJson: String, activa: Boolean)
+    fun borrarAlertaPalabra(bot: Long, id: Long)
+    fun listarRecordatorios(bot: Long, hechos: Boolean): String
+    fun crearRecordatorio(bot: Long, texto: String, proximaTs: Long, repetir: String): Long
+    fun editarRecordatorio(bot: Long, id: Long, texto: String, proximaTs: Long, repetir: String)
+    fun borrarRecordatorio(bot: Long, id: Long)
+    fun proximoAviso(bot: Long): Long
+    fun dispararAvisos(bot: Long): String
+    fun vistaPreviaResumen(bot: Long): String
+    fun listarComandosPropios(bot: Long): String
+    fun guardarComandoPropio(bot: Long, id: Long, datosJson: String): Long
+    fun vistaPreviaComandoPropio(bot: Long, datosJson: String): String
 }
 
 /** El módulo Go de verdad (whatsmeow + almacén cifrado). */
@@ -251,4 +293,46 @@ object MotorGo : Motor {
     override fun listarIniciativas(bot: Long, modulo: String, limite: Long, antesId: Long) = Wabot.listarIniciativas(bot, modulo, limite, antesId)
     override fun estadoModoSeguro(bot: Long) = Wabot.estadoModoSeguro(bot)
     override fun reanudarModoSeguro(bot: Long) = Wabot.reanudarModoSeguro(bot)
+
+    override fun fichaPersona(bot: Long, persona: String) = Wabot.fichaPersona(bot, persona)
+    override fun estadisticasPersona(bot: Long, persona: String, dias: Long) = Wabot.estadisticasPersona(bot, persona, dias)
+    override fun silenciarPersona(bot: Long, persona: String, minutos: Long, motivo: String) = Wabot.silenciarPersona(bot, persona, minutos, motivo)
+    override fun quitarSilencioPersona(bot: Long, persona: String) = Wabot.quitarSilencioPersona(bot, persona)
+    override fun listarSilencios(bot: Long) = Wabot.listarSilencios(bot)
+    override fun bloquearPersona(bot: Long, persona: String) = Wabot.bloquearPersona(bot, persona)
+    override fun desbloquearPersona(bot: Long, persona: String) = Wabot.desbloquearPersona(bot, persona)
+    override fun advertirPersona(bot: Long, persona: String, chat: String, motivo: String) = Wabot.advertirPersona(bot, persona, chat, motivo)
+    override fun listarAdvertencias(bot: Long, persona: String) = Wabot.listarAdvertencias(bot, persona)
+    override fun listarPersonasAdvertidas(bot: Long) = Wabot.listarPersonasAdvertidas(bot)
+    override fun quitarAdvertenciaPersona(bot: Long, persona: String, id: Long) = Wabot.quitarAdvertenciaPersona(bot, persona, id).toLong()
+    override fun borrarAdvertenciasPersona(bot: Long, persona: String) = Wabot.borrarAdvertenciasPersona(bot, persona).toLong()
+    override fun listarNotasPersona(bot: Long, persona: String) = Wabot.listarNotasPersona(bot, persona)
+    override fun agregarNotaPersona(bot: Long, persona: String, texto: String) = Wabot.agregarNotaPersona(bot, persona, texto)
+    override fun borrarNotaPersona(bot: Long, persona: String, id: Long) = Wabot.borrarNotaPersona(bot, persona, id)
+    override fun olvidarPersona(bot: Long, persona: String) = Wabot.olvidarPersona(bot, persona)
+    override fun exportarPersona(bot: Long, persona: String) = Wabot.exportarPersona(bot, persona)
+    override fun marcarEstadoChat(bot: Long, chat: String, estado: String) = Wabot.marcarEstadoChat(bot, chat, estado)
+    override fun listarChatsFiltrados(bot: Long, grupos: Boolean, consulta: String, estado: String, etiqueta: Long, limite: Long, desde: Long) =
+        Wabot.listarChatsFiltrados(bot, grupos, consulta, estado, etiqueta, limite, desde)
+    override fun contarPendientes(bot: Long) = Wabot.contarPendientes(bot).toLong()
+    override fun listarEtiquetas(bot: Long) = Wabot.listarEtiquetas(bot)
+    override fun crearEtiqueta(bot: Long, nombre: String, color: String) = Wabot.crearEtiqueta(bot, nombre, color)
+    override fun editarEtiqueta(bot: Long, id: Long, nombre: String, color: String) = Wabot.editarEtiqueta(bot, id, nombre, color)
+    override fun borrarEtiqueta(bot: Long, id: Long) = Wabot.borrarEtiqueta(bot, id)
+    override fun ponerEtiquetaChat(bot: Long, chat: String, id: Long, si: Boolean) = Wabot.ponerEtiquetaChat(bot, chat, id, si)
+    override fun etiquetasDeChat(bot: Long, chat: String) = Wabot.etiquetasDeChat(bot, chat)
+    override fun listarAlertasPalabra(bot: Long) = Wabot.listarAlertasPalabra(bot)
+    override fun crearAlertaPalabra(bot: Long, palabra: String, chatsJson: String) = Wabot.crearAlertaPalabra(bot, palabra, chatsJson)
+    override fun editarAlertaPalabra(bot: Long, id: Long, chatsJson: String, activa: Boolean) = Wabot.editarAlertaPalabra(bot, id, chatsJson, activa)
+    override fun borrarAlertaPalabra(bot: Long, id: Long) = Wabot.borrarAlertaPalabra(bot, id)
+    override fun listarRecordatorios(bot: Long, hechos: Boolean) = Wabot.listarRecordatorios(bot, hechos)
+    override fun crearRecordatorio(bot: Long, texto: String, proximaTs: Long, repetir: String) = Wabot.crearRecordatorio(bot, texto, proximaTs, repetir)
+    override fun editarRecordatorio(bot: Long, id: Long, texto: String, proximaTs: Long, repetir: String) = Wabot.editarRecordatorio(bot, id, texto, proximaTs, repetir)
+    override fun borrarRecordatorio(bot: Long, id: Long) = Wabot.borrarRecordatorio(bot, id)
+    override fun proximoAviso(bot: Long) = Wabot.proximoAviso(bot)
+    override fun dispararAvisos(bot: Long) = Wabot.dispararAvisos(bot)
+    override fun vistaPreviaResumen(bot: Long) = Wabot.vistaPreviaResumen(bot)
+    override fun listarComandosPropios(bot: Long) = Wabot.listarComandosPropios(bot)
+    override fun guardarComandoPropio(bot: Long, id: Long, datosJson: String) = Wabot.guardarComandoPropio(bot, id, datosJson)
+    override fun vistaPreviaComandoPropio(bot: Long, datosJson: String) = Wabot.vistaPreviaComandoPropio(bot, datosJson)
 }

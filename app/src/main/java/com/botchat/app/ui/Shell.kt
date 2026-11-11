@@ -90,6 +90,8 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
     }
     // Los "ver una vez" que quedaron a medias o caducaron se borran al abrir la app.
     LaunchedEffect(bot.id) { runCatching { Repo.barrerVerUnaVez(bot.id) } }
+    // Las alarmas de recordatorios y del resumen diario se vuelven a programar al abrir la app.
+    LaunchedEffect(bot.id) { runCatching { com.botchat.app.Alarmas.reprogramarAsync(ctx) } }
     val entrada by nav.currentBackStackEntryAsState()
     val rutaActual = entrada?.destination?.route
     val principal = rutaActual in RUTAS_PRINCIPALES
@@ -162,6 +164,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                             alAbrirInfo = { nav.navigate("info/${enc(jid)}") },
                             irA = ir,
                             alAbrirUnaVez = { id -> nav.navigate("unavez/${enc(jid)}/${enc(id)}") },
+                            alAbrirEtiquetas = { nav.navigate("etiquetas") },
                         )
                     }
                 }
@@ -188,6 +191,8 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         alAbrirVisor = { id -> nav.navigate("visor/${enc(jid)}/${enc(id)}") },
                         alAbrirDocumento = { id -> nav.navigate("documento/${enc(jid)}/${enc(id)}") },
                         alAbrirLista = { f -> nav.navigate("lista/${enc(jid)}/${enc(f.json())}") },
+                        alAbrirPersona = { nav.navigate("persona/${enc(jid)}") },
+                        alOlvidada = { nav.popBackStack("inicio", false) },
                     )
                 }
                 composable("lista/{jid}/{filtro}") { be ->
@@ -217,7 +222,8 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         cuenta = runCatching { Repo.contarSolicitudes(bot.id) }.getOrDefault(0)
                         Repo.cambios.collect { evs -> if ("solicitudes" in evs) cuenta = runCatching { Repo.contarSolicitudes(bot.id) }.getOrDefault(0) }
                     }
-                    PantallaAjustes(ajustes, alPermisos = { nav.navigate("permisos") }, pendientesSolicitudes = cuenta, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("bot") }, alAvanzado = { nav.navigate("avanzado") }, alEstadisticas = { nav.navigate("estadisticas") }, alPrivacidad = { nav.navigate("privacidad") }, alAutomatizaciones = { nav.navigate("automatizaciones") }, alModulos = { nav.navigate("modulos") }, alIniciativa = { nav.navigate("iniciativa") })
+                    PantallaAjustes(ajustes, alPermisos = { nav.navigate("permisos") }, pendientesSolicitudes = cuenta, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("bot") }, alAvanzado = { nav.navigate("avanzado") }, alEstadisticas = { nav.navigate("estadisticas") }, alPrivacidad = { nav.navigate("privacidad") }, alAutomatizaciones = { nav.navigate("automatizaciones") }, alModulos = { nav.navigate("modulos") }, alIniciativa = { nav.navigate("iniciativa") },
+                        alAvisos = { nav.navigate("avisos") }, alComandosPropios = { nav.navigate("comandos_propios") }, alEtiquetas = { nav.navigate("etiquetas") }, alAdvertencias = { nav.navigate("advertencias") })
                 }
                 composable("permisos") {
                     PantallaPermisos(bot.id, alVolver = { nav.popBackStack() }, alRangos = { nav.navigate("rangos") }, alSolicitudes = { nav.navigate("solicitudes") }, alGrupos = { nav.navigate("politicas_grupos") })
@@ -231,6 +237,22 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 composable("politicas_grupos") { PantallaPoliticasGrupo(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("permisos_avanzado") { PantallaPermisosAvanzado(bot.id, alVolver = { nav.popBackStack() }, alRegistro = { nav.navigate("registro_acciones") }) }
                 composable("registro_acciones") { PantallaRegistroAcciones(bot.id, alVolver = { nav.popBackStack() }) }
+                composable("avisos") { PantallaAvisos(bot.id, alVolver = { nav.popBackStack() }, alRecordatorio = { nav.navigate("recordatorio/$it") }) }
+                composable("recordatorio/{id}") { be ->
+                    val id = be.arguments?.getString("id")?.toLongOrNull() ?: return@composable
+                    EditorRecordatorio(bot.id, id, alVolver = { nav.popBackStack() })
+                }
+                composable("comandos_propios") { PantallaComandosPropios(bot.id, alVolver = { nav.popBackStack() }, alEditar = { nav.navigate("comando_propio/$it") }) }
+                composable("comando_propio/{id}") { be ->
+                    val id = be.arguments?.getString("id")?.toLongOrNull() ?: return@composable
+                    EditorComandoPropio(bot.id, id, alVolver = { nav.popBackStack() })
+                }
+                composable("etiquetas") { PantallaEtiquetas(bot.id, alVolver = { nav.popBackStack() }) }
+                composable("advertencias") { PantallaAdvertencias(bot.id, alVolver = { nav.popBackStack() }, alAbrirPersona = { nav.navigate("persona/${enc(it)}") }) }
+                composable("persona/{jid}") { be ->
+                    val jid = be.arguments?.getString("jid") ?: return@composable
+                    PantallaPersonaDetalle(bot.id, jid, alVolver = { nav.popBackStack() })
+                }
                 composable("modulos") {
                     PantallaModulos(
                         bot.id, alVolver = { nav.popBackStack() }, alConfigurar = { nav.navigate("modulo_config/${enc(it)}") },

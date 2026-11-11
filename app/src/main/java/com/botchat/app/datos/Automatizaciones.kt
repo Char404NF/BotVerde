@@ -102,7 +102,7 @@ data class Recorrido(val sesion: SesionVivo, val persona: String, val pasos: Lis
 data class FilaEstMenu(val paso: String, val titulo: String, val valor: Long, val opcion: String, val texto: String)
 data class EstadMenu(val iniciados: Long, val completados: Long, val abandonados: Long, val humano: Long, val expirados: Long, val opciones: List<FilaEstMenu>, val embudo: List<FilaEstMenu>, val invalidas: List<FilaEstMenu>)
 data class EtiquetaMenu(val nombre: String, val ruta: String, val ultima: Long, val estado: String)
-data class AvisoLocal(val id: Long, val ts: Long, val tipo: String, val chat: String, val titulo: String, val detalle: String)
+data class AvisoLocal(val id: Long, val ts: Long, val tipo: String, val chat: String, val titulo: String, val detalle: String, val persona: String = "")
 data class PruebaSim(val salidas: List<String>, val estado: String, val paso: String, val omitido: String, val coincide: Boolean)
 
 object JsonAuto {
@@ -139,7 +139,7 @@ object JsonAuto {
     }
 
     fun etiquetas(json: String) = lista(json) { EtiquetaMenu(it.optString("nombre"), it.optString("ruta"), it.optLong("ultima"), it.optString("estado")) }
-    fun aviso(json: String): AvisoLocal { val o = JSONObject(json); return AvisoLocal(o.optLong("id"), o.optLong("ts"), o.optString("tipo"), o.optString("chat"), o.optString("titulo"), o.optString("detalle")) }
+    fun aviso(json: String): AvisoLocal { val o = JSONObject(json); return AvisoLocal(o.optLong("id"), o.optLong("ts"), o.optString("tipo"), o.optString("chat"), o.optString("titulo"), o.optString("detalle"), o.optString("persona")) }
     fun prueba(json: String): PruebaSim {
         val o = JSONObject(json)
         val s = o.optJSONArray("salidas")

@@ -7,6 +7,10 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Avisos para mí (recordatorios y resumen diario): alarmas locales. Con SCHEDULE_EXACT_ALARM suenan a la hora; sin él se usan inexactas.
+         RECEIVE_BOOT_COMPLETED solo sirve para volver a programar esas alarmas tras reiniciar el teléfono (no escribe mensajes). -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:name=".BotApp"
@@ -42,6 +46,15 @@
         </provider>
 
         <receiver android:name=".RespuestaRapida" android:exported="false" />
+
+        <receiver android:name=".AlarmaAvisosReceiver" android:exported="false" />
+
+        <receiver android:name=".ArranqueReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Servicio en primer plano: mantiene el bot conectado. "specialUse" no tiene límite de tiempo
              (dataSync se corta a las 6 h en Android 15) y no depende de Google. -->

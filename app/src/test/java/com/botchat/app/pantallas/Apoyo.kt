@@ -280,10 +280,132 @@ class MotorFalso : Motor {
     override fun calendarioChat(bot: Long, chat: String, mes: String): String { llamadas += "calendario:$mes"; return calendario }
     override fun mensajesDia(bot: Long, chat: String, dia: String): String { llamadas += "dia:$dia"; return porDia[dia] ?: "[]" }
     override fun estadisticasGlobales(bot: Long, dias: Long) = globales
+
+    // Personas, chat y avisos (bloque B)
+    var fichaJson = Apoyo.fichaEjemplo()
+    var estadisticasPersonaJson = """{"persona":"p","total":3,"porTipo":{"texto":2,"imagen":1},"porHora":[0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"porDia":[{"dia":"2026-03-10","cuenta":3}],"chats":[{"chat":"a@s.whatsapp.net","nombre":"Ana","cuenta":3,"grupo":false}],"bytes":0,"primerDia":"2026-03-10","ultimoDia":"2026-03-10"}"""
+    var silenciosJson = "[]"
+    var advertenciasJson = "[]"
+    var advertidosJson = "[]"
+    var notasJson = "[]"
+    var resultadoAdvertir = """{"total":1,"tope":3,"llegoAlTope":false,"accion":"avisar","hecho":"","motivo":""}"""
+    var olvidarJson = """{"mensajes":4,"bytes":0,"notas":1,"advertencias":2,"sesiones":0,"alias":2}"""
+    var exportarRuta = "exportes/1/persona_x.bcf"
+    var personaFalla: String? = null
+    private fun pFalla() { personaFalla?.let { throw IllegalStateException(it) } }
+    override fun fichaPersona(bot: Long, persona: String) = fichaJson
+    override fun estadisticasPersona(bot: Long, persona: String, dias: Long) = estadisticasPersonaJson
+    override fun silenciarPersona(bot: Long, persona: String, minutos: Long, motivo: String) {
+        llamadas += "silenciar:$persona:$minutos:$motivo"; pFalla()
+        fichaJson = JSONObject(fichaJson).put("silencio", JSONObject().put("persona", persona).put("hastaTs", if (minutos > 0) System.currentTimeMillis() / 1000 + minutos * 60 else 0L).put("motivo", motivo).put("creadoTs", 1).put("por", "yo")).toString()
+    }
+    override fun quitarSilencioPersona(bot: Long, persona: String): Boolean { llamadas += "quitarSilencio:$persona"; pFalla(); fichaJson = JSONObject(fichaJson).put("silencio", JSONObject.NULL).toString(); return true }
+    override fun listarSilencios(bot: Long) = silenciosJson
+    override fun bloquearPersona(bot: Long, persona: String) { llamadas += "bloquearPersona:$persona"; pFalla(); fichaJson = JSONObject(fichaJson).put("bloqueada", true).toString() }
+    override fun desbloquearPersona(bot: Long, persona: String): Boolean { llamadas += "desbloquearPersona:$persona"; pFalla(); fichaJson = JSONObject(fichaJson).put("bloqueada", false).toString(); return true }
+    override fun advertirPersona(bot: Long, persona: String, chat: String, motivo: String): String {
+        llamadas += "advertir:$persona:$chat:$motivo"; pFalla()
+        fichaJson = JSONObject(fichaJson).put("advertencias", JSONObject(fichaJson).optInt("advertencias") + 1).toString()
+        return resultadoAdvertir
+    }
+    override fun listarAdvertencias(bot: Long, persona: String) = advertenciasJson
+    override fun listarPersonasAdvertidas(bot: Long) = advertidosJson
+    override fun quitarAdvertenciaPersona(bot: Long, persona: String, id: Long): Long { llamadas += "quitarAdvertencia:$persona:$id"; pFalla(); return 1 }
+    override fun borrarAdvertenciasPersona(bot: Long, persona: String): Long { llamadas += "borrarAdvertencias:$persona"; pFalla(); advertenciasJson = "[]"; return 2 }
+    override fun listarNotasPersona(bot: Long, persona: String) = notasJson
+    override fun agregarNotaPersona(bot: Long, persona: String, texto: String) {
+        llamadas += "nota:$persona:$texto"; pFalla()
+        notasJson = JSONArray(notasJson).put(JSONObject().put("id", 50).put("persona", persona).put("texto", texto).put("ts", System.currentTimeMillis() / 1000).put("por", "yo")).toString()
+    }
+    override fun borrarNotaPersona(bot: Long, persona: String, id: Long) { llamadas += "borrarNota:$persona:$id"; pFalla(); notasJson = "[]" }
+    override fun olvidarPersona(bot: Long, persona: String): String { llamadas += "olvidarPersona:$persona"; pFalla(); return olvidarJson }
+    override fun exportarPersona(bot: Long, persona: String): String { llamadas += "exportarPersona:$persona"; pFalla(); return exportarRuta }
+    var chatsFiltrados = mutableMapOf<String, String>() // "estado|etiqueta" → JSON
+    override fun marcarEstadoChat(bot: Long, chat: String, estado: String) {
+        llamadas += "estadoChat:$chat:$estado"; pFalla()
+        estadoChat = JSONObject(estadoChat).put("estadoTrabajo", estado).toString()
+    }
+    override fun listarChatsFiltrados(bot: Long, grupos: Boolean, consulta: String, estado: String, etiqueta: Long, limite: Long, desde: Long): String {
+        llamadas += "filtrar:$grupos:$estado:$etiqueta"
+        return chatsFiltrados["$estado|$etiqueta"] ?: "[]"
+    }
+    override fun contarPendientes(bot: Long) = pendientes
+    var pendientes = 0L
+    var etiquetasJson = mutableListOf<JSONObject>()
+    var etiquetasDeChatMapa = mutableMapOf<String, MutableSet<Long>>()
+    private fun etiquetaVista(e: JSONObject) = JSONObject(e.toString()).put("chats", etiquetasDeChatMapa.values.count { e.getLong("id") in it })
+    override fun listarEtiquetas(bot: Long) = JSONArray(etiquetasJson.map(::etiquetaVista)).toString()
+    override fun crearEtiqueta(bot: Long, nombre: String, color: String): Long {
+        llamadas += "crearEtiqueta:$nombre:$color"; pFalla()
+        val id = (etiquetasJson.maxOfOrNull { it.getLong("id") } ?: 0L) + 1
+        etiquetasJson += JSONObject().put("id", id).put("nombre", nombre).put("color", color.ifBlank { "#2EC4CB" }).put("posicion", id).put("chats", 0)
+        return id
+    }
+    override fun editarEtiqueta(bot: Long, id: Long, nombre: String, color: String) {
+        llamadas += "editarEtiqueta:$id:$nombre:$color"; pFalla()
+        etiquetasJson.first { it.getLong("id") == id }.put("nombre", nombre).put("color", color)
+    }
+    override fun borrarEtiqueta(bot: Long, id: Long) { llamadas += "borrarEtiqueta:$id"; pFalla(); etiquetasJson.removeAll { it.getLong("id") == id }; etiquetasDeChatMapa.values.forEach { it.remove(id) } }
+    override fun ponerEtiquetaChat(bot: Long, chat: String, id: Long, si: Boolean) {
+        llamadas += "etiquetaChat:$chat:$id:$si"; pFalla()
+        val s = etiquetasDeChatMapa.getOrPut(chat) { mutableSetOf() }
+        if (si) s += id else s -= id
+    }
+    override fun etiquetasDeChat(bot: Long, chat: String) = JSONArray(etiquetasJson.filter { it.getLong("id") in (etiquetasDeChatMapa[chat] ?: emptySet<Long>()) }.map(::etiquetaVista)).toString()
+    var palabras = mutableListOf<JSONObject>()
+    override fun listarAlertasPalabra(bot: Long) = JSONArray(palabras).toString()
+    override fun crearAlertaPalabra(bot: Long, palabra: String, chatsJson: String): Long {
+        llamadas += "crearPalabra:$palabra:$chatsJson"; pFalla()
+        val id = (palabras.maxOfOrNull { it.getLong("id") } ?: 0L) + 1
+        palabras += JSONObject().put("id", id).put("palabra", palabra).put("chats", JSONArray(chatsJson)).put("activa", true)
+        return id
+    }
+    override fun editarAlertaPalabra(bot: Long, id: Long, chatsJson: String, activa: Boolean) {
+        llamadas += "editarPalabra:$id:$chatsJson:$activa"; pFalla()
+        palabras.first { it.getLong("id") == id }.put("chats", JSONArray(chatsJson)).put("activa", activa)
+    }
+    override fun borrarAlertaPalabra(bot: Long, id: Long) { llamadas += "borrarPalabra:$id"; pFalla(); palabras.removeAll { it.getLong("id") == id } }
+    var recordatoriosLista = mutableListOf<JSONObject>()
+    override fun listarRecordatorios(bot: Long, hechos: Boolean) = JSONArray(recordatoriosLista.filter { hechos || it.getString("estado") == "pendiente" }).toString()
+    override fun crearRecordatorio(bot: Long, texto: String, proximaTs: Long, repetir: String): Long {
+        llamadas += "crearRecordatorio:$texto:$proximaTs:$repetir"; pFalla()
+        val id = (recordatoriosLista.maxOfOrNull { it.getLong("id") } ?: 0L) + 1
+        recordatoriosLista += JSONObject().put("id", id).put("texto", texto).put("proximaTs", proximaTs).put("repetir", repetir).put("estado", "pendiente").put("creadoTs", 1).put("avisadoTs", 0)
+        return id
+    }
+    override fun editarRecordatorio(bot: Long, id: Long, texto: String, proximaTs: Long, repetir: String) {
+        llamadas += "editarRecordatorio:$id:$texto:$proximaTs:$repetir"; pFalla()
+        recordatoriosLista.first { it.getLong("id") == id }.put("texto", texto).put("proximaTs", proximaTs).put("repetir", repetir).put("estado", "pendiente")
+    }
+    override fun borrarRecordatorio(bot: Long, id: Long) { llamadas += "borrarRecordatorio:$id"; pFalla(); recordatoriosLista.removeAll { it.getLong("id") == id } }
+    var proximoAvisoTs = 0L
+    var disparo = """{"avisos":[],"siguiente":0}"""
+    override fun proximoAviso(bot: Long): Long { llamadas += "proximoAviso"; return proximoAvisoTs }
+    override fun dispararAvisos(bot: Long): String { llamadas += "dispararAvisos"; return disparo }
+    override fun vistaPreviaResumen(bot: Long) = "Hoy llegaron 5 mensajes de 3 chat(s).\nChats pendientes: 1\nSolicitudes por revisar: 0\nAdvertencias de hoy: 0"
+    var comandosPropiosJson = mutableListOf<JSONObject>()
+    override fun listarComandosPropios(bot: Long) = JSONArray(comandosPropiosJson).toString()
+    override fun guardarComandoPropio(bot: Long, id: Long, datosJson: String): Long {
+        llamadas += "guardarComando:$id:$datosJson"; pFalla()
+        val datos = JSONObject(datosJson)
+        val usado = comandosPropiosJson.any { it.getLong("id") != id && it.getJSONObject("datos").getString("nombre").equals(datos.getString("nombre"), true) }
+        if (usado) throw IllegalStateException("ya tienes un comando con ese nombre")
+        val nuevo = if (id == 0L) (comandosPropiosJson.maxOfOrNull { it.getLong("id") } ?: 0L) + 1 else id
+        comandosPropiosJson.removeAll { it.getLong("id") == nuevo }
+        comandosPropiosJson += JSONObject().put("id", nuevo).put("activo", true).put("datos", datos)
+        return nuevo
+    }
+    override fun vistaPreviaComandoPropio(bot: Long, datosJson: String): String { llamadas += "vistaComando"; return "Escriben: !" + JSONObject(datosJson).optString("nombre") + "\n\n" + JSONObject(datosJson).optString("texto") }
 }
 
 object Apoyo {
     val clave = ByteArray(32) { (it + 1).toByte() }
+
+    fun fichaEjemplo(persona: String = "5215511111111@s.whatsapp.net", nombre: String = "Ana Pérez") = JSONObject()
+        .put("persona", persona).put("alias", JSONArray().put(persona)).put("nombre", nombre).put("telefono", "+52 55 1111 1111")
+        .put("silencio", JSONObject.NULL).put("bloqueada", false).put("noMolestar", false).put("advertencias", 0).put("notas", 0)
+        .put("etiquetas", JSONArray()).put("primeraTs", 1_700_000_000L).put("ultimaTs", 1_700_100_000L).put("recibidos", 12).put("enviados", 5).put("grupos", 1)
+        .put("rango", "").put("rangoColor", "").toString()
 
     fun casillaJson(id: String, nombre: String, grupo: String, riesgo: String = "bajo", privado: Boolean = true, grupos: Boolean = true, confirma: Boolean = false, base: Boolean = false) =
         JSONObject().put("id", id).put("nombre", nombre).put("descripcion", "Descripción de $nombre").put("grupo", grupo).put("riesgo", riesgo)

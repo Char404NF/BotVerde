@@ -81,6 +81,7 @@ fun PantallaInicio(
     val personales by vm.personales.collectAsState()
     val grupos by vm.grupos.collectAsState()
     val contadores by vm.contadores.collectAsState()
+    val etiquetas by vm.etiquetas.collectAsState()
     val haptica = rememberHaptica()
 
     Column(Modifier.fillMaxSize()) {
@@ -97,6 +98,7 @@ fun PantallaInicio(
             ),
             modifier = Modifier.fillMaxWidth().padding(horizontal = Esp.l, vertical = Esp.s).testTag("buscador"),
         )
+        FiltrosDeChats(vm)
         if (sinSesion) BannerSinSesion(alRevincular)
         PrimaryTabRow(selectedTabIndex = pager.currentPage, containerColor = MaterialTheme.colorScheme.surface) {
             listOf("Personales", "Grupos").forEachIndexed { i, titulo ->
@@ -105,7 +107,7 @@ fun PantallaInicio(
         }
         HorizontalPager(pager, Modifier.fillMaxSize(), key = { it }) { pagina ->
             val lista = if (pagina == 0) personales else grupos
-            ListaDeChats(lista, contadores, esGrupos = pagina == 1, buscando = vm.consulta.isNotBlank(), error = vm.error, alAbrirChat = alAbrirChat)
+            ListaDeChats(lista, contadores, esGrupos = pagina == 1, buscando = vm.consulta.isNotBlank(), error = vm.error, alAbrirChat = alAbrirChat, etiquetas = etiquetas, filtrando = vm.filtroEstado.isNotEmpty() || vm.filtroEtiqueta != 0L)
         }
     }
 }
@@ -126,12 +128,14 @@ private fun BannerSinSesion(alRevincular: () -> Unit) {
 }
 
 @Composable
-private fun ListaDeChats(lista: List<ChatItem>?, contadores: Map<String, Int>, esGrupos: Boolean, buscando: Boolean, error: String?, alAbrirChat: (String) -> Unit) {
+private fun ListaDeChats(lista: List<ChatItem>?, contadores: Map<String, Int>, esGrupos: Boolean, buscando: Boolean, error: String?, alAbrirChat: (String) -> Unit, etiquetas: List<com.botchat.app.datos.EtiquetaItem> = emptyList(), filtrando: Boolean = false) {
     when {
         lista == null -> FilasDeCarga()
         lista.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             if (buscando) {
                 EstadoVacio(Ico.Buscar, "Sin resultados", "No hay chats con ese nombre o número.")
+            } else if (filtrando) {
+                EstadoVacio(Ico.Seleccionar, "Ningún chat con ese filtro", "Marca chats como pendientes o ponles etiquetas desde su menú ⋮.", Modifier.testTag("filtro_vacio"))
             } else {
                 EstadoVacio(
                     Ico.Documento,
@@ -143,7 +147,7 @@ private fun ListaDeChats(lista: List<ChatItem>?, contadores: Map<String, Int>, e
         else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
             item { androidx.compose.runtime.LaunchedEffect(Unit) { kotlinx.coroutines.delay(700); EntradaLista.hecha = true } }
             itemsIndexed(lista, key = { _, c -> c.jid }) { i, c ->
-                FilaChat(c, Modifier.animateItem().entradaEscalonada(i), alAbrirChat, contadores[c.jid] ?: 0)
+                FilaChat(c, Modifier.animateItem().entradaEscalonada(i), alAbrirChat, contadores[c.jid] ?: 0, etiquetas)
                 HorizontalDivider(Modifier.padding(start = 84.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             }
         }
@@ -151,7 +155,7 @@ private fun ListaDeChats(lista: List<ChatItem>?, contadores: Map<String, Int>, e
 }
 
 @Composable
-fun FilaChat(c: ChatItem, modifier: Modifier, alAbrir: (String) -> Unit, contador: Int = 0) {
+fun FilaChat(c: ChatItem, modifier: Modifier, alAbrir: (String) -> Unit, contador: Int = 0, etiquetas: List<com.botchat.app.datos.EtiquetaItem> = emptyList()) {
     Row(modifier.fillMaxWidth().clickableEscala { alAbrir(c.jid) }.padding(horizontal = Esp.l, vertical = Esp.m), verticalAlignment = Alignment.CenterVertically) {
         Avatar(c.nombre, c.foto, c.fotoTs, c.jid, 52.dp, Modifier.compartido("avatar-${c.jid}"))
         Spacer(Modifier.width(Esp.l))
@@ -165,6 +169,10 @@ fun FilaChat(c: ChatItem, modifier: Modifier, alAbrir: (String) -> Unit, contado
                     Spacer(Modifier.width(6.dp))
                     Text(Paises.banderaDe(c.pais), style = MaterialTheme.typography.bodyMedium)
                 }
+                if (c.estadoTrabajo.isNotEmpty()) {
+                    Spacer(Modifier.width(6.dp))
+                    MarcaEstadoTrabajo(c.estadoTrabajo, Modifier.testTag("marca_${c.jid}"))
+                }
             }
             Spacer(Modifier.size(2.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -174,6 +182,11 @@ fun FilaChat(c: ChatItem, modifier: Modifier, alAbrir: (String) -> Unit, contado
                     Spacer(Modifier.width(4.dp))
                 }
                 TextoUnaLinea(descripcionCorta(c.ultimoTipo, c.ultimoTexto, c.ultimoBorrado))
+            }
+            val puestas = etiquetas.filter { it.id in c.etiquetas }
+            if (puestas.isNotEmpty()) {
+                Spacer(Modifier.size(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) { puestas.take(3).forEach { ChipEtiqueta(it) } }
             }
         }
         Spacer(Modifier.width(Esp.m))
@@ -189,3 +202,46 @@ fun FilaChat(c: ChatItem, modifier: Modifier, alAbrir: (String) -> Unit, contado
     }
 }
 
+
+/** Marca visible de Pendiente / Resuelto. */
+@Composable
+fun MarcaEstadoTrabajo(estado: String, modifier: Modifier = Modifier) {
+    val pendiente = estado == "pendiente"
+    Box(
+        modifier.clip(RoundedCornerShape(50)).background(if (pendiente) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.secondaryContainer).padding(horizontal = 8.dp, vertical = 1.dp),
+    ) {
+        Text(
+            if (pendiente) "Pendiente" else "✓ Resuelto", style = MaterialTheme.typography.labelSmall,
+            color = if (pendiente) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSecondaryContainer, maxLines = 1,
+        )
+    }
+}
+
+/** Filtros de la lista: Todos, Pendientes, Resueltos y una etiqueta. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FiltrosDeChats(vm: InicioVm) {
+    val etiquetas by vm.etiquetas.collectAsState()
+    val pendientes by vm.pendientes.collectAsState()
+    val haptica = rememberHaptica()
+    androidx.compose.foundation.lazy.LazyRow(
+        Modifier.fillMaxWidth().testTag("filtros_chats"), contentPadding = PaddingValues(horizontal = Esp.l), horizontalArrangement = Arrangement.spacedBy(Esp.s),
+    ) {
+        item {
+            androidx.compose.material3.FilterChip(vm.filtroEstado.isEmpty() && vm.filtroEtiqueta == 0L, { haptica(Toque.Suave); vm.filtrar("", 0L) }, { Text("Todos") }, modifier = Modifier.testTag("filtro_todos"))
+        }
+        item {
+            androidx.compose.material3.FilterChip(vm.filtroEstado == "pendiente", { haptica(Toque.Suave); vm.filtrar(if (vm.filtroEstado == "pendiente") "" else "pendiente", 0L) }, { Text(if (pendientes > 0) "Pendientes ($pendientes)" else "Pendientes") }, modifier = Modifier.testTag("filtro_pendientes"))
+        }
+        item {
+            androidx.compose.material3.FilterChip(vm.filtroEstado == "resuelto", { haptica(Toque.Suave); vm.filtrar(if (vm.filtroEstado == "resuelto") "" else "resuelto", 0L) }, { Text("Resueltos") }, modifier = Modifier.testTag("filtro_resueltos"))
+        }
+        items(etiquetas.size) { i ->
+            val e = etiquetas[i]
+            androidx.compose.material3.FilterChip(
+                vm.filtroEtiqueta == e.id, { haptica(Toque.Suave); vm.filtrar("", if (vm.filtroEtiqueta == e.id) 0L else e.id) },
+                { Text(e.nombre, maxLines = 1) }, leadingIcon = { PuntoRango(e.color, 10) }, modifier = Modifier.testTag("filtro_etiqueta_${e.id}"),
+            )
+        }
+    }
+}

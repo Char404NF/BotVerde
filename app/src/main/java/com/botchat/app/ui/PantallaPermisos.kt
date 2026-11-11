@@ -412,6 +412,27 @@ fun PantallaPermisosAvanzado(botId: Long, alVolver: () -> Unit, alRegistro: () -
                 CampoAjuste("Días que una solicitud ignorada se mantiene ignorada", "ignorada_dias", a, "Pasado este tiempo, si vuelve a escribir regresa a Pendientes.", botId, scope, numerico = true) { version++ }
                 CampoAjuste("Comandos por minuto de quien no tiene rango", "limite_sin_rango", a, "0 = sin límite.", botId, scope, numerico = true) { version++ }
             }
+            Seccion("Advertencias") {
+                CampoAjuste("Advertencias para que actúe la regla", "adv_tope", a, "Al llegar a este número se hace lo de abajo. 0 = nunca. Siempre te llega un aviso.", botId, scope, numerico = true) { version++ }
+                Column(Modifier.padding(horizontal = Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
+                    Text("Qué hace al llegar al tope", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
+                        listOf("avisar" to "Solo avisarme", "silenciar" to "Silenciar al bot para esa persona", "borrar" to "Borrar su mensaje", "expulsar" to "Expulsarla del grupo").forEach { (v, t) ->
+                            FilterChip((a["adv_accion"] ?: "avisar") == v, {
+                                scope.launch { runCatching { Repo.fijarAjustePermisos(botId, "adv_accion", v) }.onFailure { avisaToast(ctx, it.message, true) }; version++ }
+                            }, { Text(t, maxLines = 1) }, modifier = Modifier.testTag("adv_accion_$v"))
+                        }
+                    }
+                    Text("Borrar y expulsar solo funcionan en grupos donde el bot es administrador; si no lo es, solo te avisa.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if ((a["adv_accion"] ?: "avisar") == "silenciar") CampoAjuste("Minutos que dura el silencio", "adv_silencio_min", a, "1440 = un día.", botId, scope, numerico = true) { version++ }
+            }
+            Seccion("Reportes (!reportar)") {
+                Interruptor("Contestar “Gracias, ya avisé”", "Apagado: quien reporta no recibe respuesta en el chat; solo te llega la notificación.", a["reportar_gracias"] == "1", true, Ico.Aviso) {
+                    scope.launch { runCatching { Repo.fijarAjustePermisos(botId, "reportar_gracias", if (it) "1" else "0") }.onFailure { e -> avisaToast(ctx, e.message, true) }; version++ }
+                }
+                if (a["reportar_gracias"] == "1") CampoAjuste("Texto de la respuesta", "reportar_texto", a, "Máximo 200 letras.", botId, scope) { version++ }
+            }
             Seccion("Confirmaciones") {
                 CampoAjuste("Segundos que dura un código", "confirm_seg", a, "Entre 15 y 900. Cada código sirve una sola vez.", botId, scope, numerico = true) { version++ }
             }

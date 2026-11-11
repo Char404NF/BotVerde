@@ -58,6 +58,8 @@ object Notificador {
                 if (e.startsWith("chat:")) runCatching { revisar(ctx, e.removePrefix("chat:")) }
                 if (e == "motor:freno") runCatching { avisoFreno(ctx) }
                 if (e.startsWith("aviso:")) e.removePrefix("aviso:").toLongOrNull()?.let { runCatching { avisoLocal(ctx, it) } }
+                // Cambió un recordatorio o el resumen diario: se vuelve a programar la próxima alarma.
+                if (e == "recordatorios" || e == "permisos_ajustes") runCatching { Alarmas.reprogramarAsync(ctx) }
             }
         }
     }
@@ -114,6 +116,9 @@ object Notificador {
      * neutro (visibilidad privada con versión pública); el detalle (nombre, número, datos) se ve con el teléfono desbloqueado. Un interruptor de
      * Avanzado permite verlo también bloqueado (apagado por defecto).
      */
+    /** Muestra como notificación un aviso ya creado (lo usa la alarma de recordatorios y del resumen diario). */
+    suspend fun mostrarAviso(ctx: Context, id: Long) = avisoLocal(ctx, id)
+
     private suspend fun avisoLocal(ctx: Context, id: Long) {
         if (!permitido(ctx)) return
         val bot = Datos.get(ctx).primero() ?: return
@@ -123,9 +128,11 @@ object Notificador {
         val detalleVisibleBloqueado = Ajustes.get(ctx).detalleBloqueado.value
         val abrir = PendingIntent.getActivity(
             ctx, a.chat.hashCode() + a.tipo.hashCode(), Intent(ctx, MainActivity::class.java).apply {
-                if (a.chat.isNotEmpty() && a.tipo == "humano") putExtra(EXTRA_CHAT, a.chat)
+                if (a.chat.isNotEmpty() && (a.tipo == "humano" || a.tipo == "palabra" || a.tipo == "reporte")) putExtra(EXTRA_CHAT, a.chat)
                 if (a.tipo == "desconocido") putExtra(EXTRA_RUTA, "solicitudes")
                 if (a.tipo == "modo_seguro") putExtra(EXTRA_RUTA, "iniciativa")
+                if (a.tipo == "advertencias" && a.persona.isNotEmpty()) putExtra(EXTRA_RUTA, "persona/" + android.net.Uri.encode(a.persona))
+                if (a.tipo == "recordatorio" || a.tipo == "resumen") putExtra(EXTRA_RUTA, "avisos")
             }.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )

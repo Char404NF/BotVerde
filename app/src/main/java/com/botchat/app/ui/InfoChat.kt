@@ -74,7 +74,10 @@ private val PESTANAS_INFO = listOf("Resumen", "Calendario", "Multimedia")
 /** Info del chat: resumen de números, calendario de actividad y multimedia por fecha. Todo sale de contadores; nunca se lee el texto de los mensajes. */
 @OptIn(UnstableApi::class)
 @Composable
-fun PantallaInfoChat(botId: Long, jid: String, alVolver: () -> Unit, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit, alAbrirLista: (FiltroLista) -> Unit = {}) {
+fun PantallaInfoChat(
+    botId: Long, jid: String, alVolver: () -> Unit, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit, alAbrirLista: (FiltroLista) -> Unit = {},
+    alAbrirPersona: () -> Unit = {}, alOlvidada: () -> Unit = {},
+) {
     val scope = rememberCoroutineScope()
     val pager = rememberPagerState { PESTANAS_INFO.size }
     val haptica = rememberHaptica()
@@ -96,7 +99,7 @@ fun PantallaInfoChat(botId: Long, jid: String, alVolver: () -> Unit, alAbrirViso
     ) { relleno ->
         HorizontalPager(pager, Modifier.fillMaxSize().padding(relleno)) { pagina ->
             when (pagina) {
-                0 -> TabResumen(botId, jid, version, alAbrirLista)
+                0 -> TabResumen(botId, jid, version, alAbrirLista) { chat?.let { c -> if (!c.esGrupo) TarjetaPersona(botId, jid, c.nombre, alAbrirPersona, alOlvidada) } }
                 1 -> TabCalendario(botId, jid, version, alAbrirLista)
                 else -> TabMultimedia(botId, jid, version, alAbrirVisor, alAbrirDocumento)
             }
@@ -119,11 +122,12 @@ private fun CabeceraInfo(chat: ChatItem?, jid: String) {
 // ---------- Resumen ----------
 
 @Composable
-private fun TabResumen(botId: Long, jid: String, version: Int, alAbrirLista: (FiltroLista) -> Unit) {
+private fun TabResumen(botId: Long, jid: String, version: Int, alAbrirLista: (FiltroLista) -> Unit, cabecera: @Composable () -> Unit = {}) {
     val r by produceState<ResumenChat?>(null, jid, version) { value = runCatching { Repo.estadisticasChat(botId, jid) }.getOrNull() }
     val datos = r
     if (datos == null) { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }; return }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
+        cabecera()
         NotaDesde(datos.desde, datos.listo)
         if (datos.enviados + datos.recibidos == 0L) {
             EstadoVacio(Ico.Estadisticas, "Sin números todavía", "Cuando haya mensajes en este chat, aquí verás cuántos se enviaron y recibieron.", Modifier.padding(top = Esp.xl))

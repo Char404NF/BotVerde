@@ -110,6 +110,7 @@ fun PantallaChat(
     alAbrirInfo: () -> Unit = {},
     irA: String = "",
     alAbrirUnaVez: (String) -> Unit = {},
+    alAbrirEtiquetas: () -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as android.app.Application
     val vm: ChatVm = viewModel(key = "chat-$jid", factory = viewModelFactory { initializer { ChatVm(app, jid) } })
@@ -124,6 +125,8 @@ fun PantallaChat(
     var menu by remember { mutableStateOf(false) }
     var confirmaArchivos by remember { mutableStateOf<com.botchat.app.datos.Liberado?>(null) }
     var confirmaChat by remember { mutableStateOf(false) }
+    var pausandoBot by remember { mutableStateOf(false) }
+    var etiquetando by remember { mutableStateOf(false) }
     var verFoto by remember { mutableStateOf(false) }
     var olvidando by remember { mutableStateOf<Msg?>(null) }
     var seleccion by remember { mutableStateOf(setOf<String>()) }
@@ -270,6 +273,12 @@ fun PantallaChat(
                             } else if (chat != null) {
                                 TextoUnaLinea("Grupo", estilo = MaterialTheme.typography.bodySmall)
                             }
+                            if (vm.estadoChat.estadoTrabajo.isNotEmpty() || vm.etiquetasLocales.isNotEmpty()) {
+                                Row(Modifier.padding(top = 2.dp).testTag("marcas_chat"), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    if (vm.estadoChat.estadoTrabajo.isNotEmpty()) MarcaEstadoTrabajo(vm.estadoChat.estadoTrabajo, Modifier.testTag("marca_estado_chat"))
+                                    vm.etiquetasLocales.take(2).forEach { ChipEtiqueta(it) }
+                                }
+                            }
                         }
                     }
                 },
@@ -287,6 +296,17 @@ fun PantallaChat(
                                 text = { Text(if (controlTomado) "Reanudar el bot en este chat" else "Tomar el control (el bot calla aquí)") },
                                 onClick = { menu = false; if (controlTomado) vm.reactivarBot() else vm.tomarControl() }, modifier = Modifier.testTag("menu_tomar_control"),
                             )
+                            if (!controlTomado) DropdownMenuItem(text = { Text("Pausar el bot un rato…") }, onClick = { menu = false; pausandoBot = true }, modifier = Modifier.testTag("menu_pausar_bot"))
+                            val estadoT = vm.estadoChat.estadoTrabajo
+                            DropdownMenuItem(
+                                text = { Text(if (estadoT == "pendiente") "Quitar la marca de pendiente" else "Marcar como pendiente") },
+                                onClick = { menu = false; haptica(Toque.Suave); vm.marcarEstado(if (estadoT == "pendiente") "" else "pendiente") }, modifier = Modifier.testTag("menu_pendiente"),
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (estadoT == "resuelto") "Quitar la marca de resuelto" else "Marcar como resuelto") },
+                                onClick = { menu = false; haptica(Toque.Suave); vm.marcarEstado(if (estadoT == "resuelto") "" else "resuelto") }, modifier = Modifier.testTag("menu_resuelto"),
+                            )
+                            DropdownMenuItem(text = { Text("Etiquetas…") }, onClick = { menu = false; etiquetando = true }, modifier = Modifier.testTag("menu_etiquetas"))
                             DropdownMenuItem(text = { Text(if (vm.estadoChat.silenciado) "Activar notificaciones" else "Silenciar notificaciones") }, onClick = { menu = false; vm.silenciar(!vm.estadoChat.silenciado) }, modifier = Modifier.testTag("menu_silenciar"))
                             DropdownMenuItem(text = { Text("Borrar archivos de este chat") }, onClick = {
                                 menu = false
@@ -491,6 +511,23 @@ fun PantallaChat(
         )
     }
     if (verFoto) FotoGrandeDialogo(vm.botId, jid, chat?.nombre ?: "", { verFoto = false })
+    if (pausandoBot) {
+        AlertDialog(
+            onDismissRequest = { pausandoBot = false },
+            title = { Text("Pausar el bot en este chat") },
+            text = {
+                Column {
+                    Text("El bot calla aquí durante este tiempo. Tú puedes seguir escribiendo. Para devolverle el chat toca Reanudar.", style = MaterialTheme.typography.bodySmall)
+                    listOf(30 to "30 minutos", 60 to "1 hora", 480 to "8 horas", 1440 to "1 día").forEach { (min, t) ->
+                        TextButton({ pausandoBot = false; haptica(Toque.Suave); vm.pausarBot(min) }, Modifier.fillMaxWidth().testTag("pausa_$min")) { Text(t) }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton({ pausandoBot = false }) { Text("Cancelar") } },
+        )
+    }
+    if (etiquetando) DialogoEtiquetasChat(vm.botId, jid, { etiquetando = false }, alAbrirEtiquetas)
 }
 
 @Composable

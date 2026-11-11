@@ -73,6 +73,9 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
         private set
     var etiquetasMenu by mutableStateOf<List<com.botchat.app.datos.EtiquetaMenu>>(emptyList())
         private set
+    /** Etiquetas locales del chat (las que pone el dueño), distintas de la etiqueta de menú de arriba. */
+    var etiquetasLocales by mutableStateOf<List<com.botchat.app.datos.EtiquetaItem>>(emptyList())
+        private set
 
     // ---- adjuntos y notas de voz ----
     var adjuntos by mutableStateOf<List<AdjuntoListo>>(emptyList())
@@ -165,8 +168,13 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
                 }
                 if (evs.any { it == "presencia:$jid" }) actualizarPresencia()
                 if (evs.any { it == "sesiones" || it == "chat:$jid" }) actualizarEtiqueta()
+                if (evs.any { it == "etiquetas" || it == "chat:$jid" }) actualizarEtiquetasLocales()
             }
         }
+    }
+
+    private fun actualizarEtiquetasLocales() {
+        viewModelScope.launch { etiquetasLocales = runCatching { Repo.etiquetasDeChat(botId, jid) }.getOrDefault(emptyList()) }
     }
 
     private fun actualizarEtiqueta() {
@@ -175,6 +183,7 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
 
     private fun cargarExtras(conBorrador: Boolean) {
         actualizarEtiqueta()
+        actualizarEtiquetasLocales()
         viewModelScope.launch {
             if (conBorrador) borradorInicial = runCatching { Repo.borrador(botId, jid) }.getOrDefault("")
             estadoChat = runCatching { Repo.estadoChat(botId, jid) }.getOrDefault(EstadoChat())
@@ -473,6 +482,21 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
 
     fun reactivarBot() {
         viewModelScope.launch { runCatching { Repo.pausarBotEnChat(botId, jid, 0); estadoChat = estadoChat.copy(botPausaHasta = 0, pausaHumano = false) }.onFailure { aviso = it.message } }
+    }
+
+    /** Pausa el bot en este chat durante `minutos` (se quita con Reanudar). */
+    fun pausarBot(minutos: Int) {
+        viewModelScope.launch {
+            runCatching {
+                Repo.pausarBotEnChat(botId, jid, minutos)
+                estadoChat = estadoChat.copy(botPausaHasta = System.currentTimeMillis() / 1000 + minutos * 60L, pausaHumano = false)
+            }.onFailure { aviso = it.message }
+        }
+    }
+
+    /** Marca el chat como "pendiente", "resuelto" o sin marca (""). Es solo una marca local. */
+    fun marcarEstado(estado: String) {
+        viewModelScope.launch { runCatching { Repo.marcarEstadoChat(botId, jid, estado); estadoChat = estadoChat.copy(estadoTrabajo = estado) }.onFailure { aviso = it.message } }
     }
 
     fun silenciar(si: Boolean) {
