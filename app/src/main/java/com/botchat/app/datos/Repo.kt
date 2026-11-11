@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import org.json.JSONObject
 import wabot.Observador
 import java.io.File
 
@@ -270,6 +271,15 @@ object Repo {
     suspend fun marcarUtil(bot: Long, id: Long, hecho: Boolean) = io { motor.marcarUtilidad(bot, id, hecho) }
     suspend fun borrarUtil(bot: Long, id: Long) = io { motor.borrarUtilidad(bot, id) }
     suspend fun limpiarUtilHechas(bot: Long) = io { motor.limpiarUtilidadesHechas(bot) }
+    // Laboratorio (bloque G). Evento: "lab".
+    suspend fun estadoLab(bot: Long) = io { JsonLab.estado(motor.estadoLab(bot)) }
+    suspend fun aceptarAvisoLab(bot: Long) = io { motor.aceptarAvisoLab(bot) }
+    suspend fun fijarAjusteLab(bot: Long, clave: String, valor: String) = io { motor.fijarAjusteLab(bot, clave, valor) }
+    suspend fun enviarPruebaLab(bot: Long, tipo: String, variante: Int) = io { JsonLab.resultado(JSONObject(motor.enviarPruebaLab(bot, tipo, variante.toLong()))) }
+    suspend fun resultadosLab(bot: Long) = io { JsonLab.resultados(motor.listarResultadosLab(bot)) }
+    suspend fun marcarResultadoLab(bot: Long, id: Long, campo: String, valor: Int) = io { motor.marcarResultadoLab(bot, id, campo, valor.toLong()) }
+    suspend fun borrarResultadosLab(bot: Long) = io { motor.borrarResultadosLab(bot) }
+    suspend fun usarLimiteMedido(bot: Long) = io { motor.usarLimiteMedido(bot).toInt() }
     suspend fun proximoAviso(bot: Long) = io { motor.proximoAviso(bot) }
     suspend fun dispararAvisos(bot: Long) = io { JsonPersonas.disparo(motor.dispararAvisos(bot)) }
     suspend fun vistaPreviaResumen(bot: Long) = io { motor.vistaPreviaResumen(bot) }

@@ -428,6 +428,52 @@ class MotorFalso : Motor {
         utilLista.removeAll { it.getString("tipo") == "pendiente" && it.getBoolean("hecho") }
         return n.toLong()
     }
+    // Laboratorio (bloque G)
+    var labAj = mutableMapOf("lab_activo" to "0", "lab_aviso_ts" to "0", "lab_modo_menu" to "texto", "lab_grupos" to "0", "lab_enc_max_opc" to "12", "lab_expira_min" to "120",
+        "lab_respaldo_enc" to "0", "lab_respaldo_bot" to "1", "lab_botones_tipo" to "auto", "lab_prueba_chat" to "", "lab_prueba_hora" to "4", "lab_prueba_dia" to "12", "lab_version_wa" to "")
+    var labResultados = mutableListOf<JSONObject>()
+    var labEnMarcha = true
+    private fun labLimite(): Int = labResultados.filter { it.getString("tipo") == "encuesta" && it.getInt("visible") == 1 && it.getInt("tocable") != 0 }.maxOfOrNull { it.getString("variante").toInt() } ?: 0
+    override fun estadoLab(bot: Long): String {
+        llamadas += "estadoLab"; rFalla()
+        val on = labAj["lab_activo"] == "1" && labAj["lab_aviso_ts"] != "0"
+        val plan = JSONArray().put(JSONObject().put("tipo", "encuesta").put("variante", 4).put("nombre", "Encuesta de 4 opciones"))
+            .put(JSONObject().put("tipo", "encuesta").put("variante", 13).put("nombre", "Encuesta de 13 opciones"))
+            .put(JSONObject().put("tipo", "botones").put("variante", 3).put("nombre", "Botones (3)"))
+            .put(JSONObject().put("tipo", "lista").put("variante", 10).put("nombre", "Lista de 10 filas"))
+            .put(JSONObject().put("tipo", "interactivo").put("variante", 3).put("nombre", "Interactivo quick_reply (3)"))
+        return JSONObject().put("activo", labAj["lab_activo"] == "1").put("avisoAceptado", labAj["lab_aviso_ts"] != "0").put("avisoTs", 0).put("modo", labAj["lab_modo_menu"])
+            .put("modoReal", if (on) labAj["lab_modo_menu"] else "texto").put("grupos", labAj["lab_grupos"] == "1").put("encMax", labAj["lab_enc_max_opc"]!!.toInt())
+            .put("expiraMin", labAj["lab_expira_min"]!!.toInt()).put("respaldoEnc", labAj["lab_respaldo_enc"] == "1").put("respaldoBot", labAj["lab_respaldo_bot"] == "1")
+            .put("botonesTipo", labAj["lab_botones_tipo"]).put("pruebaChat", labAj["lab_prueba_chat"]).put("pruebaHora", labAj["lab_prueba_hora"]!!.toInt())
+            .put("pruebaDia", labAj["lab_prueba_dia"]!!.toInt()).put("versionWa", labAj["lab_version_wa"]).put("versionCliente", "2.3000.1").put("enMarcha", labEnMarcha)
+            .put("limiteMedido", labLimite()).put("pruebasHora", labResultados.size).put("pruebasDia", labResultados.size).put("plan", plan).toString()
+    }
+    override fun aceptarAvisoLab(bot: Long) { llamadas += "aceptarAvisoLab"; rFalla(); labAj["lab_aviso_ts"] = "1700000000" }
+    override fun fijarAjusteLab(bot: Long, clave: String, valor: String) {
+        llamadas += "ajusteLab:$clave:$valor"; rFalla()
+        if (clave == "lab_activo" && valor == "1" && labAj["lab_aviso_ts"] == "0") throw IllegalStateException("Falta aceptar el aviso de riesgo del Laboratorio.")
+        labAj[clave] = valor
+    }
+    override fun enviarPruebaLab(bot: Long, tipo: String, variante: Long): String {
+        llamadas += "pruebaLab:$tipo:$variante"; rFalla()
+        if (!labEnMarcha) throw IllegalStateException("Enciende el bot para hacer pruebas.")
+        val id = (labResultados.maxOfOrNull { it.getLong("id") } ?: 0L) + 1
+        val r = JSONObject().put("id", id).put("ts", 1700000000L + id).put("tipo", tipo).put("variante", variante.toString()).put("chat", labAj["lab_prueba_chat"]).put("msgId", "M$id")
+            .put("enviado", 1).put("llego", -1).put("visible", -1).put("tocable", -1).put("respondio", -1).put("versionWa", labAj["lab_version_wa"]).put("versionCliente", "2.3000.1").put("error", "")
+        labResultados.add(0, r)
+        return r.toString()
+    }
+    override fun listarResultadosLab(bot: Long) = JSONArray(labResultados).toString()
+    override fun marcarResultadoLab(bot: Long, id: Long, campo: String, valor: Long) { llamadas += "marcarLab:$id:$campo:$valor"; rFalla(); labResultados.first { it.getLong("id") == id }.put(campo, valor.toInt()) }
+    override fun borrarResultadosLab(bot: Long): Long { llamadas += "borrarLab"; rFalla(); val n = labResultados.size; labResultados.clear(); return n.toLong() }
+    override fun usarLimiteMedido(bot: Long): Long {
+        llamadas += "usarLimiteLab"; rFalla()
+        val n = labLimite()
+        if (n < 2) throw IllegalStateException("todavía no marcaste ninguna encuesta como «visible»")
+        labAj["lab_enc_max_opc"] = n.toString()
+        return n.toLong()
+    }
     var proximoAvisoTs = 0L
     var disparo = """{"avisos":[],"siguiente":0}"""
     override fun proximoAviso(bot: Long): Long { llamadas += "proximoAviso"; return proximoAvisoTs }

@@ -186,6 +186,15 @@ interface Motor {
     fun marcarUtilidad(bot: Long, id: Long, hecho: Boolean)
     fun borrarUtilidad(bot: Long, id: Long)
     fun limpiarUtilidadesHechas(bot: Long): Long
+    // Laboratorio (0.5.0, bloque G): menú como encuesta o botones y matriz de pruebas. Evento: "lab".
+    fun estadoLab(bot: Long): String
+    fun aceptarAvisoLab(bot: Long)
+    fun fijarAjusteLab(bot: Long, clave: String, valor: String)
+    fun enviarPruebaLab(bot: Long, tipo: String, variante: Long): String
+    fun listarResultadosLab(bot: Long): String
+    fun marcarResultadoLab(bot: Long, id: Long, campo: String, valor: Long)
+    fun borrarResultadosLab(bot: Long): Long
+    fun usarLimiteMedido(bot: Long): Long
     fun proximoAviso(bot: Long): Long
     fun dispararAvisos(bot: Long): String
     fun vistaPreviaResumen(bot: Long): String
@@ -419,6 +428,14 @@ object MotorGo : Motor {
     override fun marcarUtilidad(bot: Long, id: Long, hecho: Boolean) = Wabot.marcarUtilidad(bot, id, hecho)
     override fun borrarUtilidad(bot: Long, id: Long) = Wabot.borrarUtilidad(bot, id)
     override fun limpiarUtilidadesHechas(bot: Long) = Wabot.limpiarUtilidadesHechas(bot)
+    override fun estadoLab(bot: Long) = Wabot.estadoLab(bot)
+    override fun aceptarAvisoLab(bot: Long) = Wabot.aceptarAvisoLab(bot)
+    override fun fijarAjusteLab(bot: Long, clave: String, valor: String) = Wabot.fijarAjusteLab(bot, clave, valor)
+    override fun enviarPruebaLab(bot: Long, tipo: String, variante: Long) = Wabot.enviarPruebaLab(bot, tipo, variante)
+    override fun listarResultadosLab(bot: Long) = Wabot.listarResultadosLab(bot)
+    override fun marcarResultadoLab(bot: Long, id: Long, campo: String, valor: Long) = Wabot.marcarResultadoLab(bot, id, campo, valor)
+    override fun borrarResultadosLab(bot: Long) = Wabot.borrarResultadosLab(bot)
+    override fun usarLimiteMedido(bot: Long) = Wabot.usarLimiteMedido(bot)
     override fun proximoAviso(bot: Long) = Wabot.proximoAviso(bot)
     override fun dispararAvisos(bot: Long) = Wabot.dispararAvisos(bot)
     override fun vistaPreviaResumen(bot: Long) = Wabot.vistaPreviaResumen(bot)
