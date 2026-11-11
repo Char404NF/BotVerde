@@ -142,6 +142,11 @@ interface Motor {
     fun agregarNoMolestar(bot: Long, persona: String, motivo: String)
     fun quitarNoMolestar(bot: Long, persona: String)
     fun listarIniciativas(bot: Long, modulo: String, limite: Long, antesId: Long): String
+    // Paneles de los módulos H (listas y formularios simples) y la alarma de lo agendado (0.5.0, H parte 1).
+    fun filasPanelModulo(bot: Long, id: String, panel: String): String
+    fun accionModulo(bot: Long, id: String, accion: String, argsJson: String): String
+    fun proximoModulos(bot: Long): Long
+    fun tickModulos(bot: Long)
     fun estadoModoSeguro(bot: Long): String
     fun reanudarModoSeguro(bot: Long)
 
@@ -385,6 +390,10 @@ object MotorGo : Motor {
     override fun agregarNoMolestar(bot: Long, persona: String, motivo: String) = Wabot.agregarNoMolestar(bot, persona, motivo)
     override fun quitarNoMolestar(bot: Long, persona: String) = Wabot.quitarNoMolestar(bot, persona)
     override fun listarIniciativas(bot: Long, modulo: String, limite: Long, antesId: Long) = Wabot.listarIniciativas(bot, modulo, limite, antesId)
+    override fun filasPanelModulo(bot: Long, id: String, panel: String) = Wabot.filasPanelModulo(bot, id, panel)
+    override fun accionModulo(bot: Long, id: String, accion: String, argsJson: String) = Wabot.accionModulo(bot, id, accion, argsJson)
+    override fun proximoModulos(bot: Long) = Wabot.proximoModulos(bot)
+    override fun tickModulos(bot: Long) = Wabot.tickModulos(bot)
     override fun estadoModoSeguro(bot: Long) = Wabot.estadoModoSeguro(bot)
     override fun reanudarModoSeguro(bot: Long) = Wabot.reanudarModoSeguro(bot)
 

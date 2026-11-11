@@ -60,6 +60,7 @@ object Notificador {
                 if (e.startsWith("aviso:")) e.removePrefix("aviso:").toLongOrNull()?.let { runCatching { avisoLocal(ctx, it) } }
                 // Cambió un recordatorio o el resumen diario: se vuelve a programar la próxima alarma.
                 if (e == "recordatorios" || e == "permisos_ajustes") runCatching { Alarmas.reprogramarAsync(ctx) }
+                if (e == "modulos") runCatching { AlarmasModulos.reprogramarAsync(ctx) }
             }
         }
     }

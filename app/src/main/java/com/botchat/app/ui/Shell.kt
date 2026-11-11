@@ -92,7 +92,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
     // Los "ver una vez" que quedaron a medias o caducaron se borran al abrir la app.
     LaunchedEffect(bot.id) { runCatching { Repo.barrerVerUnaVez(bot.id) } }
     // Las alarmas de recordatorios y del resumen diario se vuelven a programar al abrir la app.
-    LaunchedEffect(bot.id) { runCatching { com.botchat.app.Alarmas.reprogramarAsync(ctx) } }
+    LaunchedEffect(bot.id) { runCatching { com.botchat.app.Alarmas.reprogramarAsync(ctx) }; runCatching { com.botchat.app.AlarmasModulos.reprogramarAsync(ctx) } }
     val entrada by nav.currentBackStackEntryAsState()
     val rutaActual = entrada?.destination?.route
     val principal = rutaActual in RUTAS_PRINCIPALES

@@ -216,6 +216,10 @@ object Repo {
     suspend fun noMolestar(bot: Long) = io { JsonMod.noMolestar(motor.listarNoMolestar(bot)) }
     suspend fun agregarNoMolestar(bot: Long, persona: String, motivo: String = "a mano") = io { motor.agregarNoMolestar(bot, persona, motivo) }
     suspend fun quitarNoMolestar(bot: Long, persona: String) = io { motor.quitarNoMolestar(bot, persona) }
+    suspend fun filasPanelModulo(bot: Long, id: String, panel: String) = io { JsonMod.filasPanel(motor.filasPanelModulo(bot, id, panel)) }
+    suspend fun accionModulo(bot: Long, id: String, accion: String, args: Map<String, Any?>) = io { motor.accionModulo(bot, id, accion, org.json.JSONObject(args).toString()) }
+    suspend fun proximoModulos(bot: Long) = io { motor.proximoModulos(bot) }
+    suspend fun tickModulos(bot: Long) = io { motor.tickModulos(bot) }
     suspend fun iniciativas(bot: Long, modulo: String = "", limite: Int = 100, antesId: Long = 0) = io { JsonMod.registro(motor.listarIniciativas(bot, modulo, limite.toLong(), antesId)) }
     suspend fun modoSeguro(bot: Long) = io { JsonMod.seguro(motor.estadoModoSeguro(bot)) }
     suspend fun reanudarModoSeguro(bot: Long) = io { motor.reanudarModoSeguro(bot) }

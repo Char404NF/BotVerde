@@ -48,6 +48,7 @@
         <receiver android:name=".RespuestaRapida" android:exported="false" />
 
         <receiver android:name=".AlarmaAvisosReceiver" android:exported="false" />
+        <receiver android:name=".AlarmaModulosReceiver" android:exported="false" />
 
         <receiver android:name=".ArranqueReceiver" android:exported="true">
             <intent-filter>

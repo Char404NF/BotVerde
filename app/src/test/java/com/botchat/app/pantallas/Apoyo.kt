@@ -297,6 +297,14 @@ class MotorFalso : Motor {
         noMolestar = n.toString()
     }
     override fun listarIniciativas(bot: Long, modulo: String, limite: Long, antesId: Long) = registroIni
+    // Paneles de los módulos H
+    var filasPaneles = mutableMapOf<String, String>() // "modulo:panel" -> JSON de filas
+    var respuestaAccionModulo = "Hecho."
+    override fun filasPanelModulo(bot: Long, id: String, panel: String): String { llamadas += "filasPanel:$id:$panel"; mFalla(); return filasPaneles["$id:$panel"] ?: "[]" }
+    override fun accionModulo(bot: Long, id: String, accion: String, argsJson: String): String { llamadas += "accionModulo:$id:$accion:$argsJson"; mFalla(); return respuestaAccionModulo }
+    var proximoModulosTs = 0L
+    override fun proximoModulos(bot: Long) = proximoModulosTs
+    override fun tickModulos(bot: Long) { llamadas += "tickModulos" }
     override fun estadoModoSeguro(bot: Long) = seguro
     override fun reanudarModoSeguro(bot: Long) { llamadas += "reanudarSeguro"; seguro = """{"activo":false,"ts":0,"motivo":"","texto":"","errores":0}""" }
     override fun configurarMotor(activo: Boolean, ventanaMin: Long) { llamadas += "motor:$activo:$ventanaMin" }
@@ -662,10 +670,23 @@ object Apoyo {
         rangoJson(3, "Cliente VIP", 2, personas = 0, plantilla = "cliente_vip", color = "#8E4EC6"),
     )
 
-    fun moduloJson(id: String, nombre: String, descripcion: String, icono: String, riesgo: String, iniciativa: Boolean, esquema: JSONArray? = null) =
+    fun moduloJson(id: String, nombre: String, descripcion: String, icono: String, riesgo: String, iniciativa: Boolean, esquema: JSONArray? = null, paneles: JSONArray? = null) =
         JSONObject().put("id", id).put("nombre", nombre).put("descripcion", descripcion).put("icono", icono).put("riesgo", riesgo).put("iniciativa", iniciativa)
             .put("activo", false).put("pausado", false).put("codigo", "apagado").put("estado", "Apagado").put("conEsquema", esquema != null)
-            .put("topeHora", 5).put("topeDia", 20).put("defHora", 5).put("defDia", 20).put("activadoTs", 0).apply { if (esquema != null) put("esquema", esquema) }
+            .put("topeHora", 5).put("topeDia", 20).put("defHora", 5).put("defDia", 20).put("activadoTs", 0)
+            .apply { if (esquema != null) put("esquema", esquema); if (paneles != null) put("paneles", paneles) }
+
+    /** Un panel de ejemplo como los que describe Go: una lista con formulario (texto, lista larga y archivos) y botones. */
+    fun panelEjemplo(id: String = "listas") = JSONObject().put("id", id).put("titulo", "Listas de destinatarios").put("ayuda", "Solo se escribe a quien ya te escribió.")
+        .put("alta", "Agregar a la lista")
+        .put("campos", JSONArray()
+            .put(JSONObject().put("clave", "lista").put("titulo", "Lista").put("tipo", "texto").put("defecto", "suscritos").put("largo", 30))
+            .put(JSONObject().put("clave", "persona").put("titulo", "Persona").put("tipo", "lista").put("opciones", JSONArray().apply {
+                for (i in 1..8) put(JSONObject().put("valor", "p$i").put("titulo", "Persona $i"))
+            }))
+            .put(JSONObject().put("clave", "adjuntos").put("titulo", "Archivos").put("tipo", "adjuntos")))
+        .put("extras", JSONArray().put(JSONObject().put("accion", "$id.quitar").put("titulo", "Quitar de la lista").put("confirma", "¿Quitar a esta persona?")).put(JSONObject().put("accion", "$id.vista").put("titulo", "Vista previa")))
+        .put("porFila", JSONArray().put(JSONObject().put("accion", "$id.vaciar").put("titulo", "Vaciar").put("confirma", "¿Vaciar esta lista?")))
 
     /** Un campo de cada tipo: texto, número, interruptor, lista y hora. */
     fun esquemaEjemplo() = JSONArray()

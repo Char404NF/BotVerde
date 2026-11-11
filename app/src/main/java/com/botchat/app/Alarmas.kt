@@ -97,6 +97,67 @@ class ArranqueReceiver : BroadcastReceiver() {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
         val app = ctx.applicationContext
         val pendiente = goAsync()
-        Thread { try { Alarmas.reprogramar(app) } finally { pendiente?.finish() } }.start()
+        Thread { try { Alarmas.reprogramar(app); AlarmasModulos.reprogramar(app) } finally { pendiente?.finish() } }.start()
+    }
+}
+
+/**
+ * Alarma de lo que los módulos tienen agendado (mensajes programados y difusiones programadas, H parte 1). Igual que [Alarmas]: solo dice
+ * CUÁNDO despertar a la app; qué toca (y si todavía está a tiempo según la tolerancia) lo decide el módulo Go. Si el bot no está en
+ * marcha cuando suena, no pasa nada: al arrancar cada módulo revisa lo pendiente y descarta, avisando, lo que ya pasó del tiempo de tolerancia.
+ */
+object AlarmasModulos {
+    const val ACCION = "com.botchat.app.MODULOS"
+    private const val CODIGO = 7101
+
+    private fun gestor(ctx: Context) = ctx.getSystemService(AlarmManager::class.java)
+
+    private fun pendiente(ctx: Context): PendingIntent =
+        PendingIntent.getBroadcast(ctx, CODIGO, Intent(ctx, AlarmaModulosReceiver::class.java).setAction(ACCION), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+
+    /** Programa la alarma para `siguienteSeg` (segundos desde 1970); 0 o menor la cancela. */
+    fun programar(ctx: Context, siguienteSeg: Long) {
+        val am = gestor(ctx) ?: return
+        val pi = pendiente(ctx)
+        am.cancel(pi)
+        if (siguienteSeg <= 0) return
+        val cuando = maxOf(siguienteSeg * 1000L, System.currentTimeMillis() + 1000L)
+        runCatching {
+            if (Alarmas.puedeExactas(ctx)) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cuando, pi)
+            else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cuando, pi)
+        }.onFailure { runCatching { am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cuando, pi) } }
+    }
+
+    suspend fun reprogramarAsync(ctx: Context) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { reprogramar(ctx) }
+
+    /** Vuelve a calcular la próxima alarma de los módulos (al abrir la app, tras cambiar un módulo y al reiniciar el teléfono). */
+    fun reprogramar(ctx: Context) {
+        val app = ctx.applicationContext
+        runCatching {
+            if (!Repo.abrir(app)) return
+            val bot = Datos.get(app).primero() ?: return
+            runBlocking { programar(app, Repo.proximoModulos(bot.id)) }
+        }
+    }
+}
+
+/** Suena la alarma de los módulos: se le pide al módulo Go que revise su agenda y se programa la siguiente. No escribe nada por sí sola. */
+class AlarmaModulosReceiver : BroadcastReceiver() {
+    override fun onReceive(ctx: Context, intent: Intent) {
+        val app = ctx.applicationContext
+        val pendiente = goAsync()
+        Thread {
+            try {
+                if (!Repo.abrir(app)) return@Thread
+                val bot = Datos.get(app).primero() ?: return@Thread
+                runBlocking {
+                    runCatching { Repo.tickModulos(bot.id) }
+                    AlarmasModulos.programar(app, Repo.proximoModulos(bot.id))
+                }
+            } catch (_: Exception) {
+            } finally {
+                pendiente?.finish()
+            }
+        }.start()
     }
 }

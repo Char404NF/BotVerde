@@ -79,7 +79,8 @@ fun PantallaConfigModulo(botId: Long, id: String, alVolver: () -> Unit) {
             val propia = PantallasModulo.de(id)
             if (propia != null) Box(Modifier.fillMaxWidth().testTag("config_propia")) { propia(botId, m) }
             else if (m.esquema.isNotEmpty()) ConfiguracionGenerica(botId, m)
-            else Text("Este módulo no tiene ajustes.", Modifier.testTag("config_sin_ajustes"), style = MaterialTheme.typography.bodyMedium)
+            else if (m.paneles.isEmpty()) Text("Este módulo no tiene ajustes.", Modifier.testTag("config_sin_ajustes"), style = MaterialTheme.typography.bodyMedium)
+            if (m.paneles.isNotEmpty()) PanelesGenericos(botId, m)
             if (m.iniciativa) LimitesDelModulo(botId, m)
         }
     }
