@@ -847,3 +847,39 @@ func TestRespuestaInteractivaDePruebaMarcaRespondio(t *testing.T) {
 		t.Fatalf("respondió: %+v", l[0])
 	}
 }
+
+func TestTemplateButtonReplyYEnvolturasSeAtienden(t *testing.T) {
+	e := nuevoEntorno(t)
+	e.enciende(ModoBotones)
+	e.fija("lab_botones_tipo", "interactivo")
+	c := context.Background()
+	res := resolverFijo(jidVotante, jidVotante)
+	chat, _ := types.ParseJID(jidVotante)
+	r, _, _ := e.s.EnviarMenu(c, jidVotante, jidVotante, menu(3), "", "", "")
+	tpl := func(id, texto string) *waE2E.Message {
+		return &waE2E.Message{TemplateButtonReplyMessage: &waE2E.TemplateButtonReplyMessage{SelectedID: proto.String(id), SelectedDisplayText: proto.String(texto),
+			ContextInfo: &waE2E.ContextInfo{StanzaID: proto.String(r.ID)}}}
+	}
+	ev := func(m *waE2E.Message) *events.Message {
+		return &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: chat}, ID: "TT"}, Message: m}
+	}
+	if !EsRespuesta(tpl("x", "y")) {
+		t.Fatal("TemplateButtonReply es una respuesta")
+	}
+	if x := e.s.Recibir(c, ev(tpl("bc|"+r.ID+"|3", "z")), res); x == nil || x.Num != 3 || !x.Navega {
+		t.Fatalf("id nuestro: %+v", x)
+	}
+	// sin id nuestro: por número simple o por el título
+	if x := e.s.Recibir(c, ev(tpl("1", "")), res); x == nil || x.Num != 1 || !x.Navega {
+		t.Fatalf("número: %+v", x)
+	}
+	if x := e.s.Recibir(c, ev(tpl("", "Precios")), res); x == nil || x.Num != 2 {
+		t.Fatalf("título: %+v", x)
+	}
+	// dentro de envolturas anidadas (efímero dentro de enviado desde otro dispositivo)
+	env := &waE2E.Message{EphemeralMessage: &waE2E.FutureProofMessage{Message: tpl("bc|"+r.ID+"|2", "")}}
+	env = &waE2E.Message{DeviceSentMessage: &waE2E.DeviceSentMessage{Message: env}}
+	if x := e.s.Recibir(c, ev(env), res); x == nil || x.Num != 2 || !x.Navega {
+		t.Fatalf("envuelto: %+v", x)
+	}
+}

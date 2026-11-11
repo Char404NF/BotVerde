@@ -131,6 +131,7 @@ func EsVerUnaVez(evt *events.Message) bool {
 
 // Clasificar decide qué es un mensaje y extrae lo que se guarda. No toca la red ni el disco.
 func Clasificar(evt *events.Message) Clasificado {
+	evt = desenvuelto(evt)
 	c := clasificar(evt)
 	if !c.Omitir && evt != nil && evt.Message != nil && c.Reaccion == nil && c.Revocar == "" && c.Editar == nil {
 		if ci := contextoDe(evt.Message); ci != nil {
@@ -144,6 +145,69 @@ func Clasificar(evt *events.Message) Clasificado {
 		}
 	}
 	return c
+}
+
+// Desenvolver quita las envolturas que aún queden (efímero, enviado desde otro dispositivo, documento con pie, editado,
+// mención de grupo, etc.), también las anidadas en otro orden del que la librería deshace. Si no hay nada que quitar devuelve m.
+func Desenvolver(m *waE2E.Message) *waE2E.Message {
+	for i := 0; i < 8 && m != nil; i++ {
+		var in *waE2E.Message
+		switch {
+		case m.GetDeviceSentMessage().GetMessage() != nil:
+			in = m.GetDeviceSentMessage().GetMessage()
+		case m.GetEphemeralMessage().GetMessage() != nil:
+			in = m.GetEphemeralMessage().GetMessage()
+		case m.GetViewOnceMessage().GetMessage() != nil:
+			in = m.GetViewOnceMessage().GetMessage()
+		case m.GetViewOnceMessageV2().GetMessage() != nil:
+			in = m.GetViewOnceMessageV2().GetMessage()
+		case m.GetViewOnceMessageV2Extension().GetMessage() != nil:
+			in = m.GetViewOnceMessageV2Extension().GetMessage()
+		case m.GetDocumentWithCaptionMessage().GetMessage() != nil:
+			in = m.GetDocumentWithCaptionMessage().GetMessage()
+		case m.GetEditedMessage().GetMessage() != nil:
+			in = m.GetEditedMessage().GetMessage()
+		case m.GetBotInvokeMessage().GetMessage() != nil:
+			in = m.GetBotInvokeMessage().GetMessage()
+		case m.GetLottieStickerMessage().GetMessage() != nil:
+			in = m.GetLottieStickerMessage().GetMessage()
+		case m.GetGroupMentionedMessage().GetMessage() != nil:
+			in = m.GetGroupMentionedMessage().GetMessage()
+		case m.GetAssociatedChildMessage().GetMessage() != nil:
+			in = m.GetAssociatedChildMessage().GetMessage()
+		case m.GetLimitSharingMessage().GetMessage() != nil:
+			in = m.GetLimitSharingMessage().GetMessage()
+		case m.GetBotForwardedMessage().GetMessage() != nil:
+			in = m.GetBotForwardedMessage().GetMessage()
+		case m.GetQuestionReplyMessage().GetMessage() != nil:
+			in = m.GetQuestionReplyMessage().GetMessage()
+		default:
+			return m
+		}
+		if in.MessageContextInfo == nil && m.MessageContextInfo != nil {
+			in.MessageContextInfo = m.MessageContextInfo
+		}
+		m = in
+	}
+	return m
+}
+
+// desenvuelto devuelve el evento con el mensaje ya sin envolturas; si Message falta se parte de RawMessage. No modifica el original.
+func desenvuelto(evt *events.Message) *events.Message {
+	if evt == nil {
+		return nil
+	}
+	base := evt.Message
+	if base == nil {
+		base = evt.RawMessage
+	}
+	m := Desenvolver(base)
+	if m == evt.Message {
+		return evt
+	}
+	cp := *evt
+	cp.Message = m
+	return &cp
 }
 
 // contextoDe encuentra el ContextInfo (cita, menciones, reenviado) de cualquier tipo de mensaje.
@@ -316,11 +380,17 @@ func clasificarContenido(evt *events.Message) Clasificado {
 	case m.GetPollCreationMessageV3() != nil:
 		return Clasificado{Tipo: almacen.TipoEncuesta, Texto: "Encuesta: " + m.GetPollCreationMessageV3().GetName()}
 	case m.GetButtonsResponseMessage() != nil:
-		return Clasificado{Tipo: almacen.TipoTexto, Texto: m.GetButtonsResponseMessage().GetSelectedDisplayText()}
+		return Clasificado{Tipo: almacen.TipoTexto, Texto: textoONada(m.GetButtonsResponseMessage().GetSelectedDisplayText())}
 	case m.GetListResponseMessage() != nil:
 		return Clasificado{Tipo: almacen.TipoTexto, Texto: m.GetListResponseMessage().GetTitle()}
 	case m.GetInteractiveResponseMessage() != nil:
 		return Clasificado{Tipo: almacen.TipoTexto, Texto: textoRespuestaInteractiva(m.GetInteractiveResponseMessage())}
+	case m.GetTemplateButtonReplyMessage() != nil:
+		t := strings.TrimSpace(m.GetTemplateButtonReplyMessage().GetSelectedDisplayText())
+		if t == "" {
+			t = "Respuesta de botón"
+		}
+		return Clasificado{Tipo: almacen.TipoTexto, Texto: t}
 	case m.GetSenderKeyDistributionMessage() != nil && onlySenderKey(m):
 		return Clasificado{Omitir: true}
 	}
@@ -349,6 +419,13 @@ func textoRespuestaInteractiva(r *waE2E.InteractiveResponseMessage) string {
 		}
 	}
 	return "Respuesta de botón"
+}
+
+func textoONada(t string) string {
+	if strings.TrimSpace(t) == "" {
+		return "Respuesta de botón"
+	}
+	return t
 }
 
 // TextoEspecial es lo que se guarda de un mensaje que esta versión no sabe mostrar (la pantalla lo dibuja como tarjeta).

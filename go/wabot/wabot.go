@@ -15,6 +15,7 @@ import (
 
 	"botchat/internal/auto"
 	"botchat/internal/avisos"
+	"botchat/internal/captura"
 	"botchat/internal/comandos"
 	"botchat/internal/envio"
 	"botchat/internal/estadoapp"
@@ -78,6 +79,7 @@ type estado struct {
 	avs           *avisos.Servicio
 	util          *utilidades.Servicio
 	lab           *lab.Servicio
+	captura       *captura.Servicio
 	mods          *modulos.Gestor
 	admins        *cacheAdmins
 	refresco      *time.Timer
@@ -182,6 +184,7 @@ func (s *estado) armar() {
 	s.armarModulos()
 	s.armarAuto()
 	s.armarLab()
+	s.captura = captura.Nuevo()
 	s.motor = motor.Nuevo(motor.Config{
 		Perm: s.perm, Cmd: s.cmd, EsAdminGrupo: s.admins.esAdmin, Baja: s.mods.Baja,
 		BotID: s.botID, Alm: alm, Decisor: s.decisor(), Enviador: enviadorMotor{s}, Log: s.log,
@@ -398,6 +401,7 @@ func (s *estado) evento(e any) {
 	case *events.Message:
 		sinc := s.sincronizando.Load() // se mira al llegar, no cuando le toque al trabajador
 		s.encola(func() {
+			s.capturar(v) // diagnóstico (apagado por defecto): solo estructura, en memoria
 			s.ing.Mensaje(s.ctx, v, false)
 			s.pausaPorTelefono(v)
 			// Votos y toques de nuestros menús interactivos (Laboratorio): se atienden aquí, en el trabajador.

@@ -14,6 +14,7 @@ import (
 	"go.mau.fi/whatsmeow/types/events"
 
 	"botchat/internal/almacen"
+	"botchat/internal/ingesta"
 )
 
 // Qué pasó con un voto o un toque (Entrada.Accion).
@@ -50,7 +51,8 @@ type Resolver func(ctx context.Context, ms types.MessageSource) (chat, persona s
 
 // EsRespuesta dice si un mensaje es un voto de encuesta o la respuesta a un botón, una lista o un mensaje interactivo.
 func EsRespuesta(m *waE2E.Message) bool {
-	return m.GetPollUpdateMessage() != nil || m.GetButtonsResponseMessage() != nil || m.GetListResponseMessage() != nil || m.GetInteractiveResponseMessage() != nil
+	m = ingesta.Desenvolver(m)
+	return m.GetTemplateButtonReplyMessage() != nil || m.GetPollUpdateMessage() != nil || m.GetButtonsResponseMessage() != nil || m.GetListResponseMessage() != nil || m.GetInteractiveResponseMessage() != nil
 }
 
 // Recibir procesa un voto o un toque. Devuelve nil si el mensaje no tiene que ver con el Laboratorio (por ejemplo, la respuesta de un
@@ -58,6 +60,11 @@ func EsRespuesta(m *waE2E.Message) bool {
 func (s *Servicio) Recibir(ctx context.Context, evt *events.Message, res Resolver) *Entrada {
 	if evt == nil || evt.Message == nil || evt.Info.IsFromMe || !EsRespuesta(evt.Message) {
 		return nil
+	}
+	if m := ingesta.Desenvolver(evt.Message); m != evt.Message {
+		cp := *evt
+		cp.Message = m
+		evt = &cp
 	}
 	if evt.Message.GetPollUpdateMessage() != nil {
 		return s.recibirVoto(ctx, evt, res)
@@ -233,6 +240,9 @@ func idDeToque(m *waE2E.Message) (id, mensaje string) {
 	case m.GetInteractiveResponseMessage() != nil:
 		r := m.GetInteractiveResponseMessage()
 		return idInteractivo(r), r.GetContextInfo().GetStanzaID()
+	case m.GetTemplateButtonReplyMessage() != nil:
+		r := m.GetTemplateButtonReplyMessage()
+		return r.GetSelectedID(), r.GetContextInfo().GetStanzaID()
 	}
 	return "", ""
 }
@@ -277,9 +287,18 @@ func textoInteractivo(r *waE2E.InteractiveResponseMessage) string {
 
 // numPorRespaldo resuelve la opción cuando el id no es "bc|<mensaje>|<n>": por número simple (id o índice, 1..N) o por el título
 // de la opción. Solo se usa con una sesión ya encontrada por el mensaje citado.
-func numPorRespaldo(ses *almacen.SesionLab, r *waE2E.InteractiveResponseMessage) int {
-	p := leeParams(r)
-	for _, v := range []any{p.ID, p.Index} {
+func numPorRespaldo(ses *almacen.SesionLab, m *waE2E.Message) int {
+	var cands []any
+	var titulo string
+	if r := m.GetInteractiveResponseMessage(); r != nil {
+		p := leeParams(r)
+		cands, titulo = []any{p.ID, p.Index}, textoInteractivo(r)
+	} else if r := m.GetTemplateButtonReplyMessage(); r != nil {
+		cands, titulo = []any{r.GetSelectedID()}, strings.TrimSpace(r.GetSelectedDisplayText())
+	} else {
+		return 0
+	}
+	for _, v := range cands {
 		if n, err := strconv.Atoi(strings.TrimSpace(comoTexto(v))); err == nil {
 			for _, o := range ses.Opciones {
 				if o.Num == n {
@@ -288,7 +307,7 @@ func numPorRespaldo(ses *almacen.SesionLab, r *waE2E.InteractiveResponseMessage)
 			}
 		}
 	}
-	t := strings.ToLower(textoInteractivo(r))
+	t := strings.ToLower(titulo)
 	if t == "" {
 		return 0
 	}
@@ -318,15 +337,14 @@ func (s *Servicio) recibirToque(ctx context.Context, evt *events.Message, res Re
 	msgID, num, ok := partesID(id)
 	if !ok {
 		// Respaldo (solo respuestas interactivas): sin id nuestro, pero citando un menú nuestro, se busca la opción por su número o título.
-		ir := evt.Message.GetInteractiveResponseMessage()
-		if ir == nil || citado == "" {
+		if citado == "" || (evt.Message.GetInteractiveResponseMessage() == nil && evt.Message.GetTemplateButtonReplyMessage() == nil) {
 			return nil // no es un botón nuestro
 		}
 		ses0 := s.Alm.ObtenerSesionLab(s.BotID, citado)
 		if ses0 == nil || ses0.Tipo == almacen.LabEncuesta {
 			return nil
 		}
-		msgID, num = citado, numPorRespaldo(ses0, ir)
+		msgID, num = citado, numPorRespaldo(ses0, evt.Message)
 	}
 	if citado != "" && citado != msgID {
 		msgID = citado

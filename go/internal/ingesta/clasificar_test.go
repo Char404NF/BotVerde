@@ -240,3 +240,27 @@ func TestRespuestaInteractivaSeGuardaComoTextoConElTituloDeLaOpcion(t *testing.T
 		}
 	}
 }
+
+func TestClasificaRespuestasDeBotonYEnvolturas(t *testing.T) {
+	tpl := &waE2E.Message{TemplateButtonReplyMessage: &waE2E.TemplateButtonReplyMessage{SelectedID: proto.String("a"), SelectedDisplayText: proto.String("Precios")}}
+	if c := Clasificar(&events.Message{Message: tpl}); c.Tipo != almacen.TipoTexto || c.Texto != "Precios" {
+		t.Fatalf("template: %+v", c)
+	}
+	vacio := &waE2E.Message{TemplateButtonReplyMessage: &waE2E.TemplateButtonReplyMessage{SelectedID: proto.String("a")}}
+	if c := Clasificar(&events.Message{Message: vacio}); c.Tipo != almacen.TipoTexto || c.Texto != "Respuesta de botón" {
+		t.Fatalf("template sin título: %+v", c)
+	}
+	// envolturas en orden que la librería no deshace (efímero que contiene un enviado desde otro dispositivo) y solo en RawMessage
+	env := &waE2E.Message{EphemeralMessage: &waE2E.FutureProofMessage{Message: &waE2E.Message{DeviceSentMessage: &waE2E.DeviceSentMessage{Message: tpl}}}}
+	if c := Clasificar(&events.Message{Message: env}); c.Texto != "Precios" {
+		t.Fatalf("envuelto: %+v", c)
+	}
+	if c := Clasificar(&events.Message{RawMessage: env}); c.Texto != "Precios" {
+		t.Fatalf("solo raw: %+v", c)
+	}
+	ir := &waE2E.Message{InteractiveResponseMessage: &waE2E.InteractiveResponseMessage{InteractiveResponseMessage: &waE2E.InteractiveResponseMessage_NativeFlowResponseMessage_{
+		NativeFlowResponseMessage: &waE2E.InteractiveResponseMessage_NativeFlowResponseMessage{ParamsJSON: proto.String(`{"display_text":"Hola"}`)}}}}
+	if c := Clasificar(&events.Message{Message: &waE2E.Message{DocumentWithCaptionMessage: &waE2E.FutureProofMessage{Message: ir}}}); c.Texto != "Hola" {
+		t.Fatalf("interactivo envuelto: %+v", c)
+	}
+}
