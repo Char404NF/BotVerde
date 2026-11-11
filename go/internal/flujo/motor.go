@@ -38,6 +38,8 @@ type Config struct {
 	// Conector (módulo H5) devuelve el texto de un conector HTTP para {api_<nombre>} en menús, reglas y comandos propios. nil o "" =
 	// la variable queda vacía (sin romper la conversación).
 	Conector func(nombre, sender, chat string) string
+	// IA (módulo H7) responde con IA a lo que la persona escribió para {ia_<dato>}: recibe ese dato (la pregunta). nil o "" = vacío.
+	IA func(pregunta, sender, chat string) string
 }
 
 // Motor ejecuta las automatizaciones. Implementa motor.Decisor.

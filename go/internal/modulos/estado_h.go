@@ -16,7 +16,8 @@ type estadoH struct {
 	difPrimero  time.Time     // cuándo salió el primer mensaje de difusión (calentamiento)
 	usos        []time.Time   // usos de !bajar y !api en la última hora
 	lim         map[string][]time.Time
-	wg          sync.WaitGroup // consultas a la IA en curso
+	memoria     map[string][]turnoIA // memoria corta de la IA (solo en RAM)
+	wg          sync.WaitGroup       // consultas a la IA en curso
 }
 
 // limite dice si todavía cabe un uso más de la clave dentro de la ventana (y lo cuenta). tope <= 0 = sin límite.

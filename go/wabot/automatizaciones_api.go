@@ -73,6 +73,13 @@ func (s *estado) nuevoFlujo() *flujo.Motor {
 			}
 			return s.mods.TextoConector(nombre, sender, chat)
 		},
+		// {ia_<dato>}: respuesta de la IA (módulo IA opcional, si está encendido y permite menús) a lo que la persona escribió
+		IA: func(pregunta, sender, chat string) string {
+			if s.mods == nil {
+				return ""
+			}
+			return s.mods.TextoIA(pregunta, sender, chat)
+		},
 	})
 }
 

@@ -27,3 +27,19 @@ func TestVariableDeConector(t *testing.T) {
 		t.Fatalf("los datos del formulario mandan: %q", got)
 	}
 }
+
+// {ia_<dato>} responde con IA a lo que la persona escribió en ese paso; sin dato o sin módulo queda vacío.
+func TestVariableDeIA(t *testing.T) {
+	m := Nuevo(Config{IA: func(q, sender, chat string) string { return "IA(" + q + ")" }})
+	e := entrada{Chat: "c1", Sender: "s1"}
+	if got := m.sustituye(nil, "R: {ia_dato1}", e, map[string]string{"dato1": " ¿hora? "}); got != "R: IA(¿hora?)" {
+		t.Fatalf("texto: %q", got)
+	}
+	if got := m.sustituye(nil, "R: {ia_dato2}", e, map[string]string{"dato1": "x"}); got != "R: " {
+		t.Fatalf("sin dato: %q", got)
+	}
+	sin := Nuevo(Config{})
+	if got := sin.sustituye(nil, "R: {ia_dato1}", e, map[string]string{"dato1": "x"}); got != "R: " {
+		t.Fatalf("sin módulo: %q", got)
+	}
+}
