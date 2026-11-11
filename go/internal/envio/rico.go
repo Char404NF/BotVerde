@@ -101,6 +101,18 @@ func (s *Servicio) EnviarContactoAuto(ctx context.Context, chat, nombre, telefon
 
 // enviarEspecial guarda primero el mensaje (se ve en el chat) y lo manda; `armar` construye el mensaje de WhatsApp con la cita.
 func (s *Servicio) enviarEspecial(ctx context.Context, chat, tipo, texto, citaID, citaAutorWA string, armar func(ci *waE2E.ContextInfo) *waE2E.Message) (Resultado, error) {
+	return s.enviarEspecialID(ctx, chat, tipo, texto, citaID, citaAutorWA, func(_ string, ci *waE2E.ContextInfo) *waE2E.Message { return armar(ci) }, nil)
+}
+
+// EnviarInteractivo manda un mensaje interactivo del Laboratorio (encuesta, botones, lista) como automático. En el chat se guarda
+// como texto (`resumen`: el menú numerado). `armar` recibe el id del mensaje y la cita; `antes` (opcional) se llama con el id y el
+// mensaje ya armado justo antes de enviar: si devuelve error no se envía. Así el Laboratorio guarda su sesión antes de que pueda
+// llegar la primera respuesta.
+func (s *Servicio) EnviarInteractivo(ctx context.Context, chat, resumen, citaID, citaAutorWA string, armar func(id string, ci *waE2E.ContextInfo) *waE2E.Message, antes func(id string, m *waE2E.Message) error) (Resultado, error) {
+	return s.enviarEspecialID(ctx, chat, almacen.TipoTexto, resumen, citaID, citaAutorWA, armar, antes)
+}
+
+func (s *Servicio) enviarEspecialID(ctx context.Context, chat, tipo, texto, citaID, citaAutorWA string, armar func(id string, ci *waE2E.ContextInfo) *waE2E.Message, antes func(id string, m *waE2E.Message) error) (Resultado, error) {
 	j, err := parsea(chat)
 	if err != nil {
 		return Resultado{}, err
@@ -116,21 +128,29 @@ func (s *Servicio) enviarEspecial(ctx context.Context, chat, tipo, texto, citaID
 		s.ponerCita(m, citaID)
 	}
 	m.Automatico = etiquetaAuto(ctx)
-	if _, err := s.Alm.GuardarMensaje(m); err != nil {
-		return Resultado{}, err
-	}
-	s.RegistrarEnvio(m.ID)
-	s.recordarAutor(m.ID, citaAutorWA)
 	res := Resultado{ID: m.ID, Estado: "fallido", TS: m.TS}
 	if !s.Cli.Conectado() {
-		_ = s.Alm.EstadoDeEnvio(s.BotID, chat, m.ID, "fallido")
+		if _, err := s.Alm.GuardarMensaje(m); err == nil {
+			_ = s.Alm.EstadoDeEnvio(s.BotID, chat, m.ID, "fallido")
+		}
 		return res, ErrSinConexion
 	}
 	var ci *waE2E.ContextInfo
 	if m.CitaID != "" {
 		ci = contexto(m.CitaID, s.autorDeCita(ctx, j, m), m.CitaTexto, nil, false)
 	}
-	if _, err := s.Cli.SendMessage(ctx, j, armar(ci), whatsmeow.SendRequestExtra{ID: types.MessageID(m.ID)}); err != nil {
+	wm := armar(m.ID, ci)
+	if antes != nil {
+		if err := antes(m.ID, wm); err != nil {
+			return res, err
+		}
+	}
+	if _, err := s.Alm.GuardarMensaje(m); err != nil {
+		return Resultado{}, err
+	}
+	s.RegistrarEnvio(m.ID)
+	s.recordarAutor(m.ID, citaAutorWA)
+	if _, err := s.Cli.SendMessage(ctx, j, wm, whatsmeow.SendRequestExtra{ID: types.MessageID(m.ID)}); err != nil {
 		_ = s.Alm.EstadoDeEnvio(s.BotID, chat, m.ID, "fallido")
 		s.Log("No se pudo enviar un mensaje: " + err.Error())
 		return res, err

@@ -58,6 +58,22 @@ type Salida struct {
 	Etiqueta string
 	// Auto, si viene, ata la salida a un mensaje automático (cuenta cuántos archivos salieron y cuáles no).
 	Auto *AutoInfo
+	// Menu, si viene, es el mismo menú que va en Texto pero con sus partes separadas. Si el Laboratorio está encendido, quien envía
+	// puede mandarlo como encuesta o botones; Texto (el menú numerado) es SIEMPRE el respaldo.
+	Menu *MenuLab
+}
+
+// MenuLab es un menú numerado con sus partes: el título y las opciones con el número que el menú de texto entiende (0 = volver).
+type MenuLab struct {
+	Persona  string // persona canónica a la que le toca elegir (en privado es el chat)
+	Titulo   string
+	Opciones []OpcionMenu
+}
+
+// OpcionMenu es una opción de un menú: su número y su texto.
+type OpcionMenu struct {
+	Num   int
+	Texto string
 }
 
 // AutoInfo es lo que se anota de un mensaje automático al terminar de mandarlo. Lo comparten todas sus salidas (texto y archivos).

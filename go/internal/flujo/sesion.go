@@ -43,30 +43,52 @@ func (m *Motor) visibles(def *Def, menuID int64, p *Paso, sender string, grupo b
 }
 
 func (m *Motor) menuTexto(def *Def, p *Paso, s *almacen.Sesion, e entrada) string {
+	texto, _ := m.menuPartes(def, p, s, e)
+	return texto
+}
+
+// menuPartes arma el menú numerado y, además, sus partes (título y opciones) para que el Laboratorio pueda mandarlo como encuesta o
+// botones. Sin opciones visibles no hay partes (nil): ese menú solo sale como texto.
+func (m *Motor) menuPartes(def *Def, p *Paso, s *almacen.Sesion, e entrada) (string, *motor.MenuLab) {
 	grupo := esGrupoChat(s.Chat)
 	vis := m.visibles(def, s.MenuID, p, s.Sender, grupo)
 	var b strings.Builder
-	b.WriteString(m.sustituye(def, p.Titulo, entrada{Chat: s.Chat, Sender: s.Sender}, m.c.Alm.Variables(s.ID)))
+	titulo := m.sustituye(def, p.Titulo, entrada{Chat: s.Chat, Sender: s.Sender}, m.c.Alm.Variables(s.ID))
+	b.WriteString(titulo)
+	var ops []motor.OpcionMenu
 	for _, v := range vis {
 		fmt.Fprintf(&b, "\n%d. %s", v.Num, v.O.Texto)
+		t := v.O.Texto
 		if grupo && v.O.Ambito == "privado" {
 			b.WriteString(" (solo en privado)")
+			t += " (solo en privado)"
 		}
+		ops = append(ops, motor.OpcionMenu{Num: v.Num, Texto: t})
 	}
 	if len(vis) == 0 {
 		b.WriteString("\nPor ahora no hay opciones disponibles.")
 	}
 	if p.ID != def.Inicio {
 		fmt.Fprintf(&b, "\n0. %s", textoMenuPrinc)
+		ops = append(ops, motor.OpcionMenu{Num: 0, Texto: textoMenuPrinc})
 	}
-	return b.String()
+	if len(vis) == 0 {
+		return b.String(), nil
+	}
+	return b.String(), &motor.MenuLab{Persona: s.Sender, Titulo: strings.TrimSpace(titulo), Opciones: ops}
+}
+
+// salidaMenu es el mensaje de un menú: el texto numerado de siempre y sus partes (ver motor.Salida.Menu).
+func (m *Motor) salidaMenu(def *Def, p *Paso, s *almacen.Sesion, e entrada) motor.Salida {
+	texto, menu := m.menuPartes(def, p, s, e)
+	return motor.Salida{Texto: texto, Menu: menu}
 }
 
 // mostrarPaso repite lo que se le preguntó a la persona en el paso donde va ("repetir").
 func (m *Motor) mostrarPaso(def *Def, s *almacen.Sesion, p *Paso, e entrada) []motor.Salida {
 	switch p.Tipo {
 	case PasoMenu:
-		return []motor.Salida{{Texto: m.menuTexto(def, p, s, e)}}
+		return []motor.Salida{m.salidaMenu(def, p, s, e)}
 	case PasoPedir:
 		return []motor.Salida{{Texto: m.sustituye(def, p.Pregunta, entrada{Chat: s.Chat, Sender: s.Sender}, m.c.Alm.Variables(s.ID))}}
 	case PasoForm:
@@ -153,7 +175,7 @@ func (m *Motor) continuaPaso(def *Def, s *almacen.Sesion, p *Paso, e entrada, pr
 	// Un saludo, un "gracias" o un emoji suelto no es un error: se le vuelve a mostrar el menú sin contar nada.
 	if m.esNeutro(texto) {
 		_ = alm.MoverSesion(bot, s, p.ID, false, s.Invalidas, false, evt(p.ID, "", "neutro"), ahora)
-		return resultado{Salidas: []motor.Salida{{Texto: m.menuTexto(def, p, s, e)}}, Estado: almacen.SesActiva, Paso: p.ID}, nil
+		return resultado{Salidas: []motor.Salida{m.salidaMenu(def, p, s, e)}, Estado: almacen.SesActiva, Paso: p.ID}, nil
 	}
 	return m.errorDeMenu(def, s, p, e, prueba), nil
 }
@@ -461,7 +483,7 @@ func (m *Motor) ejecuta(def *Def, s *almacen.Sesion, id string, e entrada, prueb
 		case PasoMenu:
 			_ = alm.MoverSesion(bot, s, p.ID, false, 0, false, evt(p.ID, "", "mostrado"), ahora)
 			m.pushPila(s, p.ID)
-			r.Salidas = append(r.Salidas, motor.Salida{Texto: m.menuTexto(def, p, s, e)})
+			r.Salidas = append(r.Salidas, m.salidaMenu(def, p, s, e))
 			return r, nil
 		case PasoRespuesta:
 			r.Salidas = append(r.Salidas, m.salidasDeRespuesta(def, p, e, vars)...)
