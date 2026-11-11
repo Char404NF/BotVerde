@@ -130,6 +130,9 @@ var ajustesBotDefecto = map[string]string{
 	"resumen_hora":     "20:00", // HH:MM de la zona del teléfono
 	"resumen_ultimo":   "",      // último día (AAAA-MM-DD) en que se avisó
 	"avisos_exactos":   "1",     // pedir alarmas exactas cuando el sistema lo permita
+	// Utilidades (bloque F)
+	"util_tope":         "50", // máximo de notas y de pendientes por persona (cada lista)
+	"sticker_tope_hora": "20", // stickers que el bot hace por hora en total (0 = sin tope)
 	// Menús ampliados (bloque C). Cada menú puede traer los suyos; estos son los generales.
 	"menu_err_max":       "3", // errores seguidos para que el menú se detenga y reinicie la conversación
 	"menu_txt_n1":        "No entendí esa opción. Estas son las opciones:",
@@ -835,7 +838,7 @@ func fusionarPersona(tx *sql.Tx, botID int64, desde, hacia string) error {
 		}
 	}
 	// v0.5.0 B: advertencias y notas pasan a la persona canónica; del silencio se queda el más largo (0 = siempre).
-	for _, t := range []string{"advertencias", "notas_persona"} {
+	for _, t := range []string{"advertencias", "notas_persona", "util_items"} {
 		if _, err := tx.Exec(`UPDATE `+t+` SET persona=? WHERE bot_id=? AND persona=?`, hacia, botID, desde); err != nil {
 			return err
 		}

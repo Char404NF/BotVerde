@@ -620,6 +620,7 @@ func (a *Almacen) OlvidarPersona(botID int64, persona string) (*ResultadoOlvidar
 		return int(n)
 	}
 	res.Notas = del(`DELETE FROM notas_persona WHERE bot_id=? AND persona IN ` + lista)
+	del(`DELETE FROM util_items WHERE bot_id=? AND persona IN ` + lista)
 	res.Advertencias = del(`DELETE FROM advertencias WHERE bot_id=? AND persona IN ` + lista)
 	del(`DELETE FROM persona_silencio WHERE bot_id=? AND persona IN ` + lista)
 	a.OlvidarAutoPersona(botID, fs)
@@ -698,6 +699,7 @@ type ExportePersona struct {
 	Estadisticas *EstadisticasPersona `json:"estadisticas"`
 	Mensajes     []MensajeExportado   `json:"mensajes"`
 	Formularios  []Formulario         `json:"formularios,omitempty"` // formularios que completó en un menú (etapa C)
+	Utilidades   []ItemUtil           `json:"utilidades,omitempty"`  // sus notas y pendientes propios (etapa F)
 	Recortado    bool                 `json:"recortado,omitempty"`
 }
 
@@ -720,6 +722,7 @@ func (a *Almacen) DatosDePersona(botID int64, persona string, ahora time.Time) (
 	if ex.Estadisticas, err = a.EstadisticasDePersona(botID, persona, 3650); err != nil {
 		return nil, err
 	}
+	ex.Utilidades = a.ListarItemsUtil(botID, persona, "", true)
 	fs := a.formas(botID, persona)
 	lista := enLista(len(fs))
 	if ff, e := a.db.Query(`SELECT `+colsForm+` FROM formularios WHERE bot_id=? AND (persona IN `+lista+` OR chat IN `+lista+`) ORDER BY id`, append(args2(botID, fs), argsSolo(fs)...)...); e == nil {

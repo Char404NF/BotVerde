@@ -570,6 +570,22 @@ var migraciones = [][]string{
 			PRIMARY KEY (bot_id, chat_jid)
 		) WITHOUT ROWID`,
 	},
+	// 16 (v0.5.0, etapa F): utilidades por comando. util_items guarda las NOTAS y los PENDIENTES (tareas) PROPIOS de cada persona
+	// (texto cifrado). Van aparte de notas_persona porque esas son notas del personal SOBRE alguien (las ve la ficha); estas son de
+	// quien las escribe y nadie más las ve.
+	{
+		`CREATE TABLE util_items (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			persona TEXT NOT NULL,
+			tipo TEXT NOT NULL,
+			texto_cifrado BLOB NOT NULL,
+			hecho INTEGER NOT NULL DEFAULT 0,
+			ts INTEGER NOT NULL,
+			hecho_ts INTEGER NOT NULL DEFAULT 0
+		)`,
+		`CREATE INDEX idx_util_items ON util_items(bot_id, persona, tipo, id)`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {
