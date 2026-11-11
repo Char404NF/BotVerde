@@ -110,6 +110,24 @@ interface Motor {
     fun cancelarConfirmacion(bot: Long, codigo: String)
     fun ejecutarComando(bot: Long, texto: String): String
     fun listarAcciones(bot: Long, limite: Long, antesId: Long): String
+
+    // Módulos e iniciativa propia (0.5.0, H0). Eventos: "modulos", "iniciativas".
+    fun listarModulos(bot: Long): String
+    fun infoModulo(bot: Long, id: String): String
+    fun activarModulo(bot: Long, id: String)
+    fun desactivarModulo(bot: Long, id: String)
+    fun configModulo(bot: Long, id: String): String
+    fun guardarConfigModulo(bot: Long, id: String, configJson: String)
+    fun fijarTopesModulo(bot: Long, id: String, hora: Long, dia: Long)
+    fun ajustesIniciativa(bot: Long): String
+    fun fijarAjusteIniciativa(bot: Long, clave: String, valor: String)
+    fun fijarIniciativaMaestro(bot: Long, activo: Boolean)
+    fun listarNoMolestar(bot: Long): String
+    fun agregarNoMolestar(bot: Long, persona: String, motivo: String)
+    fun quitarNoMolestar(bot: Long, persona: String)
+    fun listarIniciativas(bot: Long, modulo: String, limite: Long, antesId: Long): String
+    fun estadoModoSeguro(bot: Long): String
+    fun reanudarModoSeguro(bot: Long)
 }
 
 /** El módulo Go de verdad (whatsmeow + almacén cifrado). */
@@ -217,4 +235,20 @@ object MotorGo : Motor {
     override fun cancelarConfirmacion(bot: Long, codigo: String) = Wabot.cancelarConfirmacion(bot, codigo)
     override fun ejecutarComando(bot: Long, texto: String) = Wabot.ejecutarComando(bot, texto)
     override fun listarAcciones(bot: Long, limite: Long, antesId: Long) = Wabot.listarAcciones(bot, limite, antesId)
+    override fun listarModulos(bot: Long) = Wabot.listarModulos(bot)
+    override fun infoModulo(bot: Long, id: String) = Wabot.infoModulo(bot, id)
+    override fun activarModulo(bot: Long, id: String) = Wabot.activarModulo(bot, id)
+    override fun desactivarModulo(bot: Long, id: String) = Wabot.desactivarModulo(bot, id)
+    override fun configModulo(bot: Long, id: String) = Wabot.configModulo(bot, id)
+    override fun guardarConfigModulo(bot: Long, id: String, configJson: String) = Wabot.guardarConfigModulo(bot, id, configJson)
+    override fun fijarTopesModulo(bot: Long, id: String, hora: Long, dia: Long) = Wabot.fijarTopesModulo(bot, id, hora, dia)
+    override fun ajustesIniciativa(bot: Long) = Wabot.ajustesIniciativa(bot)
+    override fun fijarAjusteIniciativa(bot: Long, clave: String, valor: String) = Wabot.fijarAjusteIniciativa(bot, clave, valor)
+    override fun fijarIniciativaMaestro(bot: Long, activo: Boolean) = Wabot.fijarIniciativaMaestro(bot, activo)
+    override fun listarNoMolestar(bot: Long) = Wabot.listarNoMolestar(bot)
+    override fun agregarNoMolestar(bot: Long, persona: String, motivo: String) = Wabot.agregarNoMolestar(bot, persona, motivo)
+    override fun quitarNoMolestar(bot: Long, persona: String) = Wabot.quitarNoMolestar(bot, persona)
+    override fun listarIniciativas(bot: Long, modulo: String, limite: Long, antesId: Long) = Wabot.listarIniciativas(bot, modulo, limite, antesId)
+    override fun estadoModoSeguro(bot: Long) = Wabot.estadoModoSeguro(bot)
+    override fun reanudarModoSeguro(bot: Long) = Wabot.reanudarModoSeguro(bot)
 }

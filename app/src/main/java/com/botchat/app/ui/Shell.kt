@@ -217,7 +217,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         cuenta = runCatching { Repo.contarSolicitudes(bot.id) }.getOrDefault(0)
                         Repo.cambios.collect { evs -> if ("solicitudes" in evs) cuenta = runCatching { Repo.contarSolicitudes(bot.id) }.getOrDefault(0) }
                     }
-                    PantallaAjustes(ajustes, alPermisos = { nav.navigate("permisos") }, pendientesSolicitudes = cuenta, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("bot") }, alAvanzado = { nav.navigate("avanzado") }, alEstadisticas = { nav.navigate("estadisticas") }, alPrivacidad = { nav.navigate("privacidad") }, alAutomatizaciones = { nav.navigate("automatizaciones") })
+                    PantallaAjustes(ajustes, alPermisos = { nav.navigate("permisos") }, pendientesSolicitudes = cuenta, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("bot") }, alAvanzado = { nav.navigate("avanzado") }, alEstadisticas = { nav.navigate("estadisticas") }, alPrivacidad = { nav.navigate("privacidad") }, alAutomatizaciones = { nav.navigate("automatizaciones") }, alModulos = { nav.navigate("modulos") }, alIniciativa = { nav.navigate("iniciativa") })
                 }
                 composable("permisos") {
                     PantallaPermisos(bot.id, alVolver = { nav.popBackStack() }, alRangos = { nav.navigate("rangos") }, alSolicitudes = { nav.navigate("solicitudes") }, alGrupos = { nav.navigate("politicas_grupos") })
@@ -231,6 +231,22 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 composable("politicas_grupos") { PantallaPoliticasGrupo(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("permisos_avanzado") { PantallaPermisosAvanzado(bot.id, alVolver = { nav.popBackStack() }, alRegistro = { nav.navigate("registro_acciones") }) }
                 composable("registro_acciones") { PantallaRegistroAcciones(bot.id, alVolver = { nav.popBackStack() }) }
+                composable("modulos") {
+                    PantallaModulos(
+                        bot.id, alVolver = { nav.popBackStack() }, alConfigurar = { nav.navigate("modulo_config/${enc(it)}") },
+                        alAviso = { nav.navigate("modulo_aviso/${enc(it)}") }, alIniciativa = { nav.navigate("iniciativa") },
+                    )
+                }
+                composable("modulo_config/{id}") { be ->
+                    val id = be.arguments?.getString("id") ?: return@composable
+                    PantallaConfigModulo(bot.id, id, alVolver = { nav.popBackStack() })
+                }
+                composable("modulo_aviso/{id}") { be ->
+                    val id = be.arguments?.getString("id") ?: return@composable
+                    PantallaAvisoRiesgo(bot.id, id, alVolver = { nav.popBackStack() })
+                }
+                composable("iniciativa") { PantallaIniciativa(bot.id, alVolver = { nav.popBackStack() }, alRegistro = { nav.navigate("registro_iniciativas") }) }
+                composable("registro_iniciativas") { PantallaRegistroIniciativas(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("privacidad") { PantallaPrivacidad(ajustes, alVolver = { nav.popBackStack() }) }
                 composable("automatizaciones") {
                     PantallaAutomatizaciones(

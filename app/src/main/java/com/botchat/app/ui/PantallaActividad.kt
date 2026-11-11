@@ -54,6 +54,7 @@ fun frase(a: ActividadItem): String = when (a.evento) {
         "cola llena" -> "había demasiados mensajes esperando"
         "freno" -> "el bot está pausado por errores"
         "no es texto" -> "no era un texto"
+        "no molestar" -> "pidió no recibir mensajes (BAJA)"
         else -> a.motivo.ifBlank { "sin motivo" }
     }
     else -> a.evento

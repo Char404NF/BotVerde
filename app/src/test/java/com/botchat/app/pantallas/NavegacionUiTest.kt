@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.botchat.app.BotState
 import com.botchat.app.datos.Ajustes
 import com.botchat.app.ui.BotChatTema
@@ -98,18 +99,18 @@ class NavegacionUiTest {
         regla.esperaTexto("Chats que más ocupan")
         regla.onNodeWithTag("nav_ajustes").performClick()
         regla.esperaTexto("Seguridad")
-        regla.onNodeWithTag("ajuste_seguridad").performClick()
+        regla.onNodeWithTag("ajuste_seguridad").performScrollTo().performClick()
         regla.esperaTexto("Proteger la app")
         regla.onNodeWithText("Sin bloqueo").assertIsDisplayed()
         atras()
-        regla.onNodeWithTag("ajuste_descargas").performClick()
+        regla.onNodeWithTag("ajuste_descargas").performScrollTo().performClick()
         regla.esperaTexto("Descarga automática")
         atras()
-        regla.onNodeWithTag("ajuste_avanzado").performClick()
+        regla.onNodeWithTag("ajuste_avanzado").performScrollTo().performClick()
         regla.esperaTexto("Aspecto")
         regla.onNodeWithText("Medir rendimiento").assertExists()
         atras()
-        regla.onNodeWithTag("ajuste_bot").performClick()
+        regla.onNodeWithTag("ajuste_bot").performScrollTo().performClick()
         regla.esperaTexto("Iniciar")
         atras()
         // chat: la navegación de abajo se esconde y se puede entrar a los archivos compartidos

@@ -38,13 +38,15 @@ import com.botchat.app.datos.Ajustes
 
 /** Pestaña Ajustes: Seguridad, Descargas, Estado del bot y Avanzado. */
 @Composable
-fun PantallaAjustes(ajustes: Ajustes, alSeguridad: () -> Unit, alDescargas: () -> Unit, alBot: () -> Unit, alAvanzado: () -> Unit, alEstadisticas: () -> Unit = {}, alPrivacidad: () -> Unit = {}, alAutomatizaciones: () -> Unit = {}, alPermisos: () -> Unit = {}, pendientesSolicitudes: Int = 0) {
+fun PantallaAjustes(ajustes: Ajustes, alSeguridad: () -> Unit, alDescargas: () -> Unit, alBot: () -> Unit, alAvanzado: () -> Unit, alEstadisticas: () -> Unit = {}, alPrivacidad: () -> Unit = {}, alAutomatizaciones: () -> Unit = {}, alPermisos: () -> Unit = {}, pendientesSolicitudes: Int = 0, alModulos: () -> Unit = {}, alIniciativa: () -> Unit = {}) {
     val modo by ajustes.bloqueo.collectAsState()
     val ctx = LocalContext.current
     val version = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "" }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
         Tarjeta(Ico.Chats, "Automatizaciones", "Menús y respuestas del bot", alAutomatizaciones, "ajuste_automatizaciones")
         Tarjeta(Ico.Persona, "Rangos y permisos", if (pendientesSolicitudes > 0) plural(pendientesSolicitudes.toLong(), "solicitud pendiente", "solicitudes pendientes") else "Quién puede usar qué, solicitudes y grupos", alPermisos, "ajuste_permisos")
+        Tarjeta(Ico.Agregar, "Módulos", "Extras opcionales, apagados hasta que los enciendas", alModulos, "ajuste_modulos")
+        Tarjeta(Ico.Aviso, "Iniciativa propia", "El interruptor general de lo que el bot escribe solo, topes y No molestar", alIniciativa, "ajuste_iniciativa")
         Tarjeta(Ico.Candado, "Seguridad", when (modo) { Ajustes.Bloqueo.NINGUNO -> "Sin bloqueo"; Ajustes.Bloqueo.PIN -> "Protegida con PIN"; Ajustes.Bloqueo.HUELLA -> "Protegida con huella" }, alSeguridad, "ajuste_seguridad")
         Tarjeta(Ico.Candado, "Privacidad", "Mensajes eliminados por otros", alPrivacidad, "ajuste_privacidad")
         Tarjeta(Ico.Estadisticas, "Estadísticas", "Mensajes enviados y recibidos, y los chats más activos", alEstadisticas, "ajuste_estadisticas")

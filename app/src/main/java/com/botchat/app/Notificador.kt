@@ -125,6 +125,7 @@ object Notificador {
             ctx, a.chat.hashCode() + a.tipo.hashCode(), Intent(ctx, MainActivity::class.java).apply {
                 if (a.chat.isNotEmpty() && a.tipo == "humano") putExtra(EXTRA_CHAT, a.chat)
                 if (a.tipo == "desconocido") putExtra(EXTRA_RUTA, "solicitudes")
+                if (a.tipo == "modo_seguro") putExtra(EXTRA_RUTA, "iniciativa")
             }.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )

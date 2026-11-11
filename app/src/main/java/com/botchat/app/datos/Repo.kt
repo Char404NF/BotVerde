@@ -23,6 +23,7 @@ object Repo {
     /**
      * Eventos en vivo: "chats", "chat:<jid>", "msg:<jid>:<id>" (cambió ese mensaje), "archivo:<jid>:<id>" y "espacio".
      * Rangos y permisos: "rangos", "rango:<persona>", "solicitudes", "confirmaciones", "politicas", "acciones" y "permisos_ajustes".
+     * Módulos: "modulos" (activar, configurar, modo seguro, ajustes) e "iniciativas" (registro, No molestar).
      */
     val cambios: SharedFlow<List<String>> = cambiosInternos.asSharedFlow()
 
@@ -182,6 +183,25 @@ object Repo {
     suspend fun cancelarConfirmacion(bot: Long, codigo: String) = io { motor.cancelarConfirmacion(bot, codigo) }
     suspend fun ejecutarComando(bot: Long, texto: String) = io { JsonPerm.comando(motor.ejecutarComando(bot, texto)) }
     suspend fun acciones(bot: Long, limite: Int = 100, antesId: Long = 0) = io { JsonPerm.acciones(motor.listarAcciones(bot, limite.toLong(), antesId)) }
+
+    // Módulos e iniciativa propia
+    suspend fun modulos(bot: Long) = io { JsonMod.modulos(motor.listarModulos(bot)) }
+    suspend fun modulo(bot: Long, id: String) = io { JsonMod.moduloOpt(motor.infoModulo(bot, id)) }
+    suspend fun activarModulo(bot: Long, id: String) = io { motor.activarModulo(bot, id) }
+    suspend fun desactivarModulo(bot: Long, id: String) = io { motor.desactivarModulo(bot, id) }
+    suspend fun configModulo(bot: Long, id: String) = io { JsonMod.config(motor.configModulo(bot, id)) }
+    suspend fun guardarConfigModulo(bot: Long, id: String, config: Map<String, Any?>) = io { motor.guardarConfigModulo(bot, id, org.json.JSONObject(config).toString()) }
+    /** 0 = usar el tope que trae el módulo. */
+    suspend fun fijarTopesModulo(bot: Long, id: String, hora: Int, dia: Int) = io { motor.fijarTopesModulo(bot, id, hora.toLong(), dia.toLong()) }
+    suspend fun ajustesIniciativa(bot: Long) = io { JsonMod.ajustes(motor.ajustesIniciativa(bot)) }
+    suspend fun fijarAjusteIniciativa(bot: Long, clave: String, valor: String) = io { motor.fijarAjusteIniciativa(bot, clave, valor) }
+    suspend fun fijarIniciativaMaestro(bot: Long, activo: Boolean) = io { motor.fijarIniciativaMaestro(bot, activo) }
+    suspend fun noMolestar(bot: Long) = io { JsonMod.noMolestar(motor.listarNoMolestar(bot)) }
+    suspend fun agregarNoMolestar(bot: Long, persona: String, motivo: String = "a mano") = io { motor.agregarNoMolestar(bot, persona, motivo) }
+    suspend fun quitarNoMolestar(bot: Long, persona: String) = io { motor.quitarNoMolestar(bot, persona) }
+    suspend fun iniciativas(bot: Long, modulo: String = "", limite: Int = 100, antesId: Long = 0) = io { JsonMod.registro(motor.listarIniciativas(bot, modulo, limite.toLong(), antesId)) }
+    suspend fun modoSeguro(bot: Long) = io { JsonMod.seguro(motor.estadoModoSeguro(bot)) }
+    suspend fun reanudarModoSeguro(bot: Long) = io { motor.reanudarModoSeguro(bot) }
 
     suspend fun estadisticasChat(bot: Long, chat: String) = io { Json.resumenChat(motor.estadisticasChat(bot, chat)) }
     suspend fun calendario(bot: Long, chat: String, mes: String) = io { Json.calendario(motor.calendarioChat(bot, chat, mes)) }
