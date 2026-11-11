@@ -16,6 +16,7 @@ type estadoH struct {
 	difPrimero  time.Time     // cuándo salió el primer mensaje de difusión (calentamiento)
 	usos        []time.Time   // usos de !bajar y !api en la última hora
 	lim         map[string][]time.Time
+	juegos      estadoJuegos
 	memoria     map[string][]turnoIA // memoria corta de la IA (solo en RAM)
 	wg          sync.WaitGroup       // consultas a la IA en curso
 }

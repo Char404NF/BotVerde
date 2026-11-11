@@ -26,16 +26,20 @@ const (
 type falsoEnv struct {
 	mu        sync.Mutex
 	enviados  []string // "chat|texto"
+	citas     []string // id citado de cada texto enviado
+	menc      [][]string
 	conectado bool
 	falla     error
 }
 
-func (f *falsoEnv) Texto(_ context.Context, chat, texto, _ string, _ []string) error {
+func (f *falsoEnv) Texto(_ context.Context, chat, texto, cita string, menc []string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.falla != nil {
 		return f.falla
 	}
+	f.citas = append(f.citas, cita)
+	f.menc = append(f.menc, menc)
 	f.enviados = append(f.enviados, chat+"|"+texto)
 	return nil
 }
