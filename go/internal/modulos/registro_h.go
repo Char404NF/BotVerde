@@ -1,12 +1,12 @@
 package modulos
 
 // IDsH son los módulos opcionales de producción (etapa H) en el orden en que aparecen en la app.
-var IDsH = []string{IDBienvenida}
+var IDsH = []string{IDBienvenida, IDDifusion}
 
 // RegistrarH agrega al registro central los módulos opcionales H1–H5. Todos nacen APAGADOS: registrar no enciende nada. La app lo llama
 // al arrancar el bot (se puede repetir sin efecto: reemplaza por id).
 func RegistrarH() error {
-	for _, m := range []Modulo{bienvenida()} {
+	for _, m := range []Modulo{bienvenida(), difusion()} {
 		if err := Registrar(m); err != nil {
 			return err
 		}

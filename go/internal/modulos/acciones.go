@@ -231,3 +231,10 @@ func errf(f string, a ...any) error { return fmt.Errorf(f, a...) }
 func jsonMarshal(v any) ([]byte, error) { return json.Marshal(v) }
 
 func parseIP(s string) net.IP { return net.ParseIP(s) }
+
+func valorTexto(a Args, k string) string {
+	if s, ok := a[k].(string); ok {
+		return strings.TrimSpace(s)
+	}
+	return ""
+}
