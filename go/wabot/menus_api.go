@@ -416,6 +416,23 @@ func (e enviadorMotor) EnviarSalida(ctx context.Context, chat string, sal motor.
 	var r envio.Resultado
 	var err error
 	switch {
+	case sal.Menu != nil && sal.Medio == nil && e.s.lab != nil:
+		// Laboratorio: el menú como encuesta o botones. Si no corresponde o el envío falla, sigue el texto numerado de siempre.
+		persona := sal.Menu.Persona
+		env, ok, errL := e.s.lab.EnviarMenu(ctx, chat, persona, sal.Menu, sal.Texto, citaID, citaAutorWA)
+		if ok && errL == nil {
+			if env.Respaldo {
+				// por si no se ven los botones o la encuesta: debajo va el mismo menú en texto numerado
+				if _, e2 := e.s.envio.EnviarAutoCita(ctx, chat, sal.Texto, "", "", men); e2 != nil {
+					e.s.log("No se pudo mandar el texto de respaldo del menú: " + e2.Error())
+				}
+			}
+			return env.ID, nil
+		}
+		if errL != nil && errors.Is(errL, envio.ErrSinConexion) {
+			return "", errL
+		}
+		r, err = e.s.envio.EnviarAutoCita(ctx, chat, sal.Texto, citaID, citaAutorWA, men)
 	case sal.Medio != nil:
 		ruta, errC := e.s.copiaAdjunto(sal.Medio.ID)
 		if errC != nil {

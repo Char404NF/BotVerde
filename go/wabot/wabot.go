@@ -22,6 +22,7 @@ import (
 	"botchat/internal/fotos"
 	"botchat/internal/grupos"
 	"botchat/internal/ingesta"
+	"botchat/internal/lab"
 	"botchat/internal/medios"
 	"botchat/internal/modulos"
 	"botchat/internal/motor"
@@ -76,6 +77,7 @@ type estado struct {
 	eapp          *estadoapp.Servicio
 	avs           *avisos.Servicio
 	util          *utilidades.Servicio
+	lab           *lab.Servicio
 	mods          *modulos.Gestor
 	admins        *cacheAdmins
 	refresco      *time.Timer
@@ -179,6 +181,7 @@ func (s *estado) armar() {
 	s.eapp = estadoapp.Nuevo(alm, s.botID, estadoapp.Real{Client: s.cli}, s.log)
 	s.armarModulos()
 	s.armarAuto()
+	s.armarLab()
 	s.motor = motor.Nuevo(motor.Config{
 		Perm: s.perm, Cmd: s.cmd, EsAdminGrupo: s.admins.esAdmin, Baja: s.mods.Baja,
 		BotID: s.botID, Alm: alm, Decisor: s.decisor(), Enviador: enviadorMotor{s}, Log: s.log,
@@ -397,7 +400,10 @@ func (s *estado) evento(e any) {
 		s.encola(func() {
 			s.ing.Mensaje(s.ctx, v, false)
 			s.pausaPorTelefono(v)
-			s.alMotor(v, sinc)
+			// Votos y toques de nuestros menús interactivos (Laboratorio): se atienden aquí, en el trabajador.
+			if !s.alLab(v, sinc) {
+				s.alMotor(v, sinc)
+			}
 		})
 	case *events.OfflineSyncPreview:
 		s.sincronizando.Store(true)
