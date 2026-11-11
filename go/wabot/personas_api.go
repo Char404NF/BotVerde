@@ -33,6 +33,7 @@ func (s *estado) armarPersonas() {
 	s.avs = avisos.Nuevo(alm, s.botID)
 	s.avs.Log = s.log
 	s.avs.RegistrarComandos(s.cmd)
+	s.armarUtilidades()
 	s.cmd.Extra = func(cx *comandos.Contexto) []string {
 		return s.flujo.AyudaComandos(cx.EsGrupo, cx.Chat, cx.Persona, cx.Dueno)
 	}
@@ -526,6 +527,10 @@ func validarAjusteB(clave, valor string) (conocido bool, err error) {
 		return true, nil
 	case "auto_activo", "atajos_activo":
 		return true, num(0, 1)
+	case "util_tope":
+		return true, num(1, 500)
+	case "sticker_tope_hora":
+		return true, num(0, 1000)
 	case "todos_tope":
 		return true, num(1, 1024)
 	case "todos_lote":

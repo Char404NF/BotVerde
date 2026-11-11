@@ -468,6 +468,9 @@ func (e enviadorMotor) sinArchivo(ctx context.Context, chat string, sal motor.Sa
 
 func adjuntoEnvio(ruta string, m *motor.Medio, pie string) envio.Adjunto {
 	a := envio.Adjunto{Tipo: m.Tipo, Ruta: ruta, Mime: m.Mime, Nombre: m.Nombre, Pie: pie}
+	if m.Tipo == almacen.TipoSticker {
+		a.Ancho, a.Alto, a.Pie = 512, 512, "" // un sticker no lleva pie de foto
+	}
 	if m.Tipo == "audio" && strings.Contains(strings.ToLower(m.Mime), "ogg") {
 		a.NotaVoz = true
 	}

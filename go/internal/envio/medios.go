@@ -41,7 +41,7 @@ const mimeNotaDeVoz = "audio/ogg; codecs=opus"
 
 func tipoSubida(tipo string) (whatsmeow.MediaType, error) {
 	switch tipo {
-	case almacen.TipoImagen:
+	case almacen.TipoImagen, almacen.TipoSticker:
 		return whatsmeow.MediaImage, nil
 	case almacen.TipoVideo:
 		return whatsmeow.MediaVideo, nil
@@ -75,6 +75,9 @@ func (s *Servicio) enviarMedio(ctx context.Context, chat string, a Adjunto, cita
 	if _, err := tipoSubida(a.Tipo); err != nil {
 		return Resultado{}, err
 	}
+	if a.Tipo == almacen.TipoSticker && manual {
+		return Resultado{}, fmt.Errorf("No se puede enviar este tipo de archivo.") // los stickers solo los manda el bot (comando !sticker)
+	}
 	j, err := parsea(chat)
 	if err != nil {
 		return Resultado{}, err
@@ -87,7 +90,7 @@ func (s *Servicio) enviarMedio(ctx context.Context, chat string, a Adjunto, cita
 		return Resultado{}, fmt.Errorf("No se pudo leer el archivo.")
 	}
 	tope := int64(maxOtros)
-	if a.Tipo == almacen.TipoImagen {
+	if a.Tipo == almacen.TipoImagen || a.Tipo == almacen.TipoSticker {
 		tope = maxImagen
 	}
 	if st.Size() > tope {
@@ -211,6 +214,11 @@ func (s *Servicio) transmitirMedio(ctx context.Context, j types.JID, m *almacen.
 		msg = &waE2E.Message{ImageMessage: &waE2E.ImageMessage{
 			URL: &up.URL, DirectPath: &up.DirectPath, MediaKey: up.MediaKey, Mimetype: proto.String(m.ArchivoMime), FileEncSHA256: up.FileEncSHA256,
 			FileSHA256: up.FileSHA256, FileLength: &up.FileLength, Caption: pie, JPEGThumbnail: mini, Width: proto.Uint32(uint32(m.Ancho)), Height: proto.Uint32(uint32(m.Alto)), ContextInfo: ci}}
+	case almacen.TipoSticker:
+		msg = &waE2E.Message{StickerMessage: &waE2E.StickerMessage{
+			URL: &up.URL, DirectPath: &up.DirectPath, MediaKey: up.MediaKey, Mimetype: proto.String("image/webp"), FileEncSHA256: up.FileEncSHA256,
+			FileSHA256: up.FileSHA256, FileLength: &up.FileLength, Width: proto.Uint32(uint32(m.Ancho)), Height: proto.Uint32(uint32(m.Alto)),
+			IsAnimated: proto.Bool(false), ContextInfo: ci}}
 	case almacen.TipoVideo:
 		msg = &waE2E.Message{VideoMessage: &waE2E.VideoMessage{
 			URL: &up.URL, DirectPath: &up.DirectPath, MediaKey: up.MediaKey, Mimetype: proto.String(m.ArchivoMime), FileEncSHA256: up.FileEncSHA256,

@@ -27,6 +27,7 @@ import (
 	"botchat/internal/motor"
 	"botchat/internal/permisos"
 	"botchat/internal/personas"
+	"botchat/internal/utilidades"
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -74,6 +75,7 @@ type estado struct {
 	gru           *grupos.Servicio
 	eapp          *estadoapp.Servicio
 	avs           *avisos.Servicio
+	util          *utilidades.Servicio
 	mods          *modulos.Gestor
 	admins        *cacheAdmins
 	refresco      *time.Timer

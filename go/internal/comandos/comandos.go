@@ -39,7 +39,13 @@ type Contexto struct {
 	Dueno     bool     // viene de Mensajes guardados o de la app
 	Rol       *almacen.Rol
 	D         *Despachador
+	// Archivo: si el comando lo pone, la respuesta lleva ese archivo guardado (por ejemplo un sticker) además del texto.
+	Archivo *Archivo
 }
+
+// Archivo es un archivo ya guardado (cifrado) en el teléfono que sale como respuesta de un comando. El motor lo manda y el sobrante
+// se limpia solo con los adjuntos huérfanos.
+type Archivo struct{ ID, Tipo, Mime, Nombre string }
 
 // Comando es una orden registrable.
 type Comando struct {
@@ -61,8 +67,9 @@ type Comando struct {
 
 // Resultado es lo que sale de ejecutar un texto.
 type Resultado struct {
-	Manejado bool   // el texto era un comando conocido (si no, que siga el motor de menús)
-	Texto    string // respuesta ("" = no contestar)
+	Manejado bool     // el texto era un comando conocido (si no, que siga el motor de menús)
+	Texto    string   // respuesta ("" = no contestar)
+	Archivo  *Archivo // archivo que acompaña la respuesta (nil = ninguno)
 }
 
 // Despachador guarda los comandos y los ejecuta con permisos, límites y confirmaciones.
@@ -330,7 +337,7 @@ func (d *Despachador) correr(cmd *Comando, cx *Contexto, registro func(res, det 
 		return Resultado{Manejado: true, Texto: mensajeError(err)}
 	}
 	registro("ok", "")
-	return Resultado{Manejado: true, Texto: texto}
+	return Resultado{Manejado: true, Texto: texto, Archivo: cx.Archivo}
 }
 
 func mensajeError(err error) string {

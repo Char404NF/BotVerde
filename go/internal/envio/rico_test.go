@@ -115,3 +115,34 @@ func TestUbicacionYArchivoCitanConAutorExacto(t *testing.T) {
 		t.Fatal("no pausa al bot")
 	}
 }
+
+func TestStickerSaleComoStickerMessageSoloPorIniciativaDelBot(t *testing.T) {
+	s, f, a := nuevoServicio(t)
+	ctx := context.Background()
+	// desde la app (envío manual) no se permite: los stickers los manda el bot con !sticker
+	if _, err := s.EnviarMedio(ctx, privado, Adjunto{Tipo: almacen.TipoSticker, Ruta: archivoTemporal(t, "s.webp", []byte("WEBP")), Mime: "image/webp"}, ""); err == nil {
+		t.Fatal("un envío manual de sticker debe rechazarse")
+	}
+	if len(f.enviados) != 0 {
+		t.Fatal("no debía salir nada")
+	}
+	_, _ = a.GuardarMensaje(&almacen.Mensaje{ID: "Q1", ChatJID: privado, BotID: 1, RemitenteJID: privado, Tipo: almacen.TipoTexto, Texto: "hola", TS: 5})
+	r, err := s.EnviarMedioAutoCita(ctx, privado, Adjunto{Tipo: almacen.TipoSticker, Ruta: archivoTemporal(t, "s.webp", []byte("WEBP-FALSO")), Mime: "image/webp", Ancho: 512, Alto: 512, Pie: "no debe ir"}, "Q1", "", nil)
+	if err != nil || r.Estado != "enviado" {
+		t.Fatal(r, err)
+	}
+	st := f.enviados[0].msg.GetStickerMessage()
+	if st == nil || st.GetMimetype() != "image/webp" || st.GetWidth() != 512 || st.GetHeight() != 512 || st.GetIsAnimated() || st.GetContextInfo().GetStanzaID() != "Q1" {
+		t.Fatalf("%+v", f.enviados[0].msg)
+	}
+	if f.enviados[0].msg.GetImageMessage() != nil {
+		t.Fatal("no debe salir como foto")
+	}
+	if string(f.subidas[0]) != "WEBP-FALSO" {
+		t.Fatal("se sube el webp")
+	}
+	m, _ := a.ObtenerMensaje(1, privado, r.ID)
+	if m == nil || m.Tipo != almacen.TipoSticker || m.ArchivoEstado != almacen.EstadoDescargado || m.EstadoEnvio != "enviado" {
+		t.Fatalf("%+v", m)
+	}
+}

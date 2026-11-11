@@ -417,7 +417,7 @@ func corto(s string) string {
 func (m *Motor) Entrar(msg Mensaje) {
 	if msg.EsMio {
 		// Lo que escribo yo se ignora, salvo un comando con prefijo en "Mensajes guardados": ese es un comando de Dueño.
-		if msg.EsChatPropio && m.c.Cmd != nil && msg.EsTexto && !msg.EsEdicion && !msg.EsGrupo && m.c.Cmd.EsComando(msg.Texto) {
+		if msg.EsChatPropio && m.c.Cmd != nil && (msg.EsTexto || msg.Texto != "") && !msg.EsEdicion && !msg.EsGrupo && m.c.Cmd.EsComando(msg.Texto) {
 			m.entrarDueno(msg)
 		} else if !msg.EsChatPropio {
 			m.entrarAtajo(msg)
@@ -787,7 +787,9 @@ func (m *Motor) atiende(chat string, lote []Mensaje) {
 			if !r.Manejado {
 				continue
 			}
-			if r.Texto != "" {
+			if r.Archivo != nil {
+				deComandos = append(deComandos, Salida{Texto: m.sinPrefijo(r.Texto), Medio: &Medio{ID: r.Archivo.ID, Tipo: r.Archivo.Tipo, Mime: r.Archivo.Mime, Nombre: r.Archivo.Nombre}, Etiqueta: "comando"})
+			} else if r.Texto != "" {
 				deComandos = append(deComandos, Salida{Texto: m.sinPrefijo(r.Texto), Etiqueta: "comando"})
 			}
 			if x.ID == ultimo.ID {
@@ -1090,10 +1092,14 @@ func (m *Motor) entrarDueno(msg Mensaje) {
 			return
 		}
 		r := m.c.Cmd.Ejecutar(comandos.Entrada{Persona: almacen.PersonaDueno, Chat: msg.Chat, MensajeID: msg.ID, Texto: msg.Texto, Dueno: true})
-		if r.Texto == "" {
+		if r.Texto == "" && r.Archivo == nil {
 			return
 		}
-		if err := m.enviar(msg.Chat, m.sinPrefijo(r.Texto), msg.ID, "", time.Time{}); err != nil {
+		sal := Salida{Texto: m.sinPrefijo(r.Texto)}
+		if r.Archivo != nil {
+			sal.Medio = &Medio{ID: r.Archivo.ID, Tipo: r.Archivo.Tipo, Mime: r.Archivo.Mime, Nombre: r.Archivo.Nombre}
+		}
+		if err := m.enviarSalida(msg.Chat, sal, msg.ID, "", "", time.Time{}, nil); err != nil {
 			m.c.Log("No se pudo responder un comando del dueño: " + err.Error())
 		}
 	}()
