@@ -11,6 +11,7 @@ import (
 	"botchat/internal/almacen"
 	"botchat/internal/flujo"
 	"botchat/internal/motor"
+	"botchat/internal/permisos"
 )
 
 var flujoExpiraMin atomic.Int32
@@ -37,6 +38,12 @@ func (s *estado) nuevoFlujo() *flujo.Motor {
 	return flujo.Nuevo(flujo.Config{
 		BotID: s.botID, Alm: alm, Zona: alm.Zona, Expira: expiraFlujo,
 		Nombre: func(chat, sender string) string { return nombreDe(s.botID, chat, sender) },
+		MenuVisible: func(sender string, menuID int64) bool {
+			if s.perm == nil {
+				return true
+			}
+			return permisos.MenuVisible(s.perm.RolDe(sender), fmt.Sprint(menuID), "")
+		},
 		AlAviso: func(chat, tipo, titulo, detalle string) {
 			if _, err := alm.CrearAviso(s.botID, tipo, chat, titulo, detalle); err == nil {
 				s.log("Aviso local: " + titulo + ".")

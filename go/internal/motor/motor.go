@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"botchat/internal/almacen"
+	"botchat/internal/comandos"
+	"botchat/internal/permisos"
 )
 
 // Mensaje es lo que el motor necesita saber de un mensaje recibido (nunca se guarda su texto en el registro).
@@ -34,6 +36,12 @@ type Mensaje struct {
 	CitaEsMia   bool // en un grupo: responden citando un mensaje mío
 	EsTexto     bool
 	EsEdicion   bool
+
+	// Rangos y comandos (v0.5.0, bloque A).
+	Nombre       string   // nombre público con el que escribe (solo para la bandeja de solicitudes)
+	EsChatPropio bool     // el chat es "Mensajes guardados" (el chat conmigo mismo: mi propio número o LID)
+	Menciones    []string // personas mencionadas (clave guardada)
+	CitaAutor    string   // autor del mensaje citado (clave guardada), si cita a alguien
 }
 
 // Salida es una respuesta lista para mandar.
@@ -88,6 +96,13 @@ type Config struct {
 	AlHumano     func(chat, aviso string)
 	AlCoincidir  func(chat string, d Decision)
 	Aleatorio    func(n int64) int64
+
+	// Perm decide a quién le contesta el bot (bloqueados, desconocidos, política de cada grupo). nil = a todos, como antes.
+	Perm *permisos.Servicio
+	// Cmd es el despachador de comandos con prefijo. nil = sin comandos.
+	Cmd *comandos.Despachador
+	// EsAdminGrupo dice si una persona administra el grupo (solo se pregunta si la política del grupo es "solo administradores").
+	EsAdminGrupo func(chat, persona string) bool
 }
 
 // Motor es el bot automático.
@@ -104,6 +119,7 @@ type Motor struct {
 	fallos     int
 	frenoHasta time.Time
 	manual     map[string]time.Time // chat -> hora de mi último mensaje escrito a mano ahí
+	mDueno     sync.Mutex           // los comandos del Dueño salen de uno en uno
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -214,6 +230,10 @@ func corto(s string) string {
 // Entrar recibe un mensaje ya guardado. Hace solo comprobaciones rápidas y lo pone en la fila de su chat.
 func (m *Motor) Entrar(msg Mensaje) {
 	if msg.EsMio {
+		// Lo que escribo yo se ignora, salvo un comando con prefijo en "Mensajes guardados": ese es un comando de Dueño.
+		if msg.EsChatPropio && m.c.Cmd != nil && msg.EsTexto && !msg.EsEdicion && !msg.EsGrupo && m.c.Cmd.EsComando(msg.Texto) {
+			m.entrarDueno(msg)
+		}
 		return
 	}
 	m.c.Alm.RegistrarActividad(m.c.BotID, almacen.ActLlego, "", msg.Chat, tipoChat(msg))
@@ -250,8 +270,30 @@ func (m *Motor) Entrar(msg Mensaje) {
 			m.omite(msg, almacen.MotChatPausa)
 			return
 		}
-		if !(msg.Mencionado || msg.CitaEsMia || esComando(msg.Texto)) {
+		if !(msg.Mencionado || msg.CitaEsMia || esComando(msg.Texto) || (m.c.Cmd != nil && m.c.Cmd.EsComando(msg.Texto))) {
 			m.omite(msg, almacen.MotGrupo)
+			return
+		}
+	}
+	// Bloqueados, desconocidos (privado) y política de cada grupo.
+	if m.c.Perm != nil {
+		quien := msg.Remitente
+		if !msg.EsGrupo {
+			quien = msg.Chat
+		}
+		sal := m.c.Perm.Compuerta(permisos.Entrada{Persona: quien, Chat: msg.Chat, Nombre: msg.Nombre, EsGrupo: msg.EsGrupo,
+			EsAdmin: func() bool { return m.c.EsAdminGrupo != nil && m.c.EsAdminGrupo(msg.Chat, quien) }})
+		if !sal.Pasa {
+			m.omite(msg, sal.Motivo)
+			if sal.Responder != "" {
+				m.wg.Add(1)
+				go func() {
+					defer m.wg.Done()
+					if err := m.enviar(msg.Chat, sal.Responder, msg.ID, "", msg.TS); err == nil {
+						m.c.Alm.RegistrarActividad(m.c.BotID, almacen.ActRespondio, "", msg.Chat, "desconocido")
+					}
+				}()
+			}
 			return
 		}
 	}
@@ -442,10 +484,42 @@ func (m *Motor) atiende(chat string, lote []Mensaje) {
 		m.c.Alm.RegistrarActividad(m.c.BotID, almacen.ActOmitido, "agrupado con el siguiente", chat, "")
 		_ = x
 	}
-	d, err := m.c.Decisor.Decidir(m.ctx, ultimo, lote)
-	if err != nil {
-		m.c.Log("Error al decidir la respuesta: " + err.Error())
-		return
+	var deComandos []Salida
+	ultimoEsComando := false
+	if m.c.Cmd != nil {
+		for _, x := range lote {
+			if !m.c.Cmd.Existe(x.Texto) {
+				continue
+			}
+			r := m.c.Cmd.Ejecutar(comandos.Entrada{Persona: personaDe(x), Nombre: x.Nombre, Chat: chat, EsGrupo: x.EsGrupo, MensajeID: x.ID, Texto: x.Texto,
+				Menciones: x.Menciones, CitaAutor: x.CitaAutor})
+			if !r.Manejado {
+				continue
+			}
+			if r.Texto != "" {
+				deComandos = append(deComandos, Salida{Texto: m.sinPrefijo(r.Texto)})
+			}
+			if x.ID == ultimo.ID {
+				ultimoEsComando = true
+			}
+		}
+	}
+	var d Decision
+	if ultimoEsComando {
+		d = Decision{Coincidio: "comando", Respuestas: deComandos}
+	} else {
+		var err error
+		d, err = m.c.Decisor.Decidir(m.ctx, ultimo, lote)
+		if err != nil {
+			m.c.Log("Error al decidir la respuesta: " + err.Error())
+			return
+		}
+		if len(deComandos) > 0 {
+			d.Respuestas = append(deComandos, d.Respuestas...)
+			if d.Coincidio == "" {
+				d.Coincidio = "comando"
+			}
+		}
 	}
 	if d.Omitir != "" {
 		m.omite(ultimo, d.Omitir)
@@ -617,4 +691,57 @@ func (m *Motor) salirUno(p *pedido) error {
 		}
 	}
 	return err
+}
+
+// personaDe es quién escribió el mensaje: en privado, el chat; en grupos, el remitente.
+func personaDe(x Mensaje) string {
+	if x.EsGrupo {
+		return x.Remitente
+	}
+	return x.Chat
+}
+
+// sinPrefijo evita que una respuesta empiece con el prefijo de comandos (así ni un eco ni un bucle la toman por una orden).
+func (m *Motor) sinPrefijo(t string) string {
+	if m.c.Cmd != nil && strings.HasPrefix(strings.TrimSpace(t), m.c.Cmd.Prefijo()) {
+		return "· " + t
+	}
+	return t
+}
+
+// entrarDueno atiende un comando que escribí yo en "Mensajes guardados". La respuesta sale a ese mismo chat, nunca a terceros, y
+// no cuenta como intervención mía (no cancela respuestas pendientes de otros).
+func (m *Motor) entrarDueno(msg Mensaje) {
+	now := m.c.Ahora()
+	if msg.Antiguo || (!msg.TS.IsZero() && now.Sub(msg.TS) > m.c.VentanaAntigua()) || !m.c.Activo() {
+		return
+	}
+	if !m.c.Alm.PrimeraVez(m.c.BotID, msg.Chat, msg.ID) {
+		return
+	}
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		m.mDueno.Lock()
+		defer m.mDueno.Unlock()
+		if m.ctx == nil || m.ctx.Err() != nil {
+			return
+		}
+		r := m.c.Cmd.Ejecutar(comandos.Entrada{Persona: almacen.PersonaDueno, Chat: msg.Chat, MensajeID: msg.ID, Texto: msg.Texto, Dueno: true})
+		if r.Texto == "" {
+			return
+		}
+		if err := m.enviar(msg.Chat, m.sinPrefijo(r.Texto), msg.ID, "", time.Time{}); err != nil {
+			m.c.Log("No se pudo responder un comando del dueño: " + err.Error())
+		}
+	}()
+}
+
+// ResponderA manda un texto a un chat citando un mensaje, como respuesta a un comando (por ejemplo cuando el dueño confirma
+// una acción desde la app). No lleva espera de la fila del chat.
+func (m *Motor) ResponderA(chat, citaID, texto string) error {
+	if m.ctx == nil {
+		return errors.New("el motor no está iniciado")
+	}
+	return m.enviar(chat, m.sinPrefijo(texto), citaID, "", time.Time{})
 }

@@ -565,7 +565,8 @@ func (a *Almacen) EliminarBot(botID int64) error {
 	if _, err := a.db.Exec("DELETE FROM daily_stats WHERE bot_id=?", botID); err != nil {
 		return err
 	}
-	for _, t := range []string{"message_receipts", "reacciones", "chat_estado", "dedupe", "actividad"} {
+	for _, t := range []string{"message_receipts", "reacciones", "chat_estado", "dedupe", "actividad",
+		"persona_rol", "roles", "persona_alias", "registro_acciones", "solicitudes", "codigos_confirmacion", "grupos_politica", "bot_ajustes"} {
 		if _, err := a.db.Exec("DELETE FROM "+t+" WHERE bot_id=?", botID); err != nil {
 			return err
 		}

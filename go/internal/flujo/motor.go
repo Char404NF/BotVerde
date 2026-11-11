@@ -24,6 +24,8 @@ type Config struct {
 	Nombre func(chat, sender string) string
 	// AlAviso se llama cuando hay una notificación local que mostrar: tipo ("humano" o "solicitud"), título neutro y detalle completo.
 	AlAviso func(chat, tipo, titulo, detalle string)
+	// MenuVisible dice si el rango de esa persona ve ese menú (nil = todos lo ven). Lo fija cada rango en "menús que ve".
+	MenuVisible func(sender string, menuID int64) bool
 }
 
 // Motor ejecuta las automatizaciones. Implementa motor.Decisor.
@@ -150,6 +152,9 @@ func (m *Motor) procesa(e entrada, prueba bool, forzarMenu int64) (resultado, er
 			continue
 		}
 		if forzarMenu == 0 && !mn.Activo {
+			continue
+		}
+		if forzarMenu == 0 && m.c.MenuVisible != nil && !m.c.MenuVisible(e.Sender, mn.ID) {
 			continue
 		}
 		def, err := Parse(mn.Def)

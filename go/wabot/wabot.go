@@ -12,12 +12,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"botchat/internal/comandos"
 	"botchat/internal/envio"
 	"botchat/internal/flujo"
 	"botchat/internal/fotos"
 	"botchat/internal/ingesta"
 	"botchat/internal/medios"
 	"botchat/internal/motor"
+	"botchat/internal/permisos"
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -57,6 +59,9 @@ type estado struct {
 	descargas     *medios.Gestor
 	fotos         *fotos.Gestor
 	grupos        *colaGrupos
+	perm          *permisos.Servicio
+	cmd           *comandos.Despachador
+	admins        *cacheAdmins
 	refresco      *time.Timer
 	refMu         sync.Mutex
 }
@@ -152,7 +157,9 @@ func (s *estado) armar() {
 	s.envio.PausaBot = pausaTrasEscribir
 	alm.SembrarSaludo(s.botID, flujo.SaludoJSON())
 	s.flujo = s.nuevoFlujo()
+	s.armarPermisos()
 	s.motor = motor.Nuevo(motor.Config{
+		Perm: s.perm, Cmd: s.cmd, EsAdminGrupo: s.admins.esAdmin,
 		BotID: s.botID, Alm: alm, Decisor: s.decisor(), Enviador: enviadorMotor{s}, Log: s.log,
 		Activo: motorActivo.Load, Firma: firmaActual, VentanaAntigua: func() time.Duration { return time.Duration(ventanaAntiguaMin.Load()) * time.Minute },
 		AlFrenar: func() { s.avisaCambio("motor:freno") },
@@ -160,6 +167,7 @@ func (s *estado) armar() {
 	})
 	s.envio.AlEscribirYo = func(chat string) { s.alEscribirYo(chat, time.Now()) }
 	s.motor.Iniciar(s.ctx)
+	s.iniciarPermisos()
 	s.descargas.Iniciar(s.ctx)
 	s.fotos.Iniciar(s.ctx)
 	s.grupos.iniciar(s.ctx)
@@ -425,6 +433,9 @@ func (s *estado) pausaPorTelefono(v *events.Message) {
 	chat, ok := s.ing.ChatDe(s.ctx, v.Info.MessageSource)
 	if !ok || s.envio.EsEnvioPropio(chat, string(v.Info.ID)) {
 		return
+	}
+	if v.Info.Chat.Server != types.GroupServer && s.esPropio(v.Info.Chat) {
+		return // "Mensajes guardados": ahí escribo comandos para el bot, no hablo con un cliente
 	}
 	s.alEscribirYo(chat, v.Info.Timestamp)
 	if min := pausaTrasEscribirMin.Load(); min > 0 {

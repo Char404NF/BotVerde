@@ -239,6 +239,100 @@ var migraciones = [][]string{
 		`CREATE INDEX idx_mensajes_noleidos ON messages(bot_id, chat_jid, ts) WHERE es_mio=0`,
 		`ALTER TABLE flow_sessions ADD COLUMN intervencion INTEGER NOT NULL DEFAULT 0`,
 	},
+	// 10 (v0.5.0, bloque A): rangos y permisos. roles (el Dueño es una fila fija), persona_rol (con caducidad), persona_alias
+	// (número y LID de la misma persona → clave canónica), registro_acciones (sin textos), solicitudes (desconocidos),
+	// codigos_confirmacion (un solo uso), grupos_politica y bot_ajustes (prefijo, política de desconocidos, topes…).
+	{
+		`CREATE TABLE roles (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			nombre TEXT NOT NULL,
+			color TEXT NOT NULL DEFAULT '#2EC4CB',
+			posicion INTEGER NOT NULL,
+			plantilla TEXT NOT NULL DEFAULT '',
+			es_dueno INTEGER NOT NULL DEFAULT 0,
+			casillas TEXT NOT NULL DEFAULT '{}',
+			menus_modo TEXT NOT NULL DEFAULT 'todos',
+			menus TEXT NOT NULL DEFAULT '[]',
+			limite_min INTEGER NOT NULL DEFAULT 10,
+			creado_ts INTEGER NOT NULL DEFAULT 0,
+			actualizado_ts INTEGER NOT NULL DEFAULT 0
+		)`,
+		`CREATE INDEX idx_roles_bot ON roles(bot_id, posicion)`,
+		`CREATE TABLE persona_rol (
+			bot_id INTEGER NOT NULL,
+			persona TEXT NOT NULL,
+			rol_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+			caduca_en INTEGER NOT NULL DEFAULT 0,
+			asignado_por TEXT NOT NULL DEFAULT '',
+			asignado_ts INTEGER NOT NULL DEFAULT 0,
+			nota_cifrada BLOB,
+			PRIMARY KEY (bot_id, persona)
+		)`,
+		`CREATE INDEX idx_persona_rol_rol ON persona_rol(rol_id)`,
+		`CREATE INDEX idx_persona_rol_caduca ON persona_rol(bot_id, caduca_en) WHERE caduca_en>0`,
+		`CREATE TABLE persona_alias (
+			bot_id INTEGER NOT NULL,
+			alias TEXT NOT NULL,
+			canonica TEXT NOT NULL,
+			ts INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY (bot_id, alias)
+		) WITHOUT ROWID`,
+		`CREATE INDEX idx_persona_alias_canonica ON persona_alias(bot_id, canonica)`,
+		`CREATE TABLE registro_acciones (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			ts INTEGER NOT NULL,
+			quien TEXT NOT NULL,
+			accion TEXT NOT NULL,
+			objetivo TEXT NOT NULL DEFAULT '',
+			chat TEXT NOT NULL DEFAULT '',
+			resultado TEXT NOT NULL,
+			detalle TEXT NOT NULL DEFAULT ''
+		)`,
+		`CREATE INDEX idx_registro_acciones ON registro_acciones(bot_id, id)`,
+		`CREATE TABLE solicitudes (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			persona TEXT NOT NULL,
+			nombre_cifrado BLOB,
+			estado TEXT NOT NULL DEFAULT 'pendiente',
+			primera_ts INTEGER NOT NULL,
+			ultima_ts INTEGER NOT NULL,
+			mensajes INTEGER NOT NULL DEFAULT 1,
+			avisada_ts INTEGER NOT NULL DEFAULT 0,
+			decidida_ts INTEGER NOT NULL DEFAULT 0,
+			UNIQUE (bot_id, persona)
+		)`,
+		`CREATE INDEX idx_solicitudes_estado ON solicitudes(bot_id, estado, ultima_ts)`,
+		`CREATE TABLE codigos_confirmacion (
+			bot_id INTEGER NOT NULL,
+			codigo TEXT NOT NULL,
+			persona TEXT NOT NULL,
+			comando TEXT NOT NULL,
+			args_cifrados BLOB,
+			chat TEXT NOT NULL DEFAULT '',
+			cita_id TEXT NOT NULL DEFAULT '',
+			creado_ts INTEGER NOT NULL,
+			expira_ts INTEGER NOT NULL,
+			estado TEXT NOT NULL DEFAULT 'pendiente',
+			PRIMARY KEY (bot_id, codigo)
+		) WITHOUT ROWID`,
+		`CREATE TABLE grupos_politica (
+			bot_id INTEGER NOT NULL,
+			chat_jid TEXT NOT NULL,
+			modo TEXT NOT NULL DEFAULT 'todos',
+			lista TEXT NOT NULL DEFAULT '[]',
+			actualizado_ts INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY (bot_id, chat_jid)
+		) WITHOUT ROWID`,
+		`CREATE TABLE bot_ajustes (
+			bot_id INTEGER NOT NULL,
+			clave TEXT NOT NULL,
+			valor TEXT NOT NULL,
+			PRIMARY KEY (bot_id, clave)
+		) WITHOUT ROWID`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

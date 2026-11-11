@@ -121,6 +121,7 @@ func (s *estado) alMotor(v *events.Message, sincronizando bool) {
 	if !ok {
 		return
 	}
+	s.aprendeAlias(v)
 	m := motor.Mensaje{
 		Chat: chat, ID: string(v.Info.ID), Texto: c.Texto, EsGrupo: v.Info.IsGroup || v.Info.Chat.Server == types.GroupServer, EsMio: v.Info.IsFromMe,
 		TS: v.Info.Timestamp, Antiguo: sincronizando, EsTexto: c.Tipo == "texto", EsEdicion: v.IsEdit,
@@ -137,6 +138,21 @@ func (s *estado) alMotor(v *events.Message, sincronizando bool) {
 	if c.CitaAutor != "" {
 		if pj, err := types.ParseJID(c.CitaAutor); err == nil && s.esPropio(pj) {
 			m.CitaEsMia = true
+		}
+	}
+	if m.EsMio && s.envio.EsEnvioPropio(chat, m.ID) {
+		return // lo que mandó esta app o el motor (por ejemplo la respuesta a un comando) nunca vuelve como comando
+	}
+	m.Nombre = v.Info.PushName
+	m.EsChatPropio = !m.EsGrupo && s.esPropio(v.Info.Chat)
+	for _, j := range c.Menciones {
+		if pj, err := types.ParseJID(j); err == nil && !s.esPropio(pj) {
+			m.Menciones = append(m.Menciones, s.ing.Persona(s.ctx, pj))
+		}
+	}
+	if c.CitaAutor != "" {
+		if pj, err := types.ParseJID(c.CitaAutor); err == nil && !s.esPropio(pj) {
+			m.CitaAutor = s.ing.Persona(s.ctx, pj)
 		}
 	}
 	s.motor.Entrar(m)
