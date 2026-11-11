@@ -92,8 +92,8 @@ func TestVisibilidadPorOpcionConLosRangosReales(t *testing.T) {
 	id := e.crea(t, menuConReglas(), true)
 	pid := fmtID(id)
 	roles := map[string]*almacen.Rol{
-		"todo":   {MenusModo: "todos"},
-		"menu":   {MenusModo: "lista", Menus: []string{pid}},
+		"todo":    {MenusModo: "todos"},
+		"menu":    {MenusModo: "lista", Menus: []string{pid}},
 		"sueltas": {MenusModo: "lista", Menus: []string{pid + ":pub", pid + ":priv"}},
 		"ninguno": {MenusModo: "ninguno"},
 	}

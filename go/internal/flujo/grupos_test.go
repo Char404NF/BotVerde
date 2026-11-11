@@ -28,12 +28,12 @@ func menuGrupo() *Def {
 }
 
 type msgG struct {
-	quien      string // JID tal como lo manda WhatsApp (puede ser LID)
-	texto      string
-	mencion    bool
-	citaID     string
-	citaEsMia  bool
-	noTexto    bool
+	quien     string // JID tal como lo manda WhatsApp (puede ser LID)
+	texto     string
+	mencion   bool
+	citaID    string
+	citaEsMia bool
+	noTexto   bool
 }
 
 // grupoEntorno prepara un grupo con alias número↔LID para Ben.

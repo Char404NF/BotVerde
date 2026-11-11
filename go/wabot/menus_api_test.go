@@ -160,7 +160,7 @@ func TestApiAdjuntosYExportarImportarMenus(t *testing.T) {
 	}
 	// un menú con ese adjunto, exportado con contraseña e importado de vuelta (en el mismo teléfono, como copia)
 	d := &flujo.Def{V: 1, Nombre: "Catálogo", Inicio: "m", Pasos: []flujo.Paso{{ID: "m", Tipo: flujo.PasoRespuesta, Texto: "Mira",
-		Adjuntos: []flujo.AdjuntoMenu{{ID: id, Tipo: "imagen", Mime: "image/jpeg", Nombre: "foto.jpg"}},
+		Adjuntos:  []flujo.AdjuntoMenu{{ID: id, Tipo: "imagen", Mime: "image/jpeg", Nombre: "foto.jpg"}},
 		Ubicacion: &flujo.Ubicacion{Lat: 19.4, Lon: -99.1, Nombre: "Tienda"}, Contacto: &flujo.Contacto{Nombre: "Ventas", Telefono: "+525512345678"}}},
 		Disparadores: flujo.Disparadores{Comando: ".catalogo"}, Alcance: flujo.Alcance{Privados: true}}
 	d.Normalizar()
@@ -239,15 +239,17 @@ func (f *clienteFalso) BuildReaction(chat, sender types.JID, id types.MessageID,
 func (f *clienteFalso) BuildEdit(chat types.JID, id types.MessageID, c *waE2E.Message) *waE2E.Message {
 	return nil
 }
-func (f *clienteFalso) BuildRevoke(chat, sender types.JID, id types.MessageID) *waE2E.Message { return nil }
+func (f *clienteFalso) BuildRevoke(chat, sender types.JID, id types.MessageID) *waE2E.Message {
+	return nil
+}
 func (f *clienteFalso) MarkRead(context.Context, []types.MessageID, time.Time, types.JID, types.JID, ...types.ReceiptType) error {
 	return nil
 }
 func (f *clienteFalso) SendChatPresence(context.Context, types.JID, types.ChatPresence, types.ChatPresenceMedia) error {
 	return nil
 }
-func (f *clienteFalso) SendPresence(context.Context, types.Presence) error       { return nil }
-func (f *clienteFalso) SubscribePresence(context.Context, types.JID) error        { return nil }
+func (f *clienteFalso) SendPresence(context.Context, types.Presence) error { return nil }
+func (f *clienteFalso) SubscribePresence(context.Context, types.JID) error { return nil }
 func (f *clienteFalso) GetGroupInfo(context.Context, types.JID) (*types.GroupInfo, error) {
 	return nil, errors.New("sin grupo")
 }
@@ -427,7 +429,9 @@ func TestSimuladorYEstadisticasConLosPasosNuevos(t *testing.T) {
 	if a.ContarFormularios(1, 0) != 0 {
 		t.Fatal("el simulador no guarda formularios")
 	}
-	e := decodifica[map[string]any](t, func() (string, error) { return EstadisticasAutomatizacion(1, guardado.ID, "2000-01-01", "2100-01-01", true) })
+	e := decodifica[map[string]any](t, func() (string, error) {
+		return EstadisticasAutomatizacion(1, guardado.ID, "2000-01-01", "2100-01-01", true)
+	})
 	if e["formulariosEnviados"] != 1.0 || e["noEntendio"] != 0.0 || e["formularios"] != 0.0 {
 		t.Fatalf("%v", e)
 	}

@@ -15,10 +15,10 @@ import (
 // Integración: el motor real (cola de salida, mención, cita, registro del mensaje del bot) con el motor de menús, sin red.
 
 type enviado struct {
-	chat                         string
-	sal                          motor.Salida
-	citaID, citaAutor, mencion   string
-	id                           string
+	chat                       string
+	sal                        motor.Salida
+	citaID, citaAutor, mencion string
+	id                         string
 }
 
 type enviadorRico struct {

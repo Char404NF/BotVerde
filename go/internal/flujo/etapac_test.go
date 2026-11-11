@@ -68,8 +68,8 @@ func TestNumeroTextoParcialYAmbiguo(t *testing.T) {
 	casos := []struct{ dicho, espera string }{
 		{"3", "Abrimos de 9 a 6. Hoy es martes 10/11/2026."},
 		{"horario", "Abrimos de 9 a 6."},
-		{"HOR", "Abrimos de 9 a 6."},          // principio del texto, sin mayúsculas
-		{"refacc", "Refacciones desde $50."},   // palabra de una sola opción
+		{"HOR", "Abrimos de 9 a 6."},         // principio del texto, sin mayúsculas
+		{"refacc", "Refacciones desde $50."}, // palabra de una sola opción
 		{"precios de serv", "Servicio desde $200."},
 		{"2 por favor", "Servicio desde $200."}, // número con más texto
 		{"cotiz", "Cotización"},
