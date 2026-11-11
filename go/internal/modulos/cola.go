@@ -44,6 +44,13 @@ const (
 
 const maxCola = 500
 
+// ErrOmitida la devuelve una Accion que decidió no hacer nada (por ejemplo "ya no está en el grupo"): queda en el registro como
+// "descartado:omitida" y NO cuenta como error de envío para el modo seguro.
+var ErrOmitida = errors.New("omitida")
+
+// MotOmitida es el motivo que queda en el registro de una acción omitida.
+const MotOmitida = "omitida"
+
 // Iniciativa es un mensaje que un módulo quiere mandar sin que nadie se lo haya pedido.
 type Iniciativa struct {
 	Modulo                 string   // id del módulo que la manda
@@ -57,6 +64,14 @@ type Iniciativa struct {
 	Noche                  string        // NocheDiferir (por defecto) o NocheDescartar
 	RetrasoMin, RetrasoMax time.Duration // espera al azar antes de mandarla (0 = la general)
 	EsperaMax              time.Duration // lo máximo que puede esperar una ficha (0 = la general)
+	// Extras son más archivos que salen justo después del primero (hasta 2), con una pausa corta entre uno y otro.
+	Extras []envio.Adjunto
+	// Accion (opcional) reemplaza al envío: la cola la corre cuando le toca (misma ficha, mismos topes, misma pausa nocturna, mismo
+	// registro) en lugar de escribir. La usa, por ejemplo, "agregar directo" a un grupo. Personas dice a quién afecta (No molestar).
+	Accion func(ctx context.Context) error
+	// AlResultado (opcional) se llama cuando la iniciativa ya no está en la cola: "enviado", "fallido" o "descartado:<motivo>". No se
+	// llama con "diferido". Los módulos que guardan su propia agenda lo usan para saber qué pasó, porque la cola vive en memoria.
+	AlResultado func(resultado string)
 }
 
 type item struct {
@@ -164,7 +179,7 @@ func (c *Cola) Encolar(i Iniciativa) (string, error) {
 	if i.Modulo == "" || i.Chat == "" {
 		return "", errors.New("falta el módulo o el chat")
 	}
-	if strings.TrimSpace(i.Texto) == "" && i.Medio == nil {
+	if strings.TrimSpace(i.Texto) == "" && i.Medio == nil && i.Accion == nil {
 		return "", errors.New("la iniciativa no tiene nada que enviar")
 	}
 	if i.Que == "" {
@@ -206,6 +221,12 @@ func (c *Cola) retraso(i Iniciativa) time.Duration {
 
 func (c *Cola) registrar(i Iniciativa, resultado string) {
 	c.g.Alm.RegistrarModulo(c.g.BotID, i.Modulo, i.Que, resultado, i.Chat, c.g.ahora())
+	if i.AlResultado != nil && resultado != ResDiferido {
+		func() {
+			defer func() { _ = recover() }()
+			i.AlResultado(resultado)
+		}()
+	}
 }
 
 // Vaciar descarta todo lo que espera (modulo "" = todos los módulos) con ese motivo. Devuelve cuántas.
@@ -362,8 +383,18 @@ func (c *Cola) procesar(ctx context.Context, it *item, now time.Time) {
 	// 5) Enviar.
 	cx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	var err error
-	if i.Medio != nil {
+	if i.Accion != nil {
+		err = i.Accion(cx)
+	} else if i.Medio != nil {
 		err = g.Enviador.Medio(cx, i.Chat, *i.Medio, i.CitaID)
+		for k := 0; err == nil && k < len(i.Extras) && k < 2; k++ {
+			select {
+			case <-cx.Done():
+				err = cx.Err()
+			case <-time.After(c.pausaEntreArchivos()):
+				err = g.Enviador.Medio(cx, i.Chat, i.Extras[k], "")
+			}
+		}
 		if err == nil && strings.TrimSpace(i.Texto) != "" && i.Medio.Pie == "" {
 			err = g.Enviador.Texto(cx, i.Chat, i.Texto, "", i.Menciones)
 		}
@@ -371,9 +402,10 @@ func (c *Cola) procesar(ctx context.Context, it *item, now time.Time) {
 		err = g.Enviador.Texto(cx, i.Chat, i.Texto, i.CitaID, i.Menciones)
 	}
 	cancel()
+	omitida := errors.Is(err, ErrOmitida)
 	c.mu.Lock()
 	c.noAntes = g.ahora().Add(c.retraso(i))
-	if err == nil {
+	if err == nil || omitida {
 		c.fallos = 0
 	} else {
 		c.fallos++
@@ -384,11 +416,23 @@ func (c *Cola) procesar(ctx context.Context, it *item, now time.Time) {
 		c.registrar(i, ResEnviado)
 		return
 	}
+	if omitida {
+		c.registrar(i, ResDescartado+MotOmitida)
+		return
+	}
 	c.registrar(i, ResFallido)
 	g.Log(fmt.Sprintf("Una iniciativa del módulo %s no salió.", i.Modulo))
 	if fallos >= g.Alm.AjusteIniInt(g.BotID, "ini_errores") {
 		g.ModoSeguro("errores")
 	}
+}
+
+// pausaEntreArchivos es la espera entre un archivo y el siguiente del mismo mensaje (1 a 3 s; las pruebas la ponen en cero).
+func (c *Cola) pausaEntreArchivos() time.Duration {
+	if c.g.SinPausaArchivos {
+		return 0
+	}
+	return time.Second + time.Duration(c.g.Aleatorio(int64(2*time.Second)))
 }
 
 // ErroresSeguidos son los envíos fallidos seguidos de la cola.
@@ -433,4 +477,62 @@ func (c *Cola) correr(ctx context.Context) {
 			tm.Stop()
 		}
 	}
+}
+
+// Libres dice cuántas iniciativas más de ese módulo caben ahora mismo en los topes (global y del módulo, por hora y por día), ya
+// descontando las que esperan en la cola. Los módulos con agenda propia lo usan para no encolar de más. Un número grande = sin tope.
+func (c *Cola) Libres(modulo string) int {
+	g := c.g
+	now := g.ahora()
+	topeH, topeD := g.TopesGlobales()
+	mh, md := g.TopesModulo(modulo)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.cargarFichas(now)
+	f := c.fichasDe(modulo)
+	libre := 1 << 30
+	resta := func(b *cubeta, tope int, ventana time.Duration) {
+		if tope <= 0 {
+			return
+		}
+		b.podar(now, ventana)
+		if l := tope - len(b.gastos); l < libre {
+			libre = l
+		}
+	}
+	resta(&c.global.hora, topeH, time.Hour)
+	resta(&c.global.dia, topeD, 24*time.Hour)
+	resta(&f.hora, mh, time.Hour)
+	resta(&f.dia, md, 24*time.Hour)
+	esperan := 0
+	for _, it := range c.items {
+		if it.ini.Modulo == modulo {
+			esperan++
+		}
+	}
+	libre -= esperan
+	if libre < 0 {
+		libre = 0
+	}
+	return libre
+}
+
+// VaciarDonde descarta de la cola lo que cumpla la condición, con ese motivo. Devuelve cuántas.
+func (c *Cola) VaciarDonde(cond func(Iniciativa) bool, motivo string) int {
+	c.mu.Lock()
+	var quitar []*item
+	nuevo := c.items[:0]
+	for _, it := range c.items {
+		if cond(it.ini) {
+			quitar = append(quitar, it)
+		} else {
+			nuevo = append(nuevo, it)
+		}
+	}
+	c.items = nuevo
+	c.mu.Unlock()
+	for _, it := range quitar {
+		c.registrar(it.ini, ResDescartado+motivo)
+	}
+	return len(quitar)
 }

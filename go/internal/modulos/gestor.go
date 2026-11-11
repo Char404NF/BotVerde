@@ -34,6 +34,13 @@ type Gestor struct {
 	// Aviso crea un aviso local (notificación de Android) para el dueño.
 	Aviso func(titulo, detalle string)
 	Cola  *Cola
+	// Acc son las acciones de grupo y de WhatsApp que algunos módulos necesitan (nil = no disponibles, por ejemplo sin conexión).
+	Acc Acciones
+	// SinPausaArchivos quita la pausa de 1 a 3 s entre archivos de un mismo mensaje (las pruebas).
+	SinPausaArchivos bool
+
+	// h es el estado en memoria de los módulos H (contadores de lo que está en la cola, errores seguidos, usos por hora…).
+	h estadoH
 
 	mu     sync.Mutex
 	cache  map[string]*almacen.ModuloFila
@@ -204,6 +211,7 @@ type Info struct {
 	DefDia     int     `json:"defDia"`
 	ActivadoTS int64   `json:"activadoTs"`
 	Esquema    []Campo `json:"esquema,omitempty"`
+	Paneles    []Panel `json:"paneles,omitempty"`
 }
 
 func (g *Gestor) info(m Modulo, conEsquema bool) Info {
@@ -250,18 +258,29 @@ func (g *Gestor) InfoDe(id string) (Info, error) {
 	if !ok {
 		return Info{}, ErrNoExiste
 	}
-	return g.info(m, true), nil
+	x := g.info(m, true)
+	x.Paneles = g.PanelesDe(id)
+	return x, nil
 }
 
 // ---------- activar y desactivar ----------
 
 func nombreComando(c comandos.Comando) string { return c.Nombre }
 
+// comandosDe junta los comandos fijos del módulo y los que arma con el gestor.
+func (g *Gestor) comandosDe(m Modulo) []comandos.Comando {
+	cs := append([]comandos.Comando(nil), m.Comandos()...)
+	if c, ok := m.(ComandosDeGestor); ok {
+		cs = append(cs, c.ComandosG(g)...)
+	}
+	return cs
+}
+
 // arrancar registra los comandos del módulo y llama a su Activar. Si algo falla deja todo como estaba.
 func (g *Gestor) arrancar(m Modulo) error {
 	var puestos []string
 	if g.Cmd != nil {
-		for _, c := range m.Comandos() {
+		for _, c := range g.comandosDe(m) {
 			cc := c
 			id := m.ID()
 			inner := c.Ejecutar
@@ -294,7 +313,7 @@ func (g *Gestor) arrancar(m Modulo) error {
 // parar quita los comandos y llama a Desactivar.
 func (g *Gestor) parar(m Modulo) {
 	if g.Cmd != nil {
-		for _, c := range m.Comandos() {
+		for _, c := range g.comandosDe(m) {
 			g.Cmd.Quitar(c.Nombre)
 		}
 	}

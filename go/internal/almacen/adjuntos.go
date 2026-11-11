@@ -1,6 +1,7 @@
 package almacen
 
 import (
+	"botchat/internal/cifrado"
 	"bytes"
 	"encoding/binary"
 	"errors"
@@ -214,6 +215,22 @@ func (a *Almacen) ReferenciasAdjuntos(botID int64) map[string]bool {
 		filas.Close()
 		for _, x := range vs {
 			textos = append(textos, string(a.VersionDeMenu(x.m, x.v)))
+		}
+	}
+	// mensajes programados y difusiones (módulos H2/H3): su contenido cifrado guarda los ids de sus archivos
+	if filas, err := a.db.Query(`SELECT contenido FROM mod_agenda WHERE bot_id=? AND estado NOT IN ('cancelado','terminada')`, botID); err == nil {
+		var cs [][]byte
+		for filas.Next() {
+			var c []byte
+			if filas.Scan(&c) == nil {
+				cs = append(cs, c)
+			}
+		}
+		filas.Close()
+		for _, c := range cs {
+			if t, err := cifrado.AbrirTexto(a.clave, "mod_agenda", c); err == nil {
+				textos = append(textos, string(t))
+			}
 		}
 	}
 	return refsEn(textos)

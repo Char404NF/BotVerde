@@ -633,6 +633,68 @@ var migraciones = [][]string{
 		)`,
 		`CREATE INDEX idx_lab_resultados ON lab_resultados(bot_id, ts)`,
 	},
+	// 18 (v0.5.0, etapa H parte 1): módulos opcionales H1–H5. mod_listas (suscritos, "quieren entrar"…), mod_agenda (programados y
+	// difusiones; contenido CIFRADO), mod_dest (destinatarios de una difusión), mod_pendientes (verificaciones de bienvenida),
+	// mod_chats (a qué grupos aplica un módulo) y mod_conectores (conectores HTTP; configuración con llaves CIFRADA).
+	{
+		`CREATE TABLE mod_listas (
+			bot_id INTEGER NOT NULL,
+			lista TEXT NOT NULL,
+			persona TEXT NOT NULL,
+			desde_ts INTEGER NOT NULL,
+			origen TEXT NOT NULL DEFAULT '',
+			PRIMARY KEY (bot_id, lista, persona)
+		) WITHOUT ROWID`,
+		`CREATE INDEX idx_mod_listas_persona ON mod_listas(bot_id, persona)`,
+		`CREATE TABLE mod_agenda (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			modulo TEXT NOT NULL,
+			nombre TEXT NOT NULL DEFAULT '',
+			destino TEXT NOT NULL DEFAULT '',
+			contenido BLOB,
+			proximo_ts INTEGER NOT NULL DEFAULT 0,
+			repeticion TEXT NOT NULL DEFAULT '',
+			estado TEXT NOT NULL DEFAULT 'activo',
+			creado_ts INTEGER NOT NULL DEFAULT 0,
+			ultimo_ts INTEGER NOT NULL DEFAULT 0,
+			ultimo_res TEXT NOT NULL DEFAULT '',
+			veces INTEGER NOT NULL DEFAULT 0
+		)`,
+		`CREATE INDEX idx_mod_agenda ON mod_agenda(bot_id, modulo, estado, proximo_ts)`,
+		`CREATE TABLE mod_dest (
+			bot_id INTEGER NOT NULL,
+			agenda_id INTEGER NOT NULL,
+			persona TEXT NOT NULL,
+			estado TEXT NOT NULL DEFAULT 'pendiente',
+			ts INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY (bot_id, agenda_id, persona)
+		) WITHOUT ROWID`,
+		`CREATE TABLE mod_pendientes (
+			bot_id INTEGER NOT NULL,
+			modulo TEXT NOT NULL,
+			chat TEXT NOT NULL,
+			persona TEXT NOT NULL,
+			desde_ts INTEGER NOT NULL,
+			vence_ts INTEGER NOT NULL,
+			esperada TEXT NOT NULL DEFAULT '',
+			intentos INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY (bot_id, modulo, chat, persona)
+		) WITHOUT ROWID`,
+		`CREATE TABLE mod_chats (
+			bot_id INTEGER NOT NULL,
+			modulo TEXT NOT NULL,
+			chat TEXT NOT NULL,
+			PRIMARY KEY (bot_id, modulo, chat)
+		) WITHOUT ROWID`,
+		`CREATE TABLE mod_conectores (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			nombre TEXT NOT NULL,
+			config BLOB,
+			UNIQUE (bot_id, nombre)
+		)`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

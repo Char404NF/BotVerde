@@ -10,6 +10,7 @@
 package modulos
 
 import (
+	"errors"
 	"time"
 
 	"botchat/internal/comandos"
@@ -43,6 +44,8 @@ type Evento struct {
 	MensajeID string   // id del mensaje (solo EvMensaje)
 	EsMio     bool     // lo escribí yo
 	Personas  []string // quienes entraron (solo EvMiembroEntra)
+	JIDs      []string // los mismos, tal como los mandó WhatsApp (teléfono o LID), para mencionarlos (solo EvMiembroEntra)
+	Cita      string   // id del mensaje citado, si lo hay (solo EvMensaje)
 }
 
 // Modulo es lo que un módulo ofrece al marco.
@@ -64,6 +67,12 @@ type Modulo interface {
 	Desactivar(g *Gestor) error
 	Evento(g *Gestor, e Evento) // manejo de eventos; debe ser corto: solo anota y encola
 	Estado(g *Gestor) string    // una línea para la tarjeta ("3 mensajes enviados hoy"); "" = nada que decir
+}
+
+// ComandosDeGestor lo implementan los módulos cuyos comandos necesitan al gestor (por ejemplo para leer su configuración). Sus comandos
+// se suman a los de Comandos(); existen SOLO mientras el módulo está activo.
+type ComandosDeGestor interface {
+	ComandosG(g *Gestor) []comandos.Comando
 }
 
 // ConPausa lo implementan los módulos que quieren enterarse del modo seguro (opcional).
@@ -91,12 +100,17 @@ type Def struct {
 	Esquema                                []Campo // configuración genérica (texto, número, interruptor, lista, hora)
 	TopeHora, TopeDia                      int
 	Comandos                               []comandos.Comando
+	ComandosG                              func(g *Gestor) []comandos.Comando
 	AlActivar, AlDesactivar                func(g *Gestor) error
 	AlEvento                               func(g *Gestor, e Evento)
 	AlEstado                               func(g *Gestor) string
 	AlPausar, AlReanudar                   func(g *Gestor)
 	Validar                                func(cfg map[string]any) error
 	AlCambiarConfig                        func(g *Gestor)
+	// Paneles (opcionales): listas y formularios que la ventana genérica dibuja bajo los ajustes.
+	Paneles  func(g *Gestor) []Panel
+	AlFilas  func(g *Gestor, panel string) []Fila
+	AlAccion func(g *Gestor, accion string, args Args) (string, error)
 }
 
 type simple struct{ d Def }
@@ -163,4 +177,30 @@ func (s *simple) ConfigCambiada(g *Gestor) {
 	if s.d.AlCambiarConfig != nil {
 		s.d.AlCambiarConfig(g)
 	}
+}
+
+func (s *simple) Paneles(g *Gestor) []Panel {
+	if s.d.Paneles != nil {
+		return s.d.Paneles(g)
+	}
+	return nil
+}
+func (s *simple) Filas(g *Gestor, panel string) []Fila {
+	if s.d.AlFilas != nil {
+		return s.d.AlFilas(g, panel)
+	}
+	return nil
+}
+func (s *simple) Accion(g *Gestor, accion string, args Args) (string, error) {
+	if s.d.AlAccion != nil {
+		return s.d.AlAccion(g, accion, args)
+	}
+	return "", errors.New("esa acción no existe")
+}
+
+func (s *simple) ComandosG(g *Gestor) []comandos.Comando {
+	if s.d.ComandosG != nil {
+		return s.d.ComandosG(g)
+	}
+	return nil
 }
