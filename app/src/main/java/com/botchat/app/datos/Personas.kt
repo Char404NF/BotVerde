@@ -35,6 +35,9 @@ data class EstadisticasPersona(
 
 data class ResultadoOlvidar(val mensajes: Int, val bytes: Long, val notas: Int, val advertencias: Int, val sesiones: Int, val alias: Int)
 
+/** Una nota o un pendiente propio (bloque F). */
+data class UtilItem(val id: Long, val tipo: String, val texto: String, val hecho: Boolean, val ts: Long)
+
 data class RecordatorioItem(val id: Long, val texto: String, val proximaTs: Long, val repetir: String, val estado: String, val creadoTs: Long, val avisadoTs: Long)
 data class AlertaPalabraItem(val id: Long, val palabra: String, val chats: List<String>, val activa: Boolean)
 
@@ -116,6 +119,8 @@ object JsonPersonas {
     fun recordatorios(json: String) = lista(json) {
         RecordatorioItem(it.optLong("id"), it.optString("texto"), it.optLong("proximaTs"), it.optString("repetir"), it.optString("estado"), it.optLong("creadoTs"), it.optLong("avisadoTs"))
     }
+
+    fun utilidades(json: String) = lista(json) { UtilItem(it.optLong("id"), it.optString("tipo"), it.optString("texto"), it.optBoolean("hecho"), it.optLong("ts")) }
 
     fun palabras(json: String) = lista(json) { AlertaPalabraItem(it.optLong("id"), it.optString("palabra"), strs(it.optJSONArray("chats")), it.optBoolean("activa", true)) }
 

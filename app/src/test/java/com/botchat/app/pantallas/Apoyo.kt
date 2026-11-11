@@ -411,6 +411,23 @@ class MotorFalso : Motor {
         recordatoriosLista.first { it.getLong("id") == id }.put("texto", texto).put("proximaTs", proximaTs).put("repetir", repetir).put("estado", "pendiente")
     }
     override fun borrarRecordatorio(bot: Long, id: Long) { llamadas += "borrarRecordatorio:$id"; pFalla(); recordatoriosLista.removeAll { it.getLong("id") == id } }
+    // Notas y pendientes propios (bloque F)
+    var utilLista = mutableListOf<JSONObject>()
+    override fun listarUtilidades(bot: Long, tipo: String) = JSONArray(utilLista.filter { it.getString("tipo") == tipo }).toString()
+    override fun agregarUtilidad(bot: Long, tipo: String, texto: String): Long {
+        llamadas += "agregarUtil:$tipo:$texto"; pFalla()
+        val id = (utilLista.maxOfOrNull { it.getLong("id") } ?: 0L) + 1
+        utilLista += JSONObject().put("id", id).put("tipo", tipo).put("texto", texto).put("hecho", false).put("ts", 1)
+        return id
+    }
+    override fun marcarUtilidad(bot: Long, id: Long, hecho: Boolean) { llamadas += "marcarUtil:$id:$hecho"; pFalla(); utilLista.first { it.getLong("id") == id }.put("hecho", hecho) }
+    override fun borrarUtilidad(bot: Long, id: Long) { llamadas += "borrarUtil:$id"; pFalla(); utilLista.removeAll { it.getLong("id") == id } }
+    override fun limpiarUtilidadesHechas(bot: Long): Long {
+        llamadas += "limpiarUtilHechas"; pFalla()
+        val n = utilLista.count { it.getString("tipo") == "pendiente" && it.getBoolean("hecho") }
+        utilLista.removeAll { it.getString("tipo") == "pendiente" && it.getBoolean("hecho") }
+        return n.toLong()
+    }
     var proximoAvisoTs = 0L
     var disparo = """{"avisos":[],"siguiente":0}"""
     override fun proximoAviso(bot: Long): Long { llamadas += "proximoAviso"; return proximoAvisoTs }

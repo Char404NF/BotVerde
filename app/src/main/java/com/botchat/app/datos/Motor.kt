@@ -180,6 +180,12 @@ interface Motor {
     fun crearRecordatorio(bot: Long, texto: String, proximaTs: Long, repetir: String): Long
     fun editarRecordatorio(bot: Long, id: Long, texto: String, proximaTs: Long, repetir: String)
     fun borrarRecordatorio(bot: Long, id: Long)
+    // Notas y pendientes propios del dueño (0.5.0, bloque F). tipo: "nota" o "pendiente". Evento: "util:yo".
+    fun listarUtilidades(bot: Long, tipo: String): String
+    fun agregarUtilidad(bot: Long, tipo: String, texto: String): Long
+    fun marcarUtilidad(bot: Long, id: Long, hecho: Boolean)
+    fun borrarUtilidad(bot: Long, id: Long)
+    fun limpiarUtilidadesHechas(bot: Long): Long
     fun proximoAviso(bot: Long): Long
     fun dispararAvisos(bot: Long): String
     fun vistaPreviaResumen(bot: Long): String
@@ -408,6 +414,11 @@ object MotorGo : Motor {
     override fun crearRecordatorio(bot: Long, texto: String, proximaTs: Long, repetir: String) = Wabot.crearRecordatorio(bot, texto, proximaTs, repetir)
     override fun editarRecordatorio(bot: Long, id: Long, texto: String, proximaTs: Long, repetir: String) = Wabot.editarRecordatorio(bot, id, texto, proximaTs, repetir)
     override fun borrarRecordatorio(bot: Long, id: Long) = Wabot.borrarRecordatorio(bot, id)
+    override fun listarUtilidades(bot: Long, tipo: String) = Wabot.listarUtilidades(bot, tipo)
+    override fun agregarUtilidad(bot: Long, tipo: String, texto: String) = Wabot.agregarUtilidad(bot, tipo, texto)
+    override fun marcarUtilidad(bot: Long, id: Long, hecho: Boolean) = Wabot.marcarUtilidad(bot, id, hecho)
+    override fun borrarUtilidad(bot: Long, id: Long) = Wabot.borrarUtilidad(bot, id)
+    override fun limpiarUtilidadesHechas(bot: Long) = Wabot.limpiarUtilidadesHechas(bot)
     override fun proximoAviso(bot: Long) = Wabot.proximoAviso(bot)
     override fun dispararAvisos(bot: Long) = Wabot.dispararAvisos(bot)
     override fun vistaPreviaResumen(bot: Long) = Wabot.vistaPreviaResumen(bot)

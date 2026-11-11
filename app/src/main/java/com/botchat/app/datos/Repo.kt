@@ -262,6 +262,14 @@ object Repo {
     suspend fun crearRecordatorio(bot: Long, texto: String, proximaTs: Long, repetir: String = "") = io { motor.crearRecordatorio(bot, texto, proximaTs, repetir) }
     suspend fun editarRecordatorio(bot: Long, id: Long, texto: String, proximaTs: Long, repetir: String = "") = io { motor.editarRecordatorio(bot, id, texto, proximaTs, repetir) }
     suspend fun borrarRecordatorio(bot: Long, id: Long) = io { motor.borrarRecordatorio(bot, id) }
+    // Notas y pendientes propios (bloque F)
+    suspend fun notasUtil(bot: Long) = io { JsonPersonas.utilidades(motor.listarUtilidades(bot, "nota")) }
+    suspend fun pendientesUtil(bot: Long) = io { JsonPersonas.utilidades(motor.listarUtilidades(bot, "pendiente")) }
+    suspend fun agregarNotaUtil(bot: Long, texto: String) = io { motor.agregarUtilidad(bot, "nota", texto) }
+    suspend fun agregarPendienteUtil(bot: Long, texto: String) = io { motor.agregarUtilidad(bot, "pendiente", texto) }
+    suspend fun marcarUtil(bot: Long, id: Long, hecho: Boolean) = io { motor.marcarUtilidad(bot, id, hecho) }
+    suspend fun borrarUtil(bot: Long, id: Long) = io { motor.borrarUtilidad(bot, id) }
+    suspend fun limpiarUtilHechas(bot: Long) = io { motor.limpiarUtilidadesHechas(bot) }
     suspend fun proximoAviso(bot: Long) = io { motor.proximoAviso(bot) }
     suspend fun dispararAvisos(bot: Long) = io { JsonPersonas.disparo(motor.dispararAvisos(bot)) }
     suspend fun vistaPreviaResumen(bot: Long) = io { motor.vistaPreviaResumen(bot) }

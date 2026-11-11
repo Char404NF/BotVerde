@@ -39,7 +39,7 @@ import com.botchat.app.datos.Ajustes
 /** Pestaña Ajustes: Seguridad, Descargas, Estado del bot y Avanzado. */
 @Composable
 fun PantallaAjustes(ajustes: Ajustes, alSeguridad: () -> Unit, alDescargas: () -> Unit, alBot: () -> Unit, alAvanzado: () -> Unit, alEstadisticas: () -> Unit = {}, alPrivacidad: () -> Unit = {}, alAutomatizaciones: () -> Unit = {}, alPermisos: () -> Unit = {}, pendientesSolicitudes: Int = 0, alModulos: () -> Unit = {}, alIniciativa: () -> Unit = {},
-    alAvisos: () -> Unit = {}, alComandosPropios: () -> Unit = {}, alEtiquetas: () -> Unit = {}, alAdvertencias: () -> Unit = {},
+    alAvisos: () -> Unit = {}, alComandosPropios: () -> Unit = {}, alEtiquetas: () -> Unit = {}, alAdvertencias: () -> Unit = {}, alUtilidades: () -> Unit = {},
 ) {
     val modo by ajustes.bloqueo.collectAsState()
     val ctx = LocalContext.current
@@ -51,6 +51,7 @@ fun PantallaAjustes(ajustes: Ajustes, alSeguridad: () -> Unit, alDescargas: () -
         Tarjeta(Ico.Aviso, "Advertencias y notas", "A quién has advertido y lo que anotaste de cada persona", alAdvertencias, "ajuste_advertencias")
         Tarjeta(Ico.Seleccionar, "Etiquetas", "Ordena tus chats con etiquetas de colores", alEtiquetas, "ajuste_etiquetas")
         Tarjeta(Ico.Reloj, "Avisos para mí", "Palabras clave, resumen del día y recordatorios", alAvisos, "ajuste_avisos")
+        Tarjeta(Ico.Documento, "Notas y pendientes", "Tus notas y tu lista de pendientes; también por comando. Convertir fotos en stickers", alUtilidades, "ajuste_utilidades")
         Tarjeta(Ico.Agregar, "Módulos", "Extras opcionales, apagados hasta que los enciendas", alModulos, "ajuste_modulos")
         Tarjeta(Ico.Aviso, "Iniciativa propia", "El interruptor general de lo que el bot escribe solo, topes y No molestar", alIniciativa, "ajuste_iniciativa")
         Tarjeta(Ico.Candado, "Seguridad", when (modo) { Ajustes.Bloqueo.NINGUNO -> "Sin bloqueo"; Ajustes.Bloqueo.PIN -> "Protegida con PIN"; Ajustes.Bloqueo.HUELLA -> "Protegida con huella" }, alSeguridad, "ajuste_seguridad")
