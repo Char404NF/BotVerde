@@ -305,6 +305,8 @@ class MotorFalso : Motor {
     var proximoModulosTs = 0L
     override fun proximoModulos(bot: Long) = proximoModulosTs
     override fun tickModulos(bot: Long) { llamadas += "tickModulos" }
+    var llavesEnGo = mutableMapOf<String, String>()
+    override fun fijarLlaveModulo(bot: Long, id: String, clave: String, valor: String) { llamadas += "llave:$id:$clave"; llavesEnGo["$id:$clave"] = valor }
     override fun estadoModoSeguro(bot: Long) = seguro
     override fun reanudarModoSeguro(bot: Long) { llamadas += "reanudarSeguro"; seguro = """{"activo":false,"ts":0,"motivo":"","texto":"","errores":0}""" }
     override fun configurarMotor(activo: Boolean, ventanaMin: Long) { llamadas += "motor:$activo:$ventanaMin" }

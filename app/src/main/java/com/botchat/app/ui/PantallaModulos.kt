@@ -220,6 +220,7 @@ fun PantallaAvisoRiesgo(botId: Long, id: String, alVolver: () -> Unit, alEncendi
                     Text("Este módulo escribe mensajes por su cuenta, sin que nadie le haya escrito antes.", style = MaterialTheme.typography.bodyMedium)
                     Text("WhatsApp no permite el envío automático o masivo, y puede limitar o bloquear el número que lo hace. Conviene usar un número secundario.", style = MaterialTheme.typography.bodyMedium)
                     if (alto) Text("Es el nivel de riesgo más alto: úsalo solo con personas que ya te escribieron o pidieron recibir mensajes, y con pocos envíos.", style = MaterialTheme.typography.bodyMedium)
+                    if (m.id == "ia") Text("Privacidad: lo que se le pregunte a la IA SALE de este teléfono hacia el proveedor que elijas. No lo uses con información que no quieras compartir con él.", Modifier.testTag("aviso_privacidad"), style = MaterialTheme.typography.bodyMedium)
                     Text("Lo puedes apagar cuando quieras, y el interruptor general “Iniciativa propia” lo detiene de golpe.", style = MaterialTheme.typography.bodyMedium)
                 }
             }

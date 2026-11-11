@@ -11,6 +11,7 @@ object TipoCampo {
     const val LISTA = "lista"
     const val HORA = "hora"
     const val ADJUNTOS = "adjuntos" // solo en los formularios de los paneles
+    const val SECRETO = "secreto" // llave: va al Keystore, nunca a la configuración
 }
 
 /** Un botón de un panel: `accion` llega a Go; `confirma`, si no está vacío, se pregunta antes. */

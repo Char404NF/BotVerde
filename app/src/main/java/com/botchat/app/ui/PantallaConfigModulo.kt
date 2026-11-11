@@ -22,6 +22,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -103,12 +104,18 @@ fun ConfiguracionGenerica(botId: Long, m: ModuloInfo) {
     val scope = rememberCoroutineScope()
     val haptica = rememberHaptica()
     val valores = remember(m.id) { mutableStateMapOf<String, String>() } // todo se edita como texto y se convierte al guardar
+    val llaves = remember(m.id) { mutableStateMapOf<String, String>() } // lo que se escribe en los campos de llave (no se guarda aquí)
+    val llaveGuardada = remember(m.id) { mutableStateMapOf<String, Boolean>() }
+    var msgLlave by remember(m.id) { mutableStateOf<String?>(null) }
     var cargado by remember(m.id) { mutableStateOf(false) }
     var error by remember(m.id) { mutableStateOf<String?>(null) }
     var guardado by remember(m.id) { mutableStateOf(false) }
     LaunchedEffect(m.id) {
         val c = runCatching { Repo.configModulo(botId, m.id) }.getOrDefault(emptyMap())
-        m.esquema.forEach { f -> valores[f.clave] = aTexto(c[f.clave] ?: f.defecto) }
+        m.esquema.forEach { f ->
+            if (f.tipo == TipoCampo.SECRETO) llaveGuardada[f.clave] = runCatching { com.botchat.app.seguridad.LlavesModulos.existe(ctx, botId, m.id, f.clave) }.getOrDefault(false)
+            else valores[f.clave] = aTexto(c[f.clave] ?: f.defecto)
+        }
         cargado = true
     }
     if (!cargado) { Box(Modifier.fillMaxWidth().padding(Esp.l), Alignment.Center) { CircularProgressIndicator() }; return }
@@ -118,6 +125,40 @@ fun ConfiguracionGenerica(botId: Long, m: ModuloInfo) {
                 Column(Modifier.padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
                     val valor = valores[f.clave].orEmpty()
                     when (f.tipo) {
+                        TipoCampo.SECRETO -> {
+                            val hay = llaveGuardada[f.clave] == true
+                            Text(f.titulo, style = MaterialTheme.typography.titleSmall)
+                            if (f.ayuda.isNotBlank()) Text(f.ayuda, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(if (hay) "Hay una llave guardada en el Keystore de este teléfono (no se puede volver a ver)." else "Todavía no hay llave guardada.",
+                                Modifier.testTag("llave_estado_${f.clave}"), style = MaterialTheme.typography.labelLarge, color = if (hay) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                            OutlinedTextField(
+                                llaves[f.clave].orEmpty(), { llaves[f.clave] = it; msgLlave = null }, Modifier.fillMaxWidth().testTag("in_${f.clave}"), singleLine = true,
+                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
+                                placeholder = { Text(if (hay) "Escribe otra para reemplazarla" else "Pega la llave aquí") },
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
+                                Button({
+                                    haptica(Toque.Confirmar)
+                                    val v = llaves[f.clave].orEmpty().trim()
+                                    if (v.isEmpty()) { msgLlave = "Escribe la llave primero"; return@Button }
+                                    scope.launch {
+                                        runCatching { Repo.guardarLlaveModulo(ctx, botId, m.id, f.clave, v) }
+                                            .onSuccess { llaves[f.clave] = ""; llaveGuardada[f.clave] = true; msgLlave = "Llave guardada en el Keystore" }
+                                            .onFailure { msgLlave = it.message ?: "No se pudo guardar la llave" }
+                                    }
+                                }, Modifier.testTag("guardar_llave_${f.clave}")) { Text("Guardar llave") }
+                                if (hay) OutlinedButton({
+                                    haptica(Toque.Confirmar)
+                                    scope.launch {
+                                        runCatching { Repo.guardarLlaveModulo(ctx, botId, m.id, f.clave, "") }
+                                            .onSuccess { llaveGuardada[f.clave] = false; msgLlave = "Llave borrada" }
+                                            .onFailure { msgLlave = it.message ?: "No se pudo borrar la llave" }
+                                    }
+                                }, Modifier.testTag("borrar_llave_${f.clave}")) { Text("Borrar llave") }
+                            }
+                            msgLlave?.let { Text(it, Modifier.testTag("llave_msg"), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) }
+                        }
                         TipoCampo.INTERRUPTOR -> Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(f.titulo, style = MaterialTheme.typography.titleSmall)
@@ -163,6 +204,7 @@ fun ConfiguracionGenerica(botId: Long, m: ModuloInfo) {
                 m.esquema.forEach { f ->
                     val t = valores[f.clave].orEmpty().trim()
                     when (f.tipo) {
+                        TipoCampo.SECRETO -> {} // la llave nunca va a la configuración
                         TipoCampo.NUMERO -> t.replace(',', '.').toDoubleOrNull()?.let { cfg[f.clave] = it } ?: run { fallo = "«${f.titulo}» debe ser un número" }
                         TipoCampo.INTERRUPTOR -> cfg[f.clave] = t == "true"
                         else -> cfg[f.clave] = t

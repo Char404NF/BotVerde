@@ -50,6 +50,7 @@ object Repo {
             motor.abrirAlmacen(raiz.absolutePath, ClaveDatos.obtener(ctx), observador)
             abierto = true
             actualizarZona()
+            runCatching { com.botchat.app.seguridad.LlavesModulos.cargarEnMotor(ctx) { b, m, c, v -> motor.fijarLlaveModulo(b, m, c, v) } }
             com.botchat.app.datos.Ajustes.get(ctx).aplicarAGo()
             error.value = null
             true
@@ -220,6 +221,11 @@ object Repo {
     suspend fun accionModulo(bot: Long, id: String, accion: String, args: Map<String, Any?>) = io { motor.accionModulo(bot, id, accion, org.json.JSONObject(args).toString()) }
     suspend fun proximoModulos(bot: Long) = io { motor.proximoModulos(bot) }
     suspend fun tickModulos(bot: Long) = io { motor.tickModulos(bot) }
+    /** Guarda una llave de un módulo: cifrada en el Keystore y en memoria de Go (valor vacío = borrarla). Nunca va a la base. */
+    suspend fun guardarLlaveModulo(ctx: Context, bot: Long, id: String, clave: String, valor: String) = io {
+        com.botchat.app.seguridad.LlavesModulos.guardar(ctx, bot, id, clave, valor)
+        motor.fijarLlaveModulo(bot, id, clave, valor.trim())
+    }
     suspend fun iniciativas(bot: Long, modulo: String = "", limite: Int = 100, antesId: Long = 0) = io { JsonMod.registro(motor.listarIniciativas(bot, modulo, limite.toLong(), antesId)) }
     suspend fun modoSeguro(bot: Long) = io { JsonMod.seguro(motor.estadoModoSeguro(bot)) }
     suspend fun reanudarModoSeguro(bot: Long) = io { motor.reanudarModoSeguro(bot) }

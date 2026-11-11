@@ -147,6 +147,8 @@ interface Motor {
     fun accionModulo(bot: Long, id: String, accion: String, argsJson: String): String
     fun proximoModulos(bot: Long): Long
     fun tickModulos(bot: Long)
+    // Llaves de los módulos (IA, traductor): la app las guarda en el Keystore y se las pasa a Go solo en memoria (0.5.0, H parte 2).
+    fun fijarLlaveModulo(bot: Long, id: String, clave: String, valor: String)
     fun estadoModoSeguro(bot: Long): String
     fun reanudarModoSeguro(bot: Long)
 
@@ -394,6 +396,7 @@ object MotorGo : Motor {
     override fun accionModulo(bot: Long, id: String, accion: String, argsJson: String) = Wabot.accionModulo(bot, id, accion, argsJson)
     override fun proximoModulos(bot: Long) = Wabot.proximoModulos(bot)
     override fun tickModulos(bot: Long) = Wabot.tickModulos(bot)
+    override fun fijarLlaveModulo(bot: Long, id: String, clave: String, valor: String) = Wabot.fijarLlaveModulo(bot, id, clave, valor)
     override fun estadoModoSeguro(bot: Long) = Wabot.estadoModoSeguro(bot)
     override fun reanudarModoSeguro(bot: Long) = Wabot.reanudarModoSeguro(bot)
 

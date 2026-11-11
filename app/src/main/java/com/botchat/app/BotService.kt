@@ -141,6 +141,7 @@ class BotService : Service() {
         }
         Wabot.stop()
         runCatching { Wabot.eliminarBot(b.id) } // mensajes, archivos y fotos de este bot
+        runCatching { com.botchat.app.seguridad.LlavesModulos.borrarDeBot(this, b.id) } // llaves de módulos (IA…)
         runCatching { Datos.get(this).carpetaSesion(b.id).deleteRecursively() }
         Datos.get(this).eliminar(b.id)
         BotState.log("Bot eliminado.")
