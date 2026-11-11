@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"botchat/internal/auto"
 	"botchat/internal/avisos"
 	"botchat/internal/comandos"
 	"botchat/internal/envio"
@@ -59,6 +60,8 @@ type estado struct {
 	envio         *envio.Servicio
 	motor         *motor.Motor
 	flujo         *flujo.Motor
+	autoDec       *auto.Decisor // envuelve a flujo: bienvenida, ausencia, recibido y cierre
+	atajos        *auto.Atajos
 	sincronizando atomic.Bool // WhatsApp está entregando mensajes acumulados: no se contestan
 	descargas     *medios.Gestor
 	fotos         *fotos.Gestor
@@ -167,6 +170,7 @@ func (s *estado) armar() {
 	s.armarPermisos()
 	s.armarPersonas()
 	s.armarModulos()
+	s.armarAuto()
 	s.motor = motor.Nuevo(motor.Config{
 		Perm: s.perm, Cmd: s.cmd, EsAdminGrupo: s.admins.esAdmin, Baja: s.mods.Baja,
 		BotID: s.botID, Alm: alm, Decisor: s.decisor(), Enviador: enviadorMotor{s}, Log: s.log,
@@ -176,6 +180,9 @@ func (s *estado) armar() {
 		AlHumano: func(chat, aviso string) { s.avisaCambio("humano:" + chat) },
 		// Menús en grupos: tope de mensajes por minuto en un grupo y a qué conversación pertenece cada mensaje del menú que sale.
 		LimiteGrupo: func() int { return alm.AjusteBotInt(s.botID, "grupo_msgs_min") },
+		// Mensajes automáticos: lo que salió se anota (repetición por persona y registro sin textos); y los "/atajo" que escribo yo.
+		AlAuto: s.autoDec.AlAuto,
+		Atajos: s.atajos,
 		AlEnviado: func(chat, id string, ref *motor.RefSesion) {
 			if strings.HasSuffix(chat, "@g.us") {
 				_ = alm.GuardarMsgBot(s.botID, chat, id, ref.ID, ref.Persona, ref.MenuID, time.Now())
@@ -434,7 +441,7 @@ func (s *estado) decisor() motor.Decisor {
 	if d := decisorActual(); d != nil {
 		return d
 	}
-	return s.flujo
+	return s.autoDec
 }
 
 // esPropio dice si un JID es el de esta misma cuenta (teléfono o LID).

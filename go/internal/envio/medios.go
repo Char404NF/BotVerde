@@ -113,6 +113,9 @@ func (s *Servicio) enviarMedio(ctx context.Context, chat string, a Adjunto, cita
 	if citaID != "" {
 		s.ponerCita(m, citaID)
 	}
+	if !manual {
+		m.Automatico = etiquetaAuto(ctx)
+	}
 	if _, err := s.Alm.GuardarMensaje(m); err != nil {
 		return Resultado{}, err
 	}

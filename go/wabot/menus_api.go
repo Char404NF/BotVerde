@@ -293,39 +293,10 @@ func BorrarNoEntendio(botID, menuID int64) (int, error) {
 
 // ---------- adjuntos de los menús ----------
 
-// SubirAdjuntoMenu guarda cifrado un archivo (la copia en claro de `ruta` se borra al terminar) para mandarlo desde un menú. Devuelve
-// (JSON) {id, tipo, mime, nombre, bytes}. Hasta 8 MB; foto, video, audio o documento.
+// SubirAdjuntoMenu guarda cifrado un archivo para mandarlo desde un menú o un comando propio. Es el mismo servicio de adjuntos de los
+// mensajes automáticos (SubirAdjunto): mismas reglas de tipo y peso, y las notas de voz se validan (.ogg, Opus, mono).
 func SubirAdjuntoMenu(botID int64, ruta, tipo, mime, nombre string) (string, error) {
-	defer func() { _ = os.Remove(ruta) }()
-	a, err := almacenAbierto()
-	if err != nil {
-		return "", err
-	}
-	switch tipo {
-	case "imagen", "video", "audio", "documento":
-	default:
-		return "", errors.New("Ese tipo de archivo no se puede mandar desde un menú.")
-	}
-	st, err := os.Stat(ruta)
-	if err != nil || st.Size() == 0 {
-		return "", errors.New("No se pudo leer el archivo.")
-	}
-	if st.Size() > 8<<20 {
-		return "", fmt.Errorf("El archivo pesa %d MB; desde un menú se pueden mandar archivos de hasta 8 MB.", st.Size()>>20+1)
-	}
-	f, err := os.Open(ruta)
-	if err != nil {
-		return "", errors.New("No se pudo leer el archivo.")
-	}
-	defer f.Close()
-	id, n, err := a.GuardarAdjuntoMenu(botID, f)
-	if err != nil {
-		return "", err
-	}
-	if mime == "" {
-		mime = "application/octet-stream"
-	}
-	return js(map[string]any{"id": id, "tipo": tipo, "mime": mime, "nombre": nombre, "bytes": n}, nil)
+	return SubirAdjunto(botID, ruta, tipo, mime, nombre)
 }
 
 // BorrarAdjuntoMenu quita el archivo guardado de un adjunto (cuando ya no lo usa ningún menú).
@@ -434,6 +405,9 @@ func ImportarMenus(botID int64, ruta, clave string) (string, error) {
 
 // EnviarSalida implementa motor.EnviadorSalida: manda texto, archivo, ubicación o contacto citando el mensaje exacto de la persona
 // (con el autor de la cita tal como lo mandó WhatsApp) y devuelve el id del mensaje que salió.
+//
+// Si un archivo no se puede leer o subir, NO se pierde el mensaje: sale solo el texto (si lo había), se anota en el registro (sin
+// textos ni nombres) y lo demás sigue. Un archivo sin texto que falla se omite (motor.ErrSaltado).
 func (e enviadorMotor) EnviarSalida(ctx context.Context, chat string, sal motor.Salida, citaID, citaAutorWA, mencion string) (string, error) {
 	var men []string
 	if mencion != "" {
@@ -445,15 +419,16 @@ func (e enviadorMotor) EnviarSalida(ctx context.Context, chat string, sal motor.
 	case sal.Medio != nil:
 		ruta, errC := e.s.copiaAdjunto(sal.Medio.ID)
 		if errC != nil {
-			e.s.log("No se pudo leer un archivo de un menú; se manda solo el texto.")
-			if strings.TrimSpace(sal.Texto) == "" {
-				return "", errC
-			}
-			r, err = e.s.envio.EnviarAutoCita(ctx, chat, sal.Texto, citaID, citaAutorWA, men)
-			break
+			return e.sinArchivo(ctx, chat, sal, citaID, citaAutorWA, men, "archivo_ilegible")
 		}
 		pie := sal.Texto
 		r, err = e.s.envio.EnviarMedioAutoCita(ctx, chat, adjuntoEnvio(ruta, sal.Medio, pie), citaID, citaAutorWA, men)
+		if err != nil && !errors.Is(err, envio.ErrSinConexion) {
+			return e.sinArchivo(ctx, chat, sal, citaID, citaAutorWA, men, "subida_fallo")
+		}
+		if err == nil && r.Estado == "enviado" && sal.Auto != nil {
+			sal.Auto.AdjOK++
+		}
 	case sal.Ubicacion != nil:
 		u := sal.Ubicacion
 		r, err = e.s.envio.EnviarUbicacionAuto(ctx, chat, u.Lat, u.Lon, u.Nombre, u.Direccion, citaID, citaAutorWA)
@@ -462,6 +437,26 @@ func (e enviadorMotor) EnviarSalida(ctx context.Context, chat string, sal motor.
 	default:
 		r, err = e.s.envio.EnviarAutoCita(ctx, chat, sal.Texto, citaID, citaAutorWA, men)
 	}
+	if err != nil {
+		return "", err
+	}
+	if r.Estado != "enviado" {
+		return "", errNoEnviado
+	}
+	return r.ID, nil
+}
+
+// sinArchivo anota que un archivo no salió y manda solo el texto (si lo hay). Nunca escribe nombres de archivo en el registro.
+func (e enviadorMotor) sinArchivo(ctx context.Context, chat string, sal motor.Salida, citaID, citaAutorWA string, men []string, motivo string) (string, error) {
+	sal.Auto.Fallo(motivo)
+	if sal.Auto == nil && alm != nil {
+		alm.RegistrarActividad(e.s.botID, almacen.ActOmitido, "archivo no enviado", chat, motivo)
+	}
+	e.s.log("No se pudo mandar un archivo de una respuesta automática (" + motivo + "); se manda solo el texto.")
+	if strings.TrimSpace(sal.Texto) == "" {
+		return "", motor.ErrSaltado
+	}
+	r, err := e.s.envio.EnviarAutoCita(ctx, chat, sal.Texto, citaID, citaAutorWA, men)
 	if err != nil {
 		return "", err
 	}

@@ -115,6 +115,7 @@ func (s *Servicio) enviarEspecial(ctx context.Context, chat, tipo, texto, citaID
 	if citaID != "" {
 		s.ponerCita(m, citaID)
 	}
+	m.Automatico = etiquetaAuto(ctx)
 	if _, err := s.Alm.GuardarMensaje(m); err != nil {
 		return Resultado{}, err
 	}

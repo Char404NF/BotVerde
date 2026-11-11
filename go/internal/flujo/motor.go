@@ -176,10 +176,23 @@ type resultado struct {
 	Estado    string // estado de la conversación al terminar este turno
 	Paso      string
 	Sesion    *motor.RefSesion
+	Termino   bool   // una conversación de menú acaba de terminar bien (para el mensaje automático de cierre)
+	Etiqueta  string // "menu", "regla" o "comando": qué clase de automatización contesta
 }
 
 func (r resultado) decision() motor.Decision {
-	return motor.Decision{Respuestas: r.Salidas, Coincidio: r.Coincidio, PasarAHumano: r.Humano, Omitir: r.Omitir, Sesion: r.Sesion}
+	return motor.Decision{Respuestas: r.Salidas, Coincidio: r.Coincidio, PasarAHumano: r.Humano, Omitir: r.Omitir, Sesion: r.Sesion, Termino: r.Termino, Etiqueta: r.Etiqueta}
+}
+
+// etiquetaDe dice qué clase de automatización es: un comando propio, un menú interactivo o una regla de respuesta suelta.
+func etiquetaDe(def *Def) string {
+	switch {
+	case def.Propio != nil:
+		return "comando"
+	case interactivo(def):
+		return "menu"
+	}
+	return "regla"
 }
 
 func (r *resultado) texto(t string) {
@@ -249,7 +262,11 @@ func (m *Motor) procesa(e entrada, prueba bool, forzarMenu int64) (resultado, er
 			if e.EsGrupo && !e.Dirigido && !m.validaSinDirigir(def, s, e) {
 				return resultado{Omitir: almacen.MotGrupo}, nil
 			}
-			return m.continua(def, s, e, prueba)
+			r, err := m.continua(def, s, e, prueba)
+			r.Etiqueta = etiquetaDe(def)
+			// Una conversación de menú que termina bien (no un comando de una sola respuesta) abre paso al mensaje de cierre.
+			r.Termino = err == nil && !prueba && r.Estado == almacen.SesCompletada && def.Propio == nil
+			return r, err
 		}
 	}
 	if e.EsGrupo && !e.Dirigido {
@@ -284,7 +301,9 @@ func (m *Motor) procesa(e entrada, prueba bool, forzarMenu int64) (resultado, er
 		if forzarMenu == 0 && !m.seActiva(def, mn, e, ahora) && !(pideMenu && m.sirveParaMenu(def, mn, e, ahora)) {
 			continue
 		}
-		return m.inicia(def, mn, e, prueba, ahora, forzarMenu == 0)
+		r, err := m.inicia(def, mn, e, prueba, ahora, forzarMenu == 0)
+		r.Etiqueta = etiquetaDe(def)
+		return r, err
 	}
 	// Citaron un menú que ya terminó: se les dice una sola vez (por persona y menú).
 	if ref != nil && !prueba && !m.pareceComandoDeMenu(e) {

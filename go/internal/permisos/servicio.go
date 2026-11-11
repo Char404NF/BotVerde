@@ -230,6 +230,36 @@ func (s *Servicio) FijarPoliticaDesconocidos(v string) error {
 	return s.Alm.FijarAjusteBot(s.BotID, "desconocidos", v)
 }
 
+// EsConocido dice si esa persona cuenta como conocida (contacto): tiene rango, fue aprobada, está en mi agenda, o ya me había escrito
+// antes de activar la política de desconocidos. Es la misma idea que usa la compuerta; los mensajes automáticos la usan para
+// "solo desconocidos" y "solo contactos". `chat` es su chat privado (puede ser el mismo texto que la persona).
+func (s *Servicio) EsConocido(persona, chat string) bool {
+	persona = s.Persona(persona)
+	if persona == almacen.PersonaDueno {
+		return true
+	}
+	if r := s.RolDe(persona); r != nil {
+		return true
+	}
+	if sol, _ := s.Alm.ObtenerSolicitud(s.BotID, persona); sol != nil && sol.Estado == almacen.SolAprobada {
+		return true
+	}
+	for _, c := range []string{chat, persona} {
+		if c == "" || strings.HasSuffix(c, "@g.us") {
+			continue
+		}
+		if ch, _ := s.Alm.ObtenerChat(s.BotID, c); ch != nil && ch.Guardado != "" {
+			return true
+		}
+		if desde := int64(s.Alm.AjusteBotInt(s.BotID, "desconocidos_desde")); desde > 0 {
+			if cr := s.Alm.CreadoChat(s.BotID, c); cr > 0 && cr < desde {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Entrada es lo que la compuerta necesita saber de un mensaje.
 type Entrada struct {
 	Persona string // quién escribe (clave guardada)

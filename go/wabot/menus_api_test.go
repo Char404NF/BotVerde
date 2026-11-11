@@ -150,9 +150,10 @@ func TestApiAdjuntosYExportarImportarMenus(t *testing.T) {
 	}
 	grande := filepath.Join(t.TempDir(), "g.bin")
 	fh, _ := os.Create(grande)
-	fh.Truncate(9 << 20)
+	fh.Truncate(17 << 20)
 	fh.Close()
-	if _, err := SubirAdjuntoMenu(1, grande, "documento", "", "g.bin"); err == nil || !strings.Contains(err.Error(), "8 MB") {
+	// (v0.5.0 etapa D: servicio de adjuntos común; los documentos y videos admiten hasta 16 MB, fotos y notas de voz 8 MB)
+	if _, err := SubirAdjuntoMenu(1, grande, "documento", "", "g.bin"); err == nil || !strings.Contains(err.Error(), "16 MB") {
 		t.Fatalf("%v", err)
 	}
 	if err := BorrarAdjuntoMenu(1, "../x"); err == nil {
@@ -229,9 +230,13 @@ func (f *clienteFalso) GenerateMessageID() types.MessageID {
 func (f *clienteFalso) SendMessage(_ context.Context, _ types.JID, m *waE2E.Message, extra ...whatsmeow.SendRequestExtra) (whatsmeow.SendResponse, error) {
 	f.mu.Lock()
 	f.enviados = append(f.enviados, m)
-	f.ids = append(f.ids, string(extra[0].ID))
+	var id types.MessageID
+	if len(extra) > 0 { // una edición no lleva ID propio
+		id = extra[0].ID
+	}
+	f.ids = append(f.ids, string(id))
 	f.mu.Unlock()
-	return whatsmeow.SendResponse{ID: extra[0].ID, Timestamp: time.Now()}, nil
+	return whatsmeow.SendResponse{ID: id, Timestamp: time.Now()}, nil
 }
 func (f *clienteFalso) BuildReaction(chat, sender types.JID, id types.MessageID, r string) *waE2E.Message {
 	return nil

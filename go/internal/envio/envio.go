@@ -387,6 +387,14 @@ func (s *Servicio) EnviarAuto(ctx context.Context, chat, texto, citaID string, m
 	return s.enviarTexto(ctx, chat, texto, citaID, "", menciones, false)
 }
 
+// etiquetaAuto es la etiqueta "automático" de un mensaje que no escribí a mano: la que puso quien lo manda, o "bot".
+func etiquetaAuto(ctx context.Context) string {
+	if e := almacen.EtiquetaDe(ctx); e != "" {
+		return e
+	}
+	return almacen.EtiquetaPorDefecto
+}
+
 func (s *Servicio) enviarTexto(ctx context.Context, chat, texto, citaID, autorWA string, menciones []string, manual bool) (Resultado, error) {
 	texto = strings.TrimSpace(texto)
 	if texto == "" {
@@ -408,6 +416,9 @@ func (s *Servicio) enviarTexto(ctx context.Context, chat, texto, citaID, autorWA
 	m := &almacen.Mensaje{
 		ID: string(s.Cli.GenerateMessageID()), ChatJID: chat, BotID: s.BotID, RemitenteJID: almacen.QuienYo, EsMio: true, Tipo: almacen.TipoTexto,
 		Texto: texto, TS: s.ahora().Unix(), ArchivoEstado: almacen.EstadoNinguno, EstadoEnvio: "enviando", Menciones: menciones,
+	}
+	if !manual {
+		m.Automatico = etiquetaAuto(ctx)
 	}
 	if citaID != "" {
 		if o, _ := s.Alm.ObtenerMensaje(s.BotID, chat, citaID); o != nil {

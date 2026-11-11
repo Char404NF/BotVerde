@@ -51,6 +51,63 @@ type Salida struct {
 	Medio     *Medio     // archivo guardado (cifrado) que se manda; el texto va de pie de foto
 	Ubicacion *Ubicacion // punto del mapa
 	Contacto  *Contacto  // tarjeta de contacto
+	// Continua: sigue a otra salida de la misma respuesta (el segundo y el tercer archivo): entre una y otra espera de 1 a 3 s al azar.
+	Continua bool
+	// Etiqueta dice qué automatización la manda ("menu", "regla", "bienvenida"…); se guarda en el mensaje que sale para poder
+	// verlos y filtrarlos. Vacía = la del Decision o "bot".
+	Etiqueta string
+	// Auto, si viene, ata la salida a un mensaje automático (cuenta cuántos archivos salieron y cuáles no).
+	Auto *AutoInfo
+}
+
+// AutoInfo es lo que se anota de un mensaje automático al terminar de mandarlo. Lo comparten todas sus salidas (texto y archivos).
+type AutoInfo struct {
+	ID       int64
+	Tipo     string
+	Persona  string // persona canónica a la que se le manda (para la repetición)
+	Chat     string
+	SoloTxt  bool   // se pasó el tope por hora: se quitaron los archivos
+	Enviados int    // salidas que sí salieron (lo cuenta el motor)
+	AdjOK    int    // archivos que salieron (lo cuenta quien envía)
+	AdjFallo int    // archivos que no se pudieron mandar
+	Motivo   string // por qué algo no salió, sin textos ("archivo_ilegible", "subida_fallo"…)
+}
+
+// Fallo anota que un archivo no salió (lo llama quien envía).
+func (a *AutoInfo) Fallo(motivo string) {
+	if a == nil {
+		return
+	}
+	a.AdjFallo++
+	if a.Motivo == "" {
+		a.Motivo = motivo
+	}
+}
+
+// ArmarSalidas arma lo que sale de un texto con hasta 3 archivos: el texto va de pie de foto en el primer archivo si es foto, video o
+// documento; si es una nota de voz (no admite pie) el texto sale antes, como mensaje aparte. Del segundo archivo en adelante marca
+// Continua para esperar de 1 a 3 s entre uno y otro.
+func ArmarSalidas(texto string, medios []Medio) []Salida {
+	texto = strings.TrimSpace(texto)
+	var out []Salida
+	pie := texto != ""
+	for i := range medios {
+		md := medios[i]
+		s := Salida{Medio: &md}
+		if i == 0 && pie && md.Tipo != "audio" {
+			s.Texto, pie = texto, false
+		}
+		if i == 0 && pie { // audio: el texto va antes, como mensaje aparte
+			out = append(out, Salida{Texto: texto})
+			pie = false
+		}
+		s.Continua = i > 0
+		out = append(out, s)
+	}
+	if pie {
+		out = append(out, Salida{Texto: texto})
+	}
+	return out
 }
 
 // Medio es un archivo guardado en el teléfono (adjunto de menú) que se manda con la respuesta.
@@ -93,6 +150,10 @@ type Decision struct {
 	// Sesion liga lo que se responde con la conversación de menú que lo originó: el id de cada mensaje que salga se anota para poder
 	// reconocer, en un grupo, a qué conversación pertenece un mensaje del bot que citan.
 	Sesion *RefSesion
+	// Termino: la conversación de un menú acaba de terminar bien (para el mensaje automático de cierre).
+	Termino bool
+	// Etiqueta de las salidas que no traen la suya ("menu", "regla"…).
+	Etiqueta string
 }
 
 // Decisor decide qué responder. `lote` trae todos los mensajes juntados (en privado) y `ultimo` es el último.
@@ -111,6 +172,19 @@ type EnviadorSalida interface {
 type Admisor interface {
 	AdmiteEnGrupo(msg Mensaje) bool
 	EsperaTexto(msg Mensaje) bool
+}
+
+// AdmisorMedios lo implementa un decisor que también contesta a imágenes, audios, stickers y archivos aunque no haya un menú
+// esperando (por ejemplo el "ya vi tu mensaje" de los mensajes automáticos).
+type AdmisorMedios interface {
+	AdmiteSinTexto(msg Mensaje) bool
+}
+
+// Atajador atiende los atajos que escribo yo ("/gracias") desde el teléfono o la app: Existe dice si hay un atajo con ese nombre y
+// Ejecutar manda la respuesta rápida en ese chat como si la hubiera escrito yo.
+type Atajador interface {
+	Existe(nombre string) bool
+	Ejecutar(ctx context.Context, msg Mensaje)
 }
 
 // ConDiferidas lo implementa un decisor con fila de espera: cada cierto tiempo entrega las respuestas que se liberaron.
@@ -170,6 +244,12 @@ type Config struct {
 	AlEnviado func(chat, id string, ref *RefSesion)
 	// TickDiferidas es cada cuánto se revisa la fila de espera de los grupos (20 s por defecto).
 	TickDiferidas time.Duration
+	// AlAuto se llama cuando terminó de mandarse un mensaje automático (salió al menos una de sus salidas).
+	AlAuto func(a *AutoInfo)
+	// Atajos atiende lo que escribo yo como "/atajo" (nil = sin atajos). Funciona aunque el interruptor del bot esté apagado.
+	Atajos Atajador
+	// PausaAdjMin y PausaAdjMax son la espera entre un archivo y el siguiente de la misma respuesta (1 y 3 s por defecto).
+	PausaAdjMin, PausaAdjMax time.Duration
 }
 
 // Motor es el bot automático.
@@ -187,6 +267,8 @@ type Motor struct {
 	frenoHasta time.Time
 	manual     map[string]time.Time // chat -> hora de mi último mensaje escrito a mano ahí
 	mDueno     sync.Mutex           // los comandos del Dueño salen de uno en uno
+	mAtajo     sync.Mutex           // los atajos salen de uno en uno
+	ultAtajo   map[string]time.Time // chat -> hora del último atajo
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -206,6 +288,8 @@ type pedido struct {
 	salida                       *Salida    // si trae archivo, ubicación o contacto
 	ref                          *RefSesion // conversación de menú a la que pertenece
 	ts                           time.Time  // hora del mensaje al que se responde
+	continua                     bool       // sigue a otra salida (pausa de 1 a 3 s en vez de la espera normal)
+	etiqueta                     string     // qué automatización la manda
 	res                          chan error
 }
 
@@ -215,6 +299,8 @@ var (
 	ErrFreno  = errors.New("freno")
 	// ErrYaContesto: yo contesté a mano ese mensaje antes de que saliera la respuesta automática.
 	ErrYaContesto = errors.New("ya contestaste tú")
+	// ErrSaltado: esta salida (un archivo que no se pudo leer) se omitió; no es un fallo de envío y lo demás sigue.
+	ErrSaltado = errors.New("salida omitida")
 )
 
 // Nuevo crea el motor con los valores por defecto donde falte algo.
@@ -254,6 +340,8 @@ func Nuevo(c Config) *Motor {
 	def(&c.EsperaMax, 2500*time.Millisecond)
 	def(&c.Repetido, 5*time.Second)
 	def(&c.FrenoDura, 5*time.Minute)
+	def(&c.PausaAdjMin, time.Second)
+	def(&c.PausaAdjMax, 3*time.Second)
 	for p, v := range map[*int]int{&c.LimiteGlobal: 20, &c.LimiteChat: 6, &c.MaxCola: 10, &c.FrenoFallos: 5} {
 		if *p == 0 {
 			*p = v
@@ -262,7 +350,7 @@ func Nuevo(c Config) *Motor {
 	if c.Aleatorio == nil {
 		c.Aleatorio = rand.Int63n
 	}
-	return &Motor{c: c, carriles: map[string]*carril{}, repetido: map[string]time.Time{}, salida: make(chan *pedido, 256), marcasC: map[string][]time.Time{}, manual: map[string]time.Time{}}
+	return &Motor{c: c, carriles: map[string]*carril{}, repetido: map[string]time.Time{}, salida: make(chan *pedido, 256), marcasC: map[string][]time.Time{}, manual: map[string]time.Time{}, ultAtajo: map[string]time.Time{}}
 }
 
 // Iniciar arranca la cola de salida. Hay que llamar a Detener al terminar.
@@ -274,6 +362,9 @@ func (m *Motor) Iniciar(ctx context.Context) {
 	m.c.Alm.LimpiarActividad(m.c.BotID, 7)
 	m.c.Alm.LimpiarMsgBot(m.c.BotID, 7, m.c.Ahora())
 	m.c.Alm.LimpiarNoEntendio(m.c.BotID, m.c.Alm.AjusteBotInt(m.c.BotID, "noentendio_dias"), m.c.Ahora())
+	m.c.Alm.LimpiarAutoRegistro(m.c.BotID, 30, m.c.Ahora())
+	m.c.Alm.LimpiarRepeticion(m.c.BotID, 365, m.c.Ahora())
+	m.c.Alm.LimpiarAdjuntosHuerfanos(m.c.BotID, 24*time.Hour, m.c.Ahora())
 	if _, ok := m.c.Decisor.(ConDiferidas); ok {
 		m.wg.Add(1)
 		go m.cicloDiferidas()
@@ -328,6 +419,8 @@ func (m *Motor) Entrar(msg Mensaje) {
 		// Lo que escribo yo se ignora, salvo un comando con prefijo en "Mensajes guardados": ese es un comando de Dueño.
 		if msg.EsChatPropio && m.c.Cmd != nil && msg.EsTexto && !msg.EsEdicion && !msg.EsGrupo && m.c.Cmd.EsComando(msg.Texto) {
 			m.entrarDueno(msg)
+		} else if !msg.EsChatPropio {
+			m.entrarAtajo(msg)
 		}
 		return
 	}
@@ -353,8 +446,9 @@ func (m *Motor) Entrar(msg Mensaje) {
 	case !m.c.Activo():
 		m.omite(msg, almacen.MotApagado)
 		return
-	case !msg.EsTexto && m.menuEspera(msg):
-		// una foto, un audio, un sticker o un archivo cuando un menú espera texto: el menú contesta con su mensaje propio
+	case !msg.EsTexto && (m.menuEspera(msg) || m.mediosAdmitidos(msg)):
+		// una foto, un audio, un sticker o un archivo cuando un menú espera texto: el menú contesta con su mensaje propio; o cuando un
+		// mensaje automático ("ya vi tu mensaje") puede contestar aunque no haya texto
 	case !msg.EsTexto || strings.TrimSpace(msg.Texto) == "":
 		m.omite(msg, almacen.MotNoTexto)
 		return
@@ -464,6 +558,60 @@ func (m *Motor) Entrar(msg Mensaje) {
 func (m *Motor) menuEspera(msg Mensaje) bool {
 	ad, ok := m.c.Decisor.(Admisor)
 	return ok && ad.EsperaTexto(msg)
+}
+
+// mediosAdmitidos: el decisor contesta a imágenes, audios y archivos sin menú (el "ya vi tu mensaje" de los mensajes automáticos).
+func (m *Motor) mediosAdmitidos(msg Mensaje) bool {
+	ad, ok := m.c.Decisor.(AdmisorMedios)
+	return ok && ad.AdmiteSinTexto(msg)
+}
+
+// entrarAtajo atiende lo que escribí yo (desde el teléfono o la app) cuando el mensaje entero es "/nombre" de un atajo que existe.
+// Es un camino aparte y cerrado: solo texto exacto, sin espacios, de un atajo guardado; no depende de que el bot esté encendido
+// (soy yo quien lo pide), no cuenta como respuesta automática y nunca se aplica a "Mensajes guardados".
+func (m *Motor) entrarAtajo(msg Mensaje) {
+	if m.c.Atajos == nil || m.ctx == nil || !msg.EsTexto || msg.EsEdicion || msg.Antiguo {
+		return
+	}
+	t := strings.TrimSpace(msg.Texto)
+	if len(t) < 2 || len(t) > 40 || t[0] != '/' {
+		return
+	}
+	nombre := t[1:]
+	if strings.ContainsAny(nombre, " \t\r\n/") || !m.c.Atajos.Existe(nombre) {
+		return
+	}
+	now := m.c.Ahora()
+	if !msg.TS.IsZero() && now.Sub(msg.TS) > m.c.VentanaAntigua() {
+		return
+	}
+	if !m.c.Alm.PrimeraVez(m.c.BotID, msg.Chat, msg.ID) {
+		return
+	}
+	m.mu.Lock()
+	if u, ok := m.ultAtajo[msg.Chat]; ok && now.Sub(u) < 2*time.Second {
+		m.mu.Unlock()
+		m.omite(msg, "atajo repetido")
+		return
+	}
+	m.ultAtajo[msg.Chat] = now
+	m.mu.Unlock()
+	msg.Texto = t
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		defer func() {
+			if r := recover(); r != nil { // un atajo con problemas nunca debe tumbar al bot
+				m.c.Log(fmt.Sprintf("error interno en un atajo: %v", r))
+			}
+		}()
+		m.mAtajo.Lock()
+		defer m.mAtajo.Unlock()
+		if m.ctx.Err() != nil {
+			return
+		}
+		m.c.Atajos.Ejecutar(m.ctx, msg)
+	}()
 }
 
 // yaContesto: escribí yo en ese chat a la hora del mensaje o después (la respuesta automática ya no hace falta).
@@ -682,7 +830,22 @@ func (m *Motor) atiende(chat string, lote []Mensaje) {
 	if ultimo.EsGrupo {
 		citaAutor = ultimo.RemitenteWA
 	}
+	// Al terminar se anota cada mensaje automático que alcanzó a salir (repetición por persona y registro).
+	defer func() {
+		vistos := map[*AutoInfo]bool{}
+		for _, r := range d.Respuestas {
+			if r.Auto != nil && !vistos[r.Auto] {
+				vistos[r.Auto] = true
+				if r.Auto.Enviados > 0 && m.c.AlAuto != nil {
+					m.c.AlAuto(r.Auto)
+				}
+			}
+		}
+	}()
 	for _, r := range d.Respuestas {
+		if r.Etiqueta == "" {
+			r.Etiqueta = d.Etiqueta
+		}
 		if r.Texto != "" && m.c.Firma != nil {
 			if f := strings.TrimSpace(m.c.Firma()); f != "" {
 				r.Texto += "\n\n" + f
@@ -700,8 +863,17 @@ func (m *Motor) atiende(chat string, lote []Mensaje) {
 		err := m.enviarSalida(chat, r, ultimo.ID, citaAutor, mencion, ultimo.TS, d.Sesion)
 		switch {
 		case err == nil:
-			m.c.Alm.RegistrarActividad(m.c.BotID, almacen.ActRespondio, "", chat, "respondido a "+ultimo.ID)
+			if r.Auto != nil {
+				r.Auto.Enviados++
+			}
+			det := "respondido a " + ultimo.ID
+			if r.Etiqueta != "" {
+				det += " (" + r.Etiqueta + ")"
+			}
+			m.c.Alm.RegistrarActividad(m.c.BotID, almacen.ActRespondio, "", chat, det)
 			m.c.Log("Respondido a …" + corto(chat) + " (mensaje " + ultimo.ID + ").")
+		case errors.Is(err, ErrSaltado):
+			// un archivo que no se pudo leer o mandar: se anotó y lo demás sigue
 		case errors.Is(err, ErrLimite):
 			m.omite(ultimo, almacen.MotLimite)
 			return
@@ -742,8 +914,9 @@ func (m *Motor) enviar(chat, texto, citaID, mencion string, ts time.Time) error 
 
 // enviarSalida pone en la cola de salida una respuesta (texto y, si trae, archivo, ubicación o contacto) y espera su resultado.
 func (m *Motor) enviarSalida(chat string, sal Salida, citaID, citaAutor, mencion string, ts time.Time, ref *RefSesion) error {
-	p := &pedido{chat: chat, texto: sal.Texto, citaID: citaID, citaAutor: citaAutor, mencion: mencion, ts: ts, ref: ref, res: make(chan error, 1)}
-	if sal.Medio != nil || sal.Ubicacion != nil || sal.Contacto != nil {
+	p := &pedido{chat: chat, texto: sal.Texto, citaID: citaID, citaAutor: citaAutor, mencion: mencion, ts: ts, ref: ref, res: make(chan error, 1),
+		continua: sal.Continua, etiqueta: sal.Etiqueta}
+	if sal.Medio != nil || sal.Ubicacion != nil || sal.Contacto != nil || sal.Auto != nil {
 		p.salida = &sal
 	}
 	select {
@@ -818,6 +991,12 @@ func (m *Motor) salirUno(p *pedido) error {
 	if span := int64(m.c.EsperaMax - m.c.EsperaMin); span > 0 {
 		espera += time.Duration(m.c.Aleatorio(span))
 	}
+	if p.continua { // el segundo y el tercer archivo de una respuesta: de 1 a 3 s después del anterior
+		espera = m.c.PausaAdjMin
+		if span := int64(m.c.PausaAdjMax - m.c.PausaAdjMin); span > 0 {
+			espera += time.Duration(m.c.Aleatorio(span))
+		}
+	}
 	// Una sola espera humana (0,8 a 2,5 s) y nada más: sin esperas extra por la longitud del texto.
 	m.c.Enviador.Escribiendo(m.ctx, p.chat, true)
 	ok := m.c.Dormir(m.ctx, espera)
@@ -832,19 +1011,26 @@ func (m *Motor) salirUno(p *pedido) error {
 	}
 	var err error
 	id := ""
+	ctx := m.ctx
+	if p.etiqueta != "" {
+		ctx = almacen.ConEtiqueta(ctx, p.etiqueta) // el mensaje que salga se guarda con la etiqueta "automático"
+	}
 	if es, ok := m.c.Enviador.(EnviadorSalida); ok {
 		sal := Salida{Texto: p.texto}
 		if p.salida != nil {
 			sal = *p.salida
 			sal.Texto = p.texto
 		}
-		id, err = es.EnviarSalida(m.ctx, p.chat, sal, p.citaID, p.citaAutor, p.mencion)
+		id, err = es.EnviarSalida(ctx, p.chat, sal, p.citaID, p.citaAutor, p.mencion)
 	} else if p.salida == nil || p.texto != "" {
-		err = m.c.Enviador.Enviar(m.ctx, p.chat, p.texto, p.citaID, p.mencion)
+		err = m.c.Enviador.Enviar(ctx, p.chat, p.texto, p.citaID, p.mencion)
 	}
 	m.c.Enviador.Escribiendo(m.ctx, p.chat, false)
 	if err == nil && id != "" && p.ref != nil && m.c.AlEnviado != nil {
 		m.c.AlEnviado(p.chat, id, p.ref)
+	}
+	if errors.Is(err, ErrSaltado) { // no es un fallo de envío: no cuenta para el freno
+		return err
 	}
 	m.mu.Lock()
 	if err == nil {

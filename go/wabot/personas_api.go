@@ -542,6 +542,22 @@ func validarAjusteB(clave, valor string) (conocido bool, err error) {
 			return true, errors.New("el texto es muy largo (máximo 200 letras)")
 		}
 		return true, nil
+	case "auto_activo", "atajos_activo":
+		return true, num(0, 1)
+	case "auto_tope_hora":
+		return true, num(0, 1000)
+	case "auto_zona":
+		if valor != "" {
+			if _, e := time.LoadLocation(valor); e != nil {
+				return true, errors.New("esa zona horaria no existe (por ejemplo America/Mexico_City)")
+			}
+		}
+		return true, nil
+	case "atajo_modo":
+		if valor != "editar" && valor != "enviar" {
+			return true, errors.New("el modo debe ser editar o enviar")
+		}
+		return true, nil
 	case "resumen_hora":
 		var h, m int
 		if _, e := fmt.Sscanf(valor, "%d:%d", &h, &m); e != nil || h < 0 || h > 23 || m < 0 || m > 59 || len(valor) != 5 {

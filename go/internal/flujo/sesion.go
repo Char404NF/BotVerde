@@ -504,23 +504,12 @@ func (m *Motor) ejecuta(def *Def, s *almacen.Sesion, id string, e entrada, prueb
 // salidasDeRespuesta arma lo que manda un paso de respuesta: el texto (con variables), hasta 3 archivos, una ubicación y un contacto.
 // El texto va de pie de foto en el primer archivo si es foto, video o documento.
 func (m *Motor) salidasDeRespuesta(def *Def, p *Paso, e entrada, vars map[string]string) []motor.Salida {
-	var out []motor.Salida
 	texto := strings.TrimSpace(m.sustituye(def, p.Texto, e, vars))
-	pie := texto != ""
-	for i, a := range p.Adjuntos {
-		s := motor.Salida{Medio: &motor.Medio{ID: a.ID, Tipo: a.Tipo, Mime: a.Mime, Nombre: a.Nombre}}
-		if i == 0 && pie && a.Tipo != "audio" {
-			s.Texto, pie = texto, false
-		}
-		if i == 0 && pie { // audio: el texto va antes, como mensaje aparte
-			out = append(out, motor.Salida{Texto: texto})
-			pie = false
-		}
-		out = append(out, s)
+	medios := make([]motor.Medio, 0, len(p.Adjuntos))
+	for _, a := range p.Adjuntos {
+		medios = append(medios, motor.Medio{ID: a.ID, Tipo: a.Tipo, Mime: a.Mime, Nombre: a.Nombre})
 	}
-	if pie {
-		out = append(out, motor.Salida{Texto: texto})
-	}
+	out := motor.ArmarSalidas(texto, medios)
 	if u := p.Ubicacion; u != nil {
 		out = append(out, motor.Salida{Ubicacion: &motor.Ubicacion{Lat: u.Lat, Lon: u.Lon, Nombre: m.sustituye(def, u.Nombre, e, vars), Direccion: m.sustituye(def, u.Direccion, e, vars)}})
 	}

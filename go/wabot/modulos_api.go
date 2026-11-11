@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 
+	"botchat/internal/almacen"
 	"botchat/internal/envio"
 	"botchat/internal/modulos"
 
@@ -18,7 +19,7 @@ import (
 type enviadorModulos struct{ s *estado }
 
 func (e enviadorModulos) Texto(ctx context.Context, chat, texto, citaID string, menciones []string) error {
-	r, err := e.s.envio.EnviarAuto(ctx, chat, texto, citaID, menciones)
+	r, err := e.s.envio.EnviarAuto(almacen.ConEtiqueta(ctx, "modulo"), chat, texto, citaID, menciones)
 	if err != nil {
 		return err
 	}
@@ -29,7 +30,7 @@ func (e enviadorModulos) Texto(ctx context.Context, chat, texto, citaID string, 
 }
 
 func (e enviadorModulos) Medio(ctx context.Context, chat string, a envio.Adjunto, citaID string) error {
-	r, err := e.s.envio.EnviarMedioAuto(ctx, chat, a, citaID)
+	r, err := e.s.envio.EnviarMedioAuto(almacen.ConEtiqueta(ctx, "modulo"), chat, a, citaID)
 	if err != nil {
 		return err
 	}

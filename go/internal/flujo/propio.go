@@ -15,6 +15,8 @@ import (
 type OpcionPropia struct {
 	Texto     string `json:"texto"`
 	Respuesta string `json:"respuesta"`
+	// Adjuntos de la respuesta de esta opción (hasta 3): el mismo servicio de archivos cifrados de los mensajes automáticos.
+	Adjuntos []AdjuntoMenu `json:"adjuntos,omitempty"`
 }
 
 // DatosPropio son los datos que llena la pantalla "Comandos propios".
@@ -27,8 +29,9 @@ type DatosPropio struct {
 	Grupos      bool           `json:"grupos"` // en cualquier grupo donde el bot responde
 	OcultoAyuda bool           `json:"ocultoAyuda,omitempty"`
 	Opciones    []OpcionPropia `json:"opciones,omitempty"`
-	// Adjuntos queda reservado: los adjuntos de mensajes automáticos llegan con el Bloque D y se podrán reutilizar aquí.
-	Adjuntos []string `json:"adjuntos,omitempty"`
+	// Adjuntos (hasta 3) de la respuesta del comando cuando no tiene opciones; con opciones, cada opción lleva los suyos. Son los mismos
+	// archivos cifrados de los mensajes automáticos (almacen.GuardarAdjuntoDeArchivo).
+	Adjuntos []AdjuntoMenu `json:"adjuntos,omitempty"`
 }
 
 // NombreComandoValido revisa que el nombre sea una sola palabra de letras y números.
@@ -55,8 +58,14 @@ func (p *DatosPropio) Validar() error {
 		return err
 	}
 	p.Texto = strings.TrimSpace(p.Texto)
-	if p.Texto == "" {
+	if p.Texto == "" && !(len(p.Opciones) == 0 && len(p.Adjuntos) > 0) {
 		return fmt.Errorf("escribe qué responde el comando")
+	}
+	if len(p.Adjuntos) > 3 {
+		return fmt.Errorf("un comando puede llevar hasta 3 archivos")
+	}
+	if len(p.Adjuntos) > 0 && len(p.Opciones) > 0 {
+		return fmt.Errorf("con opciones, los archivos van en cada opción, no en el texto principal")
 	}
 	if len([]rune(p.Texto)) > 2000 {
 		return fmt.Errorf("el texto es muy largo (máximo 2000 letras)")
@@ -77,8 +86,11 @@ func (p *DatosPropio) Validar() error {
 	for i := range p.Opciones {
 		p.Opciones[i].Texto = strings.TrimSpace(p.Opciones[i].Texto)
 		p.Opciones[i].Respuesta = strings.TrimSpace(p.Opciones[i].Respuesta)
-		if p.Opciones[i].Texto == "" || p.Opciones[i].Respuesta == "" {
+		if p.Opciones[i].Texto == "" || (p.Opciones[i].Respuesta == "" && len(p.Opciones[i].Adjuntos) == 0) {
 			return fmt.Errorf("la opción %d necesita un texto y una respuesta", i+1)
+		}
+		if len(p.Opciones[i].Adjuntos) > 3 {
+			return fmt.Errorf("la opción %d puede llevar hasta 3 archivos", i+1)
 		}
 	}
 	return nil
@@ -98,7 +110,7 @@ func (d *Def) ConstruirPropio() error {
 	d.Alcance = Alcance{Privados: p.Privados, TodosGrupos: p.Grupos}
 	d.Horario = Horario{}
 	if len(p.Opciones) == 0 {
-		d.Pasos = []Paso{{ID: "r1", Tipo: PasoRespuesta, Texto: p.Texto}}
+		d.Pasos = []Paso{{ID: "r1", Tipo: PasoRespuesta, Texto: p.Texto, Adjuntos: p.Adjuntos}}
 		d.Inicio = "r1"
 		return nil
 	}
@@ -107,7 +119,7 @@ func (d *Def) ConstruirPropio() error {
 	for i, o := range p.Opciones {
 		id := fmt.Sprintf("o%d", i+1)
 		d.Pasos[0].Opciones = append(d.Pasos[0].Opciones, Opcion{Texto: o.Texto, Destino: id})
-		d.Pasos = append(d.Pasos, Paso{ID: id, Tipo: PasoRespuesta, Texto: o.Respuesta})
+		d.Pasos = append(d.Pasos, Paso{ID: id, Tipo: PasoRespuesta, Texto: o.Respuesta, Adjuntos: o.Adjuntos})
 	}
 	d.Inicio = "m1"
 	return nil
