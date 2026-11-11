@@ -287,14 +287,45 @@ class ChatEscribirUiTest {
         regla.esperaTexto("palabra**")
     }
 
+    private fun desdeHace(seg: Long) { Apoyo.ctx().getSharedPreferences("vistos", android.content.Context.MODE_PRIVATE).edit().putLong("_base", ahora - seg).commit() }
+
     @Test fun separadorDeSinLeerYBotonParaBajar() {
-        val muchos = (0 until 80).map { Apoyo.msgJson("m$it", ahora + 400 - it, texto = "mensaje $it", remitente = "Ana") }
+        desdeHace(1000)
+        // Más mensajes que lo que cabe en pantalla, todos sin leer (pero menos que una página: nada se carga después y la lista no se mueve).
+        val muchos = (0 until 30).map { Apoyo.msgJson("m$it", ahora - 500 + (30 - it), texto = "mensaje $it", remitente = "Ana") }
         motor.mensajes = Apoyo.arreglo(*muchos.toTypedArray())
         pantalla()
-        regla.esperaEtiqueta("lista_chat")
+        regla.esperaTexto("30 mensajes sin leer")
+        assertTrue(llamo("noLeidos:$jid:${ahora - 1000}"))
+        // La lista abre ya colocada en el primer mensaje sin leer: la línea está a la vista (sin desplazarse a mano).
+        regla.onNodeWithTag("sin_leer", useUnmergedTree = true).assertIsDisplayed()
+        regla.onNodeWithTag("lista_chat").assertIsDisplayed()
+    }
+
+    @Test fun elConteoRealPasaDeLaPrimeraPaginaDe40() {
+        desdeHace(1000)
+        val muchos = (0 until 80).map { Apoyo.msgJson("m$it", ahora - 500 + (80 - it), texto = "mensaje $it", remitente = "Ana") }
+        motor.mensajes = Apoyo.arreglo(*muchos.toTypedArray())
+        pantalla()
+        regla.esperaTexto("80 mensajes sin leer")
+        assertTrue(llamo("noLeidos:$jid:${ahora - 1000}"))
+    }
+
+    @Test fun elContadorDeSinLeerUsaElConteoDeLaBaseAunqueElChatSeaEnorme() {
+        desdeHace(1000)
+        val muchos = (0 until 30).map { Apoyo.msgJson("m$it", ahora - 500 + (30 - it), texto = "mensaje $it", remitente = "Ana") }
+        motor.mensajes = Apoyo.arreglo(*muchos.toTypedArray())
+        motor.noLeidosReales = 12_345
+        pantalla()
+        regla.esperaTexto("12345 mensajes sin leer")
+    }
+
+    @Test fun conUnSoloSinLeerDiceUnMensajeSinLeer() {
+        desdeHace(1000)
+        motor.mensajes = Apoyo.arreglo(Apoyo.msgJson("a", ahora - 300, texto = "viejo", mio = true), Apoyo.msgJson("b", ahora - 200, texto = "nuevo", remitente = "Ana"))
+        pantalla()
         regla.esperaEtiqueta("sin_leer")
-        // la primera página es de 40: la línea cuenta lo cargado
-        regla.onNodeWithText("40 mensajes sin leer", useUnmergedTree = true).assertIsDisplayed()
+        regla.onNodeWithText("1 mensaje sin leer", useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test fun conEscribirDesdeLaAppApagadoNoHayCajaDeMensaje() {

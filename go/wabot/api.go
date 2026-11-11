@@ -133,6 +133,16 @@ func ListarMensajes(botID int64, chat string, antesTS int64, antesID string, lim
 
 // MensajesPorId devuelve (JSON) los mensajes pedidos de un chat (idsJSON es un arreglo de ids), con una consulta por lote.
 // Los que ya no existen no aparecen. La pantalla lo usa para refrescar mensajes ya cargados (recibos, reacciones, ediciones…).
+// ContarNoLeidos devuelve cuántos mensajes de otras personas hay en el chat después de `desdeTS` (segundos): un COUNT sobre un
+// índice, sin recorrer el chat. Es el número real de "mensajes sin leer", sin el tope de la primera página.
+func ContarNoLeidos(botID int64, chat string, desdeTS int64) (int, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return 0, err
+	}
+	return a.ContarNoLeidos(botID, chat, desdeTS)
+}
+
 func MensajesPorId(botID int64, chat, idsJSON string) (string, error) {
 	a, err := almacenAbierto()
 	if err != nil {

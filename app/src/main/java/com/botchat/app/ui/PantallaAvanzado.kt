@@ -80,7 +80,9 @@ fun PantallaAvanzado(
     val haptica = rememberHaptica()
     val modoTema by ajustes.modoTema.collectAsState()
     val dinamico by ajustes.colorDinamico.collectAsState()
-    val reducir by ajustes.reducirAnimaciones.collectAsState()
+    val animModo by ajustes.animaciones.collectAsState()
+    val pausa by ajustes.pausaBotMin.collectAsState()
+    var ocultas by remember { mutableStateOf(false) }
     val registro by BotState.registro.collectAsState()
     var confirmaEliminar by remember { mutableStateOf(false) }
 
@@ -100,11 +102,36 @@ fun PantallaAvanzado(
                     }
                 }
                 Interruptor("Color del sistema", if (Build.VERSION.SDK_INT >= 31) "Usa los colores de tu fondo de pantalla en vez de los de Bot Chat" else "Disponible desde Android 12", dinamico, Build.VERSION.SDK_INT >= 31, Ico.Espacio) { haptica(Toque.Suave); ajustes.fijarColorDinamico(it) }
-                Interruptor("Reducir animaciones", "Todo cambia al instante, sin movimiento", reducir, true, Ico.Actualizar) { haptica(Toque.Suave); ajustes.fijarReducirAnimaciones(it) }
+                Column(Modifier.padding(horizontal = Esp.l, vertical = Esp.s), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
+                    Text("Animaciones de pantallas", style = MaterialTheme.typography.bodyLarge)
+                    val modosAnim = listOf(ModoAnim.NATURAL to "Natural", ModoAnim.REDUCIDAS to "Reducidas", ModoAnim.NINGUNA to "Ninguna")
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().testTag("anim_modo")) {
+                        modosAnim.forEachIndexed { i, (m, t) ->
+                            SegmentedButton(animModo == m, { haptica(Toque.Suave); ajustes.fijarAnimaciones(m) }, SegmentedButtonDefaults.itemShape(i, modosAnim.size), modifier = Modifier.testTag("anim_${m.name.lowercase()}")) { Text(t) }
+                        }
+                    }
+                    Text(
+                        when (animModo) {
+                            ModoAnim.NATURAL -> "Las pantallas se deslizan como en WhatsApp."
+                            ModoAnim.REDUCIDAS -> "Solo fundidos cortos, sin movimiento."
+                            ModoAnim.NINGUNA -> "Todo cambia al instante."
+                        },
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             Seccion("Funciones") {
                 Fila("Funciones", "Apagar motor, escritura, avisos y más sin reinstalar", Ico.Ajustes) { Button(alFunciones, Modifier.testTag("abrir_funciones")) { Text("Abrir") } }
                 Fila("Actividad del bot", "Qué llegó, qué respondió y por qué no", Ico.Estadisticas) { OutlinedButton(alActividad, Modifier.testTag("abrir_actividad")) { Text("Ver") } }
+            }
+            Seccion("Opciones ocultas") {
+                Fila("Mostrar opciones ocultas", "Ajustes finos que casi nadie necesita", Ico.Ajustes) { Switch(ocultas, { haptica(Toque.Suave); ocultas = it }, Modifier.testTag("sw_ocultas")) }
+                if (ocultas) {
+                    Deslizador(
+                        "Pausa del bot cuando escribo yo", if (pausa == 0) "Ninguna" else "$pausa min", pausa.toFloat(), 0f..120f, 11,
+                        "Normalmente 0: si contesto yo a un mensaje, el bot solo cancela su respuesta pendiente a ese mensaje y sigue atendiendo al resto. Con un valor mayor, el bot calla en ese chat este tiempo.",
+                    ) { ajustes.fijarPausaBotMin((it / 10f).toInt() * 10) }
+                }
             }
             Seccion("Mantenimiento") {
                 Fila("Espacio", "Qué ocupa cada chat y cómo liberarlo", Ico.Espacio) { Button(alAbrirEspacio) { Text("Abrir") } }

@@ -154,10 +154,11 @@ func (s *estado) armar() {
 	s.flujo = s.nuevoFlujo()
 	s.motor = motor.Nuevo(motor.Config{
 		BotID: s.botID, Alm: alm, Decisor: s.decisor(), Enviador: enviadorMotor{s}, Log: s.log,
-		Activo: motorActivo.Load, VentanaAntigua: func() time.Duration { return time.Duration(ventanaAntiguaMin.Load()) * time.Minute },
+		Activo: motorActivo.Load, Firma: firmaActual, VentanaAntigua: func() time.Duration { return time.Duration(ventanaAntiguaMin.Load()) * time.Minute },
 		AlFrenar: func() { s.avisaCambio("motor:freno") },
 		AlHumano: func(chat, aviso string) { s.avisaCambio("humano:" + chat) },
 	})
+	s.envio.AlEscribirYo = func(chat string) { s.alEscribirYo(chat, time.Now()) }
 	s.motor.Iniciar(s.ctx)
 	s.descargas.Iniciar(s.ctx)
 	s.fotos.Iniciar(s.ctx)
@@ -410,11 +411,11 @@ func (s *estado) esPropio(j types.JID) bool {
 	return !s.cli.Store.LID.IsEmpty() && j.User == s.cli.Store.LID.User
 }
 
-// pausaPorTelefono: si yo escribo desde mi teléfono en un chat, el bot calla ahí unos minutos. Lo que mandó esta app
-// o el motor no cuenta (sus IDs se conocen), para que el bot no se pause solo.
+// pausaPorTelefono: si yo escribo desde mi teléfono en un chat, lo que el bot tenía pendiente para ese mensaje se cancela, la
+// conversación de menú queda "intervenida" y, si hay una pausa configurada (por defecto 0 = ninguna), el bot calla ahí unos
+// minutos. Lo que mandó esta app o el motor no cuenta (sus IDs se conocen), para que el bot no se cancele ni se pause solo.
 func (s *estado) pausaPorTelefono(v *events.Message) {
-	min := pausaTrasEscribirMin.Load()
-	if !v.Info.IsFromMe || min <= 0 || time.Since(v.Info.Timestamp) > 2*time.Minute {
+	if !v.Info.IsFromMe || time.Since(v.Info.Timestamp) > 2*time.Minute {
 		return
 	}
 	c := ingesta.Clasificar(v)
@@ -425,8 +426,19 @@ func (s *estado) pausaPorTelefono(v *events.Message) {
 	if !ok || s.envio.EsEnvioPropio(chat, string(v.Info.ID)) {
 		return
 	}
-	_ = alm.PausarBot(s.botID, chat, time.Now().Add(time.Duration(min)*time.Minute).Unix())
-	s.log("El bot calla en un chat porque escribiste desde el teléfono.")
+	s.alEscribirYo(chat, v.Info.Timestamp)
+	if min := pausaTrasEscribirMin.Load(); min > 0 {
+		_ = alm.PausarBot(s.botID, chat, time.Now().Add(time.Duration(min)*time.Minute).Unix())
+		s.log("El bot calla en un chat porque escribiste desde el teléfono.")
+	}
+}
+
+// alEscribirYo: escribí yo (a mano) en ese chat a la hora ts.
+func (s *estado) alEscribirYo(chat string, ts time.Time) {
+	if s.motor != nil {
+		s.motor.Intervino(chat, ts)
+	}
+	alm.MarcarIntervencion(s.botID, chat)
 }
 
 // refrescarNombres vuelve a leer la agenda cuando deja de haber cambios por unos segundos.

@@ -59,6 +59,16 @@ class MotorFalso : Motor {
         val ids = JSONArray(idsJson)
         return JSONArray().also { a -> for (i in 0 until ids.length()) porId[ids.getString(i)]?.let { a.put(JSONObject(it)) } }.toString()
     }
+    /** Si no es null, es lo que devuelve contarNoLeidos (simula un chat más grande que lo cargado); si es null cuenta en `mensajes`. */
+    var noLeidosReales: Long? = null
+    override fun contarNoLeidos(bot: Long, chat: String, desdeTs: Long): Long {
+        llamadas += "noLeidos:$chat:$desdeTs"
+        noLeidosReales?.let { return it }
+        val todos = JSONArray(mensajes)
+        var n = 0L
+        for (i in 0 until todos.length()) { val o = todos.getJSONObject(i); if (!o.optBoolean("esMio") && o.getLong("ts") > desdeTs) n++ }
+        return n
+    }
     var cargaAnteriorActiva = false
     override fun cargaAnterior(si: Boolean) { cargaAnteriorActiva = si }
     override fun crearChatPrueba(bot: Long, cuantos: Long): String { llamadas += "crearPrueba:$cuantos"; return "120363999999999999@g.us" }
@@ -161,7 +171,11 @@ class MotorFalso : Motor {
     override fun configurarMotor(activo: Boolean, ventanaMin: Long) { llamadas += "motor:$activo:$ventanaMin" }
     override fun actividadMotor(bot: Long, limite: Long) = actividad
     override fun botEnChat(bot: Long, chat: String, activo: Boolean) { llamadas += "botChat:$activo" }
-    override fun pausarBotEnChat(bot: Long, chat: String, minutos: Long) { llamadas += "pausarBot:$minutos" }
+    override fun pausarBotEnChat(bot: Long, chat: String, minutos: Long) {
+        llamadas += "pausarBot:$minutos"
+        // como el motor real: el estado del chat refleja la pausa (0 = reactivado)
+        estadoChat = JSONObject(estadoChat).put("botPausaHasta", if (minutos > 0) System.currentTimeMillis() / 1000 + minutos * 60 else 0L).put("pausaHumano", false).toString()
+    }
     override fun olvidarMensaje(bot: Long, chat: String, id: String) { llamadas += "olvidar:$chat:$id" }
     override fun establecerZona(id: String) { zona = id }
     override fun estadisticasChat(bot: Long, chat: String) = resumenChat

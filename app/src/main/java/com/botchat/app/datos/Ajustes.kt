@@ -64,9 +64,20 @@ class Ajustes private constructor(ctx: Context) {
     val colorDinamico: StateFlow<Boolean> = _dinamico
     fun fijarColorDinamico(v: Boolean) { p.edit().putBoolean("color_dinamico", v).apply(); _dinamico.value = v }
 
-    private val _reducir = MutableStateFlow(p.getBoolean("reducir_anim", false))
-    val reducirAnimaciones: StateFlow<Boolean> = _reducir
-    fun fijarReducirAnimaciones(v: Boolean) { p.edit().putBoolean("reducir_anim", v).apply(); _reducir.value = v }
+    /**
+     * Animaciones de pantallas (Avanzado): Natural, Reducidas (solo fundidos cortos) o Ninguna. Reemplaza al antiguo interruptor
+     * "reducir_anim" de la 0.4.x: quien lo tenía encendido pasa a Reducidas (la migración se hace una sola vez al leer).
+     */
+    private fun animInicial(): com.botchat.app.ui.ModoAnim {
+        p.getString("anim_modo", null)?.let { n -> runCatching { com.botchat.app.ui.ModoAnim.valueOf(n) }.getOrNull()?.let { return it } }
+        val m = if (p.getBoolean("reducir_anim", false)) com.botchat.app.ui.ModoAnim.REDUCIDAS else com.botchat.app.ui.ModoAnim.NATURAL
+        p.edit().putString("anim_modo", m.name).remove("reducir_anim").apply()
+        return m
+    }
+
+    private val _animaciones = MutableStateFlow(animInicial())
+    val animaciones: StateFlow<com.botchat.app.ui.ModoAnim> = _animaciones
+    fun fijarAnimaciones(m: com.botchat.app.ui.ModoAnim) { p.edit().putString("anim_modo", m.name).apply(); _animaciones.value = m }
 
     // ---- funciones que se pueden apagar sin reinstalar (Avanzado → Funciones) ----
     private val _conservar = MutableStateFlow(p.getBoolean("conservar_elim", true))
@@ -94,10 +105,22 @@ class Ajustes private constructor(ctx: Context) {
     val marcarLeidoAlAbrir: StateFlow<Boolean> = _leido
     fun fijarMarcarLeidoAlAbrir(v: Boolean) { p.edit().putBoolean("marcar_leido", v).apply(); _leido.value = v }
 
-    private val _pausaBot = MutableStateFlow(p.getInt("pausa_bot_min", 30))
-    /** Minutos que el bot calla en un chat después de que escribo yo (a mano o desde el teléfono). */
+    private val _pausaBot = MutableStateFlow(p.getInt("pausa_bot_min", 0))
+    /**
+     * Minutos que el bot calla en un chat después de que escribo yo (a mano o desde el teléfono). Por defecto 0 (ninguno): si ya contesté
+     * yo, solo se cancela la respuesta pendiente de ese mensaje. Opción oculta en Avanzado.
+     */
     val pausaBotMin: StateFlow<Int> = _pausaBot
     fun fijarPausaBotMin(v: Int) { p.edit().putInt("pausa_bot_min", v).apply(); _pausaBot.value = v; aplicarAGo() }
+
+    private val _firmaActiva = MutableStateFlow(p.getBoolean("firma_activa", false))
+    /** Agregar una firma al final de las respuestas automáticas del bot (apagado por defecto; nunca se agrega a lo que escribo yo). */
+    val firmaActiva: StateFlow<Boolean> = _firmaActiva
+    fun fijarFirmaActiva(v: Boolean) { p.edit().putBoolean("firma_activa", v).apply(); _firmaActiva.value = v; aplicarAGo() }
+
+    private val _firmaTexto = MutableStateFlow(p.getString("firma_texto", "") ?: "")
+    val firmaTexto: StateFlow<String> = _firmaTexto
+    fun fijarFirmaTexto(v: String) { p.edit().putString("firma_texto", v).apply(); _firmaTexto.value = v; aplicarAGo() }
 
     private val _antiguedad = MutableStateFlow(p.getInt("antiguedad_min", 10))
     /** Minutos: lo que llegó hace más que esto no se responde. */
@@ -179,6 +202,7 @@ class Ajustes private constructor(ctx: Context) {
         runCatching { Wabot.configurarVerUnaVez(_verDias.value.toLong()) }
         runCatching { Wabot.configurarMotor(_motorAuto.value, _antiguedad.value.toLong()) }
         runCatching { Wabot.configurarFlujo(_expiraFlujo.value.toLong()) }
+        runCatching { Wabot.configurarFirma(if (_firmaActiva.value) _firmaTexto.value.trim() else "") }
     }
 
     companion object {

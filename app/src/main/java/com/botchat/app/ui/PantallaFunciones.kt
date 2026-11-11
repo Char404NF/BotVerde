@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -45,7 +47,8 @@ fun PantallaFunciones(ajustes: Ajustes, alVolver: () -> Unit) {
     val conservar by ajustes.conservarEliminados.collectAsState()
     val enLinea by ajustes.mostrarEnLinea.collectAsState()
     val leido by ajustes.marcarLeidoAlAbrir.collectAsState()
-    val pausa by ajustes.pausaBotMin.collectAsState()
+    val firmaOn by ajustes.firmaActiva.collectAsState()
+    val firmaTxt by ajustes.firmaTexto.collectAsState()
     val verDias by ajustes.verUnaVezDias.collectAsState()
     val antiguedad by ajustes.antiguedadMin.collectAsState()
     val expira by ajustes.expiraFlujoMin.collectAsState()
@@ -69,7 +72,13 @@ fun PantallaFunciones(ajustes: Ajustes, alVolver: () -> Unit) {
                 }
                 Interruptor("Conservar eliminados", "Guardar lo que otros eliminan para poder verlo", conservar, true, Ico.Candado) { haptica(Toque.Suave); ajustes.fijarConservarEliminados(it) }
                 Interruptor("Marcar como leído al abrir", "Al abrir un chat se avisa “leído”. Si en WhatsApp tienes desactivadas las confirmaciones de lectura, nunca se envían.", leido, true, Ico.Listo) { haptica(Toque.Suave); ajustes.fijarMarcarLeidoAlAbrir(it) }
-                Deslizador("Pausa del bot cuando escribo yo", if (pausa == 0) "Nunca" else "$pausa min", pausa.toFloat(), 0f..120f, 7, "Si escribes en un chat (desde la app o desde el teléfono), el bot calla ahí este tiempo.") { ajustes.fijarPausaBotMin((it / 10f).toInt() * 10) }
+                Interruptor("Firma en las respuestas automáticas", "Agrega un texto al final de lo que responde el bot (nunca de lo que escribes tú). Apagada por defecto.", firmaOn, true, Ico.Compartir) { haptica(Toque.Suave); ajustes.fijarFirmaActiva(it) }
+                if (firmaOn) {
+                    androidx.compose.material3.OutlinedTextField(
+                        firmaTxt, { ajustes.fijarFirmaTexto(it.take(120)) }, Modifier.fillMaxWidth().padding(horizontal = Esp.l).testTag("firma_texto"),
+                        label = { Text("Texto de la firma") }, placeholder = { Text("Respuesta automática") }, singleLine = true,
+                    )
+                }
                 Deslizador("Días para abrir un “ver una vez”", if (verDias == 1) "1 día" else "$verDias días", verDias.toFloat(), 1f..30f, 28, "Si no lo abres a tiempo, se borra y queda como “Expiró”.") { ajustes.fijarVerUnaVezDias(it.toInt().coerceIn(1, 30)) }
                 Interruptor("Mostrar en línea", "Con un chat abierto, tus contactos pueden verte “en línea”. Puede hacer que tu teléfono principal deje de avisarte de mensajes mientras tanto.", enLinea, true, Ico.Info) { haptica(Toque.Suave); ajustes.fijarMostrarEnLinea(it) }
             }

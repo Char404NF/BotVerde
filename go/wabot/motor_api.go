@@ -2,6 +2,7 @@ package wabot
 
 import (
 	"context"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -30,6 +31,16 @@ func ConfigurarMotor(activo bool, ventanaMin int) {
 		ventanaMin = 10
 	}
 	ventanaAntiguaMin.Store(int32(ventanaMin))
+}
+
+var firmaBot atomic.Value // string: texto opcional al final de las respuestas automáticas
+
+// ConfigurarFirma fija el texto que se agrega al final de lo que responde el bot (no de lo que escribo yo). "" = sin firma.
+func ConfigurarFirma(texto string) { firmaBot.Store(strings.TrimSpace(texto)) }
+
+func firmaActual() string {
+	f, _ := firmaBot.Load().(string)
+	return f
 }
 
 // ActividadMotor devuelve (JSON) los últimos renglones del registro de actividad: qué llegó, qué coincidió, qué se respondió

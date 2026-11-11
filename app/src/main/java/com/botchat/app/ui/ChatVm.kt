@@ -35,6 +35,9 @@ import kotlinx.coroutines.launch
 /** Lo que dura la animación de entrada de la pantalla (con un margen): hasta entonces no se hace trabajo que no se vea. */
 const val ENTRADA_MS = 380L
 
+/** Duración de "Tomar el control": un año, es decir, hasta que yo lo reanude. */
+const val MINUTOS_CONTROL = 60 * 24 * 365
+
 object ChatAbierto {
     @Volatile var jid: String = ""
 }
@@ -107,8 +110,18 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
     /** Color de los enlaces del tema, para dejar el texto formateado listo antes de dibujar. */
     @Volatile var colorTexto: Color = Color.Unspecified
 
+    /** Mensajes sin leer al abrir, contados en la base (COUNT indexado), no solo en la página cargada; -1 mientras llega. */
+    @Volatile private var sinLeerAbierto = -1
+    @Volatile private var aperturaTs = 0L
+
+    private fun armar(ms: List<Msg>, esGrupo: Boolean) = elementos(ms, esGrupo, vistoAntes, sinLeerAbierto, aperturaTs)
+
     /** Se completa cuando termina la animación de entrada: hasta entonces solo se carga lo que se ve. */
     private val entrada = CompletableDeferred<Unit>()
+
+    /** Verdadero cuando ya llegó la primera página leída de la base (no solo la copia en memoria de la vez anterior): ahí se sabe dónde está el primer sin leer. */
+    var primeraCargaLista by mutableStateOf(false)
+        private set
 
     /** Verdadero cuando ya corrió el trabajo diferido (leído, presencia, participantes, extras). */
     var diferidoListo by mutableStateOf(false)
@@ -122,6 +135,7 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
         ajustes.marcarVisto(jid)
         if (antiguo) {
             entrada.complete(Unit)
+            primeraCargaLista = true
             recargarAntiguo()
             cargarExtras(conBorrador = true)
             diferidoListo = true
@@ -182,6 +196,13 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
                 actualizar { enCache }
             }
         }
+        viewModelScope.launch {
+            // Margen de 2 min por si el reloj del servidor adelanta al del teléfono: lo que llega en esos minutos se ve en vivo, no cuenta como "sin leer".
+            val ahoraS = System.currentTimeMillis() / 1000 + 120
+            val total = runCatching { Repo.contarNoLeidos(botId, jid, vistoAntes) }.getOrNull() ?: return@launch
+            aperturaTs = ahoraS; sinLeerAbierto = total
+            recalcularElementos()
+        }
         viewModelScope.launch { chat = runCatching { Repo.chat(botId, jid) }.getOrNull(); recalcularElementos() }
         viewModelScope.launch { borradorInicial = runCatching { Repo.borrador(botId, jid) }.getOrDefault("") }
         viewModelScope.launch {
@@ -190,9 +211,10 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
                 CachePaginas.guardar(botId, jid, m)
                 if (iniciales == null) iniciales = m.mapTo(HashSet()) { it.id }
                 hayMas = m.size >= pagina
-                actualizar { MezclaMensajes.mezclar(it ?: emptyList(), m, pagina) }
+                actualizar(frescas = true) { MezclaMensajes.mezclar(it ?: emptyList(), m, pagina) }
             } catch (e: Exception) {
                 if (mensajes == null) { mensajes = emptyList(); elementos = emptyList() }
+                primeraCargaLista = true
                 aviso = e.message
             }
         }
@@ -210,7 +232,7 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
      * Aplica un cambio a la lista: la mezcla y el armado de renglones corren en un hilo de fondo, de uno en uno, y el resultado
      * (la lista y los renglones juntos) se publica de golpe. Si nada cambió, no se toca nada.
      */
-    private suspend fun actualizar(cambio: (List<Msg>?) -> List<Msg>) {
+    private suspend fun actualizar(frescas: Boolean = false, cambio: (List<Msg>?) -> List<Msg>) {
         candado.withLock {
             val antes = mensajes
             val esGrupo = chat?.esGrupo == true
@@ -219,11 +241,12 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
                 val d = cambio(antes)
                 if (d === antes && antes != null) return@withContext d to null
                 CacheTexto.precalentar(d, color)
-                d to elementos(d, esGrupo, vistoAntes)
+                d to armar(d, esGrupo)
             }
-            if (el == null) return
+            if (el == null) { if (frescas) primeraCargaLista = true; return }
             mensajes = despues
             elementos = el
+            if (frescas) primeraCargaLista = true
         }
     }
 
@@ -231,7 +254,7 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
         candado.withLock {
             val ms = mensajes ?: return
             val esGrupo = chat?.esGrupo == true
-            elementos = withContext(Dispatchers.Default) { elementos(ms, esGrupo, vistoAntes) }
+            elementos = withContext(Dispatchers.Default) { armar(ms, esGrupo) }
         }
     }
 
@@ -283,7 +306,7 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
                 val m = Repo.mensajes(botId, jid, limite = cuantos)
                 if (iniciales == null) iniciales = m.mapTo(HashSet()) { it.id }
                 mensajes = m
-                elementos = elementos(m, c?.esGrupo == true, vistoAntes)
+                elementos = armar(m, c?.esGrupo == true)
                 hayMas = m.size >= cuantos
                 ajustes.marcarVisto(jid)
                 if (c?.esGrupo == true && participantes.isEmpty()) cargarParticipantes()
@@ -438,6 +461,16 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
     }
 
     /** Quita la pausa del bot en este chat (la de escribir yo o la de "hablar con una persona"). */
+    /** "Tomar el control": el bot calla en este chat hasta que se reanude (se reutiliza la pausa del bot con una duración de un año). */
+    fun tomarControl() {
+        viewModelScope.launch {
+            runCatching {
+                Repo.pausarBotEnChat(botId, jid, MINUTOS_CONTROL)
+                estadoChat = estadoChat.copy(botPausaHasta = System.currentTimeMillis() / 1000 + MINUTOS_CONTROL * 60L)
+            }.onFailure { aviso = it.message }
+        }
+    }
+
     fun reactivarBot() {
         viewModelScope.launch { runCatching { Repo.pausarBotEnChat(botId, jid, 0); estadoChat = estadoChat.copy(botPausaHasta = 0, pausaHumano = false) }.onFailure { aviso = it.message } }
     }

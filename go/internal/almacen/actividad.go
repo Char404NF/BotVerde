@@ -22,6 +22,8 @@ const (
 	MotGrupo      = "grupo sin mención"
 	MotChatPausa  = "chat en pausa"
 	MotRepetido   = "repetido"
+	MotYaContesto = "ya contestaste tú"
+	MotIntervino  = "intervención manual"
 	MotCola       = "cola llena"
 	MotFreno      = "freno"
 	MotNoTexto    = "no es texto"

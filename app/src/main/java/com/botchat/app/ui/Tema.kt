@@ -39,6 +39,12 @@ import androidx.compose.ui.unit.sp
 /** Verdadero si el usuario quitó las animaciones en el sistema (Accesibilidad → Quitar animaciones). */
 val LocalReducirMovimiento = compositionLocalOf { false }
 
+/** Animaciones de pantallas (Avanzado): Natural, Reducidas (solo fundidos cortos) o Ninguna (sin transiciones). */
+enum class ModoAnim { NATURAL, REDUCIDAS, NINGUNA }
+
+/** Modo efectivo de las transiciones de pantalla: si el sistema quitó las animaciones es Ninguna sin importar el ajuste. */
+val LocalModoAnim = compositionLocalOf { ModoAnim.NATURAL }
+
 /** Lee el ajuste del sistema; se vuelve a leer cada vez que se llama (por ejemplo al volver a la app). */
 fun movimientoReducido(ctx: android.content.Context): Boolean =
     runCatching { Settings.Global.getFloat(ctx.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }.getOrDefault(false)
@@ -134,7 +140,7 @@ fun BotChatTema(contenido: @Composable () -> Unit) {
     val ajustes = remember { com.botchat.app.datos.Ajustes.get(ctx) }
     val modo by ajustes.modoTema.collectAsState()
     val dinamico by ajustes.colorDinamico.collectAsState()
-    val reducirAjuste by ajustes.reducirAnimaciones.collectAsState()
+    val modoAjuste by ajustes.animaciones.collectAsState()
     var reducirSistema by remember { mutableStateOf(movimientoReducido(ctx)) }
     androidx.compose.runtime.DisposableEffect(ctx) {
         val obs = object : android.database.ContentObserver(android.os.Handler(android.os.Looper.getMainLooper())) {
@@ -146,7 +152,8 @@ fun BotChatTema(contenido: @Composable () -> Unit) {
     val esquema = esquemaDeColores(modo, dinamico)
     val oscuro = esquema.background.luminance() < 0.5f
     val extra = if (oscuro) ColoresApp(Turquesa, Ambar, Color(0xFF4A2A00), Color(0xFF6A3F00)) else ColoresApp(Color(0xFF00727A), Color(0xFF8A5100), Color.White, Color(0xFFFFDCBA))
-    CompositionLocalProvider(LocalReducirMovimiento provides (reducirSistema || reducirAjuste), LocalColoresApp provides extra) {
+    val modoAnim = if (reducirSistema) ModoAnim.NINGUNA else modoAjuste
+    CompositionLocalProvider(LocalReducirMovimiento provides (modoAnim != ModoAnim.NATURAL), LocalModoAnim provides modoAnim, LocalColoresApp provides extra) {
         MaterialTheme(colorScheme = esquema, typography = Tipografia, shapes = Formas, content = contenido)
     }
 }

@@ -74,7 +74,7 @@ private data class Destino(val ruta: String, val titulo: String, val icono: andr
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -> Unit) -> Unit) {
-    val reducir = LocalReducirMovimiento.current
+    val modo = LocalModoAnim.current
     val bot = vm.bot ?: return
     val ctx = LocalContext.current
     val haptica = rememberHaptica()
@@ -94,20 +94,18 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
 
     fun entre(a: String?, b: String?) = a in RUTAS_PRINCIPALES && b in RUTAS_PRINCIPALES
     fun entra(): AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-        if (reducir) EnterTransition.None
-        else if (entre(initialState.destination.route, targetState.destination.route)) fadeIn(tween(Mov.NORMAL))
-        else fadeIn(tween(Mov.NORMAL)) + slideInHorizontally(tween(Mov.LARGA)) { it / 10 }
+        Transiciones.entra(modo, entre(initialState.destination.route, targetState.destination.route))
     }
+    // El visor de fotos aparece con un fundido sobre el chat: el chat no se mueve de debajo.
+    fun esVisor(r: String?) = r?.startsWith("visor/") == true
     fun sale(): AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-        if (reducir) ExitTransition.None else fadeOut(tween(Mov.CORTA))
+        if (esVisor(targetState.destination.route)) ExitTransition.None else Transiciones.sale(modo, entre(initialState.destination.route, targetState.destination.route))
     }
     fun vuelveEntra(): AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-        if (reducir) EnterTransition.None else fadeIn(tween(Mov.NORMAL))
+        if (esVisor(initialState.destination.route)) EnterTransition.None else Transiciones.vuelveEntra(modo, entre(initialState.destination.route, targetState.destination.route))
     }
     fun vuelveSale(): AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-        if (reducir) ExitTransition.None
-        else if (entre(initialState.destination.route, targetState.destination.route)) fadeOut(tween(Mov.CORTA))
-        else fadeOut(tween(Mov.CORTA)) + slideOutHorizontally(tween(Mov.LARGA)) { it / 10 }
+        Transiciones.vuelveSale(modo, entre(initialState.destination.route, targetState.destination.route))
     }
     fun irA(ruta: String) {
         if (ruta == rutaActual) return
@@ -118,12 +116,12 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
     Scaffold(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         topBar = {
-            AnimatedVisibility(principal, enter = if (reducir) EnterTransition.None else fadeIn(tween(Mov.NORMAL)), exit = if (reducir) ExitTransition.None else fadeOut(tween(Mov.CORTA))) {
+            AnimatedVisibility(principal, enter = Transiciones.fundidoEntra(modo), exit = Transiciones.fundidoSale(modo)) {
                 BarraApp(estadoVisible(estado, corriendo, !bot.vinculado)) { nav.navigate("bot") }
             }
         },
         bottomBar = {
-            AnimatedVisibility(principal, enter = if (reducir) EnterTransition.None else fadeIn(tween(Mov.NORMAL)), exit = if (reducir) ExitTransition.None else fadeOut(tween(Mov.CORTA))) {
+            AnimatedVisibility(principal, enter = Transiciones.fundidoEntra(modo), exit = Transiciones.fundidoSale(modo)) {
                 NavigationBar {
                     destinos.forEach { d ->
                         NavigationBarItem(
@@ -162,8 +160,8 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         )
                     }
                 }
-                composable("visor/{jid}/{id}", enterTransition = { if (reducir) EnterTransition.None else fadeIn(tween(Mov.NORMAL)) }, exitTransition = { ExitTransition.None },
-                    popExitTransition = { if (reducir) ExitTransition.None else fadeOut(tween(Mov.NORMAL)) }) { be ->
+                composable("visor/{jid}/{id}", enterTransition = { Transiciones.fundidoEntra(modo) }, exitTransition = { ExitTransition.None },
+                    popExitTransition = { Transiciones.fundidoSale(modo) }) { be ->
                     val jid = be.arguments?.getString("jid") ?: return@composable
                     val id = be.arguments?.getString("id") ?: return@composable
                     PantallaVisor(bot.id, jid, id, nombreDeChat(bot.id, jid), alCerrar = { nav.popBackStack() }, alIrAlMensaje = { m -> nav.navigate("chat/${enc(jid)}?ir=${enc(m)}") })

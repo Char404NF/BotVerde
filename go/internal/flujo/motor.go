@@ -342,15 +342,21 @@ func (m *Motor) continua(def *Def, s *almacen.Sesion, e entrada, prueba bool) (r
 	}
 	// "0" siempre vuelve al menú principal.
 	if n, ok := numeroDeOpcion(texto); ok && n == 0 {
+		alm.LimpiarIntervencion(s.ID)
 		_ = alm.MoverSesion(bot, s, s.Paso, false, 0, false, ev(p.ID, "0", "valida"), ahora)
 		return m.ejecuta(def, s, def.Inicio, e, prueba)
 	}
 	if o, idx, ok := elegida(p, texto); ok {
+		alm.LimpiarIntervencion(s.ID)
 		_ = alm.MoverSesion(bot, s, p.ID, false, 0, false, ev(p.ID, strconv.Itoa(idx), "valida"), ahora)
 		if o.Destino == "" || def.Paso(o.Destino) == nil {
 			return m.ejecuta(def, s, def.Inicio, e, prueba)
 		}
 		return m.ejecuta(def, s, o.Destino, e, prueba)
+	}
+	// Si intervine a mano en esta conversación, el texto libre es para mí: el bot ni contesta "opción no válida" ni la cuenta como error.
+	if !prueba && alm.SesionIntervenida(s.ID) {
+		return resultado{Omitir: almacen.MotIntervino, Estado: almacen.SesActiva, Paso: p.ID}, nil
 	}
 	// respuesta inválida
 	inv := s.Invalidas + 1

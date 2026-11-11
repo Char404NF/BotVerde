@@ -69,6 +69,7 @@ type Config struct {
 	Log      func(string)
 
 	Activo         func() bool          // interruptor general (Avanzado → Funciones)
+	Firma          func() string        // texto opcional al final de las respuestas automáticas ("" = ninguno; apagado por defecto)
 	VentanaAntigua func() time.Duration // más viejo que esto no se responde (10 min)
 	Ahora          func() time.Time
 	Dormir         func(ctx context.Context, d time.Duration) bool // false si se canceló
@@ -77,7 +78,6 @@ type Config struct {
 	DebounceMax  time.Duration // tope de espera para juntar una ráfaga (6 s)
 	EsperaMin    time.Duration // espera antes de enviar (0,8 s)
 	EsperaMax    time.Duration // (2,5 s)
-	PorCaracter  time.Duration // espera extra por cada letra de la respuesta, como alguien que teclea (25 ms; tope 2,5 s)
 	LimiteGlobal int           // respuestas por minuto en total (20)
 	LimiteChat   int           // respuestas por minuto en un chat (6)
 	MaxCola      int           // mensajes en espera por chat (10)
@@ -103,6 +103,7 @@ type Motor struct {
 	marcasC    map[string][]time.Time
 	fallos     int
 	frenoHasta time.Time
+	manual     map[string]time.Time // chat -> hora de mi último mensaje escrito a mano ahí
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -118,6 +119,7 @@ type carril struct {
 
 type pedido struct {
 	chat, texto, citaID, mencion string
+	ts                           time.Time // hora del mensaje al que se responde
 	res                          chan error
 }
 
@@ -125,6 +127,8 @@ type pedido struct {
 var (
 	ErrLimite = errors.New("límite de envíos")
 	ErrFreno  = errors.New("freno")
+	// ErrYaContesto: yo contesté a mano ese mensaje antes de que saliera la respuesta automática.
+	ErrYaContesto = errors.New("ya contestaste tú")
 )
 
 // Nuevo crea el motor con los valores por defecto donde falte algo.
@@ -162,7 +166,6 @@ func Nuevo(c Config) *Motor {
 	def(&c.DebounceMax, 6*time.Second)
 	def(&c.EsperaMin, 800*time.Millisecond)
 	def(&c.EsperaMax, 2500*time.Millisecond)
-	def(&c.PorCaracter, 25*time.Millisecond)
 	def(&c.Repetido, 5*time.Second)
 	def(&c.FrenoDura, 5*time.Minute)
 	for p, v := range map[*int]int{&c.LimiteGlobal: 20, &c.LimiteChat: 6, &c.MaxCola: 10, &c.FrenoFallos: 5} {
@@ -173,7 +176,7 @@ func Nuevo(c Config) *Motor {
 	if c.Aleatorio == nil {
 		c.Aleatorio = rand.Int63n
 	}
-	return &Motor{c: c, carriles: map[string]*carril{}, repetido: map[string]time.Time{}, salida: make(chan *pedido, 256), marcasC: map[string][]time.Time{}}
+	return &Motor{c: c, carriles: map[string]*carril{}, repetido: map[string]time.Time{}, salida: make(chan *pedido, 256), marcasC: map[string][]time.Time{}, manual: map[string]time.Time{}}
 }
 
 // Iniciar arranca la cola de salida. Hay que llamar a Detener al terminar.
@@ -293,6 +296,53 @@ func (m *Motor) Entrar(msg Mensaje) {
 	}
 }
 
+// yaContesto: escribí yo en ese chat a la hora del mensaje o después (la respuesta automática ya no hace falta).
+func (m *Motor) yaContesto(chat string, ts time.Time) bool {
+	if ts.IsZero() {
+		return false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	t, ok := m.manual[chat]
+	return ok && !t.Before(ts)
+}
+
+// Intervino avisa que escribí yo (a mano, desde la app o desde el teléfono) en un chat a la hora `ts`. Los mensajes que seguían
+// esperando en la fila de ese chat, y los que ya tenían respuesta lista pero sin enviar, se cancelan si son de esa hora o anteriores.
+// No debe llamarse con lo que mandó la app o el motor (eso no es una intervención mía).
+func (m *Motor) Intervino(chat string, ts time.Time) {
+	if ts.IsZero() {
+		ts = m.c.Ahora()
+	}
+	m.mu.Lock()
+	if t, ok := m.manual[chat]; !ok || ts.After(t) {
+		m.manual[chat] = ts
+	}
+	if len(m.manual) > 2000 { // solo importan los recientes
+		for k, t := range m.manual {
+			if ts.Sub(t) > time.Hour {
+				delete(m.manual, k)
+			}
+		}
+	}
+	var quitados []Mensaje
+	if cr := m.carriles[chat]; cr != nil {
+		resto := cr.cola[:0:0]
+		for _, x := range cr.cola {
+			if !x.TS.IsZero() && !ts.Before(x.TS) {
+				quitados = append(quitados, x)
+			} else {
+				resto = append(resto, x)
+			}
+		}
+		cr.cola = resto
+	}
+	m.mu.Unlock()
+	for _, x := range quitados {
+		m.omite(x, almacen.MotYaContesto)
+	}
+}
+
 func tipoChat(msg Mensaje) string {
 	if msg.EsGrupo {
 		return "grupo"
@@ -350,6 +400,10 @@ func (m *Motor) trabajaCarril(chat string) {
 		}
 		m.mu.Lock()
 		var lote []Mensaje
+		if len(cr.cola) == 0 { // contesté yo mientras esperaba: no queda nada que atender
+			m.mu.Unlock()
+			continue
+		}
 		if grupo {
 			lote = []Mensaje{cr.cola[0]}
 			cr.cola = cr.cola[1:]
@@ -380,6 +434,10 @@ func (m *Motor) atiende(chat string, lote []Mensaje) {
 		}
 		return
 	}
+	if m.yaContesto(chat, ultimo.TS) {
+		m.omite(ultimo, almacen.MotYaContesto)
+		return
+	}
 	for _, x := range lote[:len(lote)-1] {
 		m.c.Alm.RegistrarActividad(m.c.BotID, almacen.ActOmitido, "agrupado con el siguiente", chat, "")
 		_ = x
@@ -403,12 +461,21 @@ func (m *Motor) atiende(chat string, lote []Mensaje) {
 	}
 	for _, r := range d.Respuestas {
 		texto := r.Texto
+		if m.c.Firma != nil {
+			if f := strings.TrimSpace(m.c.Firma()); f != "" {
+				texto += "\n\n" + f
+			}
+		}
 		mencion := ""
 		if ultimo.EsGrupo && ultimo.RemitenteWA != "" {
 			mencion = ultimo.RemitenteWA
 			texto = "@" + usuarioDe(mencion) + " " + texto
 		}
-		err := m.enviar(chat, texto, ultimo.ID, mencion)
+		if m.yaContesto(chat, ultimo.TS) {
+			m.omite(ultimo, almacen.MotYaContesto)
+			return
+		}
+		err := m.enviar(chat, texto, ultimo.ID, mencion, ultimo.TS)
 		switch {
 		case err == nil:
 			m.c.Alm.RegistrarActividad(m.c.BotID, almacen.ActRespondio, "", chat, "respondido a "+ultimo.ID)
@@ -418,6 +485,9 @@ func (m *Motor) atiende(chat string, lote []Mensaje) {
 			return
 		case errors.Is(err, ErrFreno):
 			m.omite(ultimo, almacen.MotFreno)
+			return
+		case errors.Is(err, ErrYaContesto):
+			m.omite(ultimo, almacen.MotYaContesto)
 			return
 		default:
 			m.c.Log("No se pudo responder a …" + corto(chat) + ": " + err.Error())
@@ -444,8 +514,8 @@ func usuarioDe(j string) string {
 }
 
 // enviar pone una respuesta en la cola de salida y espera su resultado (así las respuestas de un chat salen en orden).
-func (m *Motor) enviar(chat, texto, citaID, mencion string) error {
-	p := &pedido{chat: chat, texto: texto, citaID: citaID, mencion: mencion, res: make(chan error, 1)}
+func (m *Motor) enviar(chat, texto, citaID, mencion string, ts time.Time) error {
+	p := &pedido{chat: chat, texto: texto, citaID: citaID, mencion: mencion, ts: ts, res: make(chan error, 1)}
 	select {
 	case m.salida <- p:
 	case <-m.ctx.Done():
@@ -512,16 +582,17 @@ func (m *Motor) salirUno(p *pedido) error {
 	if span := int64(m.c.EsperaMax - m.c.EsperaMin); span > 0 {
 		espera += time.Duration(m.c.Aleatorio(span))
 	}
-	// Un poco más de espera si el texto es largo, como alguien que teclea.
-	extra := time.Duration(len([]rune(p.texto))) * m.c.PorCaracter
-	if extra > 2500*time.Millisecond {
-		extra = 2500 * time.Millisecond
-	}
+	// Una sola espera humana (0,8 a 2,5 s) y nada más: sin esperas extra por la longitud del texto.
 	m.c.Enviador.Escribiendo(m.ctx, p.chat, true)
-	ok := m.c.Dormir(m.ctx, espera+extra)
+	ok := m.c.Dormir(m.ctx, espera)
 	if !ok {
 		m.c.Enviador.Escribiendo(m.ctx, p.chat, false)
 		return m.ctx.Err()
+	}
+	// Si mientras esperaba contesté yo a ese mensaje, no se manda.
+	if m.yaContesto(p.chat, p.ts) {
+		m.c.Enviador.Escribiendo(m.ctx, p.chat, false)
+		return ErrYaContesto
 	}
 	err := m.c.Enviador.Enviar(m.ctx, p.chat, p.texto, p.citaID, p.mencion)
 	m.c.Enviador.Escribiendo(m.ctx, p.chat, false)

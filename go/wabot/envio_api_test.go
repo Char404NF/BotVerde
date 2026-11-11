@@ -34,5 +34,13 @@ func TestConfigurarEnvioPausa(t *testing.T) {
 	if pausaTrasEscribir() != 0 {
 		t.Fatal("0 = nunca se pausa")
 	}
-	ConfigurarEnvio(30)
+	ConfigurarEnvio(0) // el valor por defecto de la 0.5.0
+}
+
+func TestLaPausaTrasEscribirEmpiezaEnCero(t *testing.T) {
+	// El init del paquete la deja en 0: el bot no calla por mí.
+	ConfigurarEnvio(0)
+	if pausaTrasEscribirMin.Load() != 0 {
+		t.Fatal("por defecto no hay pausa")
+	}
 }

@@ -101,6 +101,28 @@ class MotorUiTest {
         regla.espera { !hay("aviso_bot_pausado") }
     }
 
+    @Test fun tomarElControlPausaElBotEnElChatYSePuedeReanudar() {
+        motor.chat = Apoyo.chatJson("5@s.whatsapp.net", "Ana").toString()
+        motor.mensajes = Apoyo.arreglo(Apoyo.msgJson("a", ahora, texto = "hola", remitente = "Ana"))
+        regla.setContent { BotChatTema { PantallaChat("5@s.whatsapp.net", {}, {}, {}, {}) } }
+        regla.esperaTexto("hola")
+        assertFalse(hay("aviso_bot_pausado"))
+        regla.onNodeWithContentDescription("Más opciones").performClick()
+        regla.esperaEtiqueta("menu_tomar_control")
+        regla.onNodeWithText("Tomar el control (el bot calla aquí)").assertIsDisplayed()
+        regla.onNodeWithTag("menu_tomar_control").performClick()
+        regla.espera { llamo("pausarBot:${com.botchat.app.ui.MINUTOS_CONTROL}") }
+        regla.esperaEtiqueta("aviso_control")
+        regla.esperaTexto("Tienes el control de este chat: el bot no responde aquí")
+        // el menú ahora ofrece reanudar
+        regla.onNodeWithContentDescription("Más opciones").performClick()
+        regla.esperaEtiqueta("menu_tomar_control")
+        regla.onNodeWithText("Reanudar el bot en este chat").assertIsDisplayed()
+        regla.onNodeWithTag("menu_tomar_control").performClick()
+        regla.espera { llamo("pausarBot:0") }
+        regla.espera { !hay("aviso_bot_pausado") }
+    }
+
     @Test fun conEsperaDeUnaPersonaElAvisoLoDice() {
         motor.chat = Apoyo.chatJson("5@s.whatsapp.net", "Ana").toString()
         motor.mensajes = Apoyo.arreglo(Apoyo.msgJson("a", ahora, texto = "hola", remitente = "Ana"))

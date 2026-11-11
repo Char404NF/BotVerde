@@ -73,6 +73,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -196,15 +197,7 @@ fun PantallaChat(
         irAMensaje(irA)
     }
     // Al abrir con mensajes sin leer, se empieza en el primero.
-    var inicioHecho by remember(jid) { mutableStateOf(false) }
-    LaunchedEffect(msgs != null) {
-        if (msgs == null || inicioHecho) return@LaunchedEffect
-        inicioHecho = true
-        if (irA.isEmpty()) {
-            val idx = items.indexOfFirst { it is Elem.SinLeer }
-            if (idx >= 0) estadoLista.scrollToItem(idx)
-        }
-    }
+    val inicioHecho = remember(jid) { booleanArrayOf(false) }
     val llegandoAlFinal by remember { derivedStateOf { val u = estadoLista.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0; u >= items.size - 6 } }
     LaunchedEffect(llegandoAlFinal, items.size) { if (llegandoAlFinal) vm.cargarMas() }
     val lejosDelFinal by remember { derivedStateOf { estadoLista.firstVisibleItemIndex > 4 } }
@@ -289,6 +282,11 @@ fun PantallaChat(
                                 text = { Text(if (vm.estadoChat.botActivo) "Bot en este grupo: Activo (tocar para pausar)" else "Bot en este grupo: Pausado (tocar para activar)") },
                                 onClick = { menu = false; vm.botActivoEnChat(!vm.estadoChat.botActivo) }, modifier = Modifier.testTag("menu_bot_grupo"),
                             )
+                            val controlTomado = vm.estadoChat.botPausaHasta > System.currentTimeMillis() / 1000
+                            DropdownMenuItem(
+                                text = { Text(if (controlTomado) "Reanudar el bot en este chat" else "Tomar el control (el bot calla aquí)") },
+                                onClick = { menu = false; if (controlTomado) vm.reactivarBot() else vm.tomarControl() }, modifier = Modifier.testTag("menu_tomar_control"),
+                            )
                             DropdownMenuItem(text = { Text(if (vm.estadoChat.silenciado) "Activar notificaciones" else "Silenciar notificaciones") }, onClick = { menu = false; vm.silenciar(!vm.estadoChat.silenciado) }, modifier = Modifier.testTag("menu_silenciar"))
                             DropdownMenuItem(text = { Text("Borrar archivos de este chat") }, onClick = {
                                 menu = false
@@ -350,11 +348,16 @@ fun PantallaChat(
             if (pausaHasta > ahoraS) {
                 Surface(Modifier.align(Alignment.TopCenter).fillMaxWidth().zIndex(2f).testTag("aviso_bot_pausado"), color = MaterialTheme.colorScheme.tertiaryContainer) {
                     Row(Modifier.padding(horizontal = Esp.l, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        val controlTotal = pausaHasta - ahoraS > 30L * 24 * 3600 // "tomar el control" dura un año
                         Text(
-                            if (vm.estadoChat.pausaHumano) "Esperando a una persona: el bot calla aquí hasta las ${horaDe(pausaHasta)}" else "El bot está en pausa en este chat hasta las ${horaDe(pausaHasta)}",
-                            Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            when {
+                                controlTotal -> "Tienes el control de este chat: el bot no responde aquí"
+                                vm.estadoChat.pausaHumano -> "Esperando a una persona: el bot calla aquí hasta las ${horaDe(pausaHasta)}"
+                                else -> "El bot está en pausa en este chat hasta las ${horaDe(pausaHasta)}"
+                            },
+                            Modifier.weight(1f).testTag(if (controlTotal) "aviso_control" else "aviso_pausa_texto"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onTertiaryContainer,
                         )
-                        TextButton({ haptica(Toque.Suave); vm.reactivarBot() }, Modifier.testTag("reactivar_bot")) { Text("Reactivar") }
+                        TextButton({ haptica(Toque.Suave); vm.reactivarBot() }, Modifier.testTag("reactivar_bot")) { Text("Reanudar") }
                     }
                 }
             }
@@ -371,12 +374,28 @@ fun PantallaChat(
                     }
                 }
             }
-            when {
-                msgs == null -> CargaDeMensajes()
-                msgs.isEmpty() -> EstadoVacio(Ico.Documento, "Sin mensajes", "Todavía no hay mensajes en este chat.", Modifier.align(Alignment.Center))
-                else -> {
+            // Esqueleto → contenido con un fundido de ~100 ms (sin fundido con "Ninguna"). La lista ya nace colocada: sin desplazamiento visible.
+            val fase = when { msgs == null -> 0; msgs.isEmpty() -> 1; else -> 2 }
+            androidx.compose.animation.Crossfade(fase, Modifier.fillMaxSize(), animationSpec = Transiciones.fundidoChat(LocalModoAnim.current), label = "chat_contenido") { f ->
+            when (f) {
+                0 -> CargaDeMensajes()
+                1 -> Box(Modifier.fillMaxSize()) { EstadoVacio(Ico.Documento, "Sin mensajes", "Todavía no hay mensajes en este chat.", Modifier.align(Alignment.Center)) }
+                else -> Box(Modifier.fillMaxSize()) {
+                    // Posición inicial (primer mensaje sin leer): la lista se coloca antes de dejarse ver, así no hay desplazamiento visible.
+                    var colocada by remember(jid) { mutableStateOf(inicioHecho[0]) }
+                    LaunchedEffect(vm.primeraCargaLista) {
+                        // Con lo que ya hay se muestra la lista en su sitio de siempre (abajo); cuando llega la lectura de la base se coloca una vez.
+                        if (!inicioHecho[0] && vm.primeraCargaLista) {
+                            inicioHecho[0] = true
+                            if (irA.isEmpty()) {
+                                val idx = items.indexOfFirst { it is Elem.SinLeer }
+                                if (idx >= 0) estadoLista.scrollToItem(idx)
+                            }
+                        }
+                        colocada = true
+                    }
                     LazyColumn(
-                        Modifier.fillMaxSize().testTag("lista_chat"), state = estadoLista, reverseLayout = true,
+                        Modifier.fillMaxSize().alpha(if (colocada) 1f else 0f).testTag("lista_chat"), state = estadoLista, reverseLayout = true,
                         contentPadding = PaddingValues(horizontal = Esp.m, vertical = Esp.s), verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
                         items(
@@ -414,6 +433,7 @@ fun PantallaChat(
                         SmallFloatingActionButton({ haptica(Toque.Suave); scope.launch { estadoLista.animateScrollToItem(0) } }, Modifier.testTag("bajar_al_final")) { Icon(Ico.Abajo, "Ir al último mensaje") }
                     }
                 }
+            }
             }
         }
     }

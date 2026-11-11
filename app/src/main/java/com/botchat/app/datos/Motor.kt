@@ -10,6 +10,8 @@ interface Motor {
     fun obtenerChat(bot: Long, chat: String): String
     fun listarMensajes(bot: Long, chat: String, antesTs: Long, antesId: String, limite: Long): String
     fun mensajesPorId(bot: Long, chat: String, idsJson: String): String
+    /** Cuántos mensajes de otras personas hay en el chat después de `desdeTs` (segundos): COUNT indexado en Go, sin tope de página. */
+    fun contarNoLeidos(bot: Long, chat: String, desdeTs: Long): Long
     fun cargaAnterior(si: Boolean)
     fun crearChatPrueba(bot: Long, cuantos: Long): String
     fun listarArchivos(bot: Long, chat: String, categoria: String, soloDescargados: Boolean, limite: Long, desde: Long): String
@@ -89,6 +91,7 @@ object MotorGo : Motor {
     override fun obtenerChat(bot: Long, chat: String) = Wabot.obtenerChat(bot, chat)
     override fun listarMensajes(bot: Long, chat: String, antesTs: Long, antesId: String, limite: Long) = Wabot.listarMensajes(bot, chat, antesTs, antesId, limite)
     override fun mensajesPorId(bot: Long, chat: String, idsJson: String) = Wabot.mensajesPorId(bot, chat, idsJson)
+    override fun contarNoLeidos(bot: Long, chat: String, desdeTs: Long) = Wabot.contarNoLeidos(bot, chat, desdeTs)
     override fun cargaAnterior(si: Boolean) = Wabot.cargaAnterior(si)
     override fun crearChatPrueba(bot: Long, cuantos: Long) = Wabot.crearChatPrueba(bot, cuantos)
     override fun listarArchivos(bot: Long, chat: String, categoria: String, soloDescargados: Boolean, limite: Long, desde: Long) = Wabot.listarArchivos(bot, chat, categoria, soloDescargados, limite, desde)

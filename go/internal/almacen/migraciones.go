@@ -233,6 +233,12 @@ var migraciones = [][]string{
 	{
 		`CREATE INDEX idx_mensajes_remitente ON messages(bot_id, chat_jid, remitente_jid, ts) WHERE remitente_nombre<>''`,
 	},
+	// 9 (v0.5.0, bloque 0): contador de no leídos con COUNT sobre un índice parcial (solo lo que no es mío) y la señal de que
+	// intervine a mano en una conversación de menú (el bot no le contesta "opción no válida" al texto libre).
+	{
+		`CREATE INDEX idx_mensajes_noleidos ON messages(bot_id, chat_jid, ts) WHERE es_mio=0`,
+		`ALTER TABLE flow_sessions ADD COLUMN intervencion INTEGER NOT NULL DEFAULT 0`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

@@ -53,7 +53,7 @@ class AnimacionesUiTest {
 
     @Test fun conAnimacionesReducidasElSplashNoSeMuestra() {
         ArranqueLogo.mostrado = false
-        Ajustes.get(Apoyo.ctx()).fijarReducirAnimaciones(true)
+        Ajustes.get(Apoyo.ctx()).fijarAnimaciones(com.botchat.app.ui.ModoAnim.REDUCIDAS)
         regla.setContent { BotChatTema { Splash() } }
         regla.waitForIdle()
         assertTrue(ArranqueLogo.mostrado)
@@ -77,7 +77,7 @@ class AnimacionesUiTest {
         var reducir: Boolean? = null
         regla.setContent { BotChatTema { reducir = LocalReducirMovimiento.current; Text("a") } }
         assertEquals(false, reducir)
-        Ajustes.get(Apoyo.ctx()).fijarReducirAnimaciones(true)
+        Ajustes.get(Apoyo.ctx()).fijarAnimaciones(com.botchat.app.ui.ModoAnim.REDUCIDAS)
         regla.waitForIdle()
         assertEquals(true, reducir)
     }

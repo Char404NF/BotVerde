@@ -101,6 +101,8 @@ type Servicio struct {
 	Ahora func() time.Time
 	// PausaBot es cuánto calla el bot en un chat después de que escribo yo (0 = no se pausa).
 	PausaBot func() time.Duration
+	// AlEscribirYo se llama cuando escribo yo a mano desde la app (no con lo que manda el motor).
+	AlEscribirYo func(chat string)
 
 	mu        sync.Mutex
 	fichas    float64
@@ -180,6 +182,9 @@ func (s *Servicio) EsEnvioPropio(chat, id string) bool {
 }
 
 func (s *Servicio) pausarBot(chat string) {
+	if s.AlEscribirYo != nil {
+		s.AlEscribirYo(chat) // escribí yo a mano: cancela respuestas pendientes y marca la intervención
+	}
 	if s.PausaBot == nil {
 		return
 	}

@@ -15,10 +15,11 @@ import (
 	"go.mau.fi/whatsmeow/types/events"
 )
 
-// pausaTrasEscribirMin: minutos que el bot calla en un chat después de que escribo yo (ajustable en Avanzado; 0 = no se pausa).
+// pausaTrasEscribirMin: minutos que el bot calla en un chat después de que escribo yo (opción oculta en Avanzado; 0 = no se pausa, el valor por defecto).
 var pausaTrasEscribirMin atomic.Int32
 
-func init() { pausaTrasEscribirMin.Store(30) }
+// Por defecto 0: el bot no calla por mí; si contesté yo, se cancela solo su respuesta pendiente a ese mensaje.
+func init() { pausaTrasEscribirMin.Store(0) }
 
 // ConfigurarEnvio fija cuántos minutos calla el bot en un chat después de que escribo yo a mano (0 = nunca se pausa).
 func ConfigurarEnvio(pausaBotMin int) { pausaTrasEscribirMin.Store(int32(pausaBotMin)) }

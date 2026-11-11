@@ -95,7 +95,7 @@ func nuevoEntorno(t *testing.T, ajusta func(*Config)) *entorno {
 	e := &entorno{alm: alm, env: &enviadorFalso{}, dec: &decisorEco{}, rel: &reloj{}}
 	e.cfg = Config{
 		BotID: 1, Alm: alm, Decisor: e.dec, Enviador: e.env, Ahora: e.rel.ahora,
-		Debounce: 15 * time.Millisecond, DebounceMax: 60 * time.Millisecond, EsperaMin: time.Millisecond, EsperaMax: 2 * time.Millisecond, PorCaracter: time.Nanosecond,
+		Debounce: 15 * time.Millisecond, DebounceMax: 60 * time.Millisecond, EsperaMin: time.Millisecond, EsperaMax: 2 * time.Millisecond,
 		Aleatorio: func(n int64) int64 { return n / 2 },
 	}
 	if ajusta != nil {

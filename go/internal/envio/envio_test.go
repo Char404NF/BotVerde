@@ -284,6 +284,29 @@ func TestMencionesSeEnvianYSeGuardan(t *testing.T) {
 	}
 }
 
+func TestEscribirAManoAvisaAlMotorSinPausarPorDefecto(t *testing.T) {
+	s, _, a := nuevoServicio(t)
+	var avisos []string
+	s.AlEscribirYo = func(chat string) { avisos = append(avisos, chat) }
+	s.PausaBot = func() time.Duration { return 0 } // por defecto en la 0.5.0
+	if _, err := s.EnviarTexto(context.Background(), privado, "hola", "", nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(avisos) != 1 || avisos[0] != privado {
+		t.Fatalf("debía avisar que escribí yo: %v", avisos)
+	}
+	if a.BotPausado(1, privado, time.Now()) {
+		t.Fatal("sin pausa por defecto")
+	}
+	// Lo que manda el motor (automático) no es una intervención mía.
+	if _, err := s.EnviarAuto(context.Background(), privado, "respuesta del bot", "", nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(avisos) != 1 {
+		t.Fatalf("lo automático no cuenta: %v", avisos)
+	}
+}
+
 func TestPausaDelBotYTopeContraRafagas(t *testing.T) {
 	s, _, a := nuevoServicio(t)
 	s.PausaBot = func() time.Duration { return 30 * time.Minute }

@@ -83,6 +83,9 @@ object Repo {
     suspend fun mensajesPorId(bot: Long, chat: String, ids: List<String>) =
         io { Json.mensajes(motor.mensajesPorId(bot, chat, JSONArray(ids).toString())) }
 
+    /** Número real de mensajes sin leer (de otras personas, posteriores a `desdeTs`), contado en la base y no solo en lo cargado. */
+    suspend fun contarNoLeidos(bot: Long, chat: String, desdeTs: Long): Int = io { motor.contarNoLeidos(bot, chat, desdeTs).toInt() }
+
     /** Solo para medir: carga los mensajes como en la 0.4.0 (nombres uno por uno, sin caché). */
     suspend fun cargaAnterior(si: Boolean) = io { motor.cargaAnterior(si) }
     suspend fun crearChatPrueba(bot: Long, cuantos: Int) = io { motor.crearChatPrueba(bot, cuantos.toLong()) }

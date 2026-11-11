@@ -163,3 +163,68 @@ fun CheckAnimado(modifier: Modifier = Modifier, tam: Dp = 96.dp, color: Color = 
         drawPath(parte, color, style = Stroke(ancho * 1.3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
     }
 }
+
+/**
+ * Transiciones entre pantallas según "Animaciones de pantallas" (Avanzado):
+ *  - Natural: la pantalla nueva entra deslizando completa desde la derecha (~280 ms) y la de abajo se corre un poco; al volver, al revés.
+ *    Entre las pestañas principales (Chats, Espacio, Ajustes) solo hay un fundido.
+ *  - Reducidas: solo fundidos cortos, sin movimiento.
+ *  - Ninguna: sin transiciones.
+ */
+object Transiciones {
+    const val DESLIZAR_MS = 280
+    const val FUNDIDO_CORTO_MS = 100
+    /** Fundido del esqueleto al contenido cuando se abre un chat. */
+    const val FUNDIDO_CHAT_MS = 100
+
+    private fun <T> deslizar() = tween<T>(DESLIZAR_MS, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+
+    fun entra(modo: ModoAnim, entreTabs: Boolean): androidx.compose.animation.EnterTransition = when (modo) {
+        ModoAnim.NINGUNA -> androidx.compose.animation.EnterTransition.None
+        ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeIn(tween(FUNDIDO_CORTO_MS))
+        ModoAnim.NATURAL ->
+            if (entreTabs) androidx.compose.animation.fadeIn(tween(Mov.NORMAL))
+            else androidx.compose.animation.slideInHorizontally(deslizar()) { it }
+    }
+
+    fun sale(modo: ModoAnim, entreTabs: Boolean): androidx.compose.animation.ExitTransition = when (modo) {
+        ModoAnim.NINGUNA -> androidx.compose.animation.ExitTransition.None
+        ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeOut(tween(FUNDIDO_CORTO_MS))
+        ModoAnim.NATURAL ->
+            if (entreTabs) androidx.compose.animation.fadeOut(tween(Mov.CORTA))
+            else androidx.compose.animation.slideOutHorizontally(deslizar()) { -it / 4 }
+    }
+
+    fun vuelveEntra(modo: ModoAnim, entreTabs: Boolean): androidx.compose.animation.EnterTransition = when (modo) {
+        ModoAnim.NINGUNA -> androidx.compose.animation.EnterTransition.None
+        ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeIn(tween(FUNDIDO_CORTO_MS))
+        ModoAnim.NATURAL ->
+            if (entreTabs) androidx.compose.animation.fadeIn(tween(Mov.NORMAL))
+            else androidx.compose.animation.slideInHorizontally(deslizar()) { -it / 4 }
+    }
+
+    fun vuelveSale(modo: ModoAnim, entreTabs: Boolean): androidx.compose.animation.ExitTransition = when (modo) {
+        ModoAnim.NINGUNA -> androidx.compose.animation.ExitTransition.None
+        ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeOut(tween(FUNDIDO_CORTO_MS))
+        ModoAnim.NATURAL ->
+            if (entreTabs) androidx.compose.animation.fadeOut(tween(Mov.CORTA))
+            else androidx.compose.animation.slideOutHorizontally(deslizar()) { it }
+    }
+
+    /** Fundido de una pieza que aparece/desaparece (barras, visor): Natural 220 ms, Reducidas corto, Ninguna nada. */
+    fun fundidoEntra(modo: ModoAnim): androidx.compose.animation.EnterTransition = when (modo) {
+        ModoAnim.NINGUNA -> androidx.compose.animation.EnterTransition.None
+        ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeIn(tween(FUNDIDO_CORTO_MS))
+        ModoAnim.NATURAL -> androidx.compose.animation.fadeIn(tween(Mov.NORMAL))
+    }
+
+    fun fundidoSale(modo: ModoAnim): androidx.compose.animation.ExitTransition = when (modo) {
+        ModoAnim.NINGUNA -> androidx.compose.animation.ExitTransition.None
+        ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeOut(tween(FUNDIDO_CORTO_MS))
+        ModoAnim.NATURAL -> androidx.compose.animation.fadeOut(tween(Mov.CORTA))
+    }
+
+    /** Duración del fundido esqueleto → contenido del chat: 100 ms, instantáneo con "Ninguna". */
+    fun fundidoChat(modo: ModoAnim): androidx.compose.animation.core.FiniteAnimationSpec<Float> =
+        if (modo == ModoAnim.NINGUNA) androidx.compose.animation.core.snap() else tween(FUNDIDO_CHAT_MS)
+}

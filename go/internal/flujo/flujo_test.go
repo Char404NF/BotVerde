@@ -512,3 +512,42 @@ func TestLasConversacionesEnCursoYSuRecorrido(t *testing.T) {
 		t.Fatalf("pausada: %+v", d)
 	}
 }
+
+func TestConMenuActivoEIntervencionManualSoloRespondeAOpcionesOComandos(t *testing.T) {
+	e := nuevo(t)
+	e.crea(t, ventas(), true)
+	e.dice(t, ana, ana, ".menu")
+	// Intervine a mano: el texto libre ya no recibe "opción no válida" ni cuenta como error.
+	e.alm.MarcarIntervencion(1, ana)
+	for _, libre := range []string{"hola, ya te atiendo", "xyz", "ok", "gracias"} {
+		d := e.dice(t, ana, ana, libre)
+		if len(d.Respuestas) != 0 || d.Omitir != almacen.MotIntervino {
+			t.Fatalf("%q: el bot debía callar por intervención: %+v", libre, d)
+		}
+	}
+	s, _ := e.alm.SesionVigente(1, ana, ana, false, e.rel.t, 2*time.Hour)
+	if s == nil || s.Invalidas != 0 || s.Cortado {
+		t.Fatalf("el texto libre no debe contar como error: %+v", s)
+	}
+	// Una opción válida sí se atiende y devuelve la palabra al bot.
+	if d := e.dice(t, ana, ana, "1"); !strings.Contains(textos(d), "Precios") {
+		t.Fatalf("la opción válida se responde: %q", textos(d))
+	}
+	if e.alm.SesionIntervenida(s.ID) {
+		t.Fatal("tras una opción válida la marca se quita")
+	}
+	if d := e.dice(t, ana, ana, "zzz"); textos(d) != textoNoEntendi {
+		t.Fatalf("sin intervención vuelve el comportamiento normal: %q", textos(d))
+	}
+	// El comando vuelve a abrir el menú aun con intervención.
+	e.alm.MarcarIntervencion(1, ana)
+	if d := e.dice(t, ana, ana, ".menu"); !strings.HasPrefix(textos(d), "Hola Ana") {
+		t.Fatalf("el comando responde: %q", textos(d))
+	}
+	// El "0" también cuenta como opción válida.
+	e.dice(t, ana, ana, "1")
+	e.alm.MarcarIntervencion(1, ana)
+	if d := e.dice(t, ana, ana, "0"); !strings.HasPrefix(textos(d), "Hola Ana") {
+		t.Fatalf("0 vuelve al menú: %q", textos(d))
+	}
+}

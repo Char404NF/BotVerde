@@ -6,8 +6,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import com.botchat.app.datos.Ajustes
 import com.botchat.app.ui.BotChatTema
+import com.botchat.app.ui.ModoAnim
 import com.botchat.app.ui.ModoTema
 import com.botchat.app.ui.PantallaAvanzado
 import com.botchat.app.ui.PantallaDescargas
@@ -54,16 +56,39 @@ class AvanzadoUiTest {
 
     @Test fun aspectoGuardaTemaColorYAnimaciones() {
         pantalla()
-        assertEquals(ModoTema.SISTEMA, ajustes.modoTema.value); assertFalse(ajustes.colorDinamico.value); assertFalse(ajustes.reducirAnimaciones.value)
+        assertEquals(ModoTema.SISTEMA, ajustes.modoTema.value); assertFalse(ajustes.colorDinamico.value); assertEquals(ModoAnim.NATURAL, ajustes.animaciones.value)
         regla.onNodeWithText("Oscuro").performScrollTo().performClick()
         assertEquals(ModoTema.OSCURO, ajustes.modoTema.value)
-        regla.onNodeWithTag("sw_Reducir animaciones").performScrollTo().performClick()
-        assertTrue(ajustes.reducirAnimaciones.value)
+        regla.onNodeWithTag("anim_reducidas").performScrollTo().performClick()
+        assertEquals(ModoAnim.REDUCIDAS, ajustes.animaciones.value)
         regla.onNodeWithTag("sw_Color del sistema").performScrollTo().performClick()
         assertTrue(ajustes.colorDinamico.value)
         Ajustes.reiniciarParaPruebas()
         val otra = Ajustes.get(Apoyo.ctx())
-        assertEquals(ModoTema.OSCURO, otra.modoTema.value); assertTrue(otra.reducirAnimaciones.value)
+        assertEquals(ModoTema.OSCURO, otra.modoTema.value); assertEquals(ModoAnim.REDUCIDAS, otra.animaciones.value)
+    }
+
+    @Test fun pausaTrasEscribirYoEs0PorDefectoYVivaEnOpcionesOcultas() {
+        assertEquals("v0.5.0: el bot no calla por mí", 0, ajustes.pausaBotMin.value)
+        pantalla()
+        regla.onNodeWithText("Pausa del bot cuando escribo yo").assertDoesNotExist()
+        regla.onNodeWithTag("sw_ocultas").performScrollTo().performClick()
+        regla.onNodeWithText("Pausa del bot cuando escribo yo").performScrollTo().assertIsDisplayed()
+        ajustes.fijarPausaBotMin(30)
+        Ajustes.reiniciarParaPruebas()
+        assertEquals("el ajuste pausaBotMin se conserva", 30, Ajustes.get(Apoyo.ctx()).pausaBotMin.value)
+    }
+
+    @Test fun lafirmaEstaApagadaPorDefectoYSeConfiguraEnFunciones() {
+        assertFalse(ajustes.firmaActiva.value); assertEquals("", ajustes.firmaTexto.value)
+        regla.setContent { BotChatTema { com.botchat.app.ui.PantallaFunciones(ajustes, {}) } }
+        regla.onNodeWithTag("sw_Firma en las respuestas automáticas").performScrollTo().performClick()
+        assertTrue(ajustes.firmaActiva.value)
+        regla.onNodeWithTag("firma_texto").performScrollTo().performTextInput("Respuesta automática")
+        assertEquals("Respuesta automática", ajustes.firmaTexto.value)
+        Ajustes.reiniciarParaPruebas()
+        val otra = Ajustes.get(Apoyo.ctx())
+        assertTrue(otra.firmaActiva.value); assertEquals("Respuesta automática", otra.firmaTexto.value)
     }
 
     @Test fun reglasDeDescargaViajanAlModuloGo() {
