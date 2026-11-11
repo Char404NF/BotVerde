@@ -769,3 +769,81 @@ func TestPruebaBizSoloConInterruptorCasillaYTope(t *testing.T) {
 		t.Fatal("el menú real no añade nodos")
 	}
 }
+
+// ---------- respuesta interactiva (InteractiveResponseMessage) con y sin ParamsJSON válido ----------
+
+func respInteractiva(chat types.JID, citado, params, cuerpo string) *events.Message {
+	ir := &waE2E.InteractiveResponseMessage{
+		InteractiveResponseMessage: &waE2E.InteractiveResponseMessage_NativeFlowResponseMessage_{NativeFlowResponseMessage: &waE2E.InteractiveResponseMessage_NativeFlowResponseMessage{
+			Name: proto.String("quick_reply"), ParamsJSON: proto.String(params)}},
+		ContextInfo: &waE2E.ContextInfo{StanzaID: proto.String(citado)},
+	}
+	if cuerpo != "" {
+		ir.Body = &waE2E.InteractiveResponseMessage_Body{Text: proto.String(cuerpo)}
+	}
+	return &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: chat}, ID: "IR"},
+		Message: &waE2E.Message{InteractiveResponseMessage: ir}}
+}
+
+func TestRespuestaInteractivaToleranteYDeMenuReal(t *testing.T) {
+	e := nuevoEntorno(t)
+	e.enciende(ModoBotones)
+	e.fija("lab_botones_tipo", "interactivo")
+	c := context.Background()
+	res := resolverFijo(jidVotante, jidVotante)
+	chat, _ := types.ParseJID(jidVotante)
+	r, _, _ := e.s.EnviarMenu(c, jidVotante, jidVotante, menu(3), "", "", "")
+
+	// con ParamsJSON válido (id nuestro)
+	if x := e.s.Recibir(c, respInteractiva(chat, r.ID, `{"id":"bc|`+r.ID+`|3","display_text":"x"}`, ""), res); x == nil || x.Num != 3 || !x.Navega {
+		t.Fatalf("id válido: %+v", x)
+	}
+	// JSON inválido pero con el cuerpo igual al título de la opción 2
+	if x := e.s.Recibir(c, respInteractiva(chat, r.ID, `{no es json`, "Precios"), res); x == nil || x.Num != 2 || !x.Navega {
+		t.Fatalf("json inválido + cuerpo: %+v", x)
+	}
+	// id numérico simple (como número JSON) y display_text
+	if x := e.s.Recibir(c, respInteractiva(chat, r.ID, `{"id":1}`, ""), res); x == nil || x.Num != 1 || !x.Navega {
+		t.Fatalf("id numérico: %+v", x)
+	}
+	if x := e.s.Recibir(c, respInteractiva(chat, r.ID, `{"display_text":"Precios"}`, ""), res); x == nil || x.Num != 2 {
+		t.Fatalf("display_text: %+v", x)
+	}
+	// sin nada identificable: se anota, no navega
+	if x := e.s.Recibir(c, respInteractiva(chat, r.ID, ``, ""), res); x == nil || x.Accion != AccionSinOpcion || x.Navega {
+		t.Fatalf("sin datos: %+v", x)
+	}
+	// sesión ajena (no existe) o sin cita: no es nuestra
+	if x := e.s.Recibir(c, respInteractiva(chat, "AJENA", `{"id":"1"}`, "Precios"), res); x != nil {
+		t.Fatalf("ajena: %+v", x)
+	}
+	if x := e.s.Recibir(c, respInteractiva(chat, "", `{}`, "Precios"), res); x != nil {
+		t.Fatalf("sin cita: %+v", x)
+	}
+	// caducada: se anota y no navega
+	e.alm.MarcarSesionLab(1, r.ID, almacen.LabExpirada)
+	if x := e.s.Recibir(c, respInteractiva(chat, r.ID, `{"id":"bc|`+r.ID+`|1"}`, ""), res); x == nil || x.Accion != AccionExpirada || x.Navega {
+		t.Fatalf("caducada: %+v", x)
+	}
+}
+
+func TestRespuestaInteractivaDePruebaMarcaRespondio(t *testing.T) {
+	e := nuevoEntorno(t)
+	e.enciende(ModoTexto)
+	e.fija("lab_prueba_chat", jidVotante)
+	e.fija("lab_biz_activo", "1")
+	e.fija("lab_biz_ack", "1")
+	c := context.Background()
+	chat, _ := types.ParseJID(jidVotante)
+	rb, err := e.s.EnviarPrueba(c, "interactivo_biz", 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	x := e.s.Recibir(c, respInteractiva(chat, rb.MsgID, `{"display_text":"Opción 2"}`, ""), resolverFijo(jidVotante, jidVotante))
+	if x == nil || x.Navega || !x.Prueba {
+		t.Fatalf("toque de prueba: %+v", x)
+	}
+	if l := e.alm.ListarResultadosLab(1, 5); l[0].Respondio != 1 {
+		t.Fatalf("respondió: %+v", l[0])
+	}
+}

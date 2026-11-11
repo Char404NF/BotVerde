@@ -218,3 +218,25 @@ func TestReaccionCitaMencionesYReenviado(t *testing.T) {
 		t.Fatal("sin cita no hay vista previa")
 	}
 }
+
+func TestRespuestaInteractivaSeGuardaComoTextoConElTituloDeLaOpcion(t *testing.T) {
+	mk := func(params, cuerpo string) *waE2E.Message {
+		ir := &waE2E.InteractiveResponseMessage{InteractiveResponseMessage: &waE2E.InteractiveResponseMessage_NativeFlowResponseMessage_{
+			NativeFlowResponseMessage: &waE2E.InteractiveResponseMessage_NativeFlowResponseMessage{Name: proto.String("quick_reply"), ParamsJSON: proto.String(params)}}}
+		if cuerpo != "" {
+			ir.Body = &waE2E.InteractiveResponseMessage_Body{Text: proto.String(cuerpo)}
+		}
+		return &waE2E.Message{InteractiveResponseMessage: ir}
+	}
+	for _, c := range []struct{ params, cuerpo, quiero string }{
+		{`{"id":"x","display_text":"Precios"}`, "", "Precios"},
+		{`{"id":"x","display_text":"Otro"}`, "Horario", "Horario"},
+		{`{roto`, "Horario", "Horario"},
+		{`{roto`, "", "Respuesta de botón"},
+	} {
+		r := Clasificar(evt(mk(c.params, c.cuerpo)))
+		if r.Omitir || r.Tipo != almacen.TipoTexto || r.Texto != c.quiero {
+			t.Fatalf("%q/%q: %+v", c.params, c.cuerpo, r)
+		}
+	}
+}

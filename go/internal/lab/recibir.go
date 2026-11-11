@@ -232,13 +232,72 @@ func idDeToque(m *waE2E.Message) (id, mensaje string) {
 		return r.GetSingleSelectReply().GetSelectedRowID(), r.GetContextInfo().GetStanzaID()
 	case m.GetInteractiveResponseMessage() != nil:
 		r := m.GetInteractiveResponseMessage()
-		var p struct {
-			ID string `json:"id"`
-		}
-		_ = json.Unmarshal([]byte(r.GetNativeFlowResponseMessage().GetParamsJSON()), &p)
-		return p.ID, r.GetContextInfo().GetStanzaID()
+		return idInteractivo(r), r.GetContextInfo().GetStanzaID()
 	}
 	return "", ""
+}
+
+// paramsInteractivo es lo que se lee, de forma tolerante, del ParamsJSON de la respuesta de un quick_reply. El id puede venir como
+// texto o como número; si WhatsApp lo cambia o trae JSON inválido, no pasa nada: queda vacío.
+type paramsInteractivo struct {
+	ID      any    `json:"id"`
+	Display string `json:"display_text"`
+	Title   string `json:"title"`
+	Index   any    `json:"index"`
+}
+
+func leeParams(r *waE2E.InteractiveResponseMessage) (p paramsInteractivo) {
+	_ = json.Unmarshal([]byte(r.GetNativeFlowResponseMessage().GetParamsJSON()), &p)
+	return p
+}
+
+func comoTexto(v any) string {
+	switch x := v.(type) {
+	case string:
+		return x
+	case float64:
+		return strconv.Itoa(int(x))
+	}
+	return ""
+}
+
+func idInteractivo(r *waE2E.InteractiveResponseMessage) string { return comoTexto(leeParams(r).ID) }
+
+// textoInteractivo es el título visible de lo que tocó la persona (cuerpo, o display_text del JSON).
+func textoInteractivo(r *waE2E.InteractiveResponseMessage) string {
+	if t := strings.TrimSpace(r.GetBody().GetText()); t != "" {
+		return t
+	}
+	p := leeParams(r)
+	if t := strings.TrimSpace(p.Display); t != "" {
+		return t
+	}
+	return strings.TrimSpace(p.Title)
+}
+
+// numPorRespaldo resuelve la opción cuando el id no es "bc|<mensaje>|<n>": por número simple (id o índice, 1..N) o por el título
+// de la opción. Solo se usa con una sesión ya encontrada por el mensaje citado.
+func numPorRespaldo(ses *almacen.SesionLab, r *waE2E.InteractiveResponseMessage) int {
+	p := leeParams(r)
+	for _, v := range []any{p.ID, p.Index} {
+		if n, err := strconv.Atoi(strings.TrimSpace(comoTexto(v))); err == nil {
+			for _, o := range ses.Opciones {
+				if o.Num == n {
+					return n
+				}
+			}
+		}
+	}
+	t := strings.ToLower(textoInteractivo(r))
+	if t == "" {
+		return 0
+	}
+	for _, o := range ses.Opciones {
+		if strings.ToLower(strings.TrimSpace(o.Texto)) == t {
+			return o.Num
+		}
+	}
+	return 0
 }
 
 // partesID separa "bc|<mensaje>|<num>".
@@ -258,7 +317,16 @@ func (s *Servicio) recibirToque(ctx context.Context, evt *events.Message, res Re
 	id, citado := idDeToque(evt.Message)
 	msgID, num, ok := partesID(id)
 	if !ok {
-		return nil // no es un botón nuestro
+		// Respaldo (solo respuestas interactivas): sin id nuestro, pero citando un menú nuestro, se busca la opción por su número o título.
+		ir := evt.Message.GetInteractiveResponseMessage()
+		if ir == nil || citado == "" {
+			return nil // no es un botón nuestro
+		}
+		ses0 := s.Alm.ObtenerSesionLab(s.BotID, citado)
+		if ses0 == nil || ses0.Tipo == almacen.LabEncuesta {
+			return nil
+		}
+		msgID, num = citado, numPorRespaldo(ses0, ir)
 	}
 	if citado != "" && citado != msgID {
 		msgID = citado

@@ -319,6 +319,8 @@ func clasificarContenido(evt *events.Message) Clasificado {
 		return Clasificado{Tipo: almacen.TipoTexto, Texto: m.GetButtonsResponseMessage().GetSelectedDisplayText()}
 	case m.GetListResponseMessage() != nil:
 		return Clasificado{Tipo: almacen.TipoTexto, Texto: m.GetListResponseMessage().GetTitle()}
+	case m.GetInteractiveResponseMessage() != nil:
+		return Clasificado{Tipo: almacen.TipoTexto, Texto: textoRespuestaInteractiva(m.GetInteractiveResponseMessage())}
 	case m.GetSenderKeyDistributionMessage() != nil && onlySenderKey(m):
 		return Clasificado{Omitir: true}
 	}
@@ -326,6 +328,27 @@ func clasificarContenido(evt *events.Message) Clasificado {
 		return Clasificado{Omitir: true}
 	}
 	return Clasificado{Tipo: almacen.TipoOtro, Texto: TextoEspecial}
+}
+
+// textoRespuestaInteractiva saca el título de la opción que tocó la persona en un mensaje interactivo (quick_reply): primero el
+// texto del cuerpo, luego "display_text" de ParamsJSON. Un JSON inválido nunca falla: se usa un texto genérico.
+func textoRespuestaInteractiva(r *waE2E.InteractiveResponseMessage) string {
+	if t := strings.TrimSpace(r.GetBody().GetText()); t != "" {
+		return t
+	}
+	var p struct {
+		Display string `json:"display_text"`
+		Title   string `json:"title"`
+	}
+	if json.Unmarshal([]byte(r.GetNativeFlowResponseMessage().GetParamsJSON()), &p) == nil {
+		if t := strings.TrimSpace(p.Display); t != "" {
+			return t
+		}
+		if t := strings.TrimSpace(p.Title); t != "" {
+			return t
+		}
+	}
+	return "Respuesta de botón"
 }
 
 // TextoEspecial es lo que se guarda de un mensaje que esta versión no sabe mostrar (la pantalla lo dibuja como tarjeta).
