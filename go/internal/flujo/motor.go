@@ -26,6 +26,11 @@ type Config struct {
 	AlAviso func(chat, tipo, titulo, detalle string)
 	// MenuVisible dice si el rango de esa persona ve ese menú (nil = todos lo ven). Lo fija cada rango en "menús que ve".
 	MenuVisible func(sender string, menuID int64) bool
+	// Prefijo es el prefijo actual de los comandos ("!" por defecto). Los comandos propios escritos sin símbolo ("horario") usan este
+	// prefijo; los que traen símbolo propio (".menu") se comparan tal cual.
+	Prefijo func() string
+	// PuedeUsar dice si esa persona tiene al menos el rango mínimo (id de rango) que pide un comando propio.
+	PuedeUsar func(sender string, rolMin int64) bool
 }
 
 // Motor ejecuta las automatizaciones. Implementa motor.Decisor.
@@ -135,7 +140,7 @@ func (m *Motor) procesa(e entrada, prueba bool, forzarMenu int64) (resultado, er
 		if def == nil { // la automatización ya no existe
 			_ = alm.CerrarSesion(bot, s, almacen.SesAbandonada, 0, ahora)
 			s = nil
-		} else if cmd := norm(def.Disparadores.Comando); cmd != "" && comandoCoincide(norm(e.Texto), cmd) {
+		} else if cmd := m.comandoDe(def.Disparadores.Comando); cmd != "" && comandoCoincide(norm(e.Texto), cmd) {
 			_ = alm.CerrarSesion(bot, s, almacen.SesAbandonada, 0, ahora) // escribió el comando otra vez: empieza de nuevo
 			s = nil
 		} else {
@@ -161,6 +166,9 @@ func (m *Motor) procesa(e entrada, prueba bool, forzarMenu int64) (resultado, er
 		if err != nil || len(def.Pasos) == 0 || def.Paso(def.Inicio) == nil {
 			continue
 		}
+		if forzarMenu == 0 && def.Propio != nil && def.Propio.RangoMin > 0 && m.c.PuedeUsar != nil && !m.c.PuedeUsar(e.Sender, def.Propio.RangoMin) {
+			continue
+		}
 		if forzarMenu == 0 && !m.seActiva(def, mn, e, ahora) {
 			continue
 		}
@@ -176,6 +184,25 @@ func (m *Motor) procesa(e entrada, prueba bool, forzarMenu int64) (resultado, er
 	return resultado{}, nil
 }
 
+// comandoDe da el comando tal como lo escribe la gente: si empieza con una letra o un número usa el prefijo actual de los comandos
+// ("horario" → "!horario"); si trae su propio símbolo (".menu") se deja igual.
+func (m *Motor) comandoDe(c string) string {
+	c = strings.TrimSpace(c)
+	if c == "" {
+		return ""
+	}
+	if r := []rune(c)[0]; r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r > 127 {
+		pref := "!"
+		if m.c.Prefijo != nil {
+			if p := m.c.Prefijo(); p != "" {
+				pref = p
+			}
+		}
+		c = pref + c
+	}
+	return norm(c)
+}
+
 func comandoCoincide(texto, cmd string) bool {
 	return texto == cmd || strings.HasPrefix(texto, cmd+" ")
 }
@@ -184,7 +211,7 @@ func comandoCoincide(texto, cmd string) bool {
 func (m *Motor) seActiva(def *Def, mn almacen.Menu, e entrada, ahora time.Time) bool {
 	// dónde
 	if e.EsGrupo {
-		ok := false
+		ok := def.Alcance.TodosGrupos
 		for _, g := range def.Alcance.Grupos {
 			if g == e.Chat {
 				ok = true
@@ -224,7 +251,7 @@ func (m *Motor) seActiva(def *Def, mn almacen.Menu, e entrada, ahora time.Time) 
 	switch {
 	case t.Cualquiera:
 		ok = true
-	case t.Comando != "" && comandoCoincide(texto, norm(t.Comando)):
+	case t.Comando != "" && comandoCoincide(texto, m.comandoDe(t.Comando)):
 		ok = true
 	case coincidePalabra(texto, t.Palabras) || (todo != "" && coincidePalabra(todo, t.Palabras)):
 		ok = true

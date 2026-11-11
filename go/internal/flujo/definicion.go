@@ -55,6 +55,8 @@ type Alcance struct {
 	Privados bool     `json:"privados"`
 	Chats    []string `json:"chats,omitempty"`  // chats privados concretos (si Privados es falso)
 	Grupos   []string `json:"grupos,omitempty"` // solo en los grupos elegidos
+	// TodosGrupos: vale en cualquier grupo (donde el bot ya responde por mención, cita o comando). Lo usan los comandos propios.
+	TodosGrupos bool `json:"todosGrupos,omitempty"`
 }
 
 // Horario son los días y las horas en que atiende. Días: 1 = lunes … 7 = domingo. Vacío = siempre.
@@ -73,6 +75,9 @@ type Def struct {
 	Disparadores Disparadores `json:"disparadores"`
 	Alcance      Alcance      `json:"alcance"`
 	Horario      Horario      `json:"horario"`
+	// Propio marca un comando propio creado en Ajustes → Comandos propios (!horario, !precios…). Sus pasos y disparadores se generan
+	// a partir de estos datos (ConstruirPropio) y no salen en la lista normal de automatizaciones.
+	Propio *DatosPropio `json:"propio,omitempty"`
 }
 
 // Parse lee una definición de su JSON.
@@ -297,10 +302,10 @@ func (d *Def) Validar() []Aviso {
 	if !t.PrimerMensaje && t.DiasSinEscribir == 0 && len(t.Palabras) == 0 && t.Comando == "" && !t.FueraDeHorario && !t.Mencion && !t.Cualquiera {
 		add("", "No tiene cuándo activarse: elige al menos un disparador.", false)
 	}
-	if !d.Alcance.Privados && len(d.Alcance.Chats) == 0 && len(d.Alcance.Grupos) == 0 {
+	if !d.Alcance.Privados && len(d.Alcance.Chats) == 0 && len(d.Alcance.Grupos) == 0 && !d.Alcance.TodosGrupos {
 		add("", "No está asignada a ningún chat.", false)
 	}
-	if len(d.Alcance.Grupos) > 0 && !t.Mencion && t.Comando == "" && len(t.Palabras) == 0 && !t.Cualquiera {
+	if (len(d.Alcance.Grupos) > 0 || d.Alcance.TodosGrupos) && !t.Mencion && t.Comando == "" && len(t.Palabras) == 0 && !t.Cualquiera {
 		add("", "En grupos solo responde si lo mencionan o usan un comando.", false)
 	}
 	return av

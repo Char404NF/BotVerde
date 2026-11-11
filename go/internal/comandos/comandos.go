@@ -33,6 +33,7 @@ type Contexto struct {
 	MensajeID string
 	Menciones []string // personas mencionadas en el mensaje (claves guardadas)
 	CitaAutor string   // autor del mensaje citado, si lo hay
+	CitaID    string   // id del mensaje citado, si lo hay
 	Args      []string // palabras después del comando
 	Resto     string   // lo mismo, como texto
 	Dueno     bool     // viene de Mensajes guardados o de la app
@@ -50,7 +51,9 @@ type Comando struct {
 	Ambito    uint8  // Privado, Grupo o Ambos (0 = Ambos)
 	Confirma  bool   // pide código de confirmación antes de ejecutar
 	SoloDueno bool   // solo el Dueño desde Mensajes guardados o la app
-	Ejecutar  func(*Contexto) (string, error)
+	// Siempre: se atiende aunque el bot esté pausado en ese chat (por ejemplo !reanudar).
+	Siempre  bool
+	Ejecutar func(*Contexto) (string, error)
 }
 
 // Resultado es lo que sale de ejecutar un texto.
@@ -69,6 +72,8 @@ type Despachador struct {
 	AlCodigo func(c almacen.Confirmacion, descripcion string)
 	// Responder manda un texto a un chat citando un mensaje (respuesta diferida, cuando el dueño confirma desde la app).
 	Responder func(chat, citaID, texto string)
+	// Extra da líneas de ayuda de comandos que no están registrados aquí (los comandos propios del dueño), según el rango de quien pregunta.
+	Extra func(cx *Contexto) []string
 
 	mu    sync.RWMutex
 	mapa  map[string]*Comando
@@ -180,6 +185,18 @@ func (d *Despachador) Existe(texto string) bool {
 	return hay
 }
 
+// SiemprePermitido dice si el texto es un comando que se atiende aunque el bot esté pausado en el chat (por ejemplo !reanudar).
+func (d *Despachador) SiemprePermitido(texto string) bool {
+	p, _, _, ok := d.Parsear(texto)
+	if !ok {
+		return false
+	}
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	c := d.mapa[clave(p)]
+	return c != nil && c.Siempre
+}
+
 // Entrada es un mensaje que puede ser comando.
 type Entrada struct {
 	Persona   string
@@ -190,6 +207,7 @@ type Entrada struct {
 	Texto     string
 	Menciones []string
 	CitaAutor string
+	CitaID    string
 	Dueno     bool // llegó por Mensajes guardados o por la app
 }
 
@@ -214,7 +232,7 @@ func (d *Despachador) Ejecutar(e Entrada) Resultado {
 		return Resultado{}
 	}
 	cx := &Contexto{BotID: d.BotID, Persona: persona, Nombre: e.Nombre, Chat: e.Chat, EsGrupo: e.EsGrupo, MensajeID: e.MensajeID, Menciones: e.Menciones,
-		CitaAutor: e.CitaAutor, Args: args, Resto: resto, Dueno: persona == almacen.PersonaDueno && e.Dueno, D: d}
+		CitaAutor: e.CitaAutor, CitaID: e.CitaID, Args: args, Resto: resto, Dueno: persona == almacen.PersonaDueno && e.Dueno, D: d}
 	cx.Rol = d.Perm.RolDe(persona)
 	registro := func(res, det string) {
 		d.Alm.RegistrarAccion(d.BotID, persona, "cmd."+cmd.Nombre, "", e.Chat, res, det)
@@ -244,6 +262,10 @@ func (d *Despachador) Ejecutar(e Entrada) Resultado {
 		}
 	}
 	if cmd.Confirma {
+		// Al confirmar ya no hay menciones ni cita: la persona se guarda resuelta en los argumentos.
+		if obj, resto, ok := cx.Objetivo(); ok {
+			args = append([]string{"persona:" + obj}, resto...)
+		}
 		cf, err := d.Alm.CrearConfirmacion(d.BotID, persona, cmd.Nombre, args, e.Chat, e.MensajeID, d.vida(), d.ahora())
 		if err != nil {
 			registro("error", "confirmacion")
@@ -403,6 +425,9 @@ func (c *Contexto) Objetivo() (persona string, resto []string, ok bool) {
 		return d
 	}
 	for i, a := range resto {
+		if strings.HasPrefix(a, "persona:") {
+			return c.D.Perm.Persona(strings.TrimPrefix(a, "persona:")), append(resto[:i:i], resto[i+1:]...), true
+		}
 		if strings.HasPrefix(a, "@") || numero(a) != "" {
 			if len(c.Menciones) > 0 && strings.HasPrefix(a, "@") {
 				p := c.D.Perm.Persona(c.Menciones[0])

@@ -254,6 +254,10 @@ func (s *Servicio) Compuerta(e Entrada) Salida {
 	if sol != nil && sol.Estado == almacen.SolBloqueada {
 		return Salida{Motivo: "persona bloqueada"}
 	}
+	// Silenciada (por un rato o para siempre): el bot no le contesta ni le atiende comandos.
+	if persona != almacen.PersonaDueno && s.Alm.SilencioDe(s.BotID, persona, s.Ahora()) != nil {
+		return Salida{Motivo: "persona silenciada"}
+	}
 	if e.EsGrupo {
 		p := s.Alm.PoliticaDeGrupo(s.BotID, e.Chat)
 		switch p.Modo {

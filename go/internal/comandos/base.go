@@ -36,6 +36,11 @@ func cmdAyuda(cx *Contexto) (string, error) {
 		}
 		b.WriteString("\n")
 	}
+	if cx.D.Extra != nil {
+		for _, l := range cx.D.Extra(cx) {
+			b.WriteString(l + "\n")
+		}
+	}
 	return strings.TrimRight(b.String(), "\n"), nil
 }
 

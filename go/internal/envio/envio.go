@@ -283,6 +283,30 @@ func (s *Servicio) Participantes(ctx context.Context, chat string) ([]Participan
 	return out, nil
 }
 
+// SoyAdmin dice si esta cuenta administra el grupo (lo lee de la información del grupo, con la misma caché que usa el resto del envío).
+// En un chat que no es grupo devuelve false.
+func (s *Servicio) SoyAdmin(ctx context.Context, chat string) (bool, error) {
+	j, err := parsea(chat)
+	if err != nil {
+		return false, err
+	}
+	if !s.esGrupo(j) {
+		return false, nil
+	}
+	info, err := s.infoGrupo(ctx, j)
+	if err != nil {
+		return false, err
+	}
+	pn, lid := s.Cli.Propio()
+	for _, p := range info.Participants {
+		yo := (!pn.IsEmpty() && (p.JID.User == pn.User || p.PhoneNumber.User == pn.User)) || (!lid.IsEmpty() && (p.JID.User == lid.User || p.LID.User == lid.User))
+		if yo {
+			return p.IsAdmin || p.IsSuperAdmin, nil
+		}
+	}
+	return false, nil
+}
+
 // propioEnChat es mi JID tal como se usa en ese chat (LID si el grupo direcciona por LID).
 func (s *Servicio) propioEnChat(ctx context.Context, j types.JID) types.JID {
 	pn, lid := s.Cli.Propio()

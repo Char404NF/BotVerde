@@ -42,6 +42,7 @@ type Mensaje struct {
 	EsChatPropio bool     // el chat es "Mensajes guardados" (el chat conmigo mismo: mi propio número o LID)
 	Menciones    []string // personas mencionadas (clave guardada)
 	CitaAutor    string   // autor del mensaje citado (clave guardada), si cita a alguien
+	CitaID       string   // id del mensaje citado, si cita alguno
 }
 
 // Salida es una respuesta lista para mandar.
@@ -266,7 +267,9 @@ func (m *Motor) Entrar(msg Mensaje) {
 		return
 	}
 	est := m.c.Alm.EstadoDeChat(m.c.BotID, msg.Chat)
-	if est.BotPausaHasta > now.Unix() {
+	// Un chat pausado solo atiende los comandos marcados "siempre" (por ejemplo !reanudar), para poder volver a encenderlo.
+	siempre := m.c.Cmd != nil && m.c.Cmd.SiemprePermitido(msg.Texto)
+	if est.BotPausaHasta > now.Unix() && !siempre {
 		if est.PausaHumano {
 			m.omite(msg, almacen.MotHumano)
 		} else {
@@ -275,7 +278,7 @@ func (m *Motor) Entrar(msg Mensaje) {
 		return
 	}
 	if msg.EsGrupo {
-		if !est.BotActivo {
+		if !est.BotActivo && !siempre {
 			m.omite(msg, almacen.MotChatPausa)
 			return
 		}
@@ -490,14 +493,29 @@ func (m *Motor) trabajaCarril(chat string) {
 // atiende decide y responde a un mensaje o a un bloque de mensajes del mismo chat.
 func (m *Motor) atiende(chat string, lote []Mensaje) {
 	ultimo := lote[len(lote)-1]
-	// Pudieron pedir silencio mientras esperaba en la fila.
-	if est := m.c.Alm.EstadoDeChat(m.c.BotID, chat); est.BotPausaHasta > m.c.Ahora().Unix() {
-		if est.PausaHumano {
-			m.omite(ultimo, almacen.MotHumano)
-		} else {
-			m.omite(ultimo, almacen.MotPausado)
+	// Pudieron pedir silencio mientras esperaba en la fila. En un chat pausado solo se atienden los comandos "siempre" (!reanudar).
+	soloSiempre := false
+	if est := m.c.Alm.EstadoDeChat(m.c.BotID, chat); est.BotPausaHasta > m.c.Ahora().Unix() || (ultimo.EsGrupo && !est.BotActivo) {
+		hay := false
+		if m.c.Cmd != nil {
+			for _, x := range lote {
+				if m.c.Cmd.SiemprePermitido(x.Texto) {
+					hay = true
+				}
+			}
 		}
-		return
+		if !hay {
+			switch {
+			case est.BotPausaHasta <= m.c.Ahora().Unix():
+				m.omite(ultimo, almacen.MotChatPausa)
+			case est.PausaHumano:
+				m.omite(ultimo, almacen.MotHumano)
+			default:
+				m.omite(ultimo, almacen.MotPausado)
+			}
+			return
+		}
+		soloSiempre = true
 	}
 	if m.yaContesto(chat, ultimo.TS) {
 		m.omite(ultimo, almacen.MotYaContesto)
@@ -511,11 +529,11 @@ func (m *Motor) atiende(chat string, lote []Mensaje) {
 	ultimoEsComando := false
 	if m.c.Cmd != nil {
 		for _, x := range lote {
-			if !m.c.Cmd.Existe(x.Texto) {
+			if !m.c.Cmd.Existe(x.Texto) || (soloSiempre && !m.c.Cmd.SiemprePermitido(x.Texto)) {
 				continue
 			}
 			r := m.c.Cmd.Ejecutar(comandos.Entrada{Persona: personaDe(x), Nombre: x.Nombre, Chat: chat, EsGrupo: x.EsGrupo, MensajeID: x.ID, Texto: x.Texto,
-				Menciones: x.Menciones, CitaAutor: x.CitaAutor})
+				Menciones: x.Menciones, CitaAutor: x.CitaAutor, CitaID: x.CitaID})
 			if !r.Manejado {
 				continue
 			}
@@ -528,7 +546,9 @@ func (m *Motor) atiende(chat string, lote []Mensaje) {
 		}
 	}
 	var d Decision
-	if ultimoEsComando {
+	if soloSiempre {
+		d = Decision{Coincidio: "comando", Respuestas: deComandos}
+	} else if ultimoEsComando {
 		d = Decision{Coincidio: "comando", Respuestas: deComandos}
 	} else {
 		var err error
