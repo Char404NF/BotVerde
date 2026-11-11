@@ -294,3 +294,44 @@ func TestVotoYToqueLlegaAlMotorComoElNumeroDeLaOpcion(t *testing.T) {
 		t.Fatalf("botón ajeno: %+v", v[3])
 	}
 }
+
+func TestBizExperimentalExigeAvisoYCasilla(t *testing.T) {
+	_, _ = abreSolo(t)
+	st := decodifica[estadoLab](t, func() (string, error) { return EstadoLab(1) })
+	if st.BizActivo || st.BizAck {
+		t.Fatal("apagado por defecto")
+	}
+	if err := FijarAjusteLab(1, "lab_biz_activo", "1"); err == nil {
+		t.Fatal("sin aviso ni casilla no enciende")
+	}
+	if err := AceptarAvisoLab(1); err != nil {
+		t.Fatal(err)
+	}
+	if err := FijarAjusteLab(1, "lab_biz_activo", "1"); err == nil {
+		t.Fatal("sin casilla no enciende")
+	}
+	if err := FijarAjusteLab(1, "lab_biz_ack", "1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := FijarAjusteLab(1, "lab_biz_activo", "1"); err != nil {
+		t.Fatal(err)
+	}
+	st = decodifica[estadoLab](t, func() (string, error) { return EstadoLab(1) })
+	hay := false
+	for _, p := range st.Plan {
+		hay = hay || p.Tipo == "interactivo_biz"
+	}
+	if !st.BizActivo || !hay {
+		t.Fatalf("con interruptor y casilla el plan trae la prueba: %+v", st)
+	}
+	if err := FijarAjusteLab(1, "lab_biz_ack", "0"); err != nil {
+		t.Fatal(err)
+	}
+	st = decodifica[estadoLab](t, func() (string, error) { return EstadoLab(1) })
+	if st.BizActivo || st.BizAck {
+		t.Fatal("quitar la casilla apaga la prueba")
+	}
+	if _, err := EnviarPruebaLab(1, "interactivo_biz", 1); err == nil {
+		t.Fatal("apagada no envía")
+	}
+}

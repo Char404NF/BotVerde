@@ -8,7 +8,7 @@ data class EstadoLab(
     val activo: Boolean, val avisoAceptado: Boolean, val modo: String, val modoReal: String, val grupos: Boolean, val encMax: Int, val expiraMin: Int,
     val respaldoEnc: Boolean, val respaldoBot: Boolean, val botonesTipo: String, val pruebaChat: String, val pruebaHora: Int, val pruebaDia: Int,
     val versionWa: String, val versionCliente: String, val enMarcha: Boolean, val limiteMedido: Int, val pruebasHora: Int, val pruebasDia: Int,
-    val plan: List<PruebaLab>,
+    val plan: List<PruebaLab>, val bizActivo: Boolean = false, val bizAck: Boolean = false,
 )
 
 /** Una prueba que se puede mandar: tipo (encuesta, botones, lista, interactivo) y cuántas opciones lleva. */
@@ -33,6 +33,7 @@ object JsonLab {
             o.optString("pruebaChat"), o.optInt("pruebaHora", 4), o.optInt("pruebaDia", 12), o.optString("versionWa"), o.optString("versionCliente"),
             o.optBoolean("enMarcha"), o.optInt("limiteMedido"), o.optInt("pruebasHora"), o.optInt("pruebasDia"),
             List(p.length()) { i -> p.getJSONObject(i).let { PruebaLab(it.optString("tipo"), it.optInt("variante"), it.optString("nombre")) } },
+            o.optBoolean("bizActivo"), o.optBoolean("bizAck"),
         )
     }
 

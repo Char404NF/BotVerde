@@ -119,6 +119,20 @@ class LaboratorioUiTest {
         regla.espera { llamo("ajusteLab:lab_enc_max_opc:10") }
     }
 
+    @Test fun laPruebaBizNaceApagadaConAvisoRojoYSoloSeActivaConLaCasilla() {
+        encendido()
+        principal()
+        regla.esperaEtiqueta("lab_biz_aviso")
+        regla.onNodeWithTag("lab_biz_aviso", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+        regla.onNodeWithTag("lab_biz_activo", useUnmergedTree = true).performScrollTo().assertIsNotEnabled()
+        assertFalse(llamo("ajusteLab:lab_biz_activo"))
+        regla.onNodeWithTag("lab_biz_ack", useUnmergedTree = true).performScrollTo().performClick()
+        regla.espera { llamo("ajusteLab:lab_biz_ack:1") }
+        regla.espera { runCatching { regla.onNodeWithTag("lab_biz_activo", useUnmergedTree = true).assertIsEnabled() }.isSuccess }
+        regla.onNodeWithTag("lab_biz_activo", useUnmergedTree = true).performClick()
+        regla.espera { llamo("ajusteLab:lab_biz_activo:1") }
+    }
+
     @Test fun elTipoDeBotonesYLasVersionesSeGuardan() {
         encendido()
         principal()

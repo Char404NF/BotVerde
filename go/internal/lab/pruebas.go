@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	waBinary "go.mau.fi/whatsmeow/binary"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 
 	"botchat/internal/almacen"
@@ -37,6 +38,26 @@ func Plan() []Prueba {
 	return out
 }
 
+// PlanBiz son las pruebas experimentales «Interactivo + biz». La pantalla solo las ofrece con su interruptor y su casilla activos.
+func PlanBiz() []Prueba {
+	var out []Prueba
+	for _, n := range []int{1, 3} {
+		out = append(out, Prueba{almacen.LabInteractivoBiz, n, fmt.Sprintf("Interactivo + biz (experimental, %d)", n)})
+	}
+	return out
+}
+
+// BizHabilitado dice si la prueba «Interactivo + biz» puede enviarse: interruptor propio Y casilla de riesgo.
+func (s *Servicio) BizHabilitado() error {
+	if s.aj("lab_biz_activo") != "1" {
+		return ErrBizApagado
+	}
+	if s.aj("lab_biz_ack") != "1" {
+		return ErrBizSinAck
+	}
+	return nil
+}
+
 func existe(tipo string, n int) bool {
 	if n < 1 || n > 32 {
 		return false
@@ -46,6 +67,8 @@ func existe(tipo string, n int) bool {
 		return n >= 2
 	case almacen.LabBotones, almacen.LabInteractivo, almacen.LabLista:
 		return true
+	case almacen.LabInteractivoBiz:
+		return n == 1 || n == 3
 	}
 	return false
 }
@@ -58,6 +81,15 @@ func (s *Servicio) EnviarPrueba(ctx context.Context, tipo string, variante int) 
 	}
 	if !existe(tipo, variante) {
 		return almacen.ResultadoLab{}, ErrTipo
+	}
+	var nodos []waBinary.Node
+	if tipo == almacen.LabInteractivoBiz {
+		if err := s.BizHabilitado(); err != nil {
+			return almacen.ResultadoLab{}, err
+		}
+		if _, ok := s.Env.(EmisorNodos); !ok {
+			return almacen.ResultadoLab{}, ErrTipo
+		}
 	}
 	chat := s.aj("lab_prueba_chat")
 	if chat == "" {
@@ -80,21 +112,27 @@ func (s *Servicio) EnviarPrueba(ctx context.Context, tipo string, variante int) 
 	}
 	exp := ahora.Add(time.Duration(maxInt(s.ajInt("lab_expira_min"), 1)) * time.Minute)
 	var sesID string
-	r, err := s.Env.EnviarInteractivo(ctx, chat, resumenTexto(&sp, ""), "", "",
-		func(id string, ci *waE2E.ContextInfo) *waE2E.Message {
-			m := s.armar(&sp, id)
-			ponerContexto(m, ci)
-			return m
-		},
-		func(id string, m *waE2E.Message) error {
-			ses := almacen.SesionLab{ID: id, Chat: chat, Persona: chat, Tipo: tipo, Origen: almacen.LabOrigenPrueba, PruebaID: rid,
-				TS: ahora.Unix(), ExpiraTS: exp.Unix(), Opciones: sp.Opciones, Secreto: m.GetMessageContextInfo().GetMessageSecret()}
-			if err := s.Alm.GuardarSesionLab(s.BotID, ses); err != nil {
-				return err
-			}
-			sesID = id
-			return nil
-		})
+	armar := func(id string, ci *waE2E.ContextInfo) *waE2E.Message {
+		m := s.armar(&sp, id)
+		ponerContexto(m, ci)
+		return m
+	}
+	antes := func(id string, m *waE2E.Message) error {
+		ses := almacen.SesionLab{ID: id, Chat: chat, Persona: chat, Tipo: tipo, Origen: almacen.LabOrigenPrueba, PruebaID: rid,
+			TS: ahora.Unix(), ExpiraTS: exp.Unix(), Opciones: sp.Opciones, Secreto: m.GetMessageContextInfo().GetMessageSecret()}
+		if err := s.Alm.GuardarSesionLab(s.BotID, ses); err != nil {
+			return err
+		}
+		sesID = id
+		return nil
+	}
+	var r envio.Resultado
+	if tipo == almacen.LabInteractivoBiz {
+		nodos = []waBinary.Node{NodoBiz(ahora, nil)}
+		r, err = s.Env.(EmisorNodos).EnviarInteractivoNodos(ctx, chat, resumenTexto(&sp, ""), "", "", armar, antes, nodos)
+	} else {
+		r, err = s.Env.EnviarInteractivo(ctx, chat, resumenTexto(&sp, ""), "", "", armar, antes)
+	}
 	if err != nil {
 		if sesID != "" {
 			s.Alm.BorrarSesionLab(s.BotID, sesID)

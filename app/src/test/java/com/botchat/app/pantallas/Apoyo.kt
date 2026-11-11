@@ -440,7 +440,7 @@ class MotorFalso : Motor {
     }
     // Laboratorio (bloque G)
     var labAj = mutableMapOf("lab_activo" to "0", "lab_aviso_ts" to "0", "lab_modo_menu" to "texto", "lab_grupos" to "0", "lab_enc_max_opc" to "12", "lab_expira_min" to "120",
-        "lab_respaldo_enc" to "0", "lab_respaldo_bot" to "1", "lab_botones_tipo" to "auto", "lab_prueba_chat" to "", "lab_prueba_hora" to "4", "lab_prueba_dia" to "12", "lab_version_wa" to "")
+        "lab_respaldo_enc" to "0", "lab_respaldo_bot" to "1", "lab_botones_tipo" to "auto", "lab_prueba_chat" to "", "lab_prueba_hora" to "4", "lab_prueba_dia" to "12", "lab_version_wa" to "", "lab_biz_activo" to "0", "lab_biz_ack" to "0")
     var labResultados = mutableListOf<JSONObject>()
     var labEnMarcha = true
     private fun labLimite(): Int = labResultados.filter { it.getString("tipo") == "encuesta" && it.getInt("visible") == 1 && it.getInt("tocable") != 0 }.maxOfOrNull { it.getString("variante").toInt() } ?: 0
@@ -457,7 +457,7 @@ class MotorFalso : Motor {
             .put("expiraMin", labAj["lab_expira_min"]!!.toInt()).put("respaldoEnc", labAj["lab_respaldo_enc"] == "1").put("respaldoBot", labAj["lab_respaldo_bot"] == "1")
             .put("botonesTipo", labAj["lab_botones_tipo"]).put("pruebaChat", labAj["lab_prueba_chat"]).put("pruebaHora", labAj["lab_prueba_hora"]!!.toInt())
             .put("pruebaDia", labAj["lab_prueba_dia"]!!.toInt()).put("versionWa", labAj["lab_version_wa"]).put("versionCliente", "2.3000.1").put("enMarcha", labEnMarcha)
-            .put("limiteMedido", labLimite()).put("pruebasHora", labResultados.size).put("pruebasDia", labResultados.size).put("plan", plan).toString()
+            .put("limiteMedido", labLimite()).put("pruebasHora", labResultados.size).put("pruebasDia", labResultados.size).put("plan", plan).put("bizActivo", labAj["lab_biz_activo"] == "1").put("bizAck", labAj["lab_biz_ack"] == "1").toString()
     }
     override fun aceptarAvisoLab(bot: Long) { llamadas += "aceptarAvisoLab"; rFalla(); labAj["lab_aviso_ts"] = "1700000000" }
     override fun fijarAjusteLab(bot: Long, clave: String, valor: String) {

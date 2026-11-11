@@ -185,6 +185,8 @@ var ajustesBotDefecto = map[string]string{
 	"lab_prueba_chat":  "",      // mi otro número o grupo de prueba (clave del chat)
 	"lab_prueba_hora":  "4",     // pruebas por hora
 	"lab_prueba_dia":   "12",    // pruebas por día
+	"lab_biz_activo":   "0",     // interruptor propio de la prueba experimental "Interactivo + biz" (apagado)
+	"lab_biz_ack":      "0",     // casilla "Entiendo que puede bloquear mi número" de esa prueba
 	"lab_version_wa":   "",      // versión de WhatsApp del teléfono que recibe las pruebas
 }
 

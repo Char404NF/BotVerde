@@ -70,6 +70,7 @@ internal fun nombreTipoLab(tipo: String) = when (tipo) {
     "botones" -> "Botones"
     "lista" -> "Lista"
     "interactivo" -> "Interactivo"
+    "interactivo_biz" -> "Interactivo + biz"
     else -> tipo
 }
 
@@ -187,6 +188,23 @@ fun PantallaLaboratorio(botId: Long, alVolver: () -> Unit, alAviso: () -> Unit, 
                     FilaSwitchLab("Mandar también el texto con números", "Recomendado: si los botones no se ven, la persona puede contestar con el número.", e.respaldoBot, "lab_respaldo_bot") { fijar("lab_respaldo_bot", if (it) "1" else "0") }
                 }
             }
+            // Prueba experimental: Interactivo + biz
+            Card(Modifier.fillMaxWidth().testTag("tarjeta_biz"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+                Column(Modifier.padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
+                    Text("Interactivo + biz (experimental)", style = MaterialTheme.typography.titleMedium)
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer), modifier = Modifier.fillMaxWidth().testTag("lab_biz_aviso")) {
+                        Column(Modifier.padding(Esp.m), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
+                            Text("RIESGO: puede bloquear tu número.", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                            Text("Esta prueba añade a mano un nodo interno «biz» (el que propone el PR #1235 de whatsmeow) para ver si los botones aparecen. WhatsApp no lo espera de una cuenta que no sea oficial de empresa y puede limitar o bloquear el número. Solo se manda al chat de prueba, nunca a clientes ni en el menú real. Usa un número secundario.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(e.bizAck, { fijar("lab_biz_ack", if (it) "1" else "0") }, Modifier.testTag("lab_biz_ack"))
+                        Text("Entiendo que puede bloquear mi número", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    }
+                    FilaSwitchLab("Activar la prueba", if (e.bizAck) "Apagada por defecto. Aparece en la matriz de pruebas." else "Marca primero la casilla.", e.bizActivo && e.bizAck, "lab_biz_activo", habilitado = e.bizAck) { fijar("lab_biz_activo", if (it) "1" else "0") }
+                }
+            }
             // Pruebas
             Card(Modifier.fillMaxWidth().testTag("tarjeta_pruebas"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
                 Column(Modifier.padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
@@ -211,13 +229,13 @@ fun PantallaLaboratorio(botId: Long, alVolver: () -> Unit, alAviso: () -> Unit, 
 }
 
 @Composable
-private fun FilaSwitchLab(titulo: String, ayuda: String, valor: Boolean, tag: String, alCambiar: (Boolean) -> Unit) {
+private fun FilaSwitchLab(titulo: String, ayuda: String, valor: Boolean, tag: String, habilitado: Boolean = true, alCambiar: (Boolean) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(titulo, style = MaterialTheme.typography.bodyLarge)
             Text(ayuda, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(valor, alCambiar, Modifier.testTag(tag))
+        Switch(valor, alCambiar, Modifier.testTag(tag), enabled = habilitado)
     }
 }
 

@@ -3,7 +3,9 @@
 //
 // Reglas del paquete:
 //   - Solo usa lo que la librería hace por defecto (BuildPollCreation, ButtonsMessage, ListMessage, InteractiveMessage con quick_reply).
-//     No se simula ser una cuenta Business, no se cambia el tipo de dispositivo y no se inventan nodos <biz>.
+//     No se simula ser una cuenta Business y no se cambia el tipo de dispositivo. No se inventan nodos <biz>, con UNA excepción pedida
+//     por el dueño: la prueba experimental «Interactivo + biz» (biz.go), solo del Laboratorio, solo al chat de prueba, con su propio
+//     interruptor apagado y casilla de riesgo.
 //   - Nada corre en el manejador de eventos: wabot solo encola y el trabajador llama a Recibir.
 //   - Apagado por defecto. Hace falta el interruptor Y haber aceptado el aviso de riesgo.
 package lab
@@ -18,6 +20,7 @@ import (
 	"time"
 
 	"go.mau.fi/whatsmeow"
+	waBinary "go.mau.fi/whatsmeow/binary"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/types"
@@ -54,6 +57,8 @@ var (
 	ErrSinDestino = errors.New("Falta elegir el chat de prueba (tu otro número o un grupo de prueba).")
 	ErrTope       = errors.New("Llegaste al tope de pruebas. Espera un rato o súbelo en los ajustes del Laboratorio.")
 	ErrTipo       = errors.New("Esa prueba no existe.")
+	ErrBizApagado = errors.New("La prueba experimental «Interactivo + biz» está apagada.")
+	ErrBizSinAck  = errors.New("Falta marcar «Entiendo que puede bloquear mi número» para la prueba «Interactivo + biz».")
 )
 
 // Cliente es lo que se usa de whatsmeow (para poder probar sin red).
@@ -79,6 +84,12 @@ func (r Real) VersionCliente() string { return store.GetWAVersion().String() }
 type Emisor interface {
 	EnviarInteractivo(ctx context.Context, chat, resumen, citaID, citaAutorWA string, armar func(id string, ci *waE2E.ContextInfo) *waE2E.Message,
 		antes func(id string, m *waE2E.Message) error) (envio.Resultado, error)
+}
+
+// EmisorNodos es el Emisor que además puede añadir nodos al envío (solo la prueba experimental «Interactivo + biz»).
+type EmisorNodos interface {
+	EnviarInteractivoNodos(ctx context.Context, chat, resumen, citaID, citaAutorWA string, armar func(id string, ci *waE2E.ContextInfo) *waE2E.Message,
+		antes func(id string, m *waE2E.Message) error, nodos []waBinary.Node) (envio.Resultado, error)
 }
 
 // Servicio es el Laboratorio de un bot.

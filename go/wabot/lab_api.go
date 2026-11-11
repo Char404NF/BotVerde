@@ -107,6 +107,8 @@ type estadoLab struct {
 	PruebasHora    int          `json:"pruebasHora"`
 	PruebasDia     int          `json:"pruebasDia"`
 	Plan           []lab.Prueba `json:"plan"`
+	BizActivo      bool         `json:"bizActivo"`
+	BizAck         bool         `json:"bizAck"`
 }
 
 // EstadoLab devuelve (JSON) los ajustes del Laboratorio y lo que se puede probar.
@@ -123,6 +125,10 @@ func EstadoLab(botID int64) (string, error) {
 		EncMax: n("lab_enc_max_opc"), ExpiraMin: n("lab_expira_min"), RespaldoEnc: aj("lab_respaldo_enc") == "1", RespaldoBot: aj("lab_respaldo_bot") == "1",
 		BotonesTipo: aj("lab_botones_tipo"), PruebaChat: aj("lab_prueba_chat"), PruebaHora: n("lab_prueba_hora"), PruebaDia: n("lab_prueba_dia"),
 		VersionWA: aj("lab_version_wa"), Plan: lab.Plan(),
+		BizActivo: aj("lab_biz_activo") == "1", BizAck: aj("lab_biz_ack") == "1",
+	}
+	if e.BizActivo && e.BizAck {
+		e.Plan = append(e.Plan, lab.PlanBiz()...)
 	}
 	e.ModoEfectivo = lab.ModoTexto
 	if e.Activo && e.AvisoAceptado {
@@ -177,6 +183,27 @@ func FijarAjusteLab(botID int64, clave, valor string) error {
 		}
 		if valor == "1" && !aviso {
 			return lab.ErrSinAviso
+		}
+	case "lab_biz_ack":
+		if err := num(0, 1); err != nil {
+			return err
+		}
+		if valor == "0" { // quitar la casilla apaga también la prueba
+			if err := a.FijarAjusteBot(botID, "lab_biz_activo", "0"); err != nil {
+				return err
+			}
+		}
+	case "lab_biz_activo":
+		if err := num(0, 1); err != nil {
+			return err
+		}
+		if valor == "1" {
+			if !aviso {
+				return lab.ErrSinAviso
+			}
+			if a.AjusteBot(botID, "lab_biz_ack") != "1" {
+				return lab.ErrBizSinAck
+			}
 		}
 	case "lab_modo_menu":
 		if valor != lab.ModoTexto && valor != lab.ModoEncuesta && valor != lab.ModoBotones {

@@ -10,6 +10,7 @@ import (
 	"botchat/internal/identidad"
 
 	"go.mau.fi/whatsmeow"
+	waBinary "go.mau.fi/whatsmeow/binary"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"google.golang.org/protobuf/proto"
@@ -101,7 +102,7 @@ func (s *Servicio) EnviarContactoAuto(ctx context.Context, chat, nombre, telefon
 
 // enviarEspecial guarda primero el mensaje (se ve en el chat) y lo manda; `armar` construye el mensaje de WhatsApp con la cita.
 func (s *Servicio) enviarEspecial(ctx context.Context, chat, tipo, texto, citaID, citaAutorWA string, armar func(ci *waE2E.ContextInfo) *waE2E.Message) (Resultado, error) {
-	return s.enviarEspecialID(ctx, chat, tipo, texto, citaID, citaAutorWA, func(_ string, ci *waE2E.ContextInfo) *waE2E.Message { return armar(ci) }, nil)
+	return s.enviarEspecialID(ctx, chat, tipo, texto, citaID, citaAutorWA, func(_ string, ci *waE2E.ContextInfo) *waE2E.Message { return armar(ci) }, nil, nil)
 }
 
 // EnviarInteractivo manda un mensaje interactivo del Laboratorio (encuesta, botones, lista) como automático. En el chat se guarda
@@ -109,10 +110,16 @@ func (s *Servicio) enviarEspecial(ctx context.Context, chat, tipo, texto, citaID
 // mensaje ya armado justo antes de enviar: si devuelve error no se envía. Así el Laboratorio guarda su sesión antes de que pueda
 // llegar la primera respuesta.
 func (s *Servicio) EnviarInteractivo(ctx context.Context, chat, resumen, citaID, citaAutorWA string, armar func(id string, ci *waE2E.ContextInfo) *waE2E.Message, antes func(id string, m *waE2E.Message) error) (Resultado, error) {
-	return s.enviarEspecialID(ctx, chat, almacen.TipoTexto, resumen, citaID, citaAutorWA, armar, antes)
+	return s.enviarEspecialID(ctx, chat, almacen.TipoTexto, resumen, citaID, citaAutorWA, armar, antes, nil)
 }
 
-func (s *Servicio) enviarEspecialID(ctx context.Context, chat, tipo, texto, citaID, citaAutorWA string, armar func(id string, ci *waE2E.ContextInfo) *waE2E.Message, antes func(id string, m *waE2E.Message) error) (Resultado, error) {
+// EnviarInteractivoNodos es EnviarInteractivo con nodos adicionales en el envío (SendRequestExtra.AdditionalNodes). Solo lo usa la
+// prueba experimental del Laboratorio "Interactivo + biz" (pedida por el dueño); el menú real nunca pasa por aquí.
+func (s *Servicio) EnviarInteractivoNodos(ctx context.Context, chat, resumen, citaID, citaAutorWA string, armar func(id string, ci *waE2E.ContextInfo) *waE2E.Message, antes func(id string, m *waE2E.Message) error, nodos []waBinary.Node) (Resultado, error) {
+	return s.enviarEspecialID(ctx, chat, almacen.TipoTexto, resumen, citaID, citaAutorWA, armar, antes, nodos)
+}
+
+func (s *Servicio) enviarEspecialID(ctx context.Context, chat, tipo, texto, citaID, citaAutorWA string, armar func(id string, ci *waE2E.ContextInfo) *waE2E.Message, antes func(id string, m *waE2E.Message) error, nodos []waBinary.Node) (Resultado, error) {
 	j, err := parsea(chat)
 	if err != nil {
 		return Resultado{}, err
@@ -150,7 +157,11 @@ func (s *Servicio) enviarEspecialID(ctx context.Context, chat, tipo, texto, cita
 	}
 	s.RegistrarEnvio(m.ID)
 	s.recordarAutor(m.ID, citaAutorWA)
-	if _, err := s.Cli.SendMessage(ctx, j, wm, whatsmeow.SendRequestExtra{ID: types.MessageID(m.ID)}); err != nil {
+	extra := whatsmeow.SendRequestExtra{ID: types.MessageID(m.ID)}
+	if len(nodos) > 0 {
+		extra.AdditionalNodes = &nodos
+	}
+	if _, err := s.Cli.SendMessage(ctx, j, wm, extra); err != nil {
 		_ = s.Alm.EstadoDeEnvio(s.BotID, chat, m.ID, "fallido")
 		s.Log("No se pudo enviar un mensaje: " + err.Error())
 		return res, err

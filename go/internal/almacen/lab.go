@@ -18,6 +18,8 @@ const (
 	LabBotones     = "botones"
 	LabLista       = "lista"
 	LabInteractivo = "interactivo"
+	// LabInteractivoBiz: prueba experimental (solo Laboratorio, solo chat de prueba) que añade el nodo <biz> del PR #1235 de whatsmeow.
+	LabInteractivoBiz = "interactivo_biz"
 )
 
 // Estados de una sesión.

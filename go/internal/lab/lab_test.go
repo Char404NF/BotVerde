@@ -1,6 +1,7 @@
 package lab
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"go.mau.fi/whatsmeow"
+	waBinary "go.mau.fi/whatsmeow/binary"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/types"
@@ -85,6 +87,14 @@ type emisorFalso struct {
 	chats    []string
 	resumen  []string
 	falla    error
+	nodos    [][]waBinary.Node
+}
+
+func (e *emisorFalso) EnviarInteractivoNodos(c context.Context, chat, resumen, citaID, citaAutorWA string, armar func(string, *waE2E.ContextInfo) *waE2E.Message, antes func(string, *waE2E.Message) error, nodos []waBinary.Node) (envio.Resultado, error) {
+	e.mu.Lock()
+	e.nodos = append(e.nodos, nodos)
+	e.mu.Unlock()
+	return e.EnviarInteractivo(c, chat, resumen, citaID, citaAutorWA, armar, antes)
 }
 
 func (e *emisorFalso) EnviarInteractivo(_ context.Context, chat, resumen, citaID, citaAutorWA string, armar func(string, *waE2E.ContextInfo) *waE2E.Message, antes func(string, *waE2E.Message) error) (envio.Resultado, error) {
@@ -669,5 +679,93 @@ func TestPlanYLimiteMedido(t *testing.T) {
 	}
 	if LimiteMedido(nil) != 0 {
 		t.Fatal("sin datos")
+	}
+}
+
+func TestNodoBizTieneLaEstructuraDelPR1235(t *testing.T) {
+	ahora := time.Unix(1700000123, 0)
+	n := NodoBiz(ahora, bytes.NewReader(bytes.Repeat([]byte{0xab}, 20)))
+	if n.Tag != "biz" || n.Attrs["actual_actors"] != "2" || n.Attrs["host_storage"] != "2" || n.Attrs["privacy_mode_ts"] != "1700000123" {
+		t.Fatalf("biz: %+v", n)
+	}
+	h := n.GetChildren()
+	if len(h) != 2 || h[0].Tag != "interactive" || h[1].Tag != "quality_control" {
+		t.Fatalf("hijos: %+v", h)
+	}
+	if h[0].Attrs["type"] != "native_flow" || h[0].Attrs["v"] != "1" {
+		t.Fatalf("interactive: %+v", h[0].Attrs)
+	}
+	nf := h[0].GetChildren()
+	if len(nf) != 1 || nf[0].Tag != "native_flow" || nf[0].Attrs["v"] != "9" || nf[0].Attrs["name"] != "mixed" {
+		t.Fatalf("native_flow: %+v", nf)
+	}
+	if h[1].Attrs["source_type"] != "third_party" || h[1].Attrs["decision_id"] != strings.Repeat("ab", 20) {
+		t.Fatalf("quality_control: %+v", h[1].Attrs)
+	}
+	ds := h[1].GetChildren()
+	if len(ds) != 1 || ds[0].Tag != "decision_source" || ds[0].Attrs["value"] != "df" {
+		t.Fatalf("decision_source: %+v", ds)
+	}
+	// el decision_id cambia en cada mensaje
+	a, b := NodoBiz(ahora, nil), NodoBiz(ahora, nil)
+	if a.GetChildren()[1].Attrs["decision_id"] == b.GetChildren()[1].Attrs["decision_id"] {
+		t.Fatal("decision_id debe ser al azar")
+	}
+}
+
+func TestPruebaBizSoloConInterruptorCasillaYTope(t *testing.T) {
+	e := nuevoEntorno(t)
+	c := context.Background()
+	e.enciende("texto")
+	e.fija("lab_prueba_chat", jidVotante)
+	if len(PlanBiz()) != 2 {
+		t.Fatal("plan biz: 1 y 3 botones")
+	}
+	for _, p := range Plan() {
+		if p.Tipo == almacen.LabInteractivoBiz {
+			t.Fatal("el plan normal no ofrece biz")
+		}
+	}
+	if _, err := e.s.EnviarPrueba(c, almacen.LabInteractivoBiz, 1); err != ErrBizApagado {
+		t.Fatalf("sin interruptor: %v", err)
+	}
+	e.fija("lab_biz_activo", "1")
+	if _, err := e.s.EnviarPrueba(c, almacen.LabInteractivoBiz, 1); err != ErrBizSinAck {
+		t.Fatalf("sin casilla: %v", err)
+	}
+	e.fija("lab_biz_activo", "0")
+	e.fija("lab_biz_ack", "1")
+	if _, err := e.s.EnviarPrueba(c, almacen.LabInteractivoBiz, 1); err != ErrBizApagado {
+		t.Fatalf("casilla sin interruptor: %v", err)
+	}
+	if len(e.em.enviados) != 0 || len(e.em.nodos) != 0 {
+		t.Fatal("no debe enviarse nada")
+	}
+	e.fija("lab_biz_activo", "1")
+	if _, err := e.s.EnviarPrueba(c, almacen.LabInteractivoBiz, 2); err != ErrTipo {
+		t.Fatalf("variante: %v", err)
+	}
+	e.fija("lab_prueba_hora", "1")
+	r, err := e.s.EnviarPrueba(c, almacen.LabInteractivoBiz, 3)
+	if err != nil || r.Enviado != 1 || r.Tipo != "interactivo_biz" {
+		t.Fatalf("envío: %+v %v", r, err)
+	}
+	if len(e.em.nodos) != 1 || len(e.em.nodos[0]) != 1 || e.em.nodos[0][0].Tag != "biz" {
+		t.Fatalf("nodos: %+v", e.em.nodos)
+	}
+	if im := e.em.enviados[0].GetInteractiveMessage(); im == nil || len(im.GetNativeFlowMessage().GetButtons()) != 3 {
+		t.Fatal("3 botones quick_reply")
+	}
+	if _, err := e.s.EnviarPrueba(c, almacen.LabInteractivoBiz, 1); err != ErrTope {
+		t.Fatalf("tope: %v", err)
+	}
+	// el menú real nunca usa biz, aunque el modo sea botones/interactivo
+	e.fija("lab_botones_tipo", "interactivo")
+	e.enciende("botones")
+	e.s.Modo()
+	n := len(e.em.nodos)
+	_, _, _ = e.s.EnviarMenu(c, jidVotante, jidVotante, menu(3), "", "", "")
+	if len(e.em.nodos) != n {
+		t.Fatal("el menú real no añade nodos")
 	}
 }
