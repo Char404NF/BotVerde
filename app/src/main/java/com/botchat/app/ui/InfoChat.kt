@@ -87,6 +87,7 @@ fun PantallaInfoChat(botId: Long, jid: String, alVolver: () -> Unit, alAbrirViso
             Column {
                 TopAppBar(navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text("Info del chat") })
                 CabeceraInfo(chat, jid)
+                chat?.let { c -> if (c.esGrupo) TarjetaPoliticaGrupo(botId, jid, c.nombre) else TarjetaRango(botId, jid, c.nombre) }
                 PrimaryTabRow(pager.currentPage) {
                     PESTANAS_INFO.forEachIndexed { i, titulo -> Tab(pager.currentPage == i, { haptica(Toque.Suave); scope.launch { pager.animateScrollToPage(i) } }, text = { Text(titulo) }) }
                 }

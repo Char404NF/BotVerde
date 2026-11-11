@@ -82,6 +82,34 @@ interface Motor {
     fun etiquetaDeChat(bot: Long, chat: String): String
     fun obtenerAviso(bot: Long, id: Long): String
     fun configurarFlujo(expiraMin: Long)
+
+    // Rangos y permisos (0.5.0, bloque A)
+    fun catalogoPermisos(): String
+    fun listarRangos(bot: Long): String
+    fun obtenerRango(bot: Long, id: Long): String
+    fun guardarRango(bot: Long, rolJson: String): Long
+    fun borrarRango(bot: Long, id: Long): Long
+    fun reordenarRangos(bot: Long, idsJson: String)
+    fun asignarRango(bot: Long, persona: String, rolId: Long, duracion: String)
+    fun revocarRango(bot: Long, persona: String)
+    fun rangoDePersona(bot: Long, persona: String): String
+    fun listarAsignaciones(bot: Long): String
+    fun listarSolicitudes(bot: Long, estado: String): String
+    fun contarSolicitudes(bot: Long): Long
+    fun aprobarSolicitud(bot: Long, persona: String)
+    fun bloquearSolicitud(bot: Long, persona: String)
+    fun ignorarSolicitud(bot: Long, persona: String)
+    fun quitarSolicitud(bot: Long, persona: String)
+    fun politicaDeGrupo(bot: Long, chat: String): String
+    fun fijarPoliticaDeGrupo(bot: Long, politicaJson: String)
+    fun listarPoliticasDeGrupo(bot: Long): String
+    fun ajustesDePermisos(bot: Long): String
+    fun fijarAjusteDePermisos(bot: Long, clave: String, valor: String)
+    fun confirmacionesPendientes(bot: Long): String
+    fun confirmarCodigo(bot: Long, codigo: String): String
+    fun cancelarConfirmacion(bot: Long, codigo: String)
+    fun ejecutarComando(bot: Long, texto: String): String
+    fun listarAcciones(bot: Long, limite: Long, antesId: Long): String
 }
 
 /** El módulo Go de verdad (whatsmeow + almacén cifrado). */
@@ -163,4 +191,30 @@ object MotorGo : Motor {
     override fun etiquetaDeChat(bot: Long, chat: String) = Wabot.etiquetaDeChat(bot, chat)
     override fun obtenerAviso(bot: Long, id: Long) = Wabot.obtenerAviso(bot, id)
     override fun configurarFlujo(expiraMin: Long) = Wabot.configurarFlujo(expiraMin)
+    override fun catalogoPermisos() = Wabot.catalogoPermisos()
+    override fun listarRangos(bot: Long) = Wabot.listarRangos(bot)
+    override fun obtenerRango(bot: Long, id: Long) = Wabot.obtenerRango(bot, id)
+    override fun guardarRango(bot: Long, rolJson: String) = Wabot.guardarRango(bot, rolJson)
+    override fun borrarRango(bot: Long, id: Long) = Wabot.borrarRango(bot, id).toLong()
+    override fun reordenarRangos(bot: Long, idsJson: String) = Wabot.reordenarRangos(bot, idsJson)
+    override fun asignarRango(bot: Long, persona: String, rolId: Long, duracion: String) = Wabot.asignarRango(bot, persona, rolId, duracion)
+    override fun revocarRango(bot: Long, persona: String) = Wabot.revocarRango(bot, persona)
+    override fun rangoDePersona(bot: Long, persona: String) = Wabot.rangoDePersona(bot, persona)
+    override fun listarAsignaciones(bot: Long) = Wabot.listarAsignaciones(bot)
+    override fun listarSolicitudes(bot: Long, estado: String) = Wabot.listarSolicitudes(bot, estado)
+    override fun contarSolicitudes(bot: Long) = Wabot.contarSolicitudes(bot).toLong()
+    override fun aprobarSolicitud(bot: Long, persona: String) = Wabot.aprobarSolicitud(bot, persona)
+    override fun bloquearSolicitud(bot: Long, persona: String) = Wabot.bloquearSolicitud(bot, persona)
+    override fun ignorarSolicitud(bot: Long, persona: String) = Wabot.ignorarSolicitud(bot, persona)
+    override fun quitarSolicitud(bot: Long, persona: String) = Wabot.quitarSolicitud(bot, persona)
+    override fun politicaDeGrupo(bot: Long, chat: String) = Wabot.politicaDeGrupo(bot, chat)
+    override fun fijarPoliticaDeGrupo(bot: Long, politicaJson: String) = Wabot.fijarPoliticaDeGrupo(bot, politicaJson)
+    override fun listarPoliticasDeGrupo(bot: Long) = Wabot.listarPoliticasDeGrupo(bot)
+    override fun ajustesDePermisos(bot: Long) = Wabot.ajustesDePermisos(bot)
+    override fun fijarAjusteDePermisos(bot: Long, clave: String, valor: String) = Wabot.fijarAjusteDePermisos(bot, clave, valor)
+    override fun confirmacionesPendientes(bot: Long) = Wabot.confirmacionesPendientes(bot)
+    override fun confirmarCodigo(bot: Long, codigo: String) = Wabot.confirmarCodigo(bot, codigo)
+    override fun cancelarConfirmacion(bot: Long, codigo: String) = Wabot.cancelarConfirmacion(bot, codigo)
+    override fun ejecutarComando(bot: Long, texto: String) = Wabot.ejecutarComando(bot, texto)
+    override fun listarAcciones(bot: Long, limite: Long, antesId: Long) = Wabot.listarAcciones(bot, limite, antesId)
 }

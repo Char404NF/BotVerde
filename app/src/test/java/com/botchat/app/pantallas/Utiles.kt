@@ -35,3 +35,7 @@ fun ComposeContentTestRule.desplazaLista(indice: Int, etiqueta: String = "lista_
         try { onNodeWithTag(etiqueta).performScrollToIndex(indice); true } catch (e: IllegalArgumentException) { false }
     }
 }
+
+fun ComposeContentTestRule.esperaSinTexto(texto: String, substring: Boolean = false) {
+    espera { onAllNodesWithTextSafe(texto, substring) == 0 }
+}

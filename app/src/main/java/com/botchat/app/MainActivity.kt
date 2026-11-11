@@ -44,6 +44,7 @@ class MainActivity : FragmentActivity() {
     /** Si la app se abrió desde una notificación de mensaje, abre ese chat. */
     private fun pideChatDe(i: android.content.Intent?) {
         i?.getStringExtra(Notificador.EXTRA_CHAT)?.let { NavegarA.chat.value = it; i.removeExtra(Notificador.EXTRA_CHAT) }
+        i?.getStringExtra(Notificador.EXTRA_RUTA)?.let { NavegarA.ruta.value = it; i.removeExtra(Notificador.EXTRA_RUTA) }
     }
 
     override fun onStop() {

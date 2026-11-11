@@ -20,7 +20,10 @@ object Repo {
     private lateinit var raiz: File
     private val cambiosInternos = MutableSharedFlow<List<String>>(extraBufferCapacity = 64)
 
-    /** Eventos en vivo: "chats", "chat:<jid>", "msg:<jid>:<id>" (cambió ese mensaje), "archivo:<jid>:<id>" y "espacio". */
+    /**
+     * Eventos en vivo: "chats", "chat:<jid>", "msg:<jid>:<id>" (cambió ese mensaje), "archivo:<jid>:<id>" y "espacio".
+     * Rangos y permisos: "rangos", "rango:<persona>", "solicitudes", "confirmaciones", "politicas", "acciones" y "permisos_ajustes".
+     */
     val cambios: SharedFlow<List<String>> = cambiosInternos.asSharedFlow()
 
     /** Mensaje de error si no se pudo abrir el almacén (por ejemplo, la llave de datos no está disponible). */
@@ -149,6 +152,36 @@ object Repo {
     suspend fun estadisticasMenu(bot: Long, id: Long, desde: String, hasta: String, prueba: Boolean) = io { JsonAuto.estadisticas(motor.estadisticasAutomatizacion(bot, id, desde, hasta, prueba)) }
     suspend fun etiquetaChat(bot: Long, chat: String) = io { JsonAuto.etiquetas(motor.etiquetaDeChat(bot, chat)) }
     suspend fun aviso(bot: Long, id: Long) = io { JsonAuto.aviso(motor.obtenerAviso(bot, id)) }
+
+    // Rangos y permisos
+    suspend fun catalogo() = io { JsonPerm.casillas(motor.catalogoPermisos()) }
+    suspend fun rangos(bot: Long) = io { JsonPerm.rangos(motor.listarRangos(bot)) }
+    suspend fun rango(bot: Long, id: Long) = io { JsonPerm.rangoOpt(motor.obtenerRango(bot, id)) }
+    suspend fun guardarRango(bot: Long, r: Rango) = io { motor.guardarRango(bot, r.json()) }
+    suspend fun borrarRango(bot: Long, id: Long) = io { motor.borrarRango(bot, id).toInt() }
+    suspend fun reordenarRangos(bot: Long, ids: List<Long>) = io { motor.reordenarRangos(bot, JSONArray(ids).toString()) }
+    /** duracion: "24h", "7d" o "perm". */
+    suspend fun asignarRango(bot: Long, persona: String, rolId: Long, duracion: String) = io { motor.asignarRango(bot, persona, rolId, duracion) }
+    suspend fun revocarRango(bot: Long, persona: String) = io { motor.revocarRango(bot, persona) }
+    suspend fun rangoDe(bot: Long, persona: String) = io { JsonPerm.rangoDePersona(motor.rangoDePersona(bot, persona)) }
+    suspend fun asignaciones(bot: Long) = io { JsonPerm.asignaciones(motor.listarAsignaciones(bot)) }
+    suspend fun solicitudes(bot: Long, estado: String = "pendiente") = io { JsonPerm.solicitudes(motor.listarSolicitudes(bot, estado)) }
+    suspend fun contarSolicitudes(bot: Long) = io { motor.contarSolicitudes(bot).toInt() }
+    suspend fun aprobarSolicitud(bot: Long, persona: String) = io { motor.aprobarSolicitud(bot, persona) }
+    suspend fun bloquearSolicitud(bot: Long, persona: String) = io { motor.bloquearSolicitud(bot, persona) }
+    suspend fun ignorarSolicitud(bot: Long, persona: String) = io { motor.ignorarSolicitud(bot, persona) }
+    suspend fun quitarSolicitud(bot: Long, persona: String) = io { motor.quitarSolicitud(bot, persona) }
+    suspend fun politicaGrupo(bot: Long, chat: String) = io { JsonPerm.politica(motor.politicaDeGrupo(bot, chat)) }
+    suspend fun fijarPoliticaGrupo(bot: Long, p: PoliticaGrupo) =
+        io { motor.fijarPoliticaDeGrupo(bot, org.json.JSONObject().put("chat", p.chat).put("modo", p.modo).put("lista", JSONArray(p.lista)).toString()) }
+    suspend fun politicasGrupo(bot: Long) = io { JsonPerm.politicas(motor.listarPoliticasDeGrupo(bot)) }
+    suspend fun ajustesPermisos(bot: Long) = io { JsonPerm.ajustes(motor.ajustesDePermisos(bot)) }
+    suspend fun fijarAjustePermisos(bot: Long, clave: String, valor: String) = io { motor.fijarAjusteDePermisos(bot, clave, valor) }
+    suspend fun confirmaciones(bot: Long) = io { JsonPerm.confirmaciones(motor.confirmacionesPendientes(bot)) }
+    suspend fun confirmarCodigo(bot: Long, codigo: String) = io { motor.confirmarCodigo(bot, codigo) }
+    suspend fun cancelarConfirmacion(bot: Long, codigo: String) = io { motor.cancelarConfirmacion(bot, codigo) }
+    suspend fun ejecutarComando(bot: Long, texto: String) = io { JsonPerm.comando(motor.ejecutarComando(bot, texto)) }
+    suspend fun acciones(bot: Long, limite: Int = 100, antesId: Long = 0) = io { JsonPerm.acciones(motor.listarAcciones(bot, limite.toLong(), antesId)) }
 
     suspend fun estadisticasChat(bot: Long, chat: String) = io { Json.resumenChat(motor.estadisticasChat(bot, chat)) }
     suspend fun calendario(bot: Long, chat: String, mes: String) = io { Json.calendario(motor.calendarioChat(bot, chat, mes)) }

@@ -168,6 +168,52 @@ class MotorFalso : Motor {
     override fun etiquetaDeChat(bot: Long, chat: String) = etiqueta
     override fun obtenerAviso(bot: Long, id: Long) = aviso
     override fun configurarFlujo(expiraMin: Long) { llamadas += "flujo:$expiraMin" }
+    // Rangos y permisos (bloque A)
+    var catalogo = Apoyo.catalogoEjemplo
+    var rangos = Apoyo.rangosEjemplo
+    var rangoPersona = """{"rol":null,"asignacion":null,"bloqueada":false}"""
+    var solicitudesPor = mutableMapOf<String, String>()
+    var politicaGrupo = """{"chat":"","modo":"todos","lista":[]}"""
+    var politicas = "[]"
+    var ajustesPerm = """{"prefijo":"!","desconocidos":"menu","desconocidos_texto":"Gracias por escribir. Te contestamos pronto.","tope_pendientes":"50","ignorada_dias":"7","confirm_seg":"120","limite_sin_rango":"5","grupo_modo_defecto":"todos","registro_dias":"90"}"""
+    var confirmaciones = "[]"
+    var acciones = "[]"
+    var rangoFalla: String? = null
+    var comandoRespuesta = """{"manejado":true,"texto":"Esto puedes usar:\n• !ayuda"}"""
+    private fun rFalla() { rangoFalla?.let { throw IllegalStateException(it) } }
+    override fun catalogoPermisos() = catalogo
+    override fun listarRangos(bot: Long) = rangos
+    override fun obtenerRango(bot: Long, id: Long): String {
+        val a = JSONArray(rangos)
+        for (i in 0 until a.length()) if (a.getJSONObject(i).getLong("id") == id) return a.getJSONObject(i).toString()
+        return "null"
+    }
+    override fun guardarRango(bot: Long, rolJson: String): Long { llamadas += "guardarRango:$rolJson"; rFalla(); return JSONObject(rolJson).optLong("id").let { if (it == 0L) 77 else it } }
+    override fun borrarRango(bot: Long, id: Long): Long { llamadas += "borrarRango:$id"; return 0 }
+    override fun reordenarRangos(bot: Long, idsJson: String) { llamadas += "reordenarRangos:$idsJson" }
+    override fun asignarRango(bot: Long, persona: String, rolId: Long, duracion: String) { llamadas += "asignarRango:$persona:$rolId:$duracion"; rFalla() }
+    override fun revocarRango(bot: Long, persona: String) { llamadas += "revocarRango:$persona" }
+    override fun rangoDePersona(bot: Long, persona: String) = rangoPersona
+    override fun listarAsignaciones(bot: Long) = "[]"
+    override fun listarSolicitudes(bot: Long, estado: String) = solicitudesPor[estado] ?: "[]"
+    override fun contarSolicitudes(bot: Long) = JSONArray(solicitudesPor["pendiente"] ?: "[]").length().toLong()
+    override fun aprobarSolicitud(bot: Long, persona: String) { llamadas += "aprobar:$persona" }
+    override fun bloquearSolicitud(bot: Long, persona: String) { llamadas += "bloquear:$persona" }
+    override fun ignorarSolicitud(bot: Long, persona: String) { llamadas += "ignorar:$persona" }
+    override fun quitarSolicitud(bot: Long, persona: String) { llamadas += "quitarSolicitud:$persona" }
+    override fun politicaDeGrupo(bot: Long, chat: String) = politicaGrupo
+    override fun fijarPoliticaDeGrupo(bot: Long, politicaJson: String) { llamadas += "politicaGrupo:$politicaJson" }
+    override fun listarPoliticasDeGrupo(bot: Long) = politicas
+    override fun ajustesDePermisos(bot: Long) = ajustesPerm
+    override fun fijarAjusteDePermisos(bot: Long, clave: String, valor: String) {
+        llamadas += "ajustePerm:$clave:$valor"; rFalla()
+        ajustesPerm = JSONObject(ajustesPerm).put(clave, valor).toString()
+    }
+    override fun confirmacionesPendientes(bot: Long) = confirmaciones
+    override fun confirmarCodigo(bot: Long, codigo: String): String { llamadas += "confirmar:$codigo"; confirmaciones = "[]"; return "Listo." }
+    override fun cancelarConfirmacion(bot: Long, codigo: String) { llamadas += "cancelarConfirmacion:$codigo"; confirmaciones = "[]" }
+    override fun ejecutarComando(bot: Long, texto: String): String { llamadas += "comando:$texto"; return comandoRespuesta }
+    override fun listarAcciones(bot: Long, limite: Long, antesId: Long) = acciones
     override fun configurarMotor(activo: Boolean, ventanaMin: Long) { llamadas += "motor:$activo:$ventanaMin" }
     override fun actividadMotor(bot: Long, limite: Long) = actividad
     override fun botEnChat(bot: Long, chat: String, activo: Boolean) { llamadas += "botChat:$activo" }
@@ -186,6 +232,31 @@ class MotorFalso : Motor {
 
 object Apoyo {
     val clave = ByteArray(32) { (it + 1).toByte() }
+
+    fun casillaJson(id: String, nombre: String, grupo: String, riesgo: String = "bajo", privado: Boolean = true, grupos: Boolean = true, confirma: Boolean = false, base: Boolean = false) =
+        JSONObject().put("id", id).put("nombre", nombre).put("descripcion", "Descripción de $nombre").put("grupo", grupo).put("riesgo", riesgo)
+            .put("privado", privado).put("grupos", grupos).put("confirma", confirma).put("base", base)
+
+    val catalogoEjemplo = arreglo(
+        casillaJson("cmd.ayuda", "Ver la ayuda", "Lo básico", base = true),
+        casillaJson("personas.silenciar", "Silenciar al bot para una persona", "Personas"),
+        casillaJson("personas.olvidar", "Olvidar o exportar datos", "Personas", riesgo = "alto", confirma = true),
+        casillaJson("chat.pausar", "Pausar y reanudar el bot", "Chat"),
+        casillaJson("grupos.expulsar", "Expulsar", "Grupos (siendo administrador)", riesgo = "alto", privado = false, confirma = true),
+    )
+
+    fun rangoJson(id: Long, nombre: String, posicion: Int, dueno: Boolean = false, color: String = "#2EC4CB", limite: Int = 10, personas: Int = 0, plantilla: String = "", casillas: JSONObject = JSONObject(), menusModo: String = "todos") =
+        JSONObject().put("id", id).put("nombre", nombre).put("color", color).put("posicion", posicion).put("plantilla", plantilla).put("esDueno", dueno).put("casillas", casillas)
+            .put("menusModo", menusModo).put("menus", JSONArray()).put("limiteMin", limite).put("personas", personas)
+
+    val rangosEjemplo = arreglo(
+        rangoJson(1, "Dueño", 0, dueno = true, color = "#F59E28", limite = 0),
+        rangoJson(2, "Ayudante", 1, personas = 2, plantilla = "ayudante", limite = 20, casillas = JSONObject().put("personas.silenciar", JSONObject().put("modo", "privado"))),
+        rangoJson(3, "Cliente VIP", 2, personas = 0, plantilla = "cliente_vip", color = "#8E4EC6"),
+    )
+
+    fun solicitudJson(persona: String, nombre: String, estado: String = "pendiente", mensajes: Int = 2) =
+        JSONObject().put("id", 1).put("persona", persona).put("nombre", nombre).put("estado", estado).put("primeraTs", 1_000).put("ultimaTs", System.currentTimeMillis() / 1000).put("mensajes", mensajes)
 
     fun ctx(): Context = ApplicationProvider.getApplicationContext()
 

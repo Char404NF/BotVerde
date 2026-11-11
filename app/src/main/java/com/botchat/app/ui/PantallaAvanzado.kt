@@ -74,6 +74,7 @@ fun PantallaAvanzado(
     alEliminarBot: () -> Unit,
     alFunciones: () -> Unit = {},
     alActividad: () -> Unit = {},
+    alPermisosAvanzado: () -> Unit = {},
 ) {
     val ctx = LocalContext.current
     val barra = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -123,6 +124,7 @@ fun PantallaAvanzado(
             Seccion("Funciones") {
                 Fila("Funciones", "Apagar motor, escritura, avisos y más sin reinstalar", Ico.Ajustes) { Button(alFunciones, Modifier.testTag("abrir_funciones")) { Text("Abrir") } }
                 Fila("Actividad del bot", "Qué llegó, qué respondió y por qué no", Ico.Estadisticas) { OutlinedButton(alActividad, Modifier.testTag("abrir_actividad")) { Text("Ver") } }
+                Fila("Permisos y comandos", "Prefijo, topes, códigos y registro de acciones", Ico.Candado) { OutlinedButton(alPermisosAvanzado, Modifier.testTag("abrir_permisos_avanzado")) { Text("Abrir") } }
             }
             Seccion("Opciones ocultas") {
                 Fila("Mostrar opciones ocultas", "Ajustes finos que casi nadie necesita", Ico.Ajustes) { Switch(ocultas, { haptica(Toque.Suave); ocultas = it }, Modifier.testTag("sw_ocultas")) }

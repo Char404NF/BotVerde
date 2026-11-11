@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 /** Para abrir un chat desde una notificación: la pantalla principal lo recoge y navega. */
 object NavegarA {
     val chat = MutableStateFlow<String?>(null)
+    /** Pantalla interna a abrir (por ejemplo "solicitudes") cuando se toca un aviso. */
+    val ruta = MutableStateFlow<String?>(null)
 }
 
 /**
@@ -37,6 +39,7 @@ object NavegarA {
 object Notificador {
     const val CANAL = "mensajes"
     const val EXTRA_CHAT = "chat"
+    const val EXTRA_RUTA = "ruta"
     const val CLAVE_RESPUESTA = "respuesta"
     private const val ACC_RESPONDER = "com.botchat.app.RESPONDER"
     private val cerrojo = Mutex()
@@ -119,7 +122,10 @@ object Notificador {
         nm.createNotificationChannel(NotificationChannel(CANAL_AVISOS, "Avisos del bot", NotificationManager.IMPORTANCE_HIGH))
         val detalleVisibleBloqueado = Ajustes.get(ctx).detalleBloqueado.value
         val abrir = PendingIntent.getActivity(
-            ctx, a.chat.hashCode(), Intent(ctx, MainActivity::class.java).apply { if (a.chat.isNotEmpty() && a.tipo == "humano") putExtra(EXTRA_CHAT, a.chat) }.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            ctx, a.chat.hashCode() + a.tipo.hashCode(), Intent(ctx, MainActivity::class.java).apply {
+                if (a.chat.isNotEmpty() && a.tipo == "humano") putExtra(EXTRA_CHAT, a.chat)
+                if (a.tipo == "desconocido") putExtra(EXTRA_RUTA, "solicitudes")
+            }.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val publica = NotificationCompat.Builder(ctx, CANAL_AVISOS).setSmallIcon(R.drawable.ic_stat_bot).setContentTitle(a.titulo).build()

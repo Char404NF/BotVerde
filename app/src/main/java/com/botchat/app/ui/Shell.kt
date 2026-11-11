@@ -83,6 +83,11 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
     LaunchedEffect(pedido) {
         pedido?.let { j -> com.botchat.app.NavegarA.chat.value = null; nav.navigate("chat/${enc(j)}") { launchSingleTop = true } }
     }
+    // Una notificación de aviso (nueva solicitud) abre su pantalla.
+    val rutaPedida by com.botchat.app.NavegarA.ruta.collectAsState()
+    LaunchedEffect(rutaPedida) {
+        rutaPedida?.let { r -> com.botchat.app.NavegarA.ruta.value = null; nav.navigate(r) { launchSingleTop = true } }
+    }
     // Los "ver una vez" que quedaron a medias o caducaron se borran al abrir la app.
     LaunchedEffect(bot.id) { runCatching { Repo.barrerVerUnaVez(bot.id) } }
     val entrada by nav.currentBackStackEntryAsState()
@@ -207,8 +212,25 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 }
                 composable("espacio") { PantallaEspacio(alVolver = { irA("inicio") }, alAbrirChat = { nav.navigate("chat/${enc(it)}") }, conBarra = false) }
                 composable("ajustes") {
-                    PantallaAjustes(ajustes, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("bot") }, alAvanzado = { nav.navigate("avanzado") }, alEstadisticas = { nav.navigate("estadisticas") }, alPrivacidad = { nav.navigate("privacidad") }, alAutomatizaciones = { nav.navigate("automatizaciones") })
+                    var cuenta by remember { mutableStateOf(0) }
+                    LaunchedEffect(bot.id) {
+                        cuenta = runCatching { Repo.contarSolicitudes(bot.id) }.getOrDefault(0)
+                        Repo.cambios.collect { evs -> if ("solicitudes" in evs) cuenta = runCatching { Repo.contarSolicitudes(bot.id) }.getOrDefault(0) }
+                    }
+                    PantallaAjustes(ajustes, alPermisos = { nav.navigate("permisos") }, pendientesSolicitudes = cuenta, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("bot") }, alAvanzado = { nav.navigate("avanzado") }, alEstadisticas = { nav.navigate("estadisticas") }, alPrivacidad = { nav.navigate("privacidad") }, alAutomatizaciones = { nav.navigate("automatizaciones") })
                 }
+                composable("permisos") {
+                    PantallaPermisos(bot.id, alVolver = { nav.popBackStack() }, alRangos = { nav.navigate("rangos") }, alSolicitudes = { nav.navigate("solicitudes") }, alGrupos = { nav.navigate("politicas_grupos") })
+                }
+                composable("rangos") { PantallaRangos(bot.id, alVolver = { nav.popBackStack() }, alEditar = { nav.navigate("rango/$it") }) }
+                composable("rango/{id}") { be ->
+                    val id = be.arguments?.getString("id")?.toLongOrNull() ?: return@composable
+                    EditorRango(bot.id, id, alVolver = { nav.popBackStack() })
+                }
+                composable("solicitudes") { PantallaSolicitudes(bot.id, alVolver = { nav.popBackStack() }) }
+                composable("politicas_grupos") { PantallaPoliticasGrupo(bot.id, alVolver = { nav.popBackStack() }) }
+                composable("permisos_avanzado") { PantallaPermisosAvanzado(bot.id, alVolver = { nav.popBackStack() }, alRegistro = { nav.navigate("registro_acciones") }) }
+                composable("registro_acciones") { PantallaRegistroAcciones(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("privacidad") { PantallaPrivacidad(ajustes, alVolver = { nav.popBackStack() }) }
                 composable("automatizaciones") {
                     PantallaAutomatizaciones(
@@ -242,6 +264,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         ajustes, bot.nombre, vm.eliminando, alVolver = { nav.popBackStack() },
                         alAbrirEspacio = { irA("espacio") }, alMedirRendimiento = { nav.navigate("diagnostico") },
                         alFunciones = { nav.navigate("funciones") }, alActividad = { nav.navigate("actividad") }, alEliminarBot = { vm.eliminar(ctx) },
+                        alPermisosAvanzado = { nav.navigate("permisos_avanzado") },
                     )
                 }
                 composable("bot") { PantallaBot(vm, conPermiso, alVolver = { nav.popBackStack() }, alAbrirAvanzado = { nav.navigate("avanzado") }, alAbrirAyuda = { nav.navigate("ayuda") }) }
@@ -251,4 +274,5 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
         }
     }
     }
+    DialogoConfirmacion(bot.id)
 }
