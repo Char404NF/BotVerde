@@ -568,7 +568,7 @@ func (a *Almacen) EliminarBot(botID int64) error {
 	for _, t := range []string{"message_receipts", "reacciones", "chat_estado", "dedupe", "actividad",
 		"persona_rol", "roles", "persona_alias", "registro_acciones", "solicitudes", "codigos_confirmacion", "grupos_politica", "bot_ajustes", "modulos", "modulos_registro", "no_molestar",
 		"persona_silencio", "advertencias", "notas_persona", "chat_etiqueta", "etiquetas", "recordatorios", "alertas_palabra", "avisos",
-		"msg_bot_sesion", "flow_cola", "flow_vencido", "flow_noentendio", "formularios"} {
+		"msg_bot_sesion", "flow_cola", "flow_vencido", "flow_noentendio", "formularios", "auto_mensajes", "auto_repeticion", "auto_registro"} {
 		if _, err := a.db.Exec("DELETE FROM "+t+" WHERE bot_id=?", botID); err != nil {
 			return err
 		}

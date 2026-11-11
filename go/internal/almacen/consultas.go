@@ -195,6 +195,7 @@ type MensajeVista struct {
 	VerEstado   string          `json:"verEstado"`
 	VerTipo     string          `json:"verTipo"`
 	VerExpira   int64           `json:"verExpira"`
+	Automatico  string          `json:"automatico"` // mensaje mío que mandó una automatización ("" = lo escribí yo)
 
 	bot int64
 }
@@ -243,6 +244,7 @@ func (a *Almacen) vista(m *Mensaje, nom *nombresPagina) MensajeVista {
 		v.Menciones = append(v.Menciones, MencionVista{Usuario: usuarioDe(j), Nombre: nombre})
 	}
 	v.VerEstado, v.VerTipo, v.VerExpira = m.VerEstado, m.VerTipo, m.VerExpira
+	v.Automatico = m.Automatico
 	v.EstadoEnvio = estadoDe(m.EstadoEnvio, m.EsMio, 0, 0)
 	v.Reacciones = []ReaccionVista{}
 	v.PuedeBajarse = CategoriaDe(m.Tipo) != "" && len(m.ArchivoInfo) > 0 &&

@@ -98,6 +98,8 @@ func (a *Almacen) GuardarMenu(botID, id int64, def []byte) (int, error) {
 		return 0, err
 	}
 	a.avisa("automatizaciones")
+	// un archivo que la versión nueva ya no usa (y que ninguna conversación abierta necesita) se borra del teléfono
+	a.LimpiarAdjuntosHuerfanos(botID, time.Hour, time.Now())
 	return v, nil
 }
 
@@ -131,6 +133,7 @@ func (a *Almacen) BorrarMenu(botID, id int64) error {
 		return err
 	}
 	a.avisa("automatizaciones")
+	a.LimpiarAdjuntosHuerfanos(botID, time.Hour, time.Now())
 	return nil
 }
 

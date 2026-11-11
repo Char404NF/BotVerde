@@ -505,6 +505,49 @@ var migraciones = [][]string{
 		)`,
 		`CREATE INDEX idx_formularios ON formularios(bot_id, menu_id, ts)`,
 	},
+	// 14 (v0.5.0, etapa D): mensajes automáticos. auto_mensajes guarda cada mensaje (texto, configuración y adjuntos CIFRADOS) de los
+	// tipos bienvenida, ausencia, recibido, cierre y atajo; auto_repeticion recuerda cuándo se le mandó cada uno a cada persona (como la
+	// tabla de duplicados); auto_registro anota cada envío automático SIN textos (resultado, archivos que salieron y cuáles fallaron);
+	// messages.automatico etiqueta los mensajes que mandó una automatización y el índice parcial permite filtrarlos.
+	{
+		`CREATE TABLE auto_mensajes (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			tipo TEXT NOT NULL,
+			nombre TEXT NOT NULL DEFAULT '',
+			texto_cifrado BLOB,
+			config_cifrado BLOB,
+			adjuntos_cifrado BLOB,
+			activo INTEGER NOT NULL DEFAULT 1,
+			orden INTEGER NOT NULL DEFAULT 0,
+			creado_ts INTEGER NOT NULL DEFAULT 0,
+			editado_ts INTEGER NOT NULL DEFAULT 0
+		)`,
+		`CREATE INDEX idx_auto_mensajes ON auto_mensajes(bot_id, tipo, orden)`,
+		`CREATE TABLE auto_repeticion (
+			bot_id INTEGER NOT NULL,
+			auto_id INTEGER NOT NULL,
+			persona TEXT NOT NULL,
+			ultimo_ts INTEGER NOT NULL,
+			PRIMARY KEY (bot_id, auto_id, persona)
+		) WITHOUT ROWID`,
+		`CREATE TABLE auto_registro (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			ts INTEGER NOT NULL,
+			auto_id INTEGER NOT NULL,
+			tipo TEXT NOT NULL,
+			chat TEXT NOT NULL DEFAULT '',
+			resultado TEXT NOT NULL DEFAULT '',
+			adj_ok INTEGER NOT NULL DEFAULT 0,
+			adj_fallo INTEGER NOT NULL DEFAULT 0,
+			motivo TEXT NOT NULL DEFAULT ''
+		)`,
+		`CREATE INDEX idx_auto_registro ON auto_registro(bot_id, ts)`,
+		`CREATE INDEX idx_auto_registro_auto ON auto_registro(bot_id, auto_id, ts)`,
+		`ALTER TABLE messages ADD COLUMN automatico TEXT NOT NULL DEFAULT ''`,
+		`CREATE INDEX idx_mensajes_auto ON messages(bot_id, chat_jid, ts) WHERE automatico <> ''`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

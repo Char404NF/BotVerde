@@ -158,6 +158,12 @@ var ajustesBotDefecto = map[string]string{
 	"grupo_txt_turno":    "Hay varias personas usando el menú. Estás en el turno {n}; te atiendo en cuanto se libere un lugar.",
 	"grupo_txt_vencido":  "Esa conversación terminó. Escribe {prefijo}menu para empezar otra.",
 	"grupo_txt_privado":  "Esa opción es solo en privado: escríbeme al privado.",
+	// Mensajes automáticos (bloque D)
+	"auto_activo":    "1",      // interruptor general de bienvenida, ausencia, recibido y cierre (los atajos tienen el suyo)
+	"auto_tope_hora": "30",     // mensajes automáticos por hora en total; pasado el tope solo sale el texto, sin archivos
+	"auto_zona":      "",       // zona horaria por defecto de los mensajes automáticos ("" = la del teléfono)
+	"atajos_activo":  "1",      // escribir "/atajo" en un chat (desde el teléfono o la app) manda la respuesta rápida
+	"atajo_modo":     "editar", // desde el teléfono: editar (cambia mi "/atajo" por el texto) | enviar (manda aparte y deja mi "/atajo")
 }
 
 // AjusteBot devuelve un ajuste del bot (su valor por defecto si nunca se fijó).

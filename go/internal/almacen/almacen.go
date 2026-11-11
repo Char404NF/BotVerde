@@ -468,9 +468,10 @@ type Mensaje struct {
 	VerEstado       string // "ver una vez": "" (sin contenido), "pendiente", "abierto", "visto" o "expirado"
 	VerTipo         string // qué era: imagen, video o audio
 	VerExpira       int64  // hora en que caduca si no se abre
+	Automatico      string // solo en mensajes propios: lo mandó una automatización ("menu", "regla", "bienvenida", "ausencia", "recibido", "cierre", "atajo", "comando"…); "" = escrito a mano
 }
 
-const colsInsertMensaje = "id,chat_jid,bot_id,remitente_jid,remitente_nombre,es_mio,tipo,texto_cifrado,ts,borrado,editado,archivo_ruta,archivo_bytes,archivo_mime,archivo_estado,miniatura_ruta,archivo_nombre_cifrado,archivo_info_cifrado,ancho,alto,duracion_s,nota_voz,estado_envio,cita_id,cita_autor,cita_texto_cifrado,menciones_cifrado,reenviado,ver_estado,ver_tipo,ver_expira"
+const colsInsertMensaje = "id,chat_jid,bot_id,remitente_jid,remitente_nombre,es_mio,tipo,texto_cifrado,ts,borrado,editado,archivo_ruta,archivo_bytes,archivo_mime,archivo_estado,miniatura_ruta,archivo_nombre_cifrado,archivo_info_cifrado,ancho,alto,duracion_s,nota_voz,estado_envio,cita_id,cita_autor,cita_texto_cifrado,menciones_cifrado,reenviado,ver_estado,ver_tipo,ver_expira,automatico"
 const colsMensaje = colsInsertMensaje + ",eliminado_en,eliminado_por"
 
 func (a *Almacen) escanearMensaje(s interface{ Scan(...any) error }) (*Mensaje, error) {
@@ -479,7 +480,7 @@ func (a *Almacen) escanearMensaje(s interface{ Scan(...any) error }) (*Mensaje, 
 	var texto, nombre, info, citaTexto, menciones []byte
 	var reenv int
 	if err := s.Scan(&m.ID, &m.ChatJID, &m.BotID, &m.RemitenteJID, &m.RemitenteNombre, &mio, &m.Tipo, &texto, &m.TS, &borrado, &editado,
-		&m.ArchivoRuta, &m.ArchivoBytes, &m.ArchivoMime, &m.ArchivoEstado, &m.MiniaturaRuta, &nombre, &info, &m.Ancho, &m.Alto, &m.DuracionS, &nota, &m.EstadoEnvio, &m.CitaID, &m.CitaAutor, &citaTexto, &menciones, &reenv, &m.VerEstado, &m.VerTipo, &m.VerExpira, &m.EliminadoEn, &m.EliminadoPor); err != nil {
+		&m.ArchivoRuta, &m.ArchivoBytes, &m.ArchivoMime, &m.ArchivoEstado, &m.MiniaturaRuta, &nombre, &info, &m.Ancho, &m.Alto, &m.DuracionS, &nota, &m.EstadoEnvio, &m.CitaID, &m.CitaAutor, &citaTexto, &menciones, &reenv, &m.VerEstado, &m.VerTipo, &m.VerExpira, &m.Automatico, &m.EliminadoEn, &m.EliminadoPor); err != nil {
 		return nil, err
 	}
 	m.EsMio, m.Borrado, m.Editado, m.NotaVoz = mio == 1, borrado == 1, editado == 1, nota == 1
@@ -533,10 +534,10 @@ func (a *Almacen) valoresMensaje(m *Mensaje) ([]any, error) {
 	}
 	return []any{m.ID, m.ChatJID, m.BotID, m.RemitenteJID, m.RemitenteNombre, b2i(m.EsMio), m.Tipo, texto, m.TS, b2i(m.Borrado), b2i(m.Editado),
 		m.ArchivoRuta, m.ArchivoBytes, m.ArchivoMime, estado, m.MiniaturaRuta, nombre, info, m.Ancho, m.Alto, m.DuracionS, b2i(m.NotaVoz),
-		m.EstadoEnvio, m.CitaID, m.CitaAutor, cita, menc, b2i(m.Reenviado), m.VerEstado, m.VerTipo, m.VerExpira}, nil
+		m.EstadoEnvio, m.CitaID, m.CitaAutor, cita, menc, b2i(m.Reenviado), m.VerEstado, m.VerTipo, m.VerExpira, m.Automatico}, nil
 }
 
-const insertMensaje = "INSERT INTO messages(" + colsInsertMensaje + ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id,chat_jid,bot_id) DO NOTHING"
+const insertMensaje = "INSERT INTO messages(" + colsInsertMensaje + ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id,chat_jid,bot_id) DO NOTHING"
 
 // GuardarMensajes guarda varios mensajes en una sola transacción. Los chats deben existir.
 // Devuelve cuáles eran nuevos (los repetidos se ignoran).
