@@ -333,6 +333,39 @@ var migraciones = [][]string{
 			PRIMARY KEY (bot_id, clave)
 		) WITHOUT ROWID`,
 	},
+	// 11 (v0.5.0, etapa H0): marco de módulos. `modulos` (activo + configuración cifrada con el cifrado de columna + topes propios),
+	// `modulos_registro` (qué iniciativa salió o por qué no; SIN textos), `no_molestar` (lista global) y los ajustes de iniciativa
+	// (maestro, topes, pausa nocturna, modo seguro) que viven en bot_ajustes con prefijo `ini_`.
+	{
+		`CREATE TABLE modulos (
+			bot_id INTEGER NOT NULL,
+			id TEXT NOT NULL,
+			activo INTEGER NOT NULL DEFAULT 0,
+			config BLOB,
+			tope_hora INTEGER NOT NULL DEFAULT 0,
+			tope_dia INTEGER NOT NULL DEFAULT 0,
+			activado_ts INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY (bot_id, id)
+		) WITHOUT ROWID`,
+		`CREATE TABLE modulos_registro (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			modulo TEXT NOT NULL,
+			que TEXT NOT NULL,
+			ts INTEGER NOT NULL,
+			resultado TEXT NOT NULL,
+			chat TEXT NOT NULL DEFAULT ''
+		)`,
+		`CREATE INDEX idx_modulos_registro ON modulos_registro(bot_id, modulo, ts)`,
+		`CREATE TABLE no_molestar (
+			bot_id INTEGER NOT NULL,
+			persona TEXT NOT NULL,
+			desde_ts INTEGER NOT NULL,
+			motivo TEXT NOT NULL DEFAULT '',
+			confirmado INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY (bot_id, persona)
+		) WITHOUT ROWID`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

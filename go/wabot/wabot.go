@@ -18,6 +18,7 @@ import (
 	"botchat/internal/fotos"
 	"botchat/internal/ingesta"
 	"botchat/internal/medios"
+	"botchat/internal/modulos"
 	"botchat/internal/motor"
 	"botchat/internal/permisos"
 
@@ -61,6 +62,7 @@ type estado struct {
 	grupos        *colaGrupos
 	perm          *permisos.Servicio
 	cmd           *comandos.Despachador
+	mods          *modulos.Gestor
 	admins        *cacheAdmins
 	refresco      *time.Timer
 	refMu         sync.Mutex
@@ -158,15 +160,18 @@ func (s *estado) armar() {
 	alm.SembrarSaludo(s.botID, flujo.SaludoJSON())
 	s.flujo = s.nuevoFlujo()
 	s.armarPermisos()
+	s.armarModulos()
 	s.motor = motor.Nuevo(motor.Config{
-		Perm: s.perm, Cmd: s.cmd, EsAdminGrupo: s.admins.esAdmin,
+		Perm: s.perm, Cmd: s.cmd, EsAdminGrupo: s.admins.esAdmin, Baja: s.mods.Baja,
 		BotID: s.botID, Alm: alm, Decisor: s.decisor(), Enviador: enviadorMotor{s}, Log: s.log,
 		Activo: motorActivo.Load, Firma: firmaActual, VentanaAntigua: func() time.Duration { return time.Duration(ventanaAntiguaMin.Load()) * time.Minute },
-		AlFrenar: func() { s.avisaCambio("motor:freno") },
+		// Los envíos fallidos seguidos que frenan al motor también activan el modo seguro de los módulos de iniciativa.
+		AlFrenar: func() { s.avisaCambio("motor:freno"); s.mods.ModoSeguro("errores") },
 		AlHumano: func(chat, aviso string) { s.avisaCambio("humano:" + chat) },
 	})
 	s.envio.AlEscribirYo = func(chat string) { s.alEscribirYo(chat, time.Now()) }
 	s.motor.Iniciar(s.ctx)
+	s.mods.Iniciar(s.ctx)
 	s.iniciarPermisos()
 	s.descargas.Iniciar(s.ctx)
 	s.fotos.Iniciar(s.ctx)
@@ -273,6 +278,8 @@ func Stop() {
 	s.refMu.Unlock()
 	s.cli.Disconnect()
 	s.motor.Detener()
+	s.mods.Detener()
+	olvidarGestoresLibres()
 	s.descargas.Detener()
 	s.fotos.Detener()
 	s.wg.Wait()
@@ -341,15 +348,19 @@ func (s *estado) evento(e any) {
 	case *events.LoggedOut:
 		s.log("WhatsApp cerró la sesión de este dispositivo.")
 		s.status("sesion_cerrada")
+		s.desconexionForzada("sesion_cerrada")
 	case *events.StreamReplaced:
 		s.log("La sesión se abrió en otro lugar.")
 		s.status("error: la sesión se abrió en otro lugar")
+		s.desconexionForzada("otra_sesion")
 	case *events.TemporaryBan:
 		s.log("Bloqueo temporal: " + v.String())
 		s.status("error: bloqueo temporal de WhatsApp")
+		s.desconexionForzada("bloqueo_temporal")
 	case *events.ClientOutdated:
 		s.log("WhatsApp pide una versión más nueva de la conexión.")
 		s.status("error: conexión desactualizada")
+		s.desconexionForzada("version_vieja")
 	case *events.ConnectFailure:
 		s.log(fmt.Sprintf("No se pudo conectar (código %d).", int(v.Reason)))
 		s.status(fmt.Sprintf("error: no se pudo conectar (%d)", int(v.Reason)))
@@ -370,6 +381,8 @@ func (s *estado) evento(e any) {
 			info := v.Info
 			s.encola(func() { s.ing.VerUnaVezSinContenido(s.ctx, info) })
 		}
+	case *events.CallOffer:
+		s.alLlamar(v)
 	case *events.Receipt:
 		s.alRecibirAcuse(v)
 	case *events.ChatPresence:
@@ -386,6 +399,9 @@ func (s *estado) evento(e any) {
 	case *events.Picture:
 		s.encola(func() { s.alCambiarFoto(v) })
 	case *events.GroupInfo:
+		if len(v.Join) > 0 {
+			s.alEntrarAlGrupo(v)
+		}
 		if v.Name != nil {
 			nombre, jid := v.Name.Name, v.JID.ToNonAD().String()
 			s.encola(func() { s.ing.Asunto(jid, nombre) })

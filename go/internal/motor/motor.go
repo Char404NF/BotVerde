@@ -101,6 +101,9 @@ type Config struct {
 	Perm *permisos.Servicio
 	// Cmd es el despachador de comandos con prefijo. nil = sin comandos.
 	Cmd *comandos.Despachador
+	// Baja revisa un texto recibido en privado: si pide BAJA / STOP / NO MÁS, deja a la persona en la lista No molestar y devuelve
+	// una función que da el texto de confirmación (solo la primera vez; después, vacío). nil = sin lista No molestar.
+	Baja func(chat, texto string) (bool, func() string)
 	// EsAdminGrupo dice si una persona administra el grupo (solo se pregunta si la política del grupo es "solo administradores").
 	EsAdminGrupo func(chat, persona string) bool
 }
@@ -242,6 +245,12 @@ func (m *Motor) Entrar(msg Mensaje) {
 		return
 	}
 	now := m.c.Ahora()
+	// BAJA / STOP / NO MÁS en privado: la persona entra a la lista No molestar aunque el bot esté apagado o ella esté en espera.
+	var bajaConfirma func() string
+	esBaja := false
+	if m.c.Baja != nil && !msg.EsGrupo && msg.EsTexto && !msg.EsEdicion && !msg.Antiguo && (msg.TS.IsZero() || now.Sub(msg.TS) <= m.c.VentanaAntigua()) {
+		esBaja, bajaConfirma = m.c.Baja(msg.Chat, msg.Texto)
+	}
 	switch {
 	case msg.EsEdicion:
 		m.omite(msg, "mensaje editado")
@@ -296,6 +305,20 @@ func (m *Motor) Entrar(msg Mensaje) {
 			}
 			return
 		}
+	}
+	// La baja se atiende aquí (ya pasó la compuerta): se le confirma UNA sola vez y el texto no sigue a los menús.
+	if esBaja {
+		m.omite(msg, "no molestar")
+		if t := bajaConfirma(); t != "" {
+			m.wg.Add(1)
+			go func() {
+				defer m.wg.Done()
+				if err := m.enviar(msg.Chat, t, msg.ID, "", msg.TS); err == nil {
+					m.c.Alm.RegistrarActividad(m.c.BotID, almacen.ActRespondio, "", msg.Chat, "no_molestar")
+				}
+			}()
+		}
+		return
 	}
 	// El mismo texto de la misma persona, repetido enseguida, se ignora.
 	clave := msg.Chat + "\x00" + msg.Remitente + "\x00" + strings.ToLower(strings.TrimSpace(msg.Texto))

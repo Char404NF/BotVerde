@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"botchat/internal/ingesta"
+	"botchat/internal/modulos"
 	"botchat/internal/motor"
 
 	"go.mau.fi/whatsmeow/types"
@@ -154,6 +155,10 @@ func (s *estado) alMotor(v *events.Message, sincronizando bool) {
 		if pj, err := types.ParseJID(c.CitaAutor); err == nil && !s.esPropio(pj) {
 			m.CitaAutor = s.ing.Persona(s.ctx, pj)
 		}
+	}
+	if !sincronizando {
+		s.mods.Evento(modulos.Evento{Tipo: modulos.EvMensaje, Hora: m.TS, Chat: m.Chat, EsGrupo: m.EsGrupo, Persona: m.Remitente, Nombre: m.Nombre,
+			Texto: m.Texto, MensajeID: m.ID, EsMio: m.EsMio})
 	}
 	s.motor.Entrar(m)
 }

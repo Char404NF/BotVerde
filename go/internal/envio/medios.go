@@ -61,6 +61,16 @@ func (s *Servicio) carpetaTmp() string {
 
 // EnviarMedio manda una foto, un video, un audio, una nota de voz o un documento. Se guarda primero (cifrado) para verlo de inmediato.
 func (s *Servicio) EnviarMedio(ctx context.Context, chat string, a Adjunto, citaID string) (Resultado, error) {
+	return s.enviarMedio(ctx, chat, a, citaID, true)
+}
+
+// EnviarMedioAuto manda un archivo por iniciativa de un módulo: igual que EnviarMedio, pero sin el tope de envíos manuales, sin
+// pausar al bot en ese chat y sin contarlo como escrito a mano. Solo lo usa la cola de iniciativas.
+func (s *Servicio) EnviarMedioAuto(ctx context.Context, chat string, a Adjunto, citaID string) (Resultado, error) {
+	return s.enviarMedio(ctx, chat, a, citaID, false)
+}
+
+func (s *Servicio) enviarMedio(ctx context.Context, chat string, a Adjunto, citaID string, manual bool) (Resultado, error) {
 	defer func() { _ = os.Remove(a.Ruta) }() // la copia en claro nunca se queda
 	if _, err := tipoSubida(a.Tipo); err != nil {
 		return Resultado{}, err
@@ -83,7 +93,7 @@ func (s *Servicio) EnviarMedio(ctx context.Context, chat string, a Adjunto, cita
 	if st.Size() > tope {
 		return Resultado{}, fmt.Errorf("El archivo pesa %d MB; el máximo es %d MB.", st.Size()>>20, tope>>20)
 	}
-	if !s.tomarFicha() {
+	if manual && !s.tomarFicha() {
 		return Resultado{}, ErrDemasiados
 	}
 	m := &almacen.Mensaje{
@@ -107,8 +117,10 @@ func (s *Servicio) EnviarMedio(ctx context.Context, chat string, a Adjunto, cita
 		return Resultado{}, err
 	}
 	s.RegistrarEnvio(m.ID)
-	s.pausarBot(chat)
-	s.Alm.RegistrarActividad(s.BotID, almacen.ActManual, "", chat, a.Tipo)
+	if manual {
+		s.pausarBot(chat)
+		s.Alm.RegistrarActividad(s.BotID, almacen.ActManual, "", chat, a.Tipo)
+	}
 	return s.transmitirMedio(ctx, j, m, a.Onda)
 }
 
