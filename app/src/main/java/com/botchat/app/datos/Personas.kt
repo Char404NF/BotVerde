@@ -41,16 +41,19 @@ data class AlertaPalabraItem(val id: Long, val palabra: String, val chats: List<
 /** Lo que salió al disparar los avisos: los ids de los avisos nuevos (para mostrarlos) y cuándo es la próxima alarma (0 = ninguna). */
 data class DisparoAvisos(val avisos: List<Long>, val siguiente: Long)
 
-data class OpcionComando(val texto: String, val respuesta: String)
+data class OpcionComando(val texto: String, val respuesta: String, val adjuntos: List<AdjuntoSubido> = emptyList())
 
 /** Un comando propio (!horario, !precios…). `nombre` va sin prefijo. */
 data class ComandoPropio(
     val nombre: String = "", val texto: String = "", val resumen: String = "", val rangoMin: Long = 0,
     val privados: Boolean = true, val grupos: Boolean = false, val ocultoAyuda: Boolean = false, val opciones: List<OpcionComando> = emptyList(),
+    /** Archivos (hasta 3) de la respuesta cuando el comando no tiene opciones; con opciones, cada opción lleva los suyos. */
+    val adjuntos: List<AdjuntoSubido> = emptyList(),
 ) {
     fun json(): String = JSONObject().put("nombre", nombre).put("texto", texto).put("resumen", resumen).put("rangoMin", rangoMin)
         .put("privados", privados).put("grupos", grupos).put("ocultoAyuda", ocultoAyuda)
-        .put("opciones", JSONArray().also { a -> opciones.forEach { a.put(JSONObject().put("texto", it.texto).put("respuesta", it.respuesta)) } }).toString()
+        .put("adjuntos", JsonMensajesAuto.adjuntosJson(adjuntos))
+        .put("opciones", JSONArray().also { a -> opciones.forEach { a.put(JSONObject().put("texto", it.texto).put("respuesta", it.respuesta).put("adjuntos", JsonMensajesAuto.adjuntosJson(it.adjuntos))) } }).toString()
 }
 
 data class ComandoPropioItem(val id: Long, val activo: Boolean, val datos: ComandoPropio)
@@ -126,7 +129,8 @@ object JsonPersonas {
         val ops = o.optJSONArray("opciones")
         return ComandoPropio(
             o.optString("nombre"), o.optString("texto"), o.optString("resumen"), o.optLong("rangoMin"), o.optBoolean("privados"), o.optBoolean("grupos"),
-            o.optBoolean("ocultoAyuda"), List(ops?.length() ?: 0) { ops!!.getJSONObject(it).let { x -> OpcionComando(x.optString("texto"), x.optString("respuesta")) } },
+            o.optBoolean("ocultoAyuda"), List(ops?.length() ?: 0) { ops!!.getJSONObject(it).let { x -> OpcionComando(x.optString("texto"), x.optString("respuesta"), JsonMensajesAuto.adjuntos(x.optJSONArray("adjuntos"))) } },
+            JsonMensajesAuto.adjuntos(o.optJSONArray("adjuntos")),
         )
     }
 

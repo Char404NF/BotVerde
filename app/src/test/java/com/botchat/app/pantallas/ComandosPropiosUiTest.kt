@@ -95,7 +95,8 @@ class ComandosPropiosUiTest {
         regla.onNodeWithTag("comando_resumen", useUnmergedTree = true).performScrollTo().performTextInput("Nuestro horario")
         regla.esperaTexto("Abrimos a las 9, {nombre}", substring = true) // la vista previa (Go) usa el mismo texto
         regla.esperaTexto("Escriben: !horario", substring = true)
-        regla.onNodeWithTag("nota_adjuntos", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+        // (etapa D) los adjuntos de los comandos propios ya existen: el mismo selector de archivos de los mensajes automáticos
+        regla.onNodeWithTag("agregar_adjunto_comando", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         regla.onNodeWithTag("guardar_comando", useUnmergedTree = true).performScrollTo().assertIsEnabled().performClick()
         regla.espera { volvio }
         val j = guardado()

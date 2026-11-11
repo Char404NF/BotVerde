@@ -269,6 +269,25 @@ object Repo {
     suspend fun guardarComandoPropio(bot: Long, id: Long, c: ComandoPropio) = io { motor.guardarComandoPropio(bot, id, c.json()) }
     suspend fun vistaPreviaComandoPropio(bot: Long, c: ComandoPropio) = io { motor.vistaPreviaComandoPropio(bot, c.json()) }
 
+    // Mensajes automáticos y adjuntos (bloque D)
+    suspend fun listaAuto(bot: Long, tipo: String = "") = io { JsonMensajesAuto.lista(motor.listarAutos(bot, tipo)) }
+    suspend fun obtenerAuto(bot: Long, id: Long) = io { JsonMensajesAuto.mensaje(motor.obtenerAuto(bot, id)) }
+    suspend fun guardarAuto(bot: Long, m: MensajeAuto) = io { motor.guardarAuto(bot, JsonMensajesAuto.entradaJson(m)) }
+    suspend fun fijarAutoActivo(bot: Long, id: Long, activo: Boolean) = io { motor.fijarAutoActivo(bot, id, activo) }
+    suspend fun borrarAuto(bot: Long, id: Long) = io { motor.borrarAuto(bot, id) }
+    suspend fun reordenarAutos(bot: Long, ids: List<Long>) = io { motor.reordenarAutos(bot, org.json.JSONArray(ids).toString()) }
+    suspend fun plantillasMensajes() = io { JsonMensajesAuto.plantillas(motor.plantillasAuto()) }
+    suspend fun configPorDefectoAuto(tipo: String) = io { JsonMensajesAuto.config(org.json.JSONObject(motor.configPorDefectoAuto(tipo))) }
+    suspend fun probarAuto(bot: Long, m: MensajeAuto, e: EscenarioAuto) = io { JsonMensajesAuto.prueba(motor.probarAuto(bot, JsonMensajesAuto.entradaJson(m), e.json())) }
+    suspend fun registroAuto(bot: Long, autoId: Long = 0, limite: Long = 100) = io { JsonMensajesAuto.registro(motor.registroAuto(bot, autoId, limite)) }
+    suspend fun subirAdjunto(bot: Long, ruta: String, tipo: String, mime: String, nombre: String) = io { JsonMenus.adjunto(motor.subirAdjunto(bot, ruta, tipo, mime, nombre)) }
+    suspend fun borrarAdjunto(bot: Long, id: String) = io { motor.borrarAdjunto(bot, id) }
+    suspend fun limpiarAdjuntos(bot: Long) = io { motor.limpiarAdjuntos(bot) }
+    suspend fun atajos(bot: Long, chat: String) = io { JsonMensajesAuto.atajos(motor.listarAtajos(bot, chat)) }
+    suspend fun enviarArchivosAtajo(bot: Long, chat: String, id: Long) = io { motor.enviarArchivosAtajo(bot, chat, id) }
+    suspend fun mensajesAuto(bot: Long, chat: String, antesTs: Long = 0, limite: Long = 100) = io { Json.mensajes(motor.listarMensajesAuto(bot, chat, antesTs, limite)) }
+    suspend fun chatsConAutomaticos(bot: Long, dias: Long = 7) = io { JsonMensajesAuto.jids(motor.chatsConAutomaticos(bot, dias)) }
+
     suspend fun estadisticasChat(bot: Long, chat: String) = io { Json.resumenChat(motor.estadisticasChat(bot, chat)) }
     suspend fun calendario(bot: Long, chat: String, mes: String) = io { Json.calendario(motor.calendarioChat(bot, chat, mes)) }
     suspend fun mensajesDia(bot: Long, chat: String, dia: String) = io { Json.mensajes(motor.mensajesDia(bot, chat, dia)) }

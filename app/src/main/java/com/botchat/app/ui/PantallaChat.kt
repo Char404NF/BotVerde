@@ -111,6 +111,7 @@ fun PantallaChat(
     irA: String = "",
     alAbrirUnaVez: (String) -> Unit = {},
     alAbrirEtiquetas: () -> Unit = {},
+    alVerAutomaticos: () -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as android.app.Application
     val vm: ChatVm = viewModel(key = "chat-$jid", factory = viewModelFactory { initializer { ChatVm(app, jid) } })
@@ -307,6 +308,7 @@ fun PantallaChat(
                                 onClick = { menu = false; haptica(Toque.Suave); vm.marcarEstado(if (estadoT == "resuelto") "" else "resuelto") }, modifier = Modifier.testTag("menu_resuelto"),
                             )
                             DropdownMenuItem(text = { Text("Etiquetas…") }, onClick = { menu = false; etiquetando = true }, modifier = Modifier.testTag("menu_etiquetas"))
+                            DropdownMenuItem(text = { Text("Ver solo mensajes automáticos") }, onClick = { menu = false; alVerAutomaticos() }, modifier = Modifier.testTag("menu_ver_automaticos"))
                             DropdownMenuItem(text = { Text(if (vm.estadoChat.silenciado) "Activar notificaciones" else "Silenciar notificaciones") }, onClick = { menu = false; vm.silenciar(!vm.estadoChat.silenciado) }, modifier = Modifier.testTag("menu_silenciar"))
                             DropdownMenuItem(text = { Text("Borrar archivos de este chat") }, onClick = {
                                 menu = false
@@ -328,6 +330,8 @@ fun PantallaChat(
                     }
                 }
                 if (escribirActivo) {
+                    // “/” al principio de la caja: respuestas rápidas (se pone el texto en la caja; lo mando yo como siempre)
+                    SelectorAtajos(vm.botId, jid, texto, alElegir = { v -> texto = v; vm.guardarBorrador(v.text) })
                     Compositor(
                         valor = texto,
                         alCambiar = { v -> val cambio = v.text != texto.text; texto = v; if (cambio && vm.editando == null) { vm.guardarBorrador(v.text); vm.teclea(v.text.isNotBlank()) } },
@@ -603,6 +607,7 @@ private fun Burbuja(
                             Text(m.remitente, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = colorEstable(m.remitenteId, androidx.compose.foundation.isSystemInDarkTheme()).let { c -> androidx.compose.ui.graphics.lerp(c, tinta, 0.35f) }, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         if (m.reenviado) Text("Reenviado", Modifier.testTag("reenviado"), style = MaterialTheme.typography.labelSmall, fontStyle = FontStyle.Italic, color = tinta.copy(alpha = 0.65f))
+                        if (m.esMio && m.automatico.isNotEmpty()) Text("🤖 " + com.botchat.app.datos.TipoAuto.etiqueta(m.automatico), Modifier.testTag("automatico_${m.id}"), style = MaterialTheme.typography.labelSmall, fontStyle = FontStyle.Italic, color = tinta.copy(alpha = 0.65f))
                         if (m.citaId.isNotEmpty() && !m.borrado) BloqueCita(m, tinta) { alIrACita(m.citaId) }
                         ContenidoMensaje(m, vm, alAbrirVisor, alAbrirDocumento, alAbrirUnaVez)
                         FilaReacciones(m.reacciones, Modifier.padding(top = 3.dp))

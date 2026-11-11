@@ -141,8 +141,9 @@ fun EditorComandoPropio(botId: Long, id: Long, alVolver: () -> Unit) {
     var grupos by remember(o) { mutableStateOf(o.grupos) }
     var oculto by remember(o) { mutableStateOf(o.ocultoAyuda) }
     val opciones = remember(o) { mutableStateListOf<OpcionComando>().apply { addAll(o.opciones) } }
+    var adjuntos by remember(o) { mutableStateOf(o.adjuntos) }
     var guardando by remember { mutableStateOf(false) }
-    fun actual() = ComandoPropio(nombre.trim(), texto.text, resumen.trim(), rangoMin, privados, grupos, oculto, opciones.toList())
+    fun actual() = ComandoPropio(nombre.trim(), texto.text, resumen.trim(), rangoMin, privados, grupos, oculto, opciones.toList(), if (opciones.isEmpty()) adjuntos else emptyList())
     // Vista previa: la arma el módulo Go con el mismo texto y el prefijo actual (con datos de ejemplo en {nombre}, {hora} y {dia}).
     val vista by produceState<String?>(null, nombre, texto.text, opciones.toList(), privados, grupos) {
         delay(250)
@@ -174,6 +175,7 @@ fun EditorComandoPropio(botId: Long, id: Long, alVolver: () -> Unit) {
                 OutlinedButton({ inserta("{nombre}") }, Modifier.testTag("variable_nombre")) { Text("{nombre}") }
                 OutlinedButton({ inserta("{hora}") }, Modifier.testTag("variable_hora")) { Text("{hora}") }
                 OutlinedButton({ inserta("{dia}") }, Modifier.testTag("variable_dia")) { Text("{dia}") }
+                BotonEstiloLetra(texto, { texto = it }, "aa_comando")
             }
             Text("{nombre} pone el nombre de quien escribe; {hora} y {dia}, la hora y el día de ese momento.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             SeccionEst("Opciones (opcional)") {
@@ -185,6 +187,7 @@ fun EditorComandoPropio(botId: Long, id: Long, alVolver: () -> Unit) {
                             IconButton({ opciones.removeAt(i) }, Modifier.testTag("quitar_opcion_$i")) { Icon(Ico.Borrar, "Quitar la opción") }
                         }
                         OutlinedTextField(op.respuesta, { opciones[i] = op.copy(respuesta = it.take(1000)) }, Modifier.fillMaxWidth().testTag("opcion_respuesta_$i"), label = { Text("Qué responde la opción ${i + 1}") }, minLines = 2)
+                        SelectorAdjuntos(botId, op.adjuntos, "cmd_op_$i", alCambiar = { l -> opciones[i] = op.copy(adjuntos = l) })
                     }
                 }
                 if (opciones.size < 9) OutlinedButton({ opciones.add(OpcionComando("", "")); grupos = false }, Modifier.testTag("agregar_opcion")) { Text("Agregar una opción") }
@@ -202,9 +205,9 @@ fun EditorComandoPropio(botId: Long, id: Long, alVolver: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) { Switch(!oculto, { oculto = !it }, Modifier.testTag("comando_en_ayuda")); Text("  Que salga en ${prefijo}ayuda") }
                 if (!oculto) OutlinedTextField(resumen, { resumen = it.take(80) }, Modifier.fillMaxWidth().testTag("comando_resumen"), label = { Text("Descripción corta para la ayuda") }, singleLine = true)
             }
-            SeccionEst("Archivos adjuntos") {
-                Text("Por ahora el comando responde solo con texto. Los adjuntos (foto, PDF…) llegan con los Mensajes automáticos, que se podrán usar también aquí.", Modifier.testTag("nota_adjuntos"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            if (opciones.isEmpty()) SeccionEst("Archivos adjuntos") {
+                SelectorAdjuntos(botId, adjuntos, "comando", alCambiar = { adjuntos = it })
+            } else Text("Con opciones, cada opción lleva sus propios archivos.", Modifier.testTag("nota_adjuntos"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             SeccionEst("Así lo verá quien lo escriba") {
                 Text(vista ?: "…", Modifier.fillMaxWidth().testTag("vista_previa_comando"), style = MaterialTheme.typography.bodyMedium)
             }
@@ -216,7 +219,7 @@ fun EditorComandoPropio(botId: Long, id: Long, alVolver: () -> Unit) {
                         .onSuccess { avisaToast(ctx, "Guardado", false); alVolver() }
                         .onFailure { avisaToast(ctx, it.message ?: "No se pudo guardar", true); guardando = false }
                 }
-            }, Modifier.fillMaxWidth().testTag("guardar_comando"), enabled = !guardando && nombre.isNotBlank() && texto.text.isNotBlank()) { Text("Guardar") }
+            }, Modifier.fillMaxWidth().testTag("guardar_comando"), enabled = !guardando && nombre.isNotBlank() && (texto.text.isNotBlank() || (opciones.isEmpty() && adjuntos.isNotEmpty()))) { Text("Guardar") }
         }
     }
 }

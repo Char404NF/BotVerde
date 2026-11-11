@@ -33,11 +33,21 @@ import androidx.compose.ui.unit.dp
 import com.botchat.app.datos.ActividadItem
 import com.botchat.app.datos.Repo
 
+/** De “respondido a ID (bienvenida)” saca la etiqueta “Automático · bienvenida”; "" si no trae. */
+fun etiquetaAutomatica(detalle: String): String {
+    val i = detalle.lastIndexOf('(')
+    if (i < 0 || !detalle.endsWith(")")) return ""
+    return com.botchat.app.datos.TipoAuto.etiqueta(detalle.substring(i + 1, detalle.length - 1))
+}
+
+/** ¿Este renglón es algo que mandó una automatización? */
+fun esAutomatico(a: ActividadItem) = a.evento == "respondio" && etiquetaAutomatica(a.detalle).isNotEmpty() || a.evento == "coincidio" && a.detalle == "mensaje automático"
+
 /** Frase corta de un renglón del registro: sin textos de mensajes ni nombres. */
 fun frase(a: ActividadItem): String = when (a.evento) {
     "llego" -> if (a.detalle == "grupo") "Llegó un mensaje de un grupo" else "Llegó un mensaje privado"
     "coincidio" -> "Coincidió con: " + a.detalle.ifBlank { "una automatización" }
-    "respondio" -> "Respondió"
+    "respondio" -> etiquetaAutomatica(a.detalle).let { if (it.isEmpty()) "Respondió" else "Respondió ($it)" }
     "sin_regla" -> "No coincidió con ninguna automatización"
     "manual" -> "Enviaste un mensaje a mano (no es el bot)"
     "freno" -> "El bot se pausó unos minutos por errores de envío"
@@ -65,13 +75,28 @@ fun frase(a: ActividadItem): String = when (a.evento) {
 fun PantallaActividad(botId: Long, alVolver: () -> Unit) {
     var version by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { Repo.cambios.collect { evs -> if ("actividad" in evs) version++ } }
-    val lista by produceState<List<ActividadItem>?>(null, version) { value = runCatching { Repo.actividadMotor(botId) }.getOrDefault(emptyList()) }
+    val lista0 by produceState<List<ActividadItem>?>(null, version) { value = runCatching { Repo.actividadMotor(botId) }.getOrDefault(emptyList()) }
+    var soloAuto by remember { androidx.compose.runtime.mutableStateOf(false) }
+    val lista = if (soloAuto) lista0?.filter { esAutomatico(it) } else lista0
     Scaffold(topBar = { TopAppBar(navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text("Actividad del bot") }) }) { relleno ->
         val datos = lista
         when {
             datos == null -> Column(Modifier.fillMaxSize().padding(relleno), horizontalAlignment = Alignment.CenterHorizontally) { CircularProgressIndicator(Modifier.padding(Esp.xl)) }
-            datos.isEmpty() -> EstadoVacio(Ico.Chats, "Sin actividad", "Cuando lleguen mensajes verás aquí qué hizo el bot con cada uno.", Modifier.padding(relleno).padding(top = 60.dp))
+            datos.isEmpty() && !soloAuto -> EstadoVacio(Ico.Chats, "Sin actividad", "Cuando lleguen mensajes verás aquí qué hizo el bot con cada uno.", Modifier.padding(relleno).padding(top = 60.dp))
+            datos.isEmpty() -> Column(Modifier.fillMaxSize().padding(relleno)) {
+                androidx.compose.foundation.layout.Row(Modifier.padding(horizontal = Esp.l, vertical = Esp.xs), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Esp.s)) {
+                    androidx.compose.material3.FilterChip(false, { soloAuto = false }, { Text("Todo") }, Modifier.testTag("filtro_act_todo"))
+                    androidx.compose.material3.FilterChip(true, { soloAuto = true }, { Text("Automáticos") }, Modifier.testTag("filtro_act_auto"))
+                }
+                EstadoVacio(Ico.Chats, "Sin mensajes automáticos", "Aquí verás lo que mandó una bienvenida, una ausencia, un menú o una regla.", Modifier.padding(top = 40.dp))
+            }
             else -> LazyColumn(Modifier.fillMaxSize().padding(relleno).testTag("lista_actividad")) {
+                item {
+                    androidx.compose.foundation.layout.Row(Modifier.padding(horizontal = Esp.l, vertical = Esp.xs), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Esp.s)) {
+                        androidx.compose.material3.FilterChip(!soloAuto, { soloAuto = false }, { Text("Todo") }, Modifier.testTag("filtro_act_todo"))
+                        androidx.compose.material3.FilterChip(soloAuto, { soloAuto = true }, { Text("Automáticos") }, Modifier.testTag("filtro_act_auto"))
+                    }
+                }
                 item { Text("Sin textos de mensajes ni nombres. Los chats aparecen con un código corto.", Modifier.padding(Esp.l), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 items(datos) { a ->
                     Row(Modifier.fillMaxWidth().padding(horizontal = Esp.l, vertical = Esp.s)) {

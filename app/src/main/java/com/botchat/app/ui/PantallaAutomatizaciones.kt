@@ -62,7 +62,7 @@ import kotlinx.coroutines.withContext
 fun PantallaAutomatizaciones(
     botId: Long, alVolver: () -> Unit, alEditar: (Long) -> Unit, alEnCurso: () -> Unit, alActividad: () -> Unit,
     alEstadisticas: (Long) -> Unit, alProbar: (Long) -> Unit,
-    alFormularios: () -> Unit = {}, alNoEntendio: () -> Unit = {}, alAjustesMenus: () -> Unit = {},
+    alFormularios: () -> Unit = {}, alNoEntendio: () -> Unit = {}, alAjustesMenus: () -> Unit = {}, alMensajesAuto: () -> Unit = {},
 ) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -106,6 +106,7 @@ fun PantallaAutomatizaciones(
                 navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } },
                 title = { Text("Automatizaciones") },
                 actions = {
+                    IconButton(alMensajesAuto, Modifier.testTag("abrir_mensajes_auto")) { Icon(Ico.Editar, "Mensajes automáticos") }
                     IconButton(alEnCurso, Modifier.testTag("abrir_en_curso")) { Icon(Ico.Chats, "En curso ahora") }
                     IconButton(alActividad, Modifier.testTag("abrir_actividad_auto")) { Icon(Ico.Estadisticas, "Actividad del bot") }
                     Box {
@@ -129,6 +130,16 @@ fun PantallaAutomatizaciones(
                 "El bot solo responde cuando alguien le escribe; nunca escribe primero. Se revisan de arriba hacia abajo y responde la primera que coincida (el Saludo va al final).",
                 Modifier.padding(horizontal = Esp.l, vertical = Esp.s), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Card(onClick = alMensajesAuto, modifier = Modifier.fillMaxWidth().padding(horizontal = Esp.l, vertical = Esp.xs).testTag("tarjeta_mensajes_auto"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                Row(Modifier.padding(Esp.m), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Ico.Editar, null)
+                    Column(Modifier.weight(1f).padding(start = Esp.m)) {
+                        Text("Mensajes automáticos", style = MaterialTheme.typography.titleSmall)
+                        Text("Bienvenida, ausencia, “ya vi tu mensaje”, cierre y respuestas rápidas (/atajo).", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Icon(Ico.Siguiente, null)
+                }
+            }
             if (exportando) PanelExportar(botId, lista.orEmpty().filter { !it.sistema }, alCerrar = { exportando = false })
             archivoImportar?.let { f -> PanelImportar(botId, f, alTerminar = { archivoImportar = null; version++ }) }
             if (nueva) PanelNueva(

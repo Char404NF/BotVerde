@@ -429,6 +429,71 @@ class MotorFalso : Motor {
         return nuevo
     }
     override fun vistaPreviaComandoPropio(bot: Long, datosJson: String): String { llamadas += "vistaComando"; return "Escriben: !" + JSONObject(datosJson).optString("nombre") + "\n\n" + JSONObject(datosJson).optString("texto") }
+
+    // ---- Mensajes automáticos y adjuntos (bloque D) ----
+    var mensajesAuto = mutableListOf<JSONObject>()
+    var autoActivo = true
+    var autoConflictos = listOf<String>()
+    var registroAutoJson = "[]"
+    var chatsAuto = listOf<String>()
+    var mensajesAutoJson = "[]"
+    var atajosJson = "[]"
+    var subidaFalla: String? = null
+    var adjuntosSubidos = mutableListOf<JSONObject>()
+    private fun vistaAuto(o: JSONObject) = JSONObject(o.toString()).put("cuando", "siempre").put("quien", "todos · solo privados").put("repite", "una vez cada 6 horas").put("envios7d", 0).put("estado", if (o.optBoolean("activo")) "activo" else "apagado")
+    override fun listarAutos(bot: Long, tipo: String): String {
+        llamadas += "listarAutos:$tipo"
+        return JSONObject().put("mensajes", JSONArray(mensajesAuto.filter { tipo.isEmpty() || it.getString("tipo") == tipo }.map { vistaAuto(it) })).put("activo", autoActivo).put("atajosActivo", true).put("atajoModo", "editar")
+            .put("topeHora", 30).put("usadosHora", 0).put("zona", "").put("zonaBot", "America/Mexico_City").put("conflictos", JSONArray(autoConflictos)).put("automaticos24h", 0).toString()
+    }
+    override fun obtenerAuto(bot: Long, id: Long): String = vistaAuto(mensajesAuto.first { it.getLong("id") == id }).toString()
+    override fun guardarAuto(bot: Long, entradaJson: String): Long {
+        llamadas += "guardarAuto:$entradaJson"; pFalla()
+        val o = JSONObject(entradaJson)
+        if (o.optString("texto").isBlank() && o.optJSONArray("adjuntos")?.length().let { it == null || it == 0 }) throw IllegalStateException("Escribe el mensaje (o agrega un archivo).")
+        val id = if (o.optLong("id") == 0L) (mensajesAuto.maxOfOrNull { it.getLong("id") } ?: 0L) + 1 else o.getLong("id")
+        mensajesAuto.removeAll { it.getLong("id") == id }
+        mensajesAuto += o.put("id", id).put("orden", mensajesAuto.size + 1)
+        return id
+    }
+    override fun fijarAutoActivo(bot: Long, id: Long, activo: Boolean) { llamadas += "autoActivo:$id:$activo"; pFalla(); mensajesAuto.first { it.getLong("id") == id }.put("activo", activo) }
+    override fun borrarAuto(bot: Long, id: Long) { llamadas += "borrarMensajeAuto:$id"; pFalla(); mensajesAuto.removeAll { it.getLong("id") == id } }
+    override fun reordenarAutos(bot: Long, idsJson: String) { llamadas += "reordenarAutos:$idsJson" }
+    override fun plantillasAuto(): String = JSONArray()
+        .put(JSONObject().put("tipo", "bienvenida").put("nombre", "Bienvenida amable").put("descripcion", "Saluda").put("texto", "¡Hola {nombre}! Gracias por escribirnos.").put("config", JSONObject().put("cuando", JSONObject().put("siempre", true)).put("quien", JSONObject().put("personas", "todos").put("privados", true).put("grupos", false)).put("repeticion", JSONObject().put("cada", 1).put("unidad", "dias"))))
+        .put(JSONObject().put("tipo", "ausencia").put("nombre", "Fuera de horario").put("descripcion", "Avisa").put("texto", "Hola {nombre}, estamos fuera de horario: {horario}.").put("config", JSONObject().put("cuando", JSONObject().put("horarioModo", "fuera").put("horario", JSONArray().put(JSONObject().put("dia", 1).put("rangos", JSONArray().put(JSONObject().put("desde", "09:00").put("hasta", "18:00")))))).put("quien", JSONObject().put("personas", "todos").put("privados", true)).put("repeticion", JSONObject().put("cada", 12).put("unidad", "horas"))))
+        .put(JSONObject().put("tipo", "recibido").put("nombre", "Ya vi tu mensaje").put("descripcion", "Recibido").put("texto", "Recibí tu mensaje, {nombre}.").put("config", JSONObject().put("cuando", JSONObject().put("siempre", true)).put("quien", JSONObject().put("personas", "todos").put("privados", true)).put("repeticion", JSONObject().put("cada", 6).put("unidad", "horas"))))
+        .put(JSONObject().put("tipo", "atajo").put("nombre", "/gracias").put("descripcion", "Gracias").put("texto", "¡Gracias por escribir!").put("config", JSONObject()))
+        .toString()
+    override fun configPorDefectoAuto(tipo: String): String {
+        val base = JSONObject().put("quien", JSONObject().put("personas", "todos").put("privados", true)).put("repeticion", JSONObject().put("cada", 6).put("unidad", "horas"))
+        if (tipo != "ausencia") return base.put("cuando", JSONObject().put("siempre", true)).toString()
+        // igual que Go: la ausencia nace “fuera de horario” de lunes a viernes con dos rangos
+        val dias = JSONArray().also { a -> (1..5).forEach { d -> a.put(JSONObject().put("dia", d).put("rangos", JSONArray().put(JSONObject().put("desde", "09:00").put("hasta", "13:00")).put(JSONObject().put("desde", "15:00").put("hasta", "18:00")))) } }
+        return base.put("cuando", JSONObject().put("siempre", false).put("horarioModo", "fuera").put("horario", dias)).toString()
+    }
+    var ultimaPrueba: Pair<String, String>? = null
+    override fun probarAuto(bot: Long, entradaJson: String, escenarioJson: String): String {
+        llamadas += "probarAuto"; pFalla(); ultimaPrueba = entradaJson to escenarioJson
+        val o = JSONObject(entradaJson); val e = JSONObject(escenarioJson)
+        val texto = o.optString("texto").replace("{nombre}", e.optString("nombre"))
+        return JSONObject().put("aplica", !e.optBoolean("esGrupo")).put("motivo", if (e.optBoolean("esGrupo")) "No es para esta persona (revisa «A quién»)." else "").put("texto", texto)
+            .put("archivos", JSONArray()).put("cuando", "10/11/2026 10:00").toString()
+    }
+    override fun registroAuto(bot: Long, autoId: Long, limite: Long) = registroAutoJson
+    override fun subirAdjunto(bot: Long, ruta: String, tipo: String, mime: String, nombre: String): String {
+        llamadas += "subirAdjunto:$tipo:$nombre"; pFalla()
+        subidaFalla?.let { throw IllegalStateException(it) }
+        val a = JSONObject().put("id", "%024d".format(adjuntosSubidos.size + 1)).put("tipo", tipo).put("mime", mime).put("nombre", nombre).put("bytes", 10)
+        adjuntosSubidos += a
+        return a.toString()
+    }
+    override fun borrarAdjunto(bot: Long, id: String) { llamadas += "borrarAdjunto:$id" }
+    override fun limpiarAdjuntos(bot: Long): Long { llamadas += "limpiarAdjuntos"; return 0 }
+    override fun listarAtajos(bot: Long, chat: String) = atajosJson
+    override fun enviarArchivosAtajo(bot: Long, chat: String, id: Long) { llamadas += "archivosAtajo:$chat:$id" }
+    override fun listarMensajesAuto(bot: Long, chat: String, antesTs: Long, limite: Long) = mensajesAutoJson
+    override fun chatsConAutomaticos(bot: Long, dias: Long) = JSONArray(chatsAuto).toString()
 }
 
 object Apoyo {
@@ -517,11 +582,11 @@ object Apoyo {
 
     fun msgJson(
         id: String, ts: Long, texto: String = "", tipo: String = "texto", mio: Boolean = false, remitente: String = "", remitenteId: String = "x", estado: String = "ninguno",
-        bytes: Long = 0, ruta: String = "", miniatura: String = "", borrado: Boolean = false, editado: Boolean = false, puedeBajarse: Boolean = false, dur: Int = 0, nombre: String = "", notaVoz: Boolean = false,
+        bytes: Long = 0, ruta: String = "", miniatura: String = "", borrado: Boolean = false, editado: Boolean = false, puedeBajarse: Boolean = false, dur: Int = 0, nombre: String = "", notaVoz: Boolean = false, automatico: String = "",
     ) = JSONObject().put("id", id).put("chat", "chat").put("remitenteId", remitenteId).put("remitente", remitente).put("esMio", mio).put("tipo", tipo).put("texto", texto).put("ts", ts)
         .put("borrado", borrado).put("editado", editado).put("estado", estado).put("bytes", bytes).put("mime", "").put("nombre", nombre).put("ruta", ruta).put("miniatura", miniatura)
         .put("ancho", 0).put("alto", 0).put("dur", dur).put("notaVoz", notaVoz).put("puedeBajarse", puedeBajarse)
-        .put("estadoEnvio", if (mio) "enviado" else "").put("menciones", JSONArray()).put("reacciones", JSONArray())
+        .put("estadoEnvio", if (mio) "enviado" else "").put("menciones", JSONArray()).put("reacciones", JSONArray()).put("automatico", automatico)
 
     fun arreglo(vararg o: JSONObject) = JSONArray().also { a -> o.forEach { a.put(it) } }.toString()
 

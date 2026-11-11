@@ -78,6 +78,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
     val bot = vm.bot ?: return
     val ctx = LocalContext.current
     val haptica = rememberHaptica()
+    val estiloLetra by ajustes.estiloLetra.collectAsState()
     // Una notificación de mensaje abre el chat correspondiente.
     val pedido by com.botchat.app.NavegarA.chat.collectAsState()
     LaunchedEffect(pedido) {
@@ -141,7 +142,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
         },
     ) { relleno ->
     SharedTransitionLayout(Modifier.padding(relleno)) {
-        CompositionLocalProvider(LocalSharedScope provides this) {
+        CompositionLocalProvider(LocalSharedScope provides this, LocalEstiloLetra provides estiloLetra) {
             NavHost(nav, startDestination = "inicio", enterTransition = entra(), exitTransition = sale(), popEnterTransition = vuelveEntra(), popExitTransition = vuelveSale()) {
                 composable("inicio") {
                     CompositionLocalProvider(LocalAnimScope provides this) {
@@ -162,6 +163,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                             alAbrirDocumento = { id -> nav.navigate("documento/${enc(jid)}/${enc(id)}") },
                             alAbrirArchivos = { nav.navigate("archivos/${enc(jid)}") },
                             alAbrirInfo = { nav.navigate("info/${enc(jid)}") },
+                            alVerAutomaticos = { nav.navigate("automaticos_chat/${enc(jid)}") },
                             irA = ir,
                             alAbrirUnaVez = { id -> nav.navigate("unavez/${enc(jid)}/${enc(id)}") },
                             alAbrirEtiquetas = { nav.navigate("etiquetas") },
@@ -275,8 +277,24 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         bot.id, alVolver = { nav.popBackStack() }, alEditar = { nav.navigate("automatizacion/$it") }, alEnCurso = { nav.navigate("en_curso") },
                         alActividad = { nav.navigate("actividad") }, alEstadisticas = { nav.navigate("estadisticas_menu/$it") }, alProbar = { nav.navigate("simulador/$it") },
                         alFormularios = { nav.navigate("formularios/0") }, alNoEntendio = { nav.navigate("no_entendio/0") }, alAjustesMenus = { nav.navigate("ajustes_menus") },
+                        alMensajesAuto = { nav.navigate("mensajes_auto") },
                     )
                 }
+                composable("mensajes_auto") {
+                    PantallaMensajesAuto(bot.id, alVolver = { nav.popBackStack() }, alEditar = { id, tipo -> nav.navigate("mensaje_auto/$id/$tipo") }, alRegistro = { nav.navigate("registro_auto") },
+                        alVerAutomaticos = { nav.navigate("mensajes_automaticos_enviados") })
+                }
+                composable("mensaje_auto/{id}/{tipo}") { be ->
+                    val id = be.arguments?.getString("id")?.toLongOrNull() ?: return@composable
+                    val tipo = be.arguments?.getString("tipo") ?: return@composable
+                    EditorMensajeAuto(bot.id, id, tipo, alVolver = { nav.popBackStack() })
+                }
+                composable("automaticos_chat/{jid}") { be ->
+                    val jid = be.arguments?.getString("jid") ?: return@composable
+                    PantallaMensajesAutomaticos(bot.id, jid, "Mensajes automáticos de este chat", alVolver = { nav.popBackStack() }, alAbrirChat = { nav.popBackStack() })
+                }
+                composable("registro_auto") { PantallaRegistroAuto(bot.id, alVolver = { nav.popBackStack() }) }
+                composable("mensajes_automaticos_enviados") { PantallaMensajesAutomaticos(bot.id, "", "Mensajes automáticos enviados", alVolver = { nav.popBackStack() }, alAbrirChat = { nav.navigate("chat/${enc(it)}") }) }
                 composable("automatizacion/{id}") { be ->
                     val id = be.arguments?.getString("id")?.toLongOrNull() ?: return@composable
                     EditorAutomatizacion(bot.id, id, alVolver = { nav.popBackStack() }, alProbar = { nav.navigate("simulador/$it") })

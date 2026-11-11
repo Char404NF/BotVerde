@@ -186,6 +186,25 @@ interface Motor {
     fun listarComandosPropios(bot: Long): String
     fun guardarComandoPropio(bot: Long, id: Long, datosJson: String): Long
     fun vistaPreviaComandoPropio(bot: Long, datosJson: String): String
+
+    // Mensajes automáticos y adjuntos (0.5.0, bloque D). Evento: "auto", "auto_registro".
+    fun listarAutos(bot: Long, tipo: String): String
+    fun obtenerAuto(bot: Long, id: Long): String
+    fun guardarAuto(bot: Long, entradaJson: String): Long
+    fun fijarAutoActivo(bot: Long, id: Long, activo: Boolean)
+    fun borrarAuto(bot: Long, id: Long)
+    fun reordenarAutos(bot: Long, idsJson: String)
+    fun plantillasAuto(): String
+    fun configPorDefectoAuto(tipo: String): String
+    fun probarAuto(bot: Long, entradaJson: String, escenarioJson: String): String
+    fun registroAuto(bot: Long, autoId: Long, limite: Long): String
+    fun subirAdjunto(bot: Long, ruta: String, tipo: String, mime: String, nombre: String): String
+    fun borrarAdjunto(bot: Long, id: String)
+    fun limpiarAdjuntos(bot: Long): Long
+    fun listarAtajos(bot: Long, chat: String): String
+    fun enviarArchivosAtajo(bot: Long, chat: String, id: Long)
+    fun listarMensajesAuto(bot: Long, chat: String, antesTs: Long, limite: Long): String
+    fun chatsConAutomaticos(bot: Long, dias: Long): String
 }
 
 /** El módulo Go de verdad (whatsmeow + almacén cifrado). */
@@ -365,4 +384,22 @@ object MotorGo : Motor {
     override fun listarComandosPropios(bot: Long) = Wabot.listarComandosPropios(bot)
     override fun guardarComandoPropio(bot: Long, id: Long, datosJson: String) = Wabot.guardarComandoPropio(bot, id, datosJson)
     override fun vistaPreviaComandoPropio(bot: Long, datosJson: String) = Wabot.vistaPreviaComandoPropio(bot, datosJson)
+
+    override fun listarAutos(bot: Long, tipo: String) = Wabot.listarAutos(bot, tipo)
+    override fun obtenerAuto(bot: Long, id: Long) = Wabot.obtenerAuto(bot, id)
+    override fun guardarAuto(bot: Long, entradaJson: String) = Wabot.guardarAuto(bot, entradaJson)
+    override fun fijarAutoActivo(bot: Long, id: Long, activo: Boolean) = Wabot.fijarAutoActivo(bot, id, activo)
+    override fun borrarAuto(bot: Long, id: Long) = Wabot.borrarAuto(bot, id)
+    override fun reordenarAutos(bot: Long, idsJson: String) = Wabot.reordenarAutos(bot, idsJson)
+    override fun plantillasAuto() = Wabot.plantillasAuto()
+    override fun configPorDefectoAuto(tipo: String) = Wabot.configPorDefectoAuto(tipo)
+    override fun probarAuto(bot: Long, entradaJson: String, escenarioJson: String) = Wabot.probarAuto(bot, entradaJson, escenarioJson)
+    override fun registroAuto(bot: Long, autoId: Long, limite: Long) = Wabot.registroAuto(bot, autoId, limite)
+    override fun subirAdjunto(bot: Long, ruta: String, tipo: String, mime: String, nombre: String) = Wabot.subirAdjunto(bot, ruta, tipo, mime, nombre)
+    override fun borrarAdjunto(bot: Long, id: String) = Wabot.borrarAdjunto(bot, id)
+    override fun limpiarAdjuntos(bot: Long) = Wabot.limpiarAdjuntos(bot)
+    override fun listarAtajos(bot: Long, chat: String) = Wabot.listarAtajos(bot, chat)
+    override fun enviarArchivosAtajo(bot: Long, chat: String, id: Long) = Wabot.enviarArchivosAtajo(bot, chat, id)
+    override fun listarMensajesAuto(bot: Long, chat: String, antesTs: Long, limite: Long) = Wabot.listarMensajesAuto(bot, chat, antesTs, limite)
+    override fun chatsConAutomaticos(bot: Long, dias: Long) = Wabot.chatsConAutomaticos(bot, dias)
 }

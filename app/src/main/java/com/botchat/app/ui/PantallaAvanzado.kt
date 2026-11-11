@@ -84,6 +84,7 @@ fun PantallaAvanzado(
     val dinamico by ajustes.colorDinamico.collectAsState()
     val animModo by ajustes.animaciones.collectAsState()
     val pausa by ajustes.pausaBotMin.collectAsState()
+    val estiloLetra by ajustes.estiloLetra.collectAsState()
     var ocultas by remember { mutableStateOf(false) }
     val registro by BotState.registro.collectAsState()
     var confirmaEliminar by remember { mutableStateOf(false) }
@@ -127,6 +128,9 @@ fun PantallaAvanzado(
                 Fila("Actividad del bot", "Qué llegó, qué respondió y por qué no", Ico.Estadisticas) { OutlinedButton(alActividad, Modifier.testTag("abrir_actividad")) { Text("Ver") } }
                 Fila("Permisos y comandos", "Prefijo, topes, códigos y registro de acciones", Ico.Candado) { OutlinedButton(alPermisosAvanzado, Modifier.testTag("abrir_permisos_avanzado")) { Text("Abrir") } }
                 Fila("Menús", "Escalera de errores, saludos, grupos y lo que no entendió", Ico.Chats) { OutlinedButton(alMenus, Modifier.testTag("abrir_ajustes_menus_avanzado")) { Text("Abrir") } }
+                Fila("Aa Estilo de letra", "Botón para escribir con letras especiales (𝗡𝗲𝗴𝗿𝗶𝘁𝗮, 𝒮𝒸𝓇𝒾𝓅𝓉…). Puede verse distinto en otros teléfonos, no se puede buscar y los lectores de pantalla lo leen mal", Ico.Editar) {
+                    Switch(estiloLetra, { haptica(Toque.Suave); ajustes.fijarEstiloLetra(it) }, Modifier.testTag("sw_estilo_letra"))
+                }
             }
             Seccion("Opciones ocultas") {
                 Fila("Mostrar opciones ocultas", "Ajustes finos que casi nadie necesita", Ico.Ajustes) { Switch(ocultas, { haptica(Toque.Suave); ocultas = it }, Modifier.testTag("sw_ocultas")) }

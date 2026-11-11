@@ -90,6 +90,11 @@ class Ajustes private constructor(ctx: Context) {
     val motorAutomatico: StateFlow<Boolean> = _motorAuto
     fun fijarMotorAutomatico(v: Boolean) { p.edit().putBoolean("motor_auto", v).apply(); _motorAuto.value = v; aplicarAGo() }
 
+    private val _estiloLetra = MutableStateFlow(p.getBoolean("estilo_letra", false))
+    /** Mostrar “Aa Estilo de letra” en los editores de mensajes (Avanzado; apagado por defecto). */
+    val estiloLetra: StateFlow<Boolean> = _estiloLetra
+    fun fijarEstiloLetra(v: Boolean) { p.edit().putBoolean("estilo_letra", v).apply(); _estiloLetra.value = v }
+
     private val _escribir = MutableStateFlow(p.getBoolean("escribir_app", true))
     /** Poder escribir mensajes a mano desde la app. */
     val escribirDesdeApp: StateFlow<Boolean> = _escribir

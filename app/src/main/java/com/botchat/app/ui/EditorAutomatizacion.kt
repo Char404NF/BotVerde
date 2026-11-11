@@ -250,7 +250,8 @@ private fun TarjetaPaso(
 
 @Composable
 private fun Campo(valor: String, etiqueta: String, tag: String, lineas: Int = 4, alCambiar: (String) -> Unit) {
-    OutlinedTextField(valor, alCambiar, Modifier.fillMaxWidth().testTag(tag), label = { Text(etiqueta) }, maxLines = lineas)
+    // con el botón “Aa” (Avanzado → Estilo de letra) cuando está activado
+    CampoConEstilo(valor, etiqueta, tag, lineas = lineas, alCambiar = alCambiar)
 }
 
 @Composable

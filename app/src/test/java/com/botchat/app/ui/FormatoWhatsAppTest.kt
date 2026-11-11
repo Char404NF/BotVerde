@@ -85,4 +85,70 @@ class FormatoWhatsAppTest {
         assertEquals("```x```", FormatoWhatsApp.aplicar(TextFieldValue("x", TextRange(0, 1)), "```").text)
         assertNull(null)
     }
+
+    // ---------- los 8 estilos de WhatsApp (etapa D) ----------
+
+    @Test fun losOchoEstilosDeWhatsAppSePintan() {
+        // 1 *negrita*, 2 _cursiva_, 3 ~tachado~, 4 ```monoespaciado```, 5 "- " lista, 6 "1. " numerada, 7 "> " cita, 8 `código en línea`
+        val a = construye("*n* _c_ ~t~ ```m``` `l`")
+        assertEquals("n c t m l", a.text)
+        assertEquals(FontWeight.Bold, a.spanStyles.first { a.text.substring(it.start, it.end) == "n" }.item.fontWeight)
+        assertEquals(FontStyle.Italic, a.spanStyles.first { a.text.substring(it.start, it.end) == "c" }.item.fontStyle)
+        assertEquals(TextDecoration.LineThrough, a.spanStyles.first { a.text.substring(it.start, it.end) == "t" }.item.textDecoration)
+        assertTrue(a.spanStyles.any { a.text.substring(it.start, it.end) == "m" && it.item.fontFamily != null })
+        assertTrue(a.spanStyles.any { a.text.substring(it.start, it.end) == "l" && it.item.fontFamily != null })
+    }
+
+    @Test fun laListaConGuionSeVuelveVineta() {
+        assertEquals("• uno\n• dos", construye("- uno\n- dos").text)
+        assertEquals("a - b", construye("a - b").text) // un guion en medio no es lista
+        assertEquals("-sin espacio", construye("-sin espacio").text)
+        assertEquals("- ", construye("- ").text) // un renglón sin nada más no es lista
+        // dentro de una lista se sigue aplicando el formato
+        val l = construye("- *fuerte* y _suave_")
+        assertEquals("• fuerte y suave", l.text)
+        assertTrue(l.spanStyles.any { it.item.fontWeight == FontWeight.Bold })
+    }
+
+    @Test fun laListaNumeradaMantieneSuNumero() {
+        val l = construye("1. uno\n2. dos\n10. diez")
+        assertEquals("1. uno\n2. dos\n10. diez", l.text)
+        assertEquals(3, l.spanStyles.count { it.item.fontWeight == FontWeight.SemiBold })
+        assertEquals("1.sin espacio", construye("1.sin espacio").text)
+        assertEquals("versión 2. ya", construye("versión 2. ya").text) // solo al principio del renglón
+    }
+
+    @Test fun laCitaSeMarcaYAdmiteFormato() {
+        val c = construye("> dijo *esto*\ny sigue")
+        assertEquals("▎ dijo esto\ny sigue", c.text)
+        assertTrue(c.spanStyles.any { it.item.fontStyle == FontStyle.Italic && it.start == 0 })
+        assertTrue(c.spanStyles.any { it.item.fontWeight == FontWeight.Bold && c.text.substring(it.start, it.end) == "esto" })
+        assertEquals("a > b", construye("a > b").text)
+        assertEquals(">pegado", construye(">pegado").text)
+    }
+
+    @Test fun elCodigoEnLineaNoAplicaOtrosFormatosNiCruzaRenglones() {
+        val c = construye("usa `*no negrita*` aquí")
+        assertEquals("usa *no negrita* aquí", c.text)
+        assertTrue(c.spanStyles.none { it.item.fontWeight == FontWeight.Bold })
+        assertEquals("`sin cerrar", construye("`sin cerrar").text)
+        assertEquals("`uno\ndos`", construye("`uno\ndos`").text)
+        assertEquals("``", construye("``").text)
+        // el monoespaciado de tres comillas puede ocupar varios renglones
+        assertEquals("a\nb", construye("```a\nb```").text)
+    }
+
+    @Test fun losBotonesDeRenglonPonenYQuitanLista_numeradaYCita() {
+        val v = TextFieldValue("uno\ndos\ntres", TextRange(0, 13))
+        val lista = FormatoWhatsApp.aplicarLinea(v, "- ")
+        assertEquals("- uno\n- dos\n- tres", lista.text)
+        assertEquals("uno\ndos\ntres", FormatoWhatsApp.aplicarLinea(lista, "- ").text)
+        val num = FormatoWhatsApp.aplicarLinea(v, "1. ")
+        assertEquals("1. uno\n2. dos\n3. tres", num.text)
+        assertEquals("uno\ndos\ntres", FormatoWhatsApp.aplicarLinea(num, "1. ").text)
+        assertEquals("> uno\ndos\ntres", FormatoWhatsApp.aplicarLinea(TextFieldValue("uno\ndos\ntres", TextRange(1)), "> ").text)
+        // solo los renglones tocados por la selección
+        assertEquals("uno\n- dos\ntres", FormatoWhatsApp.aplicarLinea(TextFieldValue("uno\ndos\ntres", TextRange(5)), "- ").text)
+        assertEquals("- ", FormatoWhatsApp.aplicarLinea(TextFieldValue("", TextRange(0)), "- ").text)
+    }
 }

@@ -16,8 +16,10 @@ import androidx.compose.ui.text.TextRange
 import com.botchat.app.datos.Mencion
 
 /**
- * Formato de WhatsApp: *negrita*, _cursiva_, ~tachado~ y ```monoespacio```, más enlaces tocables y @menciones con el nombre.
+ * Formato de WhatsApp: *negrita*, _cursiva_, ~tachado~, ```monoespacio```, `código en línea`, listas con "- " (viñeta) y "1. " (numerada)
+ * y citas con "> ", más enlaces tocables y @menciones con el nombre.
  * Un marcador solo vale si va pegado al texto que encierra y no a mitad de una palabra; no cruza renglones.
+ * Las listas y las citas valen solo al principio de un renglón. Dentro del código no se aplica ningún otro formato.
  */
 object FormatoWhatsApp {
     private val enlace = Regex("""(?i)\b((?:https?://|www\.)[^\s<>]+)""")
@@ -42,9 +44,44 @@ object FormatoWhatsApp {
         return -1
     }
 
-    private fun AnnotatedString.Builder.pinta(s: String) {
+    private val colorCita = Color(0xFF6B7C85)
+
+    /** ¿Hay un renglón de lista numerada en `i` ("12. texto")? Devuelve el largo del prefijo ("12. ") o 0. */
+    private fun prefijoNumerado(s: String, i: Int): Int {
+        var j = i
+        while (j < s.length && j - i < 3 && s[j].isDigit()) j++
+        return if (j > i && j + 1 < s.length && s[j] == '.' && s[j + 1] == ' ' && j + 2 < s.length && s[j + 2] != '\n') j + 2 - i else 0
+    }
+
+    private fun AnnotatedString.Builder.pinta(s: String, inicioDeRenglon: Boolean = true) {
         var i = 0
         while (i < s.length) {
+            val alInicio = (i == 0 && inicioDeRenglon) || (i > 0 && s[i - 1] == '\n')
+            if (alInicio) {
+                // lista con viñeta: "- texto"
+                if (s.startsWith("- ", i) && i + 2 < s.length && s[i + 2] != '\n') {
+                    append("• ")
+                    i += 2
+                    continue
+                }
+                // lista numerada: "1. texto" (se deja el número, que ya dice el orden)
+                val n = prefijoNumerado(s, i)
+                if (n > 0) {
+                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(s.substring(i, i + n)) }
+                    i += n
+                    continue
+                }
+                // cita: "> texto" (hasta el final del renglón)
+                if (s.startsWith("> ", i) && i + 2 < s.length && s[i + 2] != '\n') {
+                    val finLinea = s.indexOf('\n', i).let { if (it < 0) s.length else it }
+                    withStyle(SpanStyle(color = colorCita, fontStyle = FontStyle.Italic)) {
+                        append("▎ ")
+                        pinta(s.substring(i + 2, finLinea), false)
+                    }
+                    i = finLinea
+                    continue
+                }
+            }
             if (s.startsWith("```", i)) {
                 val fin = s.indexOf("```", i + 3)
                 if (fin > i + 3) {
@@ -53,11 +90,21 @@ object FormatoWhatsApp {
                     continue
                 }
             }
+            // código en línea: `texto` en un solo renglón, sin otros formatos adentro
+            if (s[i] == '`' && !s.startsWith("``", i)) {
+                val fin = s.indexOf('`', i + 1)
+                val salto = s.indexOf('\n', i + 1)
+                if (fin > i + 1 && (salto < 0 || salto > fin)) {
+                    withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = Color(0x22888888))) { append(s.substring(i + 1, fin)) }
+                    i = fin + 1
+                    continue
+                }
+            }
             val c = s[i]
             if ((c == '*' || c == '_' || c == '~') && puedeAbrir(s, i, c)) {
                 val j = cierre(s, i, c)
                 if (j > 0) {
-                    withStyle(estiloDe(c)) { pinta(s.substring(i + 1, j)) }
+                    withStyle(estiloDe(c)) { pinta(s.substring(i + 1, j), false) }
                     i = j + 1
                     continue
                 }
@@ -143,5 +190,32 @@ object FormatoWhatsApp {
                 TextFieldValue(t.substring(0, ini) + marcador + sel + marcador + t.substring(fin), TextRange(ini + marcador.length, fin + marcador.length))
             }
         }
+    }
+
+    /**
+     * Pone (o quita, si todos los renglones ya lo traen) un prefijo de renglón —"- " lista, "1. " numerada o "> " cita— a los renglones
+     * que toca la selección. Para la numerada, cada renglón lleva su número (1., 2., 3.…).
+     */
+    fun aplicarLinea(v: TextFieldValue, prefijo: String): TextFieldValue {
+        val t = v.text
+        val ini = t.lastIndexOf('\n', v.selection.min - 1) + 1
+        val finBusca = if (v.selection.max > v.selection.min && v.selection.max > 0 && t.getOrNull(v.selection.max - 1) == '\n') v.selection.max - 1 else v.selection.max
+        val fin = t.indexOf('\n', finBusca).let { if (it < 0) t.length else it }
+        val lineas = t.substring(ini, fin).split('\n')
+        val numerada = prefijo == "1. "
+        val re = Regex("""^\d{1,3}\. """)
+        fun tiene(l: String) = if (numerada) re.containsMatchIn(l) else l.startsWith(prefijo)
+        val quitar = lineas.isNotEmpty() && lineas.all { tiene(it) }
+        val nuevas = lineas.mapIndexed { i, l ->
+            when {
+                quitar -> if (numerada) re.replace(l, "") else l.removePrefix(prefijo)
+                numerada -> (if (re.containsMatchIn(l)) re.replace(l, "") else l).let { "${i + 1}. $it" }
+                tiene(l) -> l
+                else -> prefijo + l
+            }
+        }
+        val bloque = nuevas.joinToString("\n")
+        val texto = t.substring(0, ini) + bloque + t.substring(fin)
+        return TextFieldValue(texto, TextRange(ini, ini + bloque.length))
     }
 }

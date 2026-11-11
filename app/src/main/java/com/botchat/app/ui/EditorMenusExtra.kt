@@ -46,6 +46,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import com.botchat.app.datos.AdjuntoDef
+import com.botchat.app.datos.AdjuntoSubido
 import com.botchat.app.datos.AjustesMenuDef
 import com.botchat.app.datos.AutoDef
 import com.botchat.app.datos.CampoDef
@@ -148,34 +149,12 @@ private fun fmtNum(v: Double): String = if (v == Math.floor(v) && !v.isInfinite(
 
 @Composable
 internal fun ExtrasRespuesta(botId: Long, p: PasoDef, cambia: (String, (PasoDef) -> PasoDef) -> Unit) {
-    val ctx = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var subiendo by remember { mutableStateOf(false) }
-    val elegir = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            subiendo = true
-            scope.launch {
-                PrepararAdjunto.desdeUri(ctx, uri).onSuccess { listo ->
-                    runCatching { Repo.subirAdjuntoMenu(botId, listo.archivo.path, listo.tipo, listo.mime, listo.nombre) }
-                        .onSuccess { a -> cambia(p.id) { q -> q.copy(adjuntos = (q.adjuntos + AdjuntoDef(a.id, a.tipo, a.mime, a.nombre)).take(3)) } }
-                        .onFailure { avisaToast(ctx, it.message ?: "No se pudo guardar el archivo", true) }
-                }.onFailure { avisaToast(ctx, it.message ?: "No se pudo leer el archivo", true) }
-                subiendo = false
-            }
-        }
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(Esp.s)) {
-        Text("Archivos (hasta 3)", style = MaterialTheme.typography.labelLarge)
-        p.adjuntos.forEachIndexed { i, a ->
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag("adjunto_${p.id}_$i")) {
-                Icon(when (a.tipo) { "imagen" -> Ico.Foto; "video" -> Ico.Video; "audio" -> Ico.Audio; else -> Ico.Documento }, null, Modifier.size(20.dp))
-                Text("  " + a.nombre.ifBlank { a.tipo }, Modifier.weight(1f), maxLines = 1)
-                IconButton({ cambia(p.id) { q -> q.copy(adjuntos = q.adjuntos.filterIndexed { j, _ -> j != i }) } }, Modifier.testTag("quitar_adjunto_${p.id}_$i")) { Icon(Ico.Borrar, "Quitar archivo") }
-            }
-        }
-        OutlinedButton({ elegir.launch(arrayOf("*/*")) }, Modifier.testTag("agregar_adjunto_${p.id}"), enabled = p.adjuntos.size < 3 && !subiendo) { Icon(Ico.Adjuntar, null); Text(if (subiendo) " Guardando…" else " Agregar archivo") }
-        Text("Foto, video, audio o documento de hasta 8 MB. Se guardan cifrados en el teléfono. Si el texto va junto con una foto, video o documento, sale como pie.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+    // Los archivos de una opción de menú usan el mismo selector (y el mismo servicio de archivos cifrados) que los mensajes automáticos.
+    SelectorAdjuntos(
+        botId, p.adjuntos.map { AdjuntoSubido(it.id, it.tipo, it.mime, it.nombre, 0) }, p.id,
+        alCambiar = { l -> cambia(p.id) { q -> q.copy(adjuntos = l.map { AdjuntoDef(it.id, it.tipo, it.mime, it.nombre) }.take(3)) } },
+    )
+    Text("Si el texto va junto con una foto, video o documento, sale como pie.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     val u = p.ubicacion
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("Mandar una ubicación", Modifier.weight(1f))
