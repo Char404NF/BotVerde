@@ -35,6 +35,9 @@ type Config struct {
 	Prefijo func() string
 	// PuedeUsar dice si esa persona tiene al menos el rango mínimo (id de rango) que pide un comando propio.
 	PuedeUsar func(sender string, rolMin int64) bool
+	// Conector (módulo H5) devuelve el texto de un conector HTTP para {api_<nombre>} en menús, reglas y comandos propios. nil o "" =
+	// la variable queda vacía (sin romper la conversación).
+	Conector func(nombre, sender, chat string) string
 }
 
 // Motor ejecuta las automatizaciones. Implementa motor.Decisor.

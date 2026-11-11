@@ -598,6 +598,9 @@ func (m *Motor) sustituye(def *Def, t string, e entrada, vars map[string]string)
 		if v, ok := vars[k]; ok {
 			return v
 		}
+		if strings.HasPrefix(k, "api_") && m.c.Conector != nil {
+			return m.c.Conector(k[4:], e.Sender, e.Chat)
+		}
 		return ""
 	})
 }

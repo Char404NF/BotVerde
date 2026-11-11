@@ -36,6 +36,8 @@ type Gestor struct {
 	Cola  *Cola
 	// Acc son las acciones de grupo y de WhatsApp que algunos módulos necesitan (nil = no disponibles, por ejemplo sin conexión).
 	Acc Acciones
+	// Descarga hace las peticiones HTTP de los módulos H5 (nil = el cliente normal con sus protecciones).
+	Descarga Descargador
 	// SinPausaArchivos quita la pausa de 1 a 3 s entre archivos de un mismo mensaje (las pruebas).
 	SinPausaArchivos bool
 
