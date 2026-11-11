@@ -494,6 +494,78 @@ class MotorFalso : Motor {
     override fun enviarArchivosAtajo(bot: Long, chat: String, id: Long) { llamadas += "archivosAtajo:$chat:$id" }
     override fun listarMensajesAuto(bot: Long, chat: String, antesTs: Long, limite: Long) = mensajesAutoJson
     override fun chatsConAutomaticos(bot: Long, dias: Long) = JSONArray(chatsAuto).toString()
+
+    // Grupos y estado de la app de WhatsApp (bloque E)
+    var estadoGrupoJson = """{"conectado":true,"enGrupo":true,"soyAdmin":true,"motivo":""}"""
+    var infoGrupoJson = JSONObject().put("chat", "g@g.us").put("nombre", "Familia").put("descripcion", "Para la familia").put("creado", 1_700_000_000L).put("creadoTexto", "14/11/2023")
+        .put("creadoPor", "Carla").put("miembros", 3).put("admins", JSONArray().put(JSONObject().put("jid", "5215511111111@s.whatsapp.net").put("nombre", "Ana").put("esAdmin", true)))
+        .put("soyAdmin", true).put("soloAdmins", false).put("infoBloqueada", false).put("aprobacionIngreso", false).put("mensajesTemporales", 0).put("reglas", "").toString()
+    var miembrosGrupoJson = Apoyo.arreglo(
+        JSONObject().put("jid", "5215511111111@s.whatsapp.net").put("persona", "5215511111111@s.whatsapp.net").put("nombre", "Ana").put("telefono", "+52 55 1111 1111").put("esAdmin", true).put("esCreador", false).put("yo", false),
+        JSONObject().put("jid", "5215522222222@s.whatsapp.net").put("persona", "5215522222222@s.whatsapp.net").put("nombre", "Luis").put("telefono", "+52 55 2222 2222").put("esAdmin", false).put("esCreador", false).put("yo", false),
+        JSONObject().put("jid", "5215544444444@s.whatsapp.net").put("persona", "5215544444444@s.whatsapp.net").put("nombre", "Carla").put("telefono", "+52 55 4444 4444").put("esAdmin", true).put("esCreador", true).put("yo", false),
+    )
+    var solicitudesGrupoJson = "[]"
+    var rankingGrupoJson = """{"dias":30,"total":0,"filas":[],"soloMiembros":true,"desde":"","aviso":""}"""
+    var inactivosGrupoJson = """{"dias":30,"aviso":"","inactivos":[]}"""
+    var reglasGrupo = ""
+    var enlaceGrupoTexto = "https://chat.whatsapp.com/ABCDEF"
+    var resultadoTodos = """{"mencionadas":3,"total":3,"mensajes":1,"truncado":false,"aviso":""}"""
+    var grupoFalla: String? = null
+    var filtrosGrupoJson: String = JSONArray().also { a ->
+        listOf("enlaces" to "Enlaces", "palabras" to "Palabras prohibidas", "repetidos" to "Mensajes repetidos", "flood" to "Flood").forEach { (f, n) ->
+            a.put(JSONObject().put("chat", "g@g.us").put("filtro", f).put("nombre", n).put("descripcion", "Detecta $n").put("activo", false).put("accion", "avisarme")
+                .put("config", JSONObject().put("exentoAdmins", true).put("exentoRangos", JSONArray()).put("permitidos", JSONArray()).put("palabras", JSONArray())
+                    .put("max", if (f == "repetidos") 3 else if (f == "flood") 6 else 0).put("segundos", if (f == "repetidos") 120 else if (f == "flood") 10 else 0).put("silencioMin", 60).put("aviso", "")))
+        }
+    }.toString()
+    var appStateJson = """{"disponible":false,"conectado":true,"motivo":"Para silenciar/fijar/archivar en tu WhatsApp hace falta que el teléfono principal sincronice (abre WhatsApp en tu teléfono principal y espera un momento)."}"""
+    private fun gFalla() { grupoFalla?.let { throw IllegalStateException(it) } }
+    override fun grupoEstado(bot: Long, chat: String, refrescar: Boolean): String { llamadas += "grupoEstado:$chat:$refrescar"; return estadoGrupoJson }
+    override fun grupoInfo(bot: Long, chat: String): String { llamadas += "grupoInfo:$chat"; gFalla(); return infoGrupoJson }
+    override fun grupoMiembros(bot: Long, chat: String): String { gFalla(); return miembrosGrupoJson }
+    override fun grupoCerrar(bot: Long, chat: String, cerrado: Boolean) { llamadas += "grupoCerrar:$chat:$cerrado"; gFalla(); infoGrupoJson = JSONObject(infoGrupoJson).put("soloAdmins", cerrado).toString() }
+    override fun grupoBloquearInfo(bot: Long, chat: String, bloqueada: Boolean) { llamadas += "grupoBloquear:$chat:$bloqueada"; gFalla(); infoGrupoJson = JSONObject(infoGrupoJson).put("infoBloqueada", bloqueada).toString() }
+    override fun grupoExpulsar(bot: Long, chat: String, persona: String) { llamadas += "grupoExpulsar:$chat:$persona"; gFalla() }
+    override fun grupoAscender(bot: Long, chat: String, persona: String, admin: Boolean) { llamadas += "grupoAscender:$persona:$admin"; gFalla() }
+    override fun grupoSolicitudes(bot: Long, chat: String): String { gFalla(); return solicitudesGrupoJson }
+    override fun grupoResolverSolicitudes(bot: Long, chat: String, personasJson: String, aprobar: Boolean): Long {
+        llamadas += "grupoSolicitudes:${if (aprobar) "aprobar" else "rechazar"}:$personasJson"; gFalla()
+        val n = if (personasJson.isBlank()) JSONArray(solicitudesGrupoJson).length() else JSONArray(personasJson).length()
+        if (personasJson.isBlank()) solicitudesGrupoJson = "[]"
+        else {
+            val quitar = JSONArray(personasJson).let { a -> List(a.length()) { a.getString(it) } }
+            val rest = JSONArray(); val a = JSONArray(solicitudesGrupoJson)
+            for (i in 0 until a.length()) if (a.getJSONObject(i).getString("jid") !in quitar) rest.put(a.get(i))
+            solicitudesGrupoJson = rest.toString()
+        }
+        return n.toLong()
+    }
+    override fun grupoRenombrar(bot: Long, chat: String, nombre: String) { llamadas += "grupoRenombrar:$nombre"; gFalla(); infoGrupoJson = JSONObject(infoGrupoJson).put("nombre", nombre).toString() }
+    override fun grupoDescripcion(bot: Long, chat: String, texto: String) { llamadas += "grupoDescripcion:$texto"; gFalla(); infoGrupoJson = JSONObject(infoGrupoJson).put("descripcion", texto).toString() }
+    override fun grupoEnlace(bot: Long, chat: String, reiniciar: Boolean): String { llamadas += "grupoEnlace:$reiniciar"; gFalla(); return if (reiniciar) "https://chat.whatsapp.com/NUEVO99" else enlaceGrupoTexto }
+    override fun grupoBorrarMensaje(bot: Long, chat: String, msgId: String) { llamadas += "grupoBorrarMensaje:$msgId"; gFalla() }
+    override fun grupoMencionarTodos(bot: Long, chat: String, texto: String): String { llamadas += "grupoTodos:$texto"; gFalla(); return resultadoTodos }
+    override fun grupoRanking(bot: Long, chat: String, dias: Long, limite: Long): String { llamadas += "grupoRanking:$dias"; gFalla(); return JSONObject(rankingGrupoJson).put("dias", dias).toString() }
+    override fun grupoInactivos(bot: Long, chat: String, dias: Long): String { llamadas += "grupoInactivos:$dias"; gFalla(); return JSONObject(inactivosGrupoJson).put("dias", dias).toString() }
+    override fun grupoReglas(bot: Long, chat: String) = reglasGrupo
+    override fun grupoGuardarReglas(bot: Long, chat: String, texto: String) { llamadas += "grupoReglas:$texto"; reglasGrupo = texto }
+    override fun grupoFiltros(bot: Long, chat: String) = filtrosGrupoJson
+    override fun grupoGuardarFiltro(bot: Long, chat: String, datosJson: String) {
+        llamadas += "grupoFiltro:$datosJson"; gFalla()
+        val nuevo = JSONObject(datosJson)
+        val a = JSONArray(filtrosGrupoJson)
+        for (i in 0 until a.length()) if (a.getJSONObject(i).getString("filtro") == nuevo.getString("filtro")) a.getJSONObject(i).also { o -> o.put("activo", nuevo.getBoolean("activo")); o.put("accion", nuevo.getString("accion")); o.put("config", nuevo.getJSONObject("config")) }
+        filtrosGrupoJson = a.toString()
+    }
+    override fun grupoRestaurarFiltro(bot: Long, chat: String, filtro: String) { llamadas += "grupoRestaurar:$filtro" }
+    override fun appStateDisponible(bot: Long) = JSONObject(appStateJson).getBoolean("disponible")
+    override fun appStateEstado(bot: Long) = appStateJson
+    override fun appStateSilenciar(bot: Long, chat: String, segundos: Long) { llamadas += "appSilenciar:$chat:$segundos"; gFalla() }
+    override fun appStateDesilenciar(bot: Long, chat: String) { llamadas += "appDesilenciar:$chat" }
+    override fun appStateFijar(bot: Long, chat: String, fijar: Boolean) { llamadas += "appFijar:$chat:$fijar" }
+    override fun appStateArchivar(bot: Long, chat: String, archivar: Boolean) { llamadas += "appArchivar:$chat:$archivar" }
+    override fun appStateSincronizar(bot: Long) { llamadas += "appSincronizar" }
 }
 
 object Apoyo {

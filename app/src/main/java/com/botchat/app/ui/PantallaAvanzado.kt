@@ -76,6 +76,7 @@ fun PantallaAvanzado(
     alActividad: () -> Unit = {},
     alPermisosAvanzado: () -> Unit = {},
     alMenus: () -> Unit = {},
+    botId: Long = 0,
 ) {
     val ctx = LocalContext.current
     val barra = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -132,6 +133,7 @@ fun PantallaAvanzado(
                     Switch(estiloLetra, { haptica(Toque.Suave); ajustes.fijarEstiloLetra(it) }, Modifier.testTag("sw_estilo_letra"))
                 }
             }
+            if (botId != 0L) SeccionMiWhatsApp(botId)
             Seccion("Opciones ocultas") {
                 Fila("Mostrar opciones ocultas", "Ajustes finos que casi nadie necesita", Ico.Ajustes) { Switch(ocultas, { haptica(Toque.Suave); ocultas = it }, Modifier.testTag("sw_ocultas")) }
                 if (ocultas) {

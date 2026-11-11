@@ -205,6 +205,36 @@ interface Motor {
     fun enviarArchivosAtajo(bot: Long, chat: String, id: Long)
     fun listarMensajesAuto(bot: Long, chat: String, antesTs: Long, limite: Long): String
     fun chatsConAutomaticos(bot: Long, dias: Long): String
+
+    // Grupos y estado de la app de WhatsApp (0.5.0, bloque E)
+    fun grupoEstado(bot: Long, chat: String, refrescar: Boolean): String
+    fun grupoInfo(bot: Long, chat: String): String
+    fun grupoMiembros(bot: Long, chat: String): String
+    fun grupoCerrar(bot: Long, chat: String, cerrado: Boolean)
+    fun grupoBloquearInfo(bot: Long, chat: String, bloqueada: Boolean)
+    fun grupoExpulsar(bot: Long, chat: String, persona: String)
+    fun grupoAscender(bot: Long, chat: String, persona: String, admin: Boolean)
+    fun grupoSolicitudes(bot: Long, chat: String): String
+    fun grupoResolverSolicitudes(bot: Long, chat: String, personasJson: String, aprobar: Boolean): Long
+    fun grupoRenombrar(bot: Long, chat: String, nombre: String)
+    fun grupoDescripcion(bot: Long, chat: String, texto: String)
+    fun grupoEnlace(bot: Long, chat: String, reiniciar: Boolean): String
+    fun grupoBorrarMensaje(bot: Long, chat: String, msgId: String)
+    fun grupoMencionarTodos(bot: Long, chat: String, texto: String): String
+    fun grupoRanking(bot: Long, chat: String, dias: Long, limite: Long): String
+    fun grupoInactivos(bot: Long, chat: String, dias: Long): String
+    fun grupoReglas(bot: Long, chat: String): String
+    fun grupoGuardarReglas(bot: Long, chat: String, texto: String)
+    fun grupoFiltros(bot: Long, chat: String): String
+    fun grupoGuardarFiltro(bot: Long, chat: String, datosJson: String)
+    fun grupoRestaurarFiltro(bot: Long, chat: String, filtro: String)
+    fun appStateDisponible(bot: Long): Boolean
+    fun appStateEstado(bot: Long): String
+    fun appStateSilenciar(bot: Long, chat: String, segundos: Long)
+    fun appStateDesilenciar(bot: Long, chat: String)
+    fun appStateFijar(bot: Long, chat: String, fijar: Boolean)
+    fun appStateArchivar(bot: Long, chat: String, archivar: Boolean)
+    fun appStateSincronizar(bot: Long)
 }
 
 /** El módulo Go de verdad (whatsmeow + almacén cifrado). */
@@ -402,4 +432,33 @@ object MotorGo : Motor {
     override fun enviarArchivosAtajo(bot: Long, chat: String, id: Long) = Wabot.enviarArchivosAtajo(bot, chat, id)
     override fun listarMensajesAuto(bot: Long, chat: String, antesTs: Long, limite: Long) = Wabot.listarMensajesAuto(bot, chat, antesTs, limite)
     override fun chatsConAutomaticos(bot: Long, dias: Long) = Wabot.chatsConAutomaticos(bot, dias)
+
+    override fun grupoEstado(bot: Long, chat: String, refrescar: Boolean) = Wabot.grupoEstado(bot, chat, refrescar)
+    override fun grupoInfo(bot: Long, chat: String) = Wabot.grupoInfo(bot, chat)
+    override fun grupoMiembros(bot: Long, chat: String) = Wabot.grupoMiembros(bot, chat)
+    override fun grupoCerrar(bot: Long, chat: String, cerrado: Boolean) = Wabot.grupoCerrar(bot, chat, cerrado)
+    override fun grupoBloquearInfo(bot: Long, chat: String, bloqueada: Boolean) = Wabot.grupoBloquearInfo(bot, chat, bloqueada)
+    override fun grupoExpulsar(bot: Long, chat: String, persona: String) = Wabot.grupoExpulsar(bot, chat, persona)
+    override fun grupoAscender(bot: Long, chat: String, persona: String, admin: Boolean) = Wabot.grupoAscender(bot, chat, persona, admin)
+    override fun grupoSolicitudes(bot: Long, chat: String) = Wabot.grupoSolicitudes(bot, chat)
+    override fun grupoResolverSolicitudes(bot: Long, chat: String, personasJson: String, aprobar: Boolean) = Wabot.grupoResolverSolicitudes(bot, chat, personasJson, aprobar).toLong()
+    override fun grupoRenombrar(bot: Long, chat: String, nombre: String) = Wabot.grupoRenombrar(bot, chat, nombre)
+    override fun grupoDescripcion(bot: Long, chat: String, texto: String) = Wabot.grupoDescripcion(bot, chat, texto)
+    override fun grupoEnlace(bot: Long, chat: String, reiniciar: Boolean) = Wabot.grupoEnlace(bot, chat, reiniciar)
+    override fun grupoBorrarMensaje(bot: Long, chat: String, msgId: String) = Wabot.grupoBorrarMensaje(bot, chat, msgId)
+    override fun grupoMencionarTodos(bot: Long, chat: String, texto: String) = Wabot.grupoMencionarTodos(bot, chat, texto)
+    override fun grupoRanking(bot: Long, chat: String, dias: Long, limite: Long) = Wabot.grupoRanking(bot, chat, dias, limite)
+    override fun grupoInactivos(bot: Long, chat: String, dias: Long) = Wabot.grupoInactivos(bot, chat, dias)
+    override fun grupoReglas(bot: Long, chat: String) = Wabot.grupoReglas(bot, chat)
+    override fun grupoGuardarReglas(bot: Long, chat: String, texto: String) = Wabot.grupoGuardarReglas(bot, chat, texto)
+    override fun grupoFiltros(bot: Long, chat: String) = Wabot.grupoFiltros(bot, chat)
+    override fun grupoGuardarFiltro(bot: Long, chat: String, datosJson: String) = Wabot.grupoGuardarFiltro(bot, chat, datosJson)
+    override fun grupoRestaurarFiltro(bot: Long, chat: String, filtro: String) = Wabot.grupoRestaurarFiltro(bot, chat, filtro)
+    override fun appStateDisponible(bot: Long) = Wabot.appStateDisponible(bot)
+    override fun appStateEstado(bot: Long) = Wabot.appStateEstado(bot)
+    override fun appStateSilenciar(bot: Long, chat: String, segundos: Long) = Wabot.appStateSilenciar(bot, chat, segundos)
+    override fun appStateDesilenciar(bot: Long, chat: String) = Wabot.appStateDesilenciar(bot, chat)
+    override fun appStateFijar(bot: Long, chat: String, fijar: Boolean) = Wabot.appStateFijar(bot, chat, fijar)
+    override fun appStateArchivar(bot: Long, chat: String, archivar: Boolean) = Wabot.appStateArchivar(bot, chat, archivar)
+    override fun appStateSincronizar(bot: Long) = Wabot.appStateSincronizar(bot)
 }

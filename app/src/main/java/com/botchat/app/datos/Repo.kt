@@ -288,6 +288,41 @@ object Repo {
     suspend fun mensajesAuto(bot: Long, chat: String, antesTs: Long = 0, limite: Long = 100) = io { Json.mensajes(motor.listarMensajesAuto(bot, chat, antesTs, limite)) }
     suspend fun chatsConAutomaticos(bot: Long, dias: Long = 7) = io { JsonMensajesAuto.jids(motor.chatsConAutomaticos(bot, dias)) }
 
+    // Grupos (bloque E). Las acciones que escriben a WhatsApp fallan con un mensaje claro en español (sin conexión, no soy administrador…).
+    suspend fun estadoGrupo(bot: Long, chat: String, refrescar: Boolean = false) = io { JsonGrupos.estado(motor.grupoEstado(bot, chat, refrescar)) }
+    suspend fun infoGrupo(bot: Long, chat: String) = io { JsonGrupos.info(motor.grupoInfo(bot, chat)) }
+    suspend fun miembrosGrupo(bot: Long, chat: String) = io { JsonGrupos.miembros(motor.grupoMiembros(bot, chat)) }
+    suspend fun cerrarGrupo(bot: Long, chat: String, cerrado: Boolean) = io { motor.grupoCerrar(bot, chat, cerrado) }
+    suspend fun bloquearInfoGrupo(bot: Long, chat: String, bloqueada: Boolean) = io { motor.grupoBloquearInfo(bot, chat, bloqueada) }
+    suspend fun expulsarDeGrupo(bot: Long, chat: String, persona: String) = io { motor.grupoExpulsar(bot, chat, persona) }
+    suspend fun ascenderEnGrupo(bot: Long, chat: String, persona: String, admin: Boolean) = io { motor.grupoAscender(bot, chat, persona, admin) }
+    suspend fun solicitudesGrupo(bot: Long, chat: String) = io { JsonGrupos.solicitudes(motor.grupoSolicitudes(bot, chat)) }
+    /** personas vacío = todas las pendientes. Devuelve cuántas se resolvieron. */
+    suspend fun resolverSolicitudesGrupo(bot: Long, chat: String, personas: List<String>, aprobar: Boolean) =
+        io { motor.grupoResolverSolicitudes(bot, chat, if (personas.isEmpty()) "" else JSONArray(personas).toString(), aprobar).toInt() }
+    suspend fun renombrarGrupo(bot: Long, chat: String, nombre: String) = io { motor.grupoRenombrar(bot, chat, nombre) }
+    suspend fun descripcionGrupo(bot: Long, chat: String, texto: String) = io { motor.grupoDescripcion(bot, chat, texto) }
+    suspend fun enlaceGrupo(bot: Long, chat: String, reiniciar: Boolean = false) = io { motor.grupoEnlace(bot, chat, reiniciar) }
+    suspend fun borrarMensajeAjeno(bot: Long, chat: String, msgId: String) = io { motor.grupoBorrarMensaje(bot, chat, msgId) }
+    suspend fun mencionarATodos(bot: Long, chat: String, texto: String) = io { JsonGrupos.todos(motor.grupoMencionarTodos(bot, chat, texto)) }
+    /** dias: 7, 30 o 90 (0 = el de Ajustes). */
+    suspend fun rankingGrupo(bot: Long, chat: String, dias: Int = 30, limite: Int = 20) = io { JsonGrupos.ranking(motor.grupoRanking(bot, chat, dias.toLong(), limite.toLong())) }
+    suspend fun inactivosGrupo(bot: Long, chat: String, dias: Int = 30) = io { JsonGrupos.inactivos(motor.grupoInactivos(bot, chat, dias.toLong())) }
+    suspend fun reglasGrupo(bot: Long, chat: String) = io { motor.grupoReglas(bot, chat) }
+    suspend fun guardarReglasGrupo(bot: Long, chat: String, texto: String) = io { motor.grupoGuardarReglas(bot, chat, texto) }
+    suspend fun filtrosGrupo(bot: Long, chat: String) = io { JsonGrupos.filtros(motor.grupoFiltros(bot, chat)) }
+    suspend fun guardarFiltroGrupo(bot: Long, f: FiltroGrupo) = io { motor.grupoGuardarFiltro(bot, f.chat, f.json()) }
+    suspend fun restaurarFiltroGrupo(bot: Long, chat: String, filtro: String) = io { motor.grupoRestaurarFiltro(bot, chat, filtro) }
+
+    // Mi WhatsApp: silenciar, fijar y archivar (estado de la app). Solo si el teléfono principal compartió las llaves.
+    suspend fun estadoAppState(bot: Long) = io { JsonGrupos.appState(motor.appStateEstado(bot)) }
+    /** segundos 0 = siempre. */
+    suspend fun silenciarEnMiWhatsApp(bot: Long, chat: String, segundos: Long) = io { motor.appStateSilenciar(bot, chat, segundos) }
+    suspend fun desilenciarEnMiWhatsApp(bot: Long, chat: String) = io { motor.appStateDesilenciar(bot, chat) }
+    suspend fun fijarEnMiWhatsApp(bot: Long, chat: String, fijar: Boolean) = io { motor.appStateFijar(bot, chat, fijar) }
+    suspend fun archivarEnMiWhatsApp(bot: Long, chat: String, archivar: Boolean) = io { motor.appStateArchivar(bot, chat, archivar) }
+    suspend fun pedirSincronizacionAppState(bot: Long) = io { motor.appStateSincronizar(bot) }
+
     suspend fun estadisticasChat(bot: Long, chat: String) = io { Json.resumenChat(motor.estadisticasChat(bot, chat)) }
     suspend fun calendario(bot: Long, chat: String, mes: String) = io { Json.calendario(motor.calendarioChat(bot, chat, mes)) }
     suspend fun mensajesDia(bot: Long, chat: String, dia: String) = io { Json.mensajes(motor.mensajesDia(bot, chat, dia)) }

@@ -76,7 +76,7 @@ private val PESTANAS_INFO = listOf("Resumen", "Calendario", "Multimedia")
 @Composable
 fun PantallaInfoChat(
     botId: Long, jid: String, alVolver: () -> Unit, alAbrirVisor: (String) -> Unit, alAbrirDocumento: (String) -> Unit, alAbrirLista: (FiltroLista) -> Unit = {},
-    alAbrirPersona: () -> Unit = {}, alOlvidada: () -> Unit = {},
+    alAbrirPersona: () -> Unit = {}, alOlvidada: () -> Unit = {}, alAbrirGrupo: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val pager = rememberPagerState { PESTANAS_INFO.size }
@@ -99,10 +99,29 @@ fun PantallaInfoChat(
     ) { relleno ->
         HorizontalPager(pager, Modifier.fillMaxSize().padding(relleno)) { pagina ->
             when (pagina) {
-                0 -> TabResumen(botId, jid, version, alAbrirLista) { chat?.let { c -> if (!c.esGrupo) TarjetaPersona(botId, jid, c.nombre, alAbrirPersona, alOlvidada) } }
+                0 -> TabResumen(botId, jid, version, alAbrirLista) {
+                    chat?.let { c ->
+                        if (c.esGrupo) TarjetaAdministrarGrupo(alAbrirGrupo) else TarjetaPersona(botId, jid, c.nombre, alAbrirPersona, alOlvidada)
+                        TarjetaMiWhatsApp(botId, jid, c.nombre)
+                    }
+                }
                 1 -> TabCalendario(botId, jid, version, alAbrirLista)
                 else -> TabMultimedia(botId, jid, version, alAbrirVisor, alAbrirDocumento)
             }
+        }
+    }
+}
+
+/** Entrada a la pantalla "Grupo": si el bot es administrador, ajustes, miembros, solicitudes, enlace, filtros y actividad. */
+@Composable
+private fun TarjetaAdministrarGrupo(alAbrir: () -> Unit) {
+    androidx.compose.material3.Card(Modifier.fillMaxWidth().padding(horizontal = Esp.l, vertical = Esp.xs).testTag("tarjeta_administrar_grupo"), colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+        Row(Modifier.padding(horizontal = Esp.l, vertical = Esp.s), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Administrar el grupo", style = MaterialTheme.typography.bodyLarge)
+                Text("Ajustes, miembros, solicitudes, enlace, filtros y actividad", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            androidx.compose.material3.Button(alAbrir, Modifier.testTag("abrir_grupo")) { Text("Abrir") }
         }
     }
 }
