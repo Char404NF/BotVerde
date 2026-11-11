@@ -164,6 +164,11 @@ var ajustesBotDefecto = map[string]string{
 	"auto_zona":      "",       // zona horaria por defecto de los mensajes automáticos ("" = la del teléfono)
 	"atajos_activo":  "1",      // escribir "/atajo" en un chat (desde el teléfono o la app) manda la respuesta rápida
 	"atajo_modo":     "editar", // desde el teléfono: editar (cambia mi "/atajo" por el texto) | enviar (manda aparte y deja mi "/atajo")
+	// Grupos (bloque E)
+	"todos_tope":       "100", // máximo de personas que menciona "!todos" en total
+	"todos_lote":       "30",  // menciones por mensaje (si hay más, salen varios mensajes)
+	"todos_espera_seg": "300", // espera mínima entre dos "!todos" en el mismo grupo
+	"grupo_dias":       "30",  // periodo por defecto del ranking y de los inactivos
 }
 
 // AjusteBot devuelve un ajuste del bot (su valor por defecto si nunca se fijó).

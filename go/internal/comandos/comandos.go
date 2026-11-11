@@ -52,7 +52,10 @@ type Comando struct {
 	Confirma  bool   // pide código de confirmación antes de ejecutar
 	SoloDueno bool   // solo el Dueño desde Mensajes guardados o la app
 	// Siempre: se atiende aunque el bot esté pausado en ese chat (por ejemplo !reanudar).
-	Siempre  bool
+	Siempre bool
+	// Validar (opcional) revisa los argumentos ANTES de pedir el código de confirmación (por ejemplo que se indicó a quién), para no
+	// gastar un código en algo que de todos modos no se puede hacer.
+	Validar  func(*Contexto) error
 	Ejecutar func(*Contexto) (string, error)
 }
 
@@ -262,9 +265,18 @@ func (d *Despachador) Ejecutar(e Entrada) Resultado {
 		}
 	}
 	if cmd.Confirma {
-		// Al confirmar ya no hay menciones ni cita: la persona se guarda resuelta en los argumentos.
+		if cmd.Validar != nil {
+			if err := cmd.Validar(cx); err != nil {
+				registro("error", "validar")
+				return Resultado{Manejado: true, Texto: mensajeError(err)}
+			}
+		}
+		// Al confirmar ya no hay menciones ni cita: la persona y el mensaje citado se guardan resueltos en los argumentos.
 		if obj, resto, ok := cx.Objetivo(); ok {
 			args = append([]string{"persona:" + obj}, resto...)
+		}
+		if e.CitaID != "" {
+			args = append(append([]string(nil), args...), citaPrefijo+e.CitaID)
 		}
 		cf, err := d.Alm.CrearConfirmacion(d.BotID, persona, cmd.Nombre, args, e.Chat, e.MensajeID, d.vida(), d.ahora())
 		if err != nil {
@@ -344,8 +356,9 @@ func (d *Despachador) Confirmar(codigo, persona string) (string, error) {
 		return "", errors.New("esa acción ya no existe")
 	}
 	esGrupo := strings.HasSuffix(cf.Chat, "@g.us")
-	cx := &Contexto{BotID: d.BotID, Persona: cf.Persona, Chat: cf.Chat, EsGrupo: esGrupo, MensajeID: cf.CitaID, Args: cf.Args, Resto: strings.Join(cf.Args, " "),
-		Dueno: cf.Persona == almacen.PersonaDueno, D: d}
+	args, citaID := sacaCita(cf.Args)
+	cx := &Contexto{BotID: d.BotID, Persona: cf.Persona, Chat: cf.Chat, EsGrupo: esGrupo, MensajeID: cf.CitaID, Args: args, Resto: strings.Join(args, " "),
+		CitaID: citaID, Dueno: cf.Persona == almacen.PersonaDueno, D: d}
 	cx.Rol = d.Perm.RolDe(cf.Persona)
 	// Los permisos se vuelven a revisar al ejecutar (pudieron cambiar mientras tanto).
 	if !cx.Dueno {
@@ -362,6 +375,23 @@ func (d *Despachador) Confirmar(codigo, persona string) (string, error) {
 		d.Responder(cf.Chat, cf.CitaID, r.Texto)
 	}
 	return r.Texto, nil
+}
+
+// citaPrefijo marca, entre los argumentos guardados de una confirmación, el mensaje que se había citado al pedir la acción.
+const citaPrefijo = "cita:"
+
+// sacaCita separa del final de los argumentos guardados el id del mensaje citado (si lo hay).
+func sacaCita(args []string) ([]string, string) {
+	out := make([]string, 0, len(args))
+	cita := ""
+	for _, a := range args {
+		if strings.HasPrefix(a, citaPrefijo) {
+			cita = strings.TrimPrefix(a, citaPrefijo)
+			continue
+		}
+		out = append(out, a)
+	}
+	return out, cita
 }
 
 func nombreActor(p string) string {

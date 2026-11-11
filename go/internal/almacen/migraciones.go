@@ -548,6 +548,28 @@ var migraciones = [][]string{
 		`ALTER TABLE messages ADD COLUMN automatico TEXT NOT NULL DEFAULT ''`,
 		`CREATE INDEX idx_mensajes_auto ON messages(bot_id, chat_jid, ts) WHERE automatico <> ''`,
 	},
+	// 15: grupos (bloque E de la v0.5.0): filtros por grupo (enlaces, palabras, repetidos, flood) con su acción y excepciones, y las
+	// reglas del grupo (texto que escribo yo; WhatsApp no tiene un campo de reglas aparte de la descripción). La configuración de cada
+	// filtro y las reglas van cifradas. El ranking y los inactivos salen de daily_stats (ya existe).
+	{
+		`CREATE TABLE grupo_filtros (
+			bot_id INTEGER NOT NULL,
+			chat_jid TEXT NOT NULL,
+			filtro TEXT NOT NULL,
+			activo INTEGER NOT NULL DEFAULT 0,
+			accion TEXT NOT NULL DEFAULT 'avisarme',
+			config_cifrado BLOB,
+			editado_ts INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY (bot_id, chat_jid, filtro)
+		) WITHOUT ROWID`,
+		`CREATE TABLE grupo_reglas (
+			bot_id INTEGER NOT NULL,
+			chat_jid TEXT NOT NULL,
+			texto_cifrado BLOB,
+			editado_ts INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY (bot_id, chat_jid)
+		) WITHOUT ROWID`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {
