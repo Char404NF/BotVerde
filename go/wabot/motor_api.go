@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"botchat/internal/avisos"
 	"botchat/internal/ingesta"
 	"botchat/internal/modulos"
 	"botchat/internal/motor"
@@ -155,6 +156,10 @@ func (s *estado) alMotor(v *events.Message, sincronizando bool) {
 		if pj, err := types.ParseJID(c.CitaAutor); err == nil && !s.esPropio(pj) {
 			m.CitaAutor = s.ing.Persona(s.ctx, pj)
 		}
+	}
+	m.CitaID = c.CitaID
+	if !sincronizando && s.avs != nil {
+		s.avs.AlMensaje(avisos.Mensaje{Chat: m.Chat, Persona: m.Remitente, Nombre: m.Nombre, Texto: m.Texto, EsGrupo: m.EsGrupo, EsMio: m.EsMio, Edicion: m.EsEdicion})
 	}
 	if !sincronizando {
 		s.mods.Evento(modulos.Evento{Tipo: modulos.EvMensaje, Hora: m.TS, Chat: m.Chat, EsGrupo: m.EsGrupo, Persona: m.Remitente, Nombre: m.Nombre,

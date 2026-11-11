@@ -37,7 +37,11 @@ func decisorActual() motor.Decisor { return decisorPrueba }
 func (s *estado) nuevoFlujo() *flujo.Motor {
 	return flujo.Nuevo(flujo.Config{
 		BotID: s.botID, Alm: alm, Zona: alm.Zona, Expira: expiraFlujo,
-		Nombre: func(chat, sender string) string { return nombreDe(s.botID, chat, sender) },
+		Nombre:  func(chat, sender string) string { return nombreDe(s.botID, chat, sender) },
+		Prefijo: func() string { return alm.AjusteBot(s.botID, "prefijo") },
+		PuedeUsar: func(sender string, rolMin int64) bool {
+			return puedeUsarRango(s.perm, s.botID, sender, rolMin)
+		},
 		MenuVisible: func(sender string, menuID int64) bool {
 			if s.perm == nil {
 				return true
@@ -123,7 +127,7 @@ func ListarAutomatizaciones(botID int64) (string, error) {
 	out := []resumenAuto{}
 	for _, m := range menus {
 		d, err := flujo.Parse(m.Def)
-		if err != nil {
+		if err != nil || d.Propio != nil { // los comandos propios tienen su propia pantalla
 			continue
 		}
 		graves := 0

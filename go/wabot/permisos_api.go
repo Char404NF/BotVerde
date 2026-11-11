@@ -237,6 +237,12 @@ func despachadorDe(botID int64) (*comandos.Despachador, error) {
 	}
 	d := comandos.Nuevo(a, botID, p)
 	d.AlCodigo = func(c almacen.Confirmacion, desc string) { avisoCodigo(botID, c, desc, nil) }
+	if ps, err := servicioPersonas(botID); err == nil {
+		ps.RegistrarComandos(d)
+	}
+	if av, err := servicioAvisos(botID); err == nil {
+		av.RegistrarComandos(d)
+	}
 	return d, nil
 }
 
@@ -552,7 +558,13 @@ func FijarAjusteDePermisos(botID int64, clave, valor string) error {
 			return err
 		}
 	default:
-		return errors.New("ajuste desconocido")
+		conocido, err := validarAjusteB(clave, valor)
+		if !conocido {
+			return errors.New("ajuste desconocido")
+		}
+		if err != nil {
+			return err
+		}
 	}
 	if err := a.FijarAjusteBot(botID, clave, valor); err != nil {
 		return err

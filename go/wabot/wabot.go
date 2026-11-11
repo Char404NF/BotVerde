@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"botchat/internal/avisos"
 	"botchat/internal/comandos"
 	"botchat/internal/envio"
 	"botchat/internal/flujo"
@@ -21,6 +22,7 @@ import (
 	"botchat/internal/modulos"
 	"botchat/internal/motor"
 	"botchat/internal/permisos"
+	"botchat/internal/personas"
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -62,6 +64,8 @@ type estado struct {
 	grupos        *colaGrupos
 	perm          *permisos.Servicio
 	cmd           *comandos.Despachador
+	pers          *personas.Servicio
+	avs           *avisos.Servicio
 	mods          *modulos.Gestor
 	admins        *cacheAdmins
 	refresco      *time.Timer
@@ -160,6 +164,7 @@ func (s *estado) armar() {
 	alm.SembrarSaludo(s.botID, flujo.SaludoJSON())
 	s.flujo = s.nuevoFlujo()
 	s.armarPermisos()
+	s.armarPersonas()
 	s.armarModulos()
 	s.motor = motor.Nuevo(motor.Config{
 		Perm: s.perm, Cmd: s.cmd, EsAdminGrupo: s.admins.esAdmin, Baja: s.mods.Baja,
