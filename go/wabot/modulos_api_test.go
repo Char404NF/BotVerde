@@ -23,11 +23,24 @@ func conEco(t *testing.T) {
 	t.Cleanup(func() { modulos.Quitar(modulos.IDEco) })
 }
 
+// listaEco devuelve las tarjetas de los módulos pero solo la del Eco de prueba (los módulos H1–H5 de producción también aparecen en la
+// lista real; aquí se prueban aparte).
+func listaEco(t *testing.T) []modulos.Info {
+	t.Helper()
+	var out []modulos.Info
+	for _, i := range decodifica[[]modulos.Info](t, func() (string, error) { return ListarModulos(1) }) {
+		if i.ID == "eco_prueba" {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
 func TestApiModulosDeExtremoAExtremo(t *testing.T) {
 	obs, a := abreSolo(t)
 	conEco(t)
 	const ana = "5215511111111@s.whatsapp.net"
-	lista := decodifica[[]modulos.Info](t, func() (string, error) { return ListarModulos(1) })
+	lista := listaEco(t)
 	if len(lista) != 1 || lista[0].ID != "eco_prueba" || lista[0].Activo || lista[0].Codigo != "apagado" || lista[0].Riesgo != "medio" || !lista[0].ConEsquema {
 		t.Fatalf("lista: %+v", lista)
 	}
@@ -45,7 +58,7 @@ func TestApiModulosDeExtremoAExtremo(t *testing.T) {
 	if err := ActivarModulo(1, "nadie"); err == nil {
 		t.Fatal("activar inexistente")
 	}
-	lista = decodifica[[]modulos.Info](t, func() (string, error) { return ListarModulos(1) })
+	lista = listaEco(t)
 	if !lista[0].Activo || lista[0].Codigo != "esperando_maestro" || lista[0].ActivadoTS == 0 {
 		t.Fatalf("activo con el maestro apagado: %+v", lista[0])
 	}
@@ -94,7 +107,7 @@ func TestApiModulosDeExtremoAExtremo(t *testing.T) {
 	if aj["maestro"] != "1" || aj["tope_hora"] != "4" {
 		t.Fatalf("ajustes: %v", aj)
 	}
-	lista = decodifica[[]modulos.Info](t, func() (string, error) { return ListarModulos(1) })
+	lista = listaEco(t)
 	if lista[0].Codigo != "activo" {
 		t.Fatalf("con el maestro encendido: %+v", lista[0])
 	}
@@ -129,7 +142,7 @@ func TestApiModulosDeExtremoAExtremo(t *testing.T) {
 	if seg["activo"] != true || seg["motivo"] != "errores" {
 		t.Fatalf("seguro: %v", seg)
 	}
-	lista = decodifica[[]modulos.Info](t, func() (string, error) { return ListarModulos(1) })
+	lista = listaEco(t)
 	if lista[0].Codigo != "pausado_seguro" || !lista[0].Activo {
 		t.Fatalf("pausado: %+v", lista[0])
 	}
@@ -144,7 +157,7 @@ func TestApiModulosDeExtremoAExtremo(t *testing.T) {
 	if err := DesactivarModulo(1, "eco_prueba"); err != nil {
 		t.Fatal(err)
 	}
-	lista = decodifica[[]modulos.Info](t, func() (string, error) { return ListarModulos(1) })
+	lista = listaEco(t)
 	if lista[0].Activo || lista[0].Codigo != "apagado" {
 		t.Fatalf("apagado: %+v", lista[0])
 	}
@@ -256,7 +269,7 @@ func TestBotDesconexionForzadaYEventosAModulos(t *testing.T) {
 	}
 	_ = FijarIniciativaMaestro(1, true)
 	estado := func() string {
-		l := decodifica[[]modulos.Info](t, func() (string, error) { return ListarModulos(1) })
+		l := listaEco(t)
 		return l[0].Estado
 	}
 	pn := types.NewJID("5215511111111", types.DefaultUserServer)
@@ -289,7 +302,7 @@ func TestBotDesconexionForzadaYEventosAModulos(t *testing.T) {
 		t.Fatalf("avisos de modo seguro: %d", n)
 	}
 	// El módulo sigue encendido, solo pausado, y deja de recibir eventos.
-	l := decodifica[[]modulos.Info](t, func() (string, error) { return ListarModulos(1) })
+	l := listaEco(t)
 	if !l[0].Activo || l[0].Codigo != "pausado_seguro" {
 		t.Fatalf("pausado: %+v", l[0])
 	}
@@ -301,7 +314,7 @@ func TestBotDesconexionForzadaYEventosAModulos(t *testing.T) {
 	}
 	// Al apagar el bot, los módulos se quedan encendidos en la base y al volver a arrancar se restauran.
 	Stop()
-	l = decodifica[[]modulos.Info](t, func() (string, error) { return ListarModulos(1) })
+	l = listaEco(t)
 	if !l[0].Activo {
 		t.Fatal("detener el bot no apaga los módulos")
 	}

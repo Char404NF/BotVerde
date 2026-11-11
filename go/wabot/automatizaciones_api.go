@@ -66,6 +66,13 @@ func (s *estado) nuevoFlujo() *flujo.Motor {
 				s.log("Aviso local: " + titulo + ".")
 			}
 		},
+		// {api_<nombre>}: texto de un conector HTTP (módulo Descargas y conectores, si está encendido)
+		Conector: func(nombre, sender, chat string) string {
+			if s.mods == nil {
+				return ""
+			}
+			return s.mods.TextoConector(nombre, sender, chat)
+		},
 	})
 }
 

@@ -2,11 +2,14 @@ package wabot
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strings"
 	"sync"
 
 	"botchat/internal/almacen"
 	"botchat/internal/envio"
+	"botchat/internal/grupos"
 	"botchat/internal/modulos"
 
 	"go.mau.fi/whatsmeow/types/events"
@@ -30,6 +33,14 @@ func (e enviadorModulos) Texto(ctx context.Context, chat, texto, citaID string, 
 }
 
 func (e enviadorModulos) Medio(ctx context.Context, chat string, a envio.Adjunto, citaID string) error {
+	if id, ok := strings.CutPrefix(a.Ruta, modulos.PrefijoAdj); ok {
+		// archivo guardado cifrado (difusión, programados): se descifra a una copia temporal que el envío borra al terminar
+		ruta, err := e.s.copiaAdjunto(id)
+		if err != nil {
+			return err
+		}
+		a.Ruta = ruta
+	}
 	r, err := e.s.envio.EnviarMedioAuto(almacen.ConEtiqueta(ctx, "modulo"), chat, a, citaID)
 	if err != nil {
 		return err
@@ -42,11 +53,70 @@ func (e enviadorModulos) Medio(ctx context.Context, chat string, a envio.Adjunto
 
 func (e enviadorModulos) Conectado() bool { return e.s.cli.IsConnected() && e.s.cli.IsLoggedIn() }
 
+// accionesModulos son las acciones de grupo que usan los módulos H1 y H4, hechas con el servicio de grupos del bot.
+type accionesModulos struct{ s *estado }
+
+func (a accionesModulos) gru() (*grupos.Servicio, error) {
+	if a.s.gru == nil {
+		return nil, grupos.ErrNoDisponible
+	}
+	return a.s.gru, nil
+}
+
+func (a accionesModulos) EsAdmin(ctx context.Context, chat string) (bool, error) {
+	g, err := a.gru()
+	if err != nil {
+		return false, err
+	}
+	return g.EsAdmin(ctx, chat)
+}
+
+func (a accionesModulos) Expulsar(ctx context.Context, chat, persona string) error {
+	g, err := a.gru()
+	if err != nil {
+		return err
+	}
+	if err := g.Expulsar(ctx, chat, persona); err != nil && !errors.Is(err, grupos.ErrNoMiembro) {
+		return err // si ya no estaba en el grupo, no hay nada que hacer
+	}
+	return nil
+}
+
+func (a accionesModulos) Enlace(ctx context.Context, chat string) (string, error) {
+	g, err := a.gru()
+	if err != nil {
+		return "", err
+	}
+	return g.Enlace(ctx, almacen.PersonaDueno, chat, false)
+}
+
+func (a accionesModulos) Agregar(ctx context.Context, chat, persona string) (string, error) {
+	g, err := a.gru()
+	if err != nil {
+		return "", err
+	}
+	return g.AgregarMiembro(ctx, chat, persona)
+}
+
+var registroModulosH sync.Once
+
+// registrarModulosH deja registrados en el marco los módulos opcionales H1–H5 (apagados: registrar no enciende nada). Se llama al
+// arrancar el bot y al abrir la lista de módulos sin el bot en marcha.
+func registrarModulosH() {
+	registroModulosH.Do(func() {
+		if err := modulos.RegistrarH(); err != nil {
+			panic("módulos H: " + err.Error())
+		}
+	})
+}
+
 // armarModulos crea el gestor de módulos del bot que se está iniciando.
 func (s *estado) armarModulos() {
 	olvidarGestoresLibres()
+	registrarModulosH()
 	g := modulos.NuevoGestor(alm, s.botID, s.cmd)
 	g.Enviador = enviadorModulos{s}
+	g.Acc = accionesModulos{s}
 	g.Log = s.log
 	g.Cambio = s.avisaCambio
 	g.Zona = alm.Zona
@@ -69,15 +139,16 @@ func (s *estado) alEntrarAlGrupo(v *events.GroupInfo) {
 	chat := v.JID.ToNonAD().String()
 	joins := v.Join
 	s.encola(func() {
-		var personas []string
+		var personas, jids []string
 		for _, j := range joins {
 			if s.esPropio(j) {
 				continue
 			}
 			personas = append(personas, s.ing.Persona(s.ctx, j))
+			jids = append(jids, j.ToNonAD().String())
 		}
 		if len(personas) > 0 {
-			s.mods.Evento(modulos.Evento{Tipo: modulos.EvMiembroEntra, Chat: chat, EsGrupo: true, Personas: personas})
+			s.mods.Evento(modulos.Evento{Tipo: modulos.EvMiembroEntra, Chat: chat, EsGrupo: true, Personas: personas, JIDs: jids})
 		}
 	})
 }
@@ -116,6 +187,7 @@ func gestorDe(botID int64) (*modulos.Gestor, error) {
 	if s != nil && s.botID == botID && s.mods != nil {
 		return s.mods, nil
 	}
+	registrarModulosH()
 	gestoresLibresMu.Lock()
 	defer gestoresLibresMu.Unlock()
 	if g, ok := gestoresLibres[botID]; ok && g.Alm == a {
@@ -345,5 +417,64 @@ func ReanudarModoSeguro(botID int64) error {
 		return err
 	}
 	accionDueno(botID, "iniciativa.reanudar", "", "")
+	return nil
+}
+
+// FilasPanelModulo devuelve (JSON) los renglones de un panel de la ventana de un módulo: [{id, titulo, detalle}]. Los paneles (listas y
+// formularios simples) vienen en InfoModulo → paneles. Evento: "modulos".
+func FilasPanelModulo(botID int64, id, panel string) (string, error) {
+	g, err := gestorDe(botID)
+	if err != nil {
+		return "", err
+	}
+	f, err := g.FilasPanel(id, panel)
+	if err != nil {
+		return "", err
+	}
+	return js(f, nil)
+}
+
+// AccionModulo corre un botón de un panel de un módulo (argsJSON: los valores del formulario, o {"id": ...} del renglón). Devuelve el
+// mensaje corto en español para mostrar, o el error. Las acciones del dueño quedan en el registro de acciones (sin textos).
+func AccionModulo(botID int64, id, accion, argsJSON string) (string, error) {
+	g, err := gestorDe(botID)
+	if err != nil {
+		return "", err
+	}
+	args := modulos.Args{}
+	if strings.TrimSpace(argsJSON) != "" {
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", errors.New("los datos del formulario no son válidos")
+		}
+	}
+	msg, err := g.AccionModulo(id, accion, args)
+	res := ""
+	if err != nil {
+		res = "error"
+	}
+	accionDueno(botID, "modulo.accion", id+":"+accion, res)
+	return msg, err
+}
+
+// ProximoModulos dice cuándo toca lo siguiente que tienen agendado los módulos encendidos (mensajes programados y difusiones), en
+// segundos desde 1970; 0 si no hay nada. La app programa con esto una alarma de Android.
+func ProximoModulos(botID int64) (int64, error) {
+	g, err := gestorDe(botID)
+	if err != nil {
+		return 0, err
+	}
+	return g.ProximoAgenda(), nil
+}
+
+// TickModulos revisa ya la agenda de los módulos (lo llama la alarma de Android a la hora justa). Si el bot no está en marcha no hace nada:
+// al arrancar, cada módulo revisa lo que quedó pendiente (y descarta lo que ya pasó del tiempo de tolerancia).
+func TickModulos(botID int64) error {
+	mu.Lock()
+	s := st
+	mu.Unlock()
+	if s == nil || s.botID != botID || s.mods == nil {
+		return nil
+	}
+	s.encola(func() { s.mods.TickAgenda() })
 	return nil
 }
