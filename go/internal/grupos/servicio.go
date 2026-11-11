@@ -532,6 +532,54 @@ func (s *Servicio) Bajar(ctx context.Context, actor, chat, persona string) error
 	})
 }
 
+// Resultados de AgregarMiembro.
+const (
+	AgregadoOK         = "ok"         // quedó dentro
+	AgregadoYaEsta     = "ya_esta"    // ya era miembro
+	AgregadoPrivacidad = "privacidad" // WhatsApp no la deja agregar (su privacidad, o salió hace poco): falla en silencio, hay que invitarla
+)
+
+// AgregarMiembro agrega a una persona al grupo con la acción real de WhatsApp (UpdateGroupParticipants "add"). La librería manda el
+// token de privacidad de esa persona; sin él, o si su privacidad no lo permite (WhatsApp responde 403 o 408 sin avisarle), el resultado
+// es AgregadoPrivacidad y quien llama debe caer a la invitación con enlace. Hay que ser administrador.
+func (s *Servicio) AgregarMiembro(ctx context.Context, chat, persona string) (string, error) {
+	res := AgregadoOK
+	err := s.hacer(ctx, almacen.PersonaDueno, "grupo.agregar", chat, persona, func(j types.JID, inf *types.GroupInfo) error {
+		jid, err := types.ParseJID(persona)
+		if err != nil || jid.User == "" {
+			return ErrSinPersona
+		}
+		if _, ok := s.buscaMiembro(inf, persona); ok {
+			res = AgregadoYaEsta
+			return nil
+		}
+		out, err := s.Cli.UpdateGroupParticipants(ctx, j, []types.JID{jid.ToNonAD()}, whatsmeow.ParticipantChangeAdd)
+		if err != nil {
+			if strings.Contains(err.Error(), "privacy token") {
+				res = AgregadoPrivacidad
+				return nil
+			}
+			return err
+		}
+		for _, r := range out {
+			switch r.Error {
+			case 0:
+			case 409:
+				res = AgregadoYaEsta
+			case 403, 408:
+				res = AgregadoPrivacidad
+			default:
+				return fallo(fmt.Sprintf("WhatsApp no pudo agregar a esa persona (código %d)", r.Error), nil)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return res, nil
+}
+
 // Renombrar cambia el nombre del grupo.
 func (s *Servicio) Renombrar(ctx context.Context, actor, chat, nombre string) error {
 	nombre = strings.TrimSpace(nombre)
