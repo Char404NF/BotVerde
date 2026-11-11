@@ -278,6 +278,7 @@ fun EditorRango(botId: Long, id: Long, alVolver: () -> Unit) {
                             Checkbox(a.id.toString() in menus, { if (it) menus.add(a.id.toString()) else menus.remove(a.id.toString()) }, Modifier.testTag("menu_${a.id}"))
                             Text(a.nombre)
                         }
+                        if (a.id.toString() !in menus) OpcionesSueltas(botId, a.id, menus)
                     }
                 }
             }
@@ -400,4 +401,33 @@ fun ElegirChats(botId: Long, elegidos: List<String>, titulo: String, alCancelar:
         confirmButton = { TextButton({ alAceptar(marcados.toList()) }, enabled = marcados.isNotEmpty(), modifier = Modifier.testTag("aceptar_chats")) { Text("Listo") } },
         dismissButton = { TextButton(alCancelar) { Text("Cancelar") } },
     )
+}
+
+
+/** Opciones sueltas de un menú que el rango puede ver aunque no vea el menú entero (se guardan como "idMenú:idOpción"). */
+@Composable
+private fun OpcionesSueltas(botId: Long, menuId: Long, menus: androidx.compose.runtime.snapshots.SnapshotStateList<String>) {
+    var abierto by remember { mutableStateOf(menus.any { it.startsWith("$menuId:") }) }
+    val opciones by produceState<List<Pair<String, String>>?>(null, abierto) {
+        value = if (!abierto) null else runCatching {
+            Repo.automatizacion(botId, menuId).def.pasos.filter { it.tipo == "menu" }.flatMap { p -> p.opciones.filter { it.id.isNotEmpty() }.map { it.id to it.texto } }
+        }.getOrDefault(emptyList())
+    }
+    Column(Modifier.padding(start = Esp.xl)) {
+        TextButton({ abierto = !abierto }, Modifier.testTag("opciones_sueltas_$menuId")) { Text(if (abierto) "Ocultar opciones" else "Elegir solo algunas opciones…", style = MaterialTheme.typography.labelMedium) }
+        if (abierto) {
+            val lista = opciones
+            when {
+                lista == null -> Text("Cargando…", style = MaterialTheme.typography.bodySmall)
+                lista.isEmpty() -> Text("Este menú aún no tiene opciones guardadas con identificador: guárdalo una vez en el editor.", style = MaterialTheme.typography.bodySmall)
+                else -> lista.forEach { (oid, texto) ->
+                    val clave = "$menuId:$oid"
+                    Row(Modifier.fillMaxWidth().clickable { if (clave in menus) menus.remove(clave) else menus.add(clave) }, verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(clave in menus, { if (it) menus.add(clave) else menus.remove(clave) }, Modifier.testTag("opcion_${menuId}_$oid"))
+                        Text(texto, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+    }
 }

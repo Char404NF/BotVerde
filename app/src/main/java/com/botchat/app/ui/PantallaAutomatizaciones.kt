@@ -53,13 +53,16 @@ import com.botchat.app.datos.AutoDef
 import com.botchat.app.datos.AutoResumen
 import com.botchat.app.datos.PlantillaAuto
 import com.botchat.app.datos.Repo
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Automatizaciones: las respuestas y menús del bot. Cada tarjeta se enciende, se duplica, se prueba o se borra. */
 @Composable
 fun PantallaAutomatizaciones(
     botId: Long, alVolver: () -> Unit, alEditar: (Long) -> Unit, alEnCurso: () -> Unit, alActividad: () -> Unit,
     alEstadisticas: (Long) -> Unit, alProbar: (Long) -> Unit,
+    alFormularios: () -> Unit = {}, alNoEntendio: () -> Unit = {}, alAjustesMenus: () -> Unit = {},
 ) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -70,6 +73,10 @@ fun PantallaAutomatizaciones(
     var nueva by remember { mutableStateOf(false) }
     var plantillas by remember { mutableStateOf<List<PlantillaAuto>?>(null) }
     var borrando by remember { mutableStateOf<AutoResumen?>(null) }
+    var masMenu by remember { mutableStateOf(false) }
+    var exportando by remember { mutableStateOf(false) }
+    var archivoImportar by remember { mutableStateOf<java.io.File?>(null) }
+    val cuentaForms by produceState(0L, version) { value = runCatching { Repo.contarFormularios(botId) }.getOrDefault(0L) }
 
     val importar = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
@@ -82,6 +89,17 @@ fun PantallaAutomatizaciones(
         }
     }
 
+    val importarBcm = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val dir = java.io.File(ctx.cacheDir, "adjuntos").apply { mkdirs() }
+                    java.io.File(dir, "importar_${System.nanoTime()}.bcm").also { f -> ctx.contentResolver.openInputStream(uri)?.use { i -> f.outputStream().use { o -> i.copyTo(o) } } ?: error("No se pudo leer el archivo") }
+                }
+            }.onSuccess { archivoImportar = it }.onFailure { avisaToast(ctx, it.message ?: "No se pudo leer el archivo", true) }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -90,6 +108,16 @@ fun PantallaAutomatizaciones(
                 actions = {
                     IconButton(alEnCurso, Modifier.testTag("abrir_en_curso")) { Icon(Ico.Chats, "En curso ahora") }
                     IconButton(alActividad, Modifier.testTag("abrir_actividad_auto")) { Icon(Ico.Estadisticas, "Actividad del bot") }
+                    Box {
+                        IconButton({ masMenu = true }, Modifier.testTag("mas_automatizaciones")) { Icon(Ico.Mas, "Más") }
+                        DropdownMenu(masMenu, { masMenu = false }) {
+                            DropdownMenuItem(text = { Text(if (cuentaForms > 0) "Formularios recibidos ($cuentaForms)" else "Formularios recibidos") }, onClick = { masMenu = false; alFormularios() }, modifier = Modifier.testTag("abrir_formularios"))
+                            DropdownMenuItem(text = { Text("Lo que no entendió") }, onClick = { masMenu = false; alNoEntendio() }, modifier = Modifier.testTag("abrir_no_entendio"))
+                            DropdownMenuItem(text = { Text("Ajustes de los menús") }, onClick = { masMenu = false; alAjustesMenus() }, modifier = Modifier.testTag("abrir_ajustes_menus"))
+                            DropdownMenuItem(text = { Text("Exportar menús (archivo cifrado)") }, onClick = { masMenu = false; exportando = !exportando }, modifier = Modifier.testTag("abrir_exportar_menus"))
+                            DropdownMenuItem(text = { Text("Importar menús (archivo cifrado)") }, onClick = { masMenu = false; importarBcm.launch(arrayOf("*/*")) }, modifier = Modifier.testTag("abrir_importar_menus"))
+                        }
+                    }
                 },
             )
         },
@@ -101,6 +129,8 @@ fun PantallaAutomatizaciones(
                 "El bot solo responde cuando alguien le escribe; nunca escribe primero. Se revisan de arriba hacia abajo y responde la primera que coincida (el Saludo va al final).",
                 Modifier.padding(horizontal = Esp.l, vertical = Esp.s), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (exportando) PanelExportar(botId, lista.orEmpty().filter { !it.sistema }, alCerrar = { exportando = false })
+            archivoImportar?.let { f -> PanelImportar(botId, f, alTerminar = { archivoImportar = null; version++ }) }
             if (nueva) PanelNueva(
                 alCero = { nueva = false; scope.launch { runCatching { Repo.guardarAutomatizacion(botId, 0, AutoDef.nueva()) }.onSuccess { alEditar(it.first) }.onFailure { avisaToast(ctx, it.message, true) } } },
                 alPlantillas = { scope.launch { plantillas = runCatching { Repo.plantillasAutomatizacion() }.getOrDefault(emptyList()) } },
@@ -140,6 +170,76 @@ fun PantallaAutomatizaciones(
             confirmButton = { TextButton({ borrando = null; scope.launch { runCatching { Repo.borrarAutomatizacion(botId, a.id) }; version++ } }, Modifier.testTag("confirmar_borrar_auto")) { Text("Borrar", color = MaterialTheme.colorScheme.error) } },
             dismissButton = { TextButton({ borrando = null }) { Text("Cancelar") } },
         )
+    }
+}
+
+/** Exportar menús: se eligen, se les puede poner contraseña (para abrirlos en otro teléfono) y se comparte el archivo cifrado. */
+@Composable
+private fun PanelExportar(botId: Long, menus: List<AutoResumen>, alCerrar: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val elegidos = remember { androidx.compose.runtime.mutableStateListOf<Long>() }
+    var clave by remember { mutableStateOf("") }
+    var trabajando by remember { mutableStateOf(false) }
+    Card(Modifier.fillMaxWidth().padding(horizontal = Esp.l).testTag("panel_exportar"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+        Column(Modifier.padding(Esp.m), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
+            Text("Exportar menús", style = MaterialTheme.typography.titleSmall)
+            Text("Se guardan en un archivo cifrado (con sus fotos y archivos). Con contraseña lo puedes abrir en otro teléfono; sin contraseña solo sirve como copia de seguridad en este.", style = MaterialTheme.typography.bodySmall)
+            if (menus.isEmpty()) Text("Todavía no hay menús para exportar.", style = MaterialTheme.typography.bodySmall)
+            menus.forEach { a ->
+                Row(Modifier.fillMaxWidth().clickable { if (a.id in elegidos) elegidos.remove(a.id) else elegidos.add(a.id) }.testTag("exportar_menu_${a.id}"), verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.Checkbox(a.id in elegidos, null)
+                    Text(a.nombre, Modifier.padding(start = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            androidx.compose.material3.OutlinedTextField(clave, { clave = it }, Modifier.fillMaxWidth().testTag("exportar_clave"), label = { Text("Contraseña (opcional, mínimo 6)") }, singleLine = true,
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
+            Row(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
+                OutlinedButton({
+                    trabajando = true
+                    scope.launch {
+                        runCatching { Repo.exportarMenus(botId, elegidos.toList(), clave) }.onSuccess { ruta -> compartirCifrado(ctx, ruta, "menus", "bcm"); alCerrar() }.onFailure { avisaToast(ctx, it.message ?: "No se pudo exportar", true) }
+                        trabajando = false
+                    }
+                }, Modifier.testTag("exportar_menus"), enabled = elegidos.isNotEmpty() && !trabajando) { Text(if (trabajando) "Preparando…" else "Exportar") }
+                TextButton(alCerrar, Modifier.testTag("cerrar_exportar_menus")) { Text("Cancelar") }
+            }
+        }
+    }
+}
+
+/** Importar menús: el archivo se lee y se crean los menús APAGADOS (no se ejecuta nada hasta que los enciendas). */
+@Composable
+private fun PanelImportar(botId: Long, archivo: java.io.File, alTerminar: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var clave by remember { mutableStateOf("") }
+    var trabajando by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    Card(Modifier.fillMaxWidth().padding(horizontal = Esp.l).testTag("panel_importar"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+        Column(Modifier.padding(Esp.m), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
+            Text("Importar menús", style = MaterialTheme.typography.titleSmall)
+            Text("Si el archivo se exportó con contraseña, escríbela. Los menús llegan apagados y sin chats asignados; revísalos antes de encenderlos.", style = MaterialTheme.typography.bodySmall)
+            androidx.compose.material3.OutlinedTextField(clave, { clave = it; error = null }, Modifier.fillMaxWidth().testTag("importar_clave"), label = { Text("Contraseña (si tiene)") }, singleLine = true,
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(), isError = error != null)
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("error_importar")) }
+            Row(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
+                OutlinedButton({
+                    trabajando = true
+                    scope.launch {
+                        // la copia en claro se borra al intentar; si la contraseña falla se vuelve a copiar
+                        val copia = withContext(Dispatchers.IO) { java.io.File(archivo.parentFile, "reintento_${System.nanoTime()}.bcm").also { archivo.copyTo(it, overwrite = true) } }
+                        runCatching { Repo.importarMenus(botId, copia.path, clave) }.onSuccess { r ->
+                            archivo.delete()
+                            avisaToast(ctx, if (r.ids.size == 1) "Se importó “${r.nombres[0]}” (apagado)" else "Se importaron ${r.ids.size} menús (apagados)" + if (r.omitidos > 0) ". ${r.omitidos} no se pudieron leer" else "", true)
+                            alTerminar()
+                        }.onFailure { error = it.message ?: "No se pudo importar" }
+                        trabajando = false
+                    }
+                }, Modifier.testTag("importar_menus"), enabled = !trabajando) { Text(if (trabajando) "Importando…" else "Importar") }
+                TextButton({ archivo.delete(); alTerminar() }, Modifier.testTag("cancelar_importar_menus")) { Text("Cancelar") }
+            }
+        }
     }
 }
 

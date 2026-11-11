@@ -259,11 +259,11 @@ private fun DialogoExportar(botId: Long, persona: String, nombre: String, alCerr
 }
 
 /** Copia el archivo cifrado a la carpeta de adjuntos de la caché y abre el selector de apps para compartirlo. */
-internal suspend fun compartirCifrado(ctx: Context, ruta: String, nombre: String) {
+internal suspend fun compartirCifrado(ctx: Context, ruta: String, nombre: String, extension: String = "bcf") {
     try {
         val f = withContext(Dispatchers.IO) {
             val dir = File(ctx.cacheDir, "adjuntos").apply { mkdirs() }
-            File(dir, Temporales.nombreSeguro("datos_$nombre") + ".bcf").also { Repo.archivo(ruta).copyTo(it, overwrite = true) }
+            File(dir, Temporales.nombreSeguro("datos_$nombre") + "." + extension).also { Repo.archivo(ruta).copyTo(it, overwrite = true) }
         }
         val uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.packageName + ".compartir", f)
         val i = Intent(Intent.ACTION_SEND).setType("application/octet-stream").putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

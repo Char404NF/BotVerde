@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.botchat.app.datos.AutoDef
 import com.botchat.app.datos.AvisoVal
+import com.botchat.app.datos.CampoDef
 import com.botchat.app.datos.ChatItem
 import com.botchat.app.datos.OpcionDef
 import com.botchat.app.datos.PasoDef
@@ -64,13 +65,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 
-internal val TIPOS_PASO = listOf("menu" to "Menú", "respuesta" to "Respuesta", "pedir" to "Pedir dato", "humano" to "Pasar a humano", "fin" to "Fin")
+internal val TIPOS_PASO = listOf("menu" to "Menú", "respuesta" to "Respuesta", "pedir" to "Pedir dato", "formulario" to "Formulario", "humano" to "Pasar a humano", "fin" to "Fin")
 private fun nombreTipoPaso(t: String) = TIPOS_PASO.firstOrNull { it.first == t }?.second ?: t
 
 /** Resumen corto de un paso para la lista. */
 internal fun resumenPaso(p: PasoDef): String {
+    if (p.tipo == "formulario") return resumenFormulario(p)
     val base = when (p.tipo) { "menu" -> p.titulo; "respuesta", "humano", "fin" -> p.texto; "pedir" -> p.pregunta; else -> "" }
-    val t = base.replace('\n', ' ').trim()
+    var t = base.replace('\n', ' ').trim()
+    if (t.isBlank() && p.tipo == "respuesta") t = listOfNotNull(p.adjuntos.firstOrNull()?.let { "[" + (it.nombre.ifBlank { it.tipo }) + "]" }, p.ubicacion?.let { "[Ubicación]" }, p.contacto?.let { "[Contacto]" }).joinToString(" ")
     return if (t.length > 46) t.take(46) + "…" else t.ifBlank { "(vacío)" }
 }
 
@@ -84,7 +87,7 @@ internal fun ordenar(d: AutoDef): Pair<List<Pair<PasoDef, Int>>, List<PasoDef>> 
         salida += p to nivel
         when (p.tipo) {
             "menu" -> p.opciones.forEach { if (it.destino.isNotEmpty()) visita(it.destino, nivel + 1) }
-            "respuesta", "pedir" -> if (p.siguiente.isNotEmpty()) visita(p.siguiente, nivel)
+            "respuesta", "pedir", "formulario" -> if (p.siguiente.isNotEmpty()) visita(p.siguiente, nivel)
         }
     }
     visita(d.inicio, 0)
@@ -99,6 +102,7 @@ private fun pasoNuevo(d: AutoDef, tipo: String): PasoDef {
         "menu" -> PasoDef(id, "menu", "Elige una opción:", listOf(OpcionDef("Opción 1", "")))
         "respuesta" -> PasoDef(id, "respuesta", texto = "Escribe aquí la respuesta.")
         "pedir" -> PasoDef(id, "pedir", pregunta = "¿Cuál es tu nombre?", variable = "dato" + (d.pasos.count { it.tipo == "pedir" } + 1))
+        "formulario" -> PasoDef(id, "formulario", titulo = "Te haré unas preguntas cortas.", texto = "¡Listo! Recibimos tus datos.", campos = listOf(CampoDef(id = "nombre", etiqueta = "Nombre", pregunta = "¿Cómo te llamas?", tipo = "texto")))
         "humano" -> PasoDef(id, "humano", texto = "Un momento, una persona te atenderá.")
         else -> PasoDef(id, "fin", texto = "¡Gracias por escribirnos!")
     }
@@ -149,7 +153,7 @@ fun EditorAutomatizacion(botId: Long, id: Long, alVolver: () -> Unit, alProbar: 
                     },
                 )
                 PrimaryTabRow(pestana) {
-                    listOf("Pasos", "Cuándo y dónde", "Vista previa").forEachIndexed { i, t -> Tab(pestana == i, { pestana = i }, text = { Text(t) }, modifier = Modifier.testTag("pestana_$i")) }
+                    listOf("Pasos", "Cuándo y dónde", "Vista previa", "Ajustes").forEachIndexed { i, t -> Tab(pestana == i, { pestana = i }, text = { Text(t) }, modifier = Modifier.testTag("pestana_$i")) }
                 }
             }
         },
@@ -157,9 +161,10 @@ fun EditorAutomatizacion(botId: Long, id: Long, alVolver: () -> Unit, alProbar: 
         if (d == null) { Box(Modifier.fillMaxSize().padding(relleno), Alignment.Center) { CircularProgressIndicator() }; return@Scaffold }
         Column(Modifier.fillMaxSize().padding(relleno)) {
             when (pestana) {
-                0 -> PestanaPasos(d, avisos, sistema) { def = it }
+                0 -> PestanaPasos(botId, d, avisos, sistema) { def = it }
                 1 -> PestanaCuando(botId, d) { def = it }
-                else -> PestanaVistaPrevia(d)
+                2 -> PestanaVistaPrevia(d)
+                else -> PestanaAjustesMenu(d) { def = it }
             }
         }
     }
@@ -177,7 +182,7 @@ fun EditorAutomatizacion(botId: Long, id: Long, alVolver: () -> Unit, alProbar: 
 // ---------- pestaña Pasos ----------
 
 @Composable
-private fun PestanaPasos(d: AutoDef, avisos: List<AvisoVal>, sistema: Boolean, alCambiar: (AutoDef) -> Unit) {
+private fun PestanaPasos(botId: Long, d: AutoDef, avisos: List<AvisoVal>, sistema: Boolean, alCambiar: (AutoDef) -> Unit) {
     var abierto by remember { mutableStateOf<String?>(null) }
     val (orden, sueltos) = remember(d) { ordenar(d) }
     fun cambiaPaso(id: String, f: (PasoDef) -> PasoDef) = alCambiar(d.copy(pasos = d.pasos.map { if (it.id == id) f(it) else it }))
@@ -203,11 +208,11 @@ private fun PestanaPasos(d: AutoDef, avisos: List<AvisoVal>, sistema: Boolean, a
                 }
             }
         }
-        Text("Puedes usar {nombre}, {hora}, {dia} y los datos que pidas ({dato1}, {dato2}…). Escribir 0 siempre vuelve al menú principal.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        orden.forEach { (p, nivel) -> TarjetaPaso(d, p, nivel, p.id == abierto, { abierto = if (abierto == p.id) null else p.id }, ::cambiaPaso, ::borra, ::agrega, { alCambiar(d.copy(inicio = p.id)) }) }
+        Text("Puedes usar {nombre}, {hora}, {dia}, {fecha}, {horario} y los datos que pidas ({dato1}, {dato2}…), y estilos de WhatsApp (*negrita*, _cursiva_). La gente puede escribir el número o parte del texto de la opción; “menú”, “atrás”, “inicio”, “salir”, “persona” y “repetir” siempre funcionan.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        orden.forEach { (p, nivel) -> TarjetaPaso(botId, d, p, nivel, p.id == abierto, { abierto = if (abierto == p.id) null else p.id }, ::cambiaPaso, ::borra, ::agrega, { alCambiar(d.copy(inicio = p.id)) }) }
         if (sueltos.isNotEmpty()) {
             Text("Pasos sueltos (nadie llega a ellos todavía)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.tertiary)
-            sueltos.forEach { p -> TarjetaPaso(d, p, 0, p.id == abierto, { abierto = if (abierto == p.id) null else p.id }, ::cambiaPaso, ::borra, ::agrega, { alCambiar(d.copy(inicio = p.id)) }) }
+            sueltos.forEach { p -> TarjetaPaso(botId, d, p, 0, p.id == abierto, { abierto = if (abierto == p.id) null else p.id }, ::cambiaPaso, ::borra, ::agrega, { alCambiar(d.copy(inicio = p.id)) }) }
         }
         Text("Agregar paso", style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
@@ -219,7 +224,7 @@ private fun PestanaPasos(d: AutoDef, avisos: List<AvisoVal>, sistema: Boolean, a
 
 @Composable
 private fun TarjetaPaso(
-    d: AutoDef, p: PasoDef, nivel: Int, abierto: Boolean, alAbrir: () -> Unit,
+    botId: Long, d: AutoDef, p: PasoDef, nivel: Int, abierto: Boolean, alAbrir: () -> Unit,
     cambia: (String, (PasoDef) -> PasoDef) -> Unit, borra: (String) -> Unit, agrega: (String, (PasoDef) -> AutoDef) -> Unit, alHacerInicial: () -> Unit,
 ) {
     Card(
@@ -238,7 +243,7 @@ private fun TarjetaPaso(
                 Text("${i + 1}. ${o.texto} → " + (d.paso(o.destino)?.let { resumenPaso(it).take(28) } ?: "sin destino"), style = MaterialTheme.typography.bodySmall,
                     color = if (d.paso(o.destino) == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (abierto) EditorDePaso(d, p, cambia, borra, agrega, alHacerInicial)
+            if (abierto) EditorDePaso(botId, d, p, cambia, borra, agrega, alHacerInicial)
         }
     }
 }
@@ -250,7 +255,7 @@ private fun Campo(valor: String, etiqueta: String, tag: String, lineas: Int = 4,
 
 @Composable
 private fun EditorDePaso(
-    d: AutoDef, p: PasoDef, cambia: (String, (PasoDef) -> PasoDef) -> Unit, borra: (String) -> Unit, agrega: (String, (PasoDef) -> AutoDef) -> Unit, alHacerInicial: () -> Unit,
+    botId: Long, d: AutoDef, p: PasoDef, cambia: (String, (PasoDef) -> PasoDef) -> Unit, borra: (String) -> Unit, agrega: (String, (PasoDef) -> AutoDef) -> Unit, alHacerInicial: () -> Unit,
 ) {
     when (p.tipo) {
         "menu" -> {
@@ -263,11 +268,13 @@ private fun EditorDePaso(
                 }
                 SelectorDestino(d, o.destino, "destino_${p.id}_$i", conTerminar = false, alElegir = { dest -> cambia(p.id) { q -> q.copy(opciones = q.opciones.mapIndexed { j, x -> if (j == i) x.copy(destino = dest) else x }) } },
                     alNuevo = { tipo -> agrega(tipo) { nuevo -> d.copy(pasos = d.pasos.map { q -> if (q.id == p.id) q.copy(opciones = q.opciones.mapIndexed { j, x -> if (j == i) x.copy(destino = nuevo.id) else x }) else q } + nuevo) } })
+                AjustesDeOpcion(p, i, o, cambia)
             }
             OutlinedButton({ cambia(p.id) { it.copy(opciones = it.opciones + OpcionDef("Opción ${it.opciones.size + 1}", "")) } }, Modifier.testTag("agregar_opcion_${p.id}")) { Icon(Ico.Agregar, null); Text(" Agregar opción") }
         }
         "respuesta" -> {
             Campo(p.texto, "Texto de la respuesta", "texto_${p.id}") { t -> cambia(p.id) { it.copy(texto = t) } }
+            ExtrasRespuesta(botId, p, cambia)
             Text("Después:", style = MaterialTheme.typography.labelMedium)
             SelectorDestino(d, p.siguiente, "siguiente_${p.id}", conTerminar = true, alElegir = { dest -> cambia(p.id) { it.copy(siguiente = dest) } },
                 alNuevo = { tipo -> agrega(tipo) { nuevo -> d.copy(pasos = d.pasos.map { q -> if (q.id == p.id) q.copy(siguiente = nuevo.id) else q } + nuevo) } })
@@ -285,9 +292,11 @@ private fun EditorDePaso(
                 alNuevo = { tipo -> agrega(tipo) { nuevo -> d.copy(pasos = d.pasos.map { q -> if (q.id == p.id) q.copy(siguiente = nuevo.id) else q } + nuevo) } })
         }
         "humano" -> {
-            Campo(p.texto, "Lo que se le responde antes de callar", "texto_${p.id}") { t -> cambia(p.id) { it.copy(texto = t) } }
-            Text("El bot calla en este chat hasta que lo reactives o pasen 12 horas, y te llega un aviso neutro.", style = MaterialTheme.typography.bodySmall)
+            Campo(p.texto, "Lo que se le responde si estás en horario", "texto_${p.id}") { t -> cambia(p.id) { it.copy(texto = t) } }
+            Campo(p.textoFuera, "Lo que se le responde si estás fuera de horario (puedes usar {horario})", "texto_fuera_${p.id}") { t -> cambia(p.id) { it.copy(textoFuera = t) } }
+            Text("El chat queda como Pendiente, el bot calla ahí hasta que lo reactives o pasen 12 horas, te llega un aviso neutro y se conserva lo que la persona ya contestó. El horario se elige en la pestaña Cuándo y dónde.", style = MaterialTheme.typography.bodySmall)
         }
+        "formulario" -> EditorFormulario(d, p, cambia, { actual, tag, alElegir, alNuevo -> SelectorDestino(d, actual, tag, conTerminar = true, alElegir = alElegir, alNuevo = alNuevo) }, agrega)
         else -> Campo(p.texto, "Mensaje final (opcional)", "texto_${p.id}") { t -> cambia(p.id) { it.copy(texto = t) } }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
@@ -398,6 +407,7 @@ private fun sustituyeEjemplo(t: String): String {
     return Regex("""\{([a-zA-Z0-9_]+)\}""").replace(t) { m ->
         when (val k = m.groupValues[1].lowercase()) {
             "nombre" -> "María"; "hora" -> hoy.format(DateTimeFormatter.ofPattern("HH:mm")); "dia", "día" -> dia
+            "fecha" -> hoy.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")); "horario" -> "de lunes a viernes de 09:00 a 18:00"
             else -> if (k.startsWith("dato")) "ejemplo" else ""
         }
     }
@@ -415,7 +425,27 @@ private fun avanzaPrev(d: AutoDef, desde: String, bur: MutableList<BurbujaPrev>)
                 return p.id to "menu"
             }
             "pedir" -> { bur += BurbujaPrev(true, sustituyeEjemplo(p.pregunta)); return p.id to "pedir" }
-            "respuesta" -> { bur += BurbujaPrev(true, sustituyeEjemplo(p.texto)); if (p.siguiente.isEmpty()) return null to "fin"; id = p.siguiente }
+            "respuesta" -> {
+                if (p.texto.isNotBlank()) bur += BurbujaPrev(true, sustituyeEjemplo(p.texto))
+                p.adjuntos.forEach { bur += BurbujaPrev(true, "[" + it.tipo.replaceFirstChar { c -> c.uppercase() } + ": " + it.nombre.ifBlank { it.tipo } + "]") }
+                p.ubicacion?.let { bur += BurbujaPrev(true, "[Ubicación: " + it.nombre.ifBlank { "${it.lat}, ${it.lon}" } + "]") }
+                p.contacto?.let { bur += BurbujaPrev(true, "[Contacto: ${it.nombre} · ${it.telefono}]") }
+                if (p.siguiente.isEmpty()) return null to "fin"; id = p.siguiente
+            }
+            "formulario" -> {
+                if (p.titulo.isNotBlank()) bur += BurbujaPrev(true, sustituyeEjemplo(p.titulo))
+                p.campos.forEachIndexed { i, c ->
+                    if (i > 0) bur += BurbujaPrev(false, "ejemplo")
+                    bur += BurbujaPrev(true, (if (p.campos.size > 1) "(${i + 1} de ${p.campos.size}) " else "") + sustituyeEjemplo(c.pregunta) + if (c.tipo == "opcion") c.opciones.filter { it.isNotBlank() }.mapIndexed { k, o -> "\n${k + 1}. $o" }.joinToString("") else "")
+                }
+                if (p.campos.isNotEmpty()) bur += BurbujaPrev(false, "ejemplo")
+                if (!p.sinResumen) {
+                    bur += BurbujaPrev(true, "Revisa tus datos:" + p.campos.joinToString("") { "\n• ${it.etiqueta.ifBlank { it.id }}: ejemplo" } + "\n\n¿Es correcto?\n1. Sí\n2. Corregir")
+                    bur += BurbujaPrev(false, "1")
+                }
+                bur += BurbujaPrev(true, sustituyeEjemplo(p.texto).ifBlank { "¡Listo! Recibimos tus datos." })
+                if (p.siguiente.isEmpty()) return null to "fin"; id = p.siguiente
+            }
             "humano" -> { if (p.texto.isNotBlank()) bur += BurbujaPrev(true, sustituyeEjemplo(p.texto)); bur += BurbujaPrev(true, "— Aquí el bot calla y te avisa —"); return null to "humano" }
             else -> { if (p.texto.isNotBlank()) bur += BurbujaPrev(true, sustituyeEjemplo(p.texto)); return null to "fin" }
         }

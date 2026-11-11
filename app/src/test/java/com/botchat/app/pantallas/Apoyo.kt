@@ -168,6 +168,39 @@ class MotorFalso : Motor {
     override fun etiquetaDeChat(bot: Long, chat: String) = etiqueta
     override fun obtenerAviso(bot: Long, id: Long) = aviso
     override fun configurarFlujo(expiraMin: Long) { llamadas += "flujo:$expiraMin" }
+    // Menús ampliados (bloque C)
+    var ajustesMenus = mutableMapOf(
+        "menu_err_max" to "3", "menu_txt_n1" to "No entendí esa opción. Estas son las opciones:", "menu_txt_n2" to "Sigo sin entender. Escribe *persona* para hablar con alguien.",
+        "menu_txt_n3" to "Parece que no nos estamos entendiendo.", "menu_txt_notexto" to "Por ahora solo entiendo mensajes escritos.", "menu_txt_ambiguo" to "Encontré varias opciones.",
+        "menu_txt_salir" to "Listo.", "menu_txt_cancelar" to "Cancelado.", "menu_saludos" to "hola, gracias, ok", "menu_volver" to "reiniciar", "menu_retoma_horas" to "24",
+        "menu_humano_dentro" to "Una persona te atenderá.", "menu_humano_fuera" to "Estamos fuera de horario.", "menu_horario" to "", "menu_region" to "MX",
+        "noentendio_activo" to "1", "noentendio_dias" to "30", "grupo_max_sesiones" to "5", "grupo_expira_min" to "10", "grupo_msgs_min" to "8", "grupo_cualquiera" to "0",
+        "grupo_cola_min" to "10", "grupo_txt_turno" to "Estás en el turno {n}.", "grupo_txt_vencido" to "Esa conversación terminó.", "grupo_txt_privado" to "Escríbeme al privado.",
+    )
+    var formulariosJson = "[]"
+    var formularioJson = """{"id":1,"menuId":1,"menu":"Citas","cliente":"Ana","chat":"","persona":"","ts":0,"campos":[]}"""
+    var noEntendioJson = "[]"
+    var adjuntoJson = """{"id":"abc123","tipo":"imagen","mime":"image/jpeg","nombre":"foto.jpg","bytes":14}"""
+    var importadoJson = """{"ids":[7],"nombres":["Menú importado"],"avisos":0,"omitidos":0}"""
+    var menusFalla: String? = null
+    override fun ajustesDeMenus(bot: Long) = JSONObject(ajustesMenus.toMap()).toString()
+    override fun fijarAjusteDeMenus(bot: Long, clave: String, valor: String) {
+        llamadas += "ajusteMenus:$clave:$valor"
+        menusFalla?.let { throw IllegalStateException(it) }
+        ajustesMenus[clave] = valor
+    }
+    override fun listarFormularios(bot: Long, menuId: Long, limite: Long): String { llamadas += "formularios:$menuId"; return formulariosJson }
+    override fun obtenerFormulario(bot: Long, id: Long) = formularioJson
+    override fun contarFormularios(bot: Long, menuId: Long) = JSONArray(formulariosJson).length().toLong()
+    override fun borrarFormulario(bot: Long, id: Long) { llamadas += "borrarFormulario:$id"; formulariosJson = "[]" }
+    override fun borrarFormularios(bot: Long, menuId: Long): Long { llamadas += "borrarFormularios:$menuId"; val n = JSONArray(formulariosJson).length().toLong(); formulariosJson = "[]"; return n }
+    override fun exportarFormularios(bot: Long, menuId: Long): String { llamadas += "exportarFormularios:$menuId"; menusFalla?.let { throw IllegalStateException(it) }; return "exportes/1/formularios_1.bcf" }
+    override fun listarNoEntendio(bot: Long, menuId: Long, limite: Long): String { llamadas += "noEntendio:$menuId"; return noEntendioJson }
+    override fun borrarNoEntendio(bot: Long, menuId: Long): Long { llamadas += "borrarNoEntendio:$menuId"; val n = JSONArray(noEntendioJson).length().toLong(); noEntendioJson = "[]"; return n }
+    override fun subirAdjuntoMenu(bot: Long, ruta: String, tipo: String, mime: String, nombre: String): String { llamadas += "subirAdjunto:$tipo:$nombre"; menusFalla?.let { throw IllegalStateException(it) }; return adjuntoJson }
+    override fun borrarAdjuntoMenu(bot: Long, id: String) { llamadas += "borrarAdjunto:$id" }
+    override fun exportarMenus(bot: Long, idsJson: String, clave: String): String { llamadas += "exportarMenus:$idsJson:${clave.isNotEmpty()}"; menusFalla?.let { throw IllegalStateException(it) }; return "exportes/1/menus_1.bcm" }
+    override fun importarMenus(bot: Long, ruta: String, clave: String): String { llamadas += "importarMenus:${clave.isNotEmpty()}"; menusFalla?.let { throw IllegalStateException(it) }; return importadoJson }
     // Rangos y permisos (bloque A)
     var catalogo = Apoyo.catalogoEjemplo
     var rangos = Apoyo.rangosEjemplo

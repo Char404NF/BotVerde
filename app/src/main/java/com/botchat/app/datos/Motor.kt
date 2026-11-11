@@ -83,6 +83,22 @@ interface Motor {
     fun obtenerAviso(bot: Long, id: Long): String
     fun configurarFlujo(expiraMin: Long)
 
+    // Menús ampliados (0.5.0, bloque C)
+    fun ajustesDeMenus(bot: Long): String
+    fun fijarAjusteDeMenus(bot: Long, clave: String, valor: String)
+    fun listarFormularios(bot: Long, menuId: Long, limite: Long): String
+    fun obtenerFormulario(bot: Long, id: Long): String
+    fun contarFormularios(bot: Long, menuId: Long): Long
+    fun borrarFormulario(bot: Long, id: Long)
+    fun borrarFormularios(bot: Long, menuId: Long): Long
+    fun exportarFormularios(bot: Long, menuId: Long): String
+    fun listarNoEntendio(bot: Long, menuId: Long, limite: Long): String
+    fun borrarNoEntendio(bot: Long, menuId: Long): Long
+    fun subirAdjuntoMenu(bot: Long, ruta: String, tipo: String, mime: String, nombre: String): String
+    fun borrarAdjuntoMenu(bot: Long, id: String)
+    fun exportarMenus(bot: Long, idsJson: String, clave: String): String
+    fun importarMenus(bot: Long, ruta: String, clave: String): String
+
     // Rangos y permisos (0.5.0, bloque A)
     fun catalogoPermisos(): String
     fun listarRangos(bot: Long): String
@@ -251,6 +267,20 @@ object MotorGo : Motor {
     override fun etiquetaDeChat(bot: Long, chat: String) = Wabot.etiquetaDeChat(bot, chat)
     override fun obtenerAviso(bot: Long, id: Long) = Wabot.obtenerAviso(bot, id)
     override fun configurarFlujo(expiraMin: Long) = Wabot.configurarFlujo(expiraMin)
+    override fun ajustesDeMenus(bot: Long) = Wabot.ajustesDeMenus(bot)
+    override fun fijarAjusteDeMenus(bot: Long, clave: String, valor: String) = Wabot.fijarAjusteDeMenus(bot, clave, valor)
+    override fun listarFormularios(bot: Long, menuId: Long, limite: Long) = Wabot.listarFormularios(bot, menuId, limite)
+    override fun obtenerFormulario(bot: Long, id: Long) = Wabot.obtenerFormulario(bot, id)
+    override fun contarFormularios(bot: Long, menuId: Long) = Wabot.contarFormularios(bot, menuId)
+    override fun borrarFormulario(bot: Long, id: Long) = Wabot.borrarFormulario(bot, id)
+    override fun borrarFormularios(bot: Long, menuId: Long) = Wabot.borrarFormularios(bot, menuId)
+    override fun exportarFormularios(bot: Long, menuId: Long) = Wabot.exportarFormularios(bot, menuId)
+    override fun listarNoEntendio(bot: Long, menuId: Long, limite: Long) = Wabot.listarNoEntendio(bot, menuId, limite)
+    override fun borrarNoEntendio(bot: Long, menuId: Long) = Wabot.borrarNoEntendio(bot, menuId)
+    override fun subirAdjuntoMenu(bot: Long, ruta: String, tipo: String, mime: String, nombre: String) = Wabot.subirAdjuntoMenu(bot, ruta, tipo, mime, nombre)
+    override fun borrarAdjuntoMenu(bot: Long, id: String) = Wabot.borrarAdjuntoMenu(bot, id)
+    override fun exportarMenus(bot: Long, idsJson: String, clave: String) = Wabot.exportarMenus(bot, idsJson, clave)
+    override fun importarMenus(bot: Long, ruta: String, clave: String) = Wabot.importarMenus(bot, ruta, clave)
     override fun catalogoPermisos() = Wabot.catalogoPermisos()
     override fun listarRangos(bot: Long) = Wabot.listarRangos(bot)
     override fun obtenerRango(bot: Long, id: Long) = Wabot.obtenerRango(bot, id)

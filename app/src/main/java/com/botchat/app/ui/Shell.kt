@@ -274,6 +274,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                     PantallaAutomatizaciones(
                         bot.id, alVolver = { nav.popBackStack() }, alEditar = { nav.navigate("automatizacion/$it") }, alEnCurso = { nav.navigate("en_curso") },
                         alActividad = { nav.navigate("actividad") }, alEstadisticas = { nav.navigate("estadisticas_menu/$it") }, alProbar = { nav.navigate("simulador/$it") },
+                        alFormularios = { nav.navigate("formularios/0") }, alNoEntendio = { nav.navigate("no_entendio/0") }, alAjustesMenus = { nav.navigate("ajustes_menus") },
                     )
                 }
                 composable("automatizacion/{id}") { be ->
@@ -287,8 +288,22 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 }
                 composable("estadisticas_menu/{id}") { be ->
                     val id = be.arguments?.getString("id")?.toLongOrNull() ?: return@composable
-                    PantallaEstadisticasMenu(bot.id, id, nombreDeAuto(bot.id, id), alVolver = { nav.popBackStack() })
+                    PantallaEstadisticasMenu(bot.id, id, nombreDeAuto(bot.id, id), alVolver = { nav.popBackStack() },
+                        alFormularios = { nav.navigate("formularios/$it") }, alNoEntendio = { nav.navigate("no_entendio/$it") })
                 }
+                composable("formularios/{menu}") { be ->
+                    val menu = be.arguments?.getString("menu")?.toLongOrNull() ?: 0L
+                    PantallaFormularios(bot.id, menu, if (menu == 0L) "Formularios recibidos" else "Formularios de " + nombreDeAuto(bot.id, menu), alVolver = { nav.popBackStack() }, alAbrir = { nav.navigate("formulario/$it") })
+                }
+                composable("formulario/{id}") { be ->
+                    val id = be.arguments?.getString("id")?.toLongOrNull() ?: return@composable
+                    PantallaFormulario(bot.id, id, alVolver = { nav.popBackStack() }, alAbrirChat = { nav.navigate("chat/${enc(it)}") })
+                }
+                composable("no_entendio/{menu}") { be ->
+                    val menu = be.arguments?.getString("menu")?.toLongOrNull() ?: 0L
+                    PantallaNoEntendio(bot.id, menu, if (menu == 0L) "Lo que no entendió" else "No entendió: " + nombreDeAuto(bot.id, menu), alVolver = { nav.popBackStack() })
+                }
+                composable("ajustes_menus") { PantallaAjustesMenus(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("simulador/{id}") { be ->
                     val id = be.arguments?.getString("id")?.toLongOrNull() ?: return@composable
                     PantallaSimulador(bot.id, id, nombreDeAuto(bot.id, id), alVolver = { nav.popBackStack() })
@@ -302,7 +317,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         ajustes, bot.nombre, vm.eliminando, alVolver = { nav.popBackStack() },
                         alAbrirEspacio = { irA("espacio") }, alMedirRendimiento = { nav.navigate("diagnostico") },
                         alFunciones = { nav.navigate("funciones") }, alActividad = { nav.navigate("actividad") }, alEliminarBot = { vm.eliminar(ctx) },
-                        alPermisosAvanzado = { nav.navigate("permisos_avanzado") },
+                        alPermisosAvanzado = { nav.navigate("permisos_avanzado") }, alMenus = { nav.navigate("ajustes_menus") },
                     )
                 }
                 composable("bot") { PantallaBot(vm, conPermiso, alVolver = { nav.popBackStack() }, alAbrirAvanzado = { nav.navigate("avanzado") }, alAbrirAyuda = { nav.navigate("ayuda") }) }

@@ -2,7 +2,15 @@
 
 package com.botchat.app.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,7 +48,7 @@ private val RANGOS = listOf("Hoy" to 0L, "7 días" to 6L, "30 días" to 29L, "To
 
 /** Estadísticas de una automatización: cuántos entraron, cuántos terminaron, qué opciones eligen y dónde se atoran. */
 @Composable
-fun PantallaEstadisticasMenu(botId: Long, menuId: Long, nombre: String, alVolver: () -> Unit) {
+fun PantallaEstadisticasMenu(botId: Long, menuId: Long, nombre: String, alVolver: () -> Unit, alFormularios: (Long) -> Unit = {}, alNoEntendio: (Long) -> Unit = {}) {
     var rango by remember { mutableStateOf("30 días") }
     var conPruebas by remember { mutableStateOf(false) }
     val datos by produceState<EstadMenu?>(null, rango, conPruebas) {
@@ -72,9 +80,44 @@ fun PantallaEstadisticasMenu(botId: Long, menuId: Long, nombre: String, alVolver
                 Cifra(d.abandonados, "Abandonados", "Abandonado", Modifier.weight(1f).testTag("est_abandonados"))
                 Cifra(d.humano, "Pasaron a una persona", "Pasó a una persona", Modifier.weight(1f).testTag("est_humano"))
             }
+            SeccionEst("Cómo terminan") { BarraDeEstados(d) }
             if (d.opciones.isNotEmpty()) SeccionEst("Opciones elegidas") { Barras(d.opciones) { "${it.titulo} → ${it.opcion}" + if (it.texto.isNotBlank()) " (${it.texto})" else "" } }
             if (d.embudo.isNotEmpty()) SeccionEst("Embudo: quién llegó a cada paso") { Barras(d.embudo) { it.titulo } }
+            if (d.abandonos.isNotEmpty()) SeccionEst("Dónde abandonan") { Barras(d.abandonos) { it.titulo } }
             if (d.invalidas.isNotEmpty()) SeccionEst("Dónde más se equivocan") { Barras(d.invalidas) { it.titulo } }
+            if (d.formulariosEnviados + d.formulariosCancelados > 0 || d.formularios > 0) SeccionEst("Formularios") {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
+                    Cifra(d.formulariosEnviados, "Enviados", "Enviado", Modifier.weight(1f).testTag("est_form_enviados"))
+                    Cifra(d.formulariosCancelados, "Cancelados", "Cancelado", Modifier.weight(1f).testTag("est_form_cancelados"))
+                }
+                if (d.formularios > 0) OutlinedButton({ alFormularios(menuId) }, Modifier.fillMaxWidth().testTag("ver_formularios_menu")) { Text("Ver los ${plural(d.formularios, "formulario recibido", "formularios recibidos")}") }
+            }
+            SeccionEst("Lo que no entendió") {
+                Text(if (d.noEntendio == 0L) "Hasta ahora no hay mensajes sin entender." else plural(d.noEntendio, "mensaje que el menú no entendió", "mensajes que el menú no entendió"), Modifier.testTag("est_no_entendio"), style = MaterialTheme.typography.bodyMedium)
+                if (d.noEntendio > 0) OutlinedButton({ alNoEntendio(menuId) }, Modifier.fillMaxWidth().testTag("ver_no_entendio_menu")) { Text("Ver la lista") }
+            }
+        }
+    }
+}
+
+/** Barra apilada simple: de cada 100 conversaciones, cuántas se completan, pasan a una persona, caducan o se abandonan. */
+@Composable
+private fun BarraDeEstados(d: EstadMenu) {
+    val abandonadas = (d.abandonados - d.expirados).coerceAtLeast(0)
+    val partes = listOf(
+        Triple("Completadas", d.completados, MaterialTheme.colorScheme.primary), Triple("A una persona", d.humano, MaterialTheme.colorScheme.tertiary),
+        Triple("Caducaron", d.expirados, MaterialTheme.colorScheme.outline), Triple("Abandonadas", abandonadas, MaterialTheme.colorScheme.error),
+    ).filter { it.second > 0 }
+    val total = partes.sumOf { it.second }.coerceAtLeast(1L)
+    if (partes.isEmpty()) { Text("Todavía no termina ninguna conversación.", style = MaterialTheme.typography.bodySmall); return }
+    Row(Modifier.fillMaxWidth().height(18.dp).clip(RoundedCornerShape(9.dp)).testTag("barra_estados")) {
+        partes.forEach { (_, n, c) -> Box(Modifier.weight(n.toFloat() / total).fillMaxHeight().background(c)) }
+    }
+    partes.forEach { (t, n, c) ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(10.dp).clip(CircleShape).background(c))
+            Text("  $t", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            Text("${numero(n)} (${(n * 100 / total)}%)", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

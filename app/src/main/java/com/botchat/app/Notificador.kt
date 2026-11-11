@@ -131,6 +131,7 @@ object Notificador {
                 if (a.chat.isNotEmpty() && (a.tipo == "humano" || a.tipo == "palabra" || a.tipo == "reporte")) putExtra(EXTRA_CHAT, a.chat)
                 if (a.tipo == "desconocido") putExtra(EXTRA_RUTA, "solicitudes")
                 if (a.tipo == "modo_seguro") putExtra(EXTRA_RUTA, "iniciativa")
+                if (a.tipo == "formulario") putExtra(EXTRA_RUTA, "formularios/0")
                 if (a.tipo == "advertencias" && a.persona.isNotEmpty()) putExtra(EXTRA_RUTA, "persona/" + android.net.Uri.encode(a.persona))
                 if (a.tipo == "recordatorio" || a.tipo == "resumen") putExtra(EXTRA_RUTA, "avisos")
             }.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),

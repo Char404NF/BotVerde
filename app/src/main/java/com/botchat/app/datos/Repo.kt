@@ -154,6 +154,22 @@ object Repo {
     suspend fun etiquetaChat(bot: Long, chat: String) = io { JsonAuto.etiquetas(motor.etiquetaDeChat(bot, chat)) }
     suspend fun aviso(bot: Long, id: Long) = io { JsonAuto.aviso(motor.obtenerAviso(bot, id)) }
 
+    // Menús ampliados (bloque C)
+    suspend fun ajustesDeMenus(bot: Long) = io { JsonMenus.ajustes(motor.ajustesDeMenus(bot)) }
+    suspend fun fijarAjusteDeMenus(bot: Long, clave: String, valor: String) = io { motor.fijarAjusteDeMenus(bot, clave, valor) }
+    suspend fun formularios(bot: Long, menuId: Long = 0, limite: Long = 200) = io { JsonMenus.formularios(motor.listarFormularios(bot, menuId, limite)) }
+    suspend fun formulario(bot: Long, id: Long) = io { JsonMenus.formulario(motor.obtenerFormulario(bot, id)) }
+    suspend fun contarFormularios(bot: Long, menuId: Long = 0) = io { motor.contarFormularios(bot, menuId) }
+    suspend fun borrarFormulario(bot: Long, id: Long) = io { motor.borrarFormulario(bot, id) }
+    suspend fun borrarFormularios(bot: Long, menuId: Long = 0) = io { motor.borrarFormularios(bot, menuId) }
+    suspend fun exportarFormularios(bot: Long, menuId: Long = 0) = io { motor.exportarFormularios(bot, menuId) }
+    suspend fun noEntendio(bot: Long, menuId: Long = 0, limite: Long = 200) = io { JsonMenus.noEntendio(motor.listarNoEntendio(bot, menuId, limite)) }
+    suspend fun borrarNoEntendio(bot: Long, menuId: Long = 0) = io { motor.borrarNoEntendio(bot, menuId) }
+    suspend fun subirAdjuntoMenu(bot: Long, ruta: String, tipo: String, mime: String, nombre: String) = io { JsonMenus.adjunto(motor.subirAdjuntoMenu(bot, ruta, tipo, mime, nombre)) }
+    suspend fun borrarAdjuntoMenu(bot: Long, id: String) = io { motor.borrarAdjuntoMenu(bot, id) }
+    suspend fun exportarMenus(bot: Long, ids: List<Long>, clave: String) = io { motor.exportarMenus(bot, org.json.JSONArray(ids).toString(), clave) }
+    suspend fun importarMenus(bot: Long, ruta: String, clave: String) = io { JsonMenus.importado(motor.importarMenus(bot, ruta, clave)) }
+
     // Rangos y permisos
     suspend fun catalogo() = io { JsonPerm.casillas(motor.catalogoPermisos()) }
     suspend fun rangos(bot: Long) = io { JsonPerm.rangos(motor.listarRangos(bot)) }
