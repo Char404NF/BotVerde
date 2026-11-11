@@ -41,3 +41,17 @@ func (g *Gestor) Llave(modulo, clave string) string {
 	defer llavesMu.RUnlock()
 	return llavesEn[claveLlave(g.BotID, modulo, clave)]
 }
+
+// CampoLlaveValido dice si el módulo declara ese campo como secreto (para no guardar llaves que nadie va a usar).
+func CampoLlaveValido(modulo, clave string) bool {
+	m, ok := Obtener(modulo)
+	if !ok {
+		return false
+	}
+	for _, c := range m.Esquema() {
+		if c.Clave == clave && c.Tipo == CampoSecreto {
+			return true
+		}
+	}
+	return false
+}

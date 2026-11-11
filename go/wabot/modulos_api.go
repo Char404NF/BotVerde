@@ -504,3 +504,20 @@ func TickModulos(botID int64) error {
 	s.encola(func() { s.mods.TickAgenda() })
 	return nil
 }
+
+// FijarLlaveModulo le pasa a Go, SOLO en memoria, una llave que la app guarda cifrada en el Android Keystore (por ejemplo la llave de
+// la IA). Valor vacío = olvidarla. Nunca se escribe en la base, el registro ni los logs. La app la vuelve a mandar cada vez que arranca.
+func FijarLlaveModulo(botID int64, modulo, clave, valor string) error {
+	registrarModulosH()
+	if !modulos.CampoLlaveValido(modulo, clave) {
+		return errors.New("ese módulo no usa esa llave")
+	}
+	modulos.FijarLlave(botID, modulo, clave, valor)
+	accionDueno(botID, "modulo.llave", modulo, map[bool]string{true: "borrada", false: ""}[valor == ""])
+	return nil
+}
+
+// TieneLlaveModulo dice si hay una llave en memoria para ese módulo (nunca la devuelve).
+func TieneLlaveModulo(botID int64, modulo, clave string) bool {
+	return modulos.TieneLlave(botID, modulo, clave)
+}

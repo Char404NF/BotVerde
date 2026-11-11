@@ -17,7 +17,8 @@ import (
 func TestModulosHRegistradosApagadosYConEsquema(t *testing.T) {
 	abreSolo(t)
 	lista := decodifica[[]modulos.Info](t, func() (string, error) { return ListarModulos(1) })
-	riesgos := map[string]string{"bienvenida": "medio", "difusion": "alto", "programados": "medio", "invitar": "medio", "descargas": "medio"}
+	riesgos := map[string]string{"bienvenida": "medio", "difusion": "alto", "programados": "medio", "invitar": "medio", "descargas": "medio",
+		"traductor": "bajo", "ia": "medio", "llamadas": "bajo", "juegos": "bajo"}
 	vistos := map[string]modulos.Info{}
 	for _, i := range lista {
 		vistos[i.ID] = i
@@ -31,8 +32,8 @@ func TestModulosHRegistradosApagadosYConEsquema(t *testing.T) {
 			t.Fatalf("%s: %+v", id, i)
 		}
 	}
-	if !vistos["difusion"].Iniciativa || vistos["descargas"].Iniciativa {
-		t.Fatal("difusión escribe por iniciativa; descargas solo responde")
+	if !vistos["difusion"].Iniciativa || vistos["descargas"].Iniciativa || vistos["traductor"].Iniciativa || !vistos["ia"].Iniciativa || !vistos["llamadas"].Iniciativa || !vistos["juegos"].Iniciativa {
+		t.Fatal("difusión, IA, llamadas y juegos escriben por la cola; descargas y traductor solo responden")
 	}
 	// los paneles viajan en la información de cada módulo
 	info := decodifica[modulos.Info](t, func() (string, error) { return InfoModulo(1, "difusion") })
@@ -44,7 +45,7 @@ func TestModulosHRegistradosApagadosYConEsquema(t *testing.T) {
 		t.Fatalf("paneles: %v", ids)
 	}
 	// las casillas de los módulos están en el catálogo para asignarlas a rangos antes de encenderlos
-	for _, c := range []string{"bienvenida.exento", "difusion.ver", "programados.ver", "invitar.usar", "descargas.bajar", "descargas.conectar"} {
+	for _, c := range []string{"bienvenida.exento", "difusion.ver", "programados.ver", "invitar.usar", "descargas.bajar", "descargas.conectar", "traductor.usar", "ia.usar", "juegos.jugar"} {
 		x, ok := permisos.Buscar(c)
 		if !ok || x.Modulo == "" {
 			t.Fatalf("la casilla %s no está en el catálogo", c)
@@ -142,4 +143,58 @@ func TestBotBienvenidaPorEventoDeGrupo(t *testing.T) {
 	if s.mods.Cola.Pendientes() != 0 {
 		t.Fatal("al apagar se descarta lo que esperaba")
 	}
+}
+
+func TestApiLlavesDeModulosSoloEnMemoria(t *testing.T) {
+	_, a := abreSolo(t)
+	registrarModulosH()
+	if err := FijarLlaveModulo(1, "ia", "llave", "sk-PRUEBA-123"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = FijarLlaveModulo(1, "ia", "llave", "") })
+	if !TieneLlaveModulo(1, "ia", "llave") || TieneLlaveModulo(1, "traductor", "llave") {
+		t.Fatal("la llave debe quedar solo para ese módulo")
+	}
+	if err := FijarLlaveModulo(1, "ia", "url", "x"); err == nil {
+		t.Fatal("solo los campos secretos aceptan llave")
+	}
+	if err := FijarLlaveModulo(1, "nadie", "llave", "x"); err == nil {
+		t.Fatal("módulo inexistente")
+	}
+	cfg, err := ConfigModulo(1, "ia")
+	if err != nil || strings.Contains(cfg, "PRUEBA") || strings.Contains(cfg, `"llave"`) {
+		t.Fatalf("la configuración no lleva la llave: %q %v", cfg, err)
+	}
+	if err := GuardarConfigModulo(1, "ia", `{"llave":"sk-otra"}`); err == nil {
+		t.Fatal("no se guarda una llave en la configuración")
+	}
+	regs, _ := a.ListarAcciones(1, 50, 0)
+	for _, r := range regs {
+		if strings.Contains(r.Objetivo+r.Detalle+r.Accion, "PRUEBA") {
+			t.Fatal("la llave llegó al registro de acciones")
+		}
+	}
+	info, _ := InfoModulo(1, "ia")
+	if !strings.Contains(info, `"tipo":"secreto"`) || strings.Contains(info, "PRUEBA") {
+		t.Fatal("el esquema trae el campo secreto y nunca su valor")
+	}
+	_ = FijarLlaveModulo(1, "ia", "llave", "")
+	if TieneLlaveModulo(1, "ia", "llave") {
+		t.Fatal("vacío la olvida")
+	}
+}
+
+// Con el bot en marcha: una llamada entrante llega al módulo Llamadas por el evento de whatsmeow y queda en el registro de perdidas.
+func TestBotLlamadaEntranteQuedaEnElRegistro(t *testing.T) {
+	s := arrancaBot(t)
+	ana := types.NewJID("5215511111111", types.DefaultUserServer)
+	_, _ = alm.ActualizarChat(1, ana.String(), false, func(c *almacen.Chat) { c.Guardado = "Ana" })
+	if err := ActivarModulo(1, "llamadas"); err != nil {
+		t.Fatal(err)
+	}
+	s.evento(&events.CallOffer{BasicCallMeta: types.BasicCallMeta{From: ana, CallCreator: ana, CallID: "LLAM1"}})
+	esperaHasta(t, "la llamada no quedó en el registro", func() bool {
+		fs, _ := FilasPanelModulo(1, "llamadas", "perdidas")
+		return strings.Contains(fs, "Ana")
+	})
 }
