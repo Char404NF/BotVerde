@@ -92,7 +92,7 @@ func (m *Motor) citaUnMenu(msg motor.Mensaje) bool {
 // escrito (se manda citándolo y mencionándola); el bot no escribe a nadie que no le haya hablado.
 func (m *Motor) Diferidas(ahora time.Time) []motor.Diferida {
 	bot, alm := m.c.BotID, m.c.Alm
-	alm.ExpirarSesiones(bot, ahora, m.expiraDefecto(true))
+	alm.ExpirarSesiones(bot, ahora, m.c.Expira()) // las conversaciones nuevas traen su propia caducidad; este es el valor de las antiguas
 	vida := time.Duration(m.ajusteInt("grupo_cola_min")) * time.Minute
 	if vida <= 0 {
 		vida = 10 * time.Minute

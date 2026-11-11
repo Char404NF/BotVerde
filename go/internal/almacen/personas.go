@@ -645,6 +645,11 @@ func (a *Almacen) OlvidarPersona(botID int64, persona string) (*ResultadoOlvidar
 		_, _ = a.db.Exec(`DELETE FROM flow_sessions WHERE id=?`, id)
 	}
 	res.Sesiones = len(ids)
+	// formularios que mandó, fila de espera y mensajes del bot ligados a sus conversaciones (etapa C)
+	del(`DELETE FROM formularios WHERE bot_id=? AND (persona IN `+lista+` OR chat IN `+lista+`)`, argsSolo(fs)...)
+	del(`DELETE FROM flow_cola WHERE bot_id=? AND persona IN ` + lista)
+	del(`DELETE FROM flow_vencido WHERE bot_id=? AND persona IN ` + lista)
+	del(`DELETE FROM msg_bot_sesion WHERE bot_id=? AND persona IN ` + lista)
 	// 5. registro de acciones: queda que pasó, pero sin a quién
 	_, _ = a.db.Exec(`UPDATE registro_acciones SET objetivo='', chat='' WHERE bot_id=? AND (objetivo IN `+lista+` OR chat IN `+lista+`)`, append(args2(botID, fs), argsSolo(fs)...)...)
 	_, _ = a.db.Exec(`UPDATE registro_acciones SET quien='persona_olvidada' WHERE bot_id=? AND quien IN `+lista, args2(botID, fs)...)
@@ -691,6 +696,7 @@ type ExportePersona struct {
 	Notas        []Nota               `json:"notas"`
 	Estadisticas *EstadisticasPersona `json:"estadisticas"`
 	Mensajes     []MensajeExportado   `json:"mensajes"`
+	Formularios  []Formulario         `json:"formularios,omitempty"` // formularios que completó en un menú (etapa C)
 	Recortado    bool                 `json:"recortado,omitempty"`
 }
 
@@ -715,6 +721,14 @@ func (a *Almacen) DatosDePersona(botID int64, persona string, ahora time.Time) (
 	}
 	fs := a.formas(botID, persona)
 	lista := enLista(len(fs))
+	if ff, e := a.db.Query(`SELECT `+colsForm+` FROM formularios WHERE bot_id=? AND (persona IN `+lista+` OR chat IN `+lista+`) ORDER BY id`, append(args2(botID, fs), argsSolo(fs)...)...); e == nil {
+		for ff.Next() {
+			if f, e := a.escanearFormulario(ff); e == nil {
+				ex.Formularios = append(ex.Formularios, *f)
+			}
+		}
+		ff.Close()
+	}
 	q := `SELECT chat_jid,id,ts,tipo,es_mio,texto_cifrado,archivo_bytes,borrado FROM messages WHERE bot_id=? AND (chat_jid IN ` + lista + ` OR remitente_jid IN ` + lista + `) ORDER BY ts, id LIMIT ?`
 	filas, err := a.db.Query(q, append(append(args2(botID, fs), argsSolo(fs)...), maxExportados+1)...)
 	if err != nil {

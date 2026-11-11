@@ -804,6 +804,25 @@ func fusionarPersona(tx *sql.Tx, botID int64, desde, hacia string) error {
 	if _, err := tx.Exec(`UPDATE codigos_confirmacion SET persona=? WHERE bot_id=? AND persona=?`, hacia, botID, desde); err != nil {
 		return err
 	}
+	// v0.5.0 C: las conversaciones de menú abiertas en grupos, la fila de espera, los avisos de "conversación terminada" y los
+	// formularios pasan a la persona canónica (la conversación es de (grupo, persona canónica)).
+	for _, q := range []string{
+		`UPDATE flow_sessions SET sender=? WHERE bot_id=? AND sender=? AND estado IN ('activo','humano','pausado') AND NOT EXISTS (SELECT 1 FROM flow_sessions o WHERE o.bot_id=flow_sessions.bot_id AND o.chat=flow_sessions.chat AND o.sender=? AND o.estado IN ('activo','humano','pausado') AND o.prueba=flow_sessions.prueba)`,
+	} {
+		if _, err := tx.Exec(q, hacia, botID, desde, hacia); err != nil {
+			return err
+		}
+	}
+	for _, q := range []string{
+		`UPDATE OR IGNORE flow_cola SET persona=? WHERE bot_id=? AND persona=?`,
+		`UPDATE OR IGNORE flow_vencido SET persona=? WHERE bot_id=? AND persona=?`,
+		`UPDATE msg_bot_sesion SET persona=? WHERE bot_id=? AND persona=?`,
+		`UPDATE formularios SET persona=? WHERE bot_id=? AND persona=?`,
+	} {
+		if _, err := tx.Exec(q, hacia, botID, desde); err != nil {
+			return err
+		}
+	}
 	// v0.5.0 B: advertencias y notas pasan a la persona canónica; del silencio se queda el más largo (0 = siempre).
 	for _, t := range []string{"advertencias", "notas_persona"} {
 		if _, err := tx.Exec(`UPDATE `+t+` SET persona=? WHERE bot_id=? AND persona=?`, hacia, botID, desde); err != nil {

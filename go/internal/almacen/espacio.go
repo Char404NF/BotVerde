@@ -567,7 +567,8 @@ func (a *Almacen) EliminarBot(botID int64) error {
 	}
 	for _, t := range []string{"message_receipts", "reacciones", "chat_estado", "dedupe", "actividad",
 		"persona_rol", "roles", "persona_alias", "registro_acciones", "solicitudes", "codigos_confirmacion", "grupos_politica", "bot_ajustes", "modulos", "modulos_registro", "no_molestar",
-		"persona_silencio", "advertencias", "notas_persona", "chat_etiqueta", "etiquetas", "recordatorios", "alertas_palabra", "avisos"} {
+		"persona_silencio", "advertencias", "notas_persona", "chat_etiqueta", "etiquetas", "recordatorios", "alertas_palabra", "avisos",
+		"msg_bot_sesion", "flow_cola", "flow_vencido", "flow_noentendio", "formularios"} {
 		if _, err := a.db.Exec("DELETE FROM "+t+" WHERE bot_id=?", botID); err != nil {
 			return err
 		}
@@ -575,6 +576,7 @@ func (a *Almacen) EliminarBot(botID int64) error {
 	_ = os.RemoveAll(filepath.Join(a.raiz, "media", fmt.Sprint(botID)))
 	_ = os.RemoveAll(filepath.Join(a.raiz, "avatars", fmt.Sprint(botID)))
 	_ = os.RemoveAll(filepath.Join(a.raiz, "exportes", fmt.Sprint(botID)))
+	_ = os.RemoveAll(filepath.Join(a.raiz, "menu_adj", fmt.Sprint(botID)))
 	a.nombres.limpiar()
 	a.avisa("chats")
 	return nil
