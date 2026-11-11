@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.botchat.app.datos.ChatItem
+import com.botchat.app.datos.EstadoCaptura
 import com.botchat.app.datos.EstadoLab
 import com.botchat.app.datos.PruebaLab
 import com.botchat.app.datos.Repo
@@ -93,7 +94,7 @@ internal fun siguienteLab(v: Int) = when (v) { -1 -> 1; 1 -> 0; else -> -1 }
  * en texto numerado. Para encenderlo hay que aceptar un aviso de riesgo.
  */
 @Composable
-fun PantallaLaboratorio(botId: Long, alVolver: () -> Unit, alAviso: () -> Unit, alMatriz: () -> Unit) {
+fun PantallaLaboratorio(botId: Long, alVolver: () -> Unit, alAviso: () -> Unit, alMatriz: () -> Unit, alCaptura: () -> Unit = {}) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val haptica = rememberHaptica()
@@ -132,6 +133,15 @@ fun PantallaLaboratorio(botId: Long, alVolver: () -> Unit, alAviso: () -> Unit, 
                         haptica(Toque.Fuerte)
                         if (!it) fijar("lab_activo", "0") else if (!e.avisoAceptado) alAviso() else fijar("lab_activo", "1")
                     }, Modifier.testTag("lab_activo"))
+                }
+            }
+            Card(Modifier.fillMaxWidth().testTag("tarjeta_captura"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+                Row(Modifier.padding(Esp.l), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Captura de mensajes (diagnóstico)", style = MaterialTheme.typography.titleMedium)
+                        Text("Muestra con qué forma llegan los mensajes. Solo estructura, en memoria.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    OutlinedButton(alCaptura, Modifier.testTag("lab_abrir_captura")) { Text("Abrir") }
                 }
             }
             if (!e.activo) {
@@ -480,5 +490,79 @@ private fun androidx.compose.foundation.layout.RowScope.Celda(texto: String, mal
     }
     Box(Modifier.weight(1f).padding(2.dp).then(if (alTocar != null) Modifier.clickable { alTocar() } else Modifier).testTag(tag), Alignment.Center) {
         Text(texto, style = if (alTocar != null) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium, color = color, textAlign = TextAlign.Center)
+    }
+}
+
+// ---------- Captura de mensajes (diagnóstico) ----------
+
+private fun horaCaptura(ts: Long) = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(ts * 1000))
+
+/**
+ * Diagnóstico: guarda, SOLO en la memoria del teléfono, la estructura (nombres de campos y largos) de los últimos mensajes recibidos, para ver
+ * con qué forma llega algo raro. Apagada por defecto; se apaga sola a los 10 minutos o a los 30 mensajes. Nada va a disco ni a la base.
+ */
+@Composable
+fun PantallaCapturaLab(botId: Long, alVolver: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val haptica = rememberHaptica()
+    var version by remember { mutableIntStateOf(0) }
+    val estado by produceState<EstadoCaptura?>(null, version) { value = runCatching { Repo.estadoCaptura(botId) }.getOrNull() ?: value }
+    val activa = estado?.activo == true
+    // Mientras está encendida se refresca sola (llegan mensajes y corre el reloj).
+    LaunchedEffect(activa) { while (activa) { delay(2000); version++ } }
+
+    fun accion(f: suspend () -> Unit) = scope.launch {
+        runCatching { f() }.onFailure { avisaToast(ctx, it.message ?: "No se pudo", true) }
+        version++
+    }
+
+    Scaffold(topBar = { TopAppBar(navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text("Captura de mensajes") }) }) { relleno ->
+        val e = estado
+        if (e == null) { Box(Modifier.fillMaxSize().padding(relleno), Alignment.Center) { CircularProgressIndicator() }; return@Scaffold }
+        Column(Modifier.fillMaxSize().padding(relleno).verticalScroll(rememberScrollState()).padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
+            Text(
+                "Solo se guarda la estructura del mensaje (qué campos trae y cuánto miden), en la memoria del teléfono: nada va a disco, a la base ni al registro. Sin bytes, claves ni números completos. Se apaga sola a los 10 minutos o a los 30 mensajes.",
+                Modifier.testTag("captura_aviso"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Card(Modifier.fillMaxWidth().testTag("tarjeta_captura_estado"), colors = CardDefaults.cardColors(containerColor = if (e.activo) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer)) {
+                Row(Modifier.padding(Esp.l), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Capturar mensajes que lleguen", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            if (e.activo) "Encendida. Quedan ${e.restanSeg / 60}:${"%02d".format(e.restanSeg % 60)} · ${e.capturados} de ${e.max} mensajes." else "Apagada.",
+                            Modifier.testTag("captura_estado_texto"), style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Switch(e.activo, { haptica(Toque.Fuerte); accion { Repo.activarCaptura(botId, it) } }, Modifier.testTag("captura_activo"))
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Mostrar textos", style = MaterialTheme.typography.bodyLarge)
+                    Text("Apagado: los textos solo por su largo. Encendido: los de hasta 60 letras (con los números largos tapados como ***1234). Los ids de botones siempre se ven.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(e.mostrarTextos, { accion { Repo.mostrarTextosCaptura(botId, it) } }, Modifier.testTag("captura_textos"))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
+                Button({
+                    runCatching { ctx.getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(android.content.ClipData.newPlainText("Captura", e.textoCompleto())) }
+                    avisaToast(ctx, "Copiado", false)
+                }, Modifier.testTag("captura_copiar"), enabled = e.items.isNotEmpty()) { Text("Copiar todo") }
+                OutlinedButton({ accion { Repo.borrarCaptura(botId) } }, Modifier.testTag("captura_borrar"), enabled = e.items.isNotEmpty()) { Text("Borrar") }
+            }
+            if (e.items.isEmpty()) {
+                Text(if (e.activo) "Esperando mensajes…" else "Nada capturado.", Modifier.testTag("captura_vacio"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            e.items.asReversed().forEach { it ->
+                Card(Modifier.fillMaxWidth().testTag("captura_item_${it.n}"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+                    Column(Modifier.padding(Esp.m), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
+                        Text("#${it.n} · ${horaCaptura(it.ts)} · ${it.chat} · ${it.clasif}", style = MaterialTheme.typography.titleSmall)
+                        if (it.detalle != "-") Text(it.detalle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(it.arbol, style = MaterialTheme.typography.bodySmall, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                    }
+                }
+            }
+        }
     }
 }

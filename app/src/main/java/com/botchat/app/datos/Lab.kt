@@ -23,7 +23,25 @@ data class ResultadoLab(
     val respondio: Int, val versionWa: String, val versionCliente: String, val error: String,
 )
 
+/** Un mensaje capturado: solo estructura (nombres de campos y largos). */
+data class ItemCaptura(val n: Int, val ts: Long, val chat: String, val clasif: String, val detalle: String, val arbol: String)
+
+/** Estado de la captura de diagnóstico. */
+data class EstadoCaptura(val activo: Boolean, val mostrarTextos: Boolean, val restanSeg: Int, val capturados: Int, val max: Int, val items: List<ItemCaptura>) {
+    /** Todo el texto, listo para pegar. */
+    fun textoCompleto(): String = items.joinToString("\n\n") { "#${it.n} · ${it.chat} · ${it.clasif} · ${it.detalle}\n${it.arbol}" }
+}
+
 object JsonLab {
+    fun captura(json: String): EstadoCaptura {
+        val o = JSONObject(json)
+        val a = o.optJSONArray("items") ?: JSONArray()
+        return EstadoCaptura(
+            o.optBoolean("activo"), o.optBoolean("mostrarTextos"), o.optInt("restanSeg"), o.optInt("capturados"), o.optInt("max", 30),
+            List(a.length()) { i -> a.getJSONObject(i).let { ItemCaptura(it.optInt("n"), it.optLong("ts"), it.optString("chat"), it.optString("clasif"), it.optString("detalle"), it.optString("arbol")) } },
+        )
+    }
+
     fun estado(json: String): EstadoLab {
         val o = JSONObject(json)
         val p = o.optJSONArray("plan") ?: JSONArray()

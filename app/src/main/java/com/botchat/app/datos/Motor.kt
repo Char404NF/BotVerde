@@ -201,6 +201,11 @@ interface Motor {
     fun listarResultadosLab(bot: Long): String
     fun marcarResultadoLab(bot: Long, id: Long, campo: String, valor: Long)
     fun borrarResultadosLab(bot: Long): Long
+    // Captura de mensajes (diagnóstico del Laboratorio): solo estructura, solo en memoria.
+    fun estadoCaptura(bot: Long): String
+    fun activarCaptura(bot: Long, activo: Boolean)
+    fun mostrarTextosCaptura(bot: Long, mostrar: Boolean)
+    fun borrarCaptura(bot: Long)
     fun usarLimiteMedido(bot: Long): Long
     fun proximoAviso(bot: Long): Long
     fun dispararAvisos(bot: Long): String
@@ -447,6 +452,10 @@ object MotorGo : Motor {
     override fun listarResultadosLab(bot: Long) = Wabot.listarResultadosLab(bot)
     override fun marcarResultadoLab(bot: Long, id: Long, campo: String, valor: Long) = Wabot.marcarResultadoLab(bot, id, campo, valor)
     override fun borrarResultadosLab(bot: Long) = Wabot.borrarResultadosLab(bot)
+    override fun estadoCaptura(bot: Long) = Wabot.estadoCaptura(bot)
+    override fun activarCaptura(bot: Long, activo: Boolean) = Wabot.activarCaptura(bot, activo)
+    override fun mostrarTextosCaptura(bot: Long, mostrar: Boolean) = Wabot.mostrarTextosCaptura(bot, mostrar)
+    override fun borrarCaptura(bot: Long) = Wabot.borrarCaptura(bot)
     override fun usarLimiteMedido(bot: Long) = Wabot.usarLimiteMedido(bot)
     override fun proximoAviso(bot: Long) = Wabot.proximoAviso(bot)
     override fun dispararAvisos(bot: Long) = Wabot.dispararAvisos(bot)

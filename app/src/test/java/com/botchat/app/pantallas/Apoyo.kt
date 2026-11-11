@@ -484,6 +484,17 @@ class MotorFalso : Motor {
         labAj["lab_enc_max_opc"] = n.toString()
         return n.toLong()
     }
+    // Captura de mensajes (diagnóstico)
+    var capActiva = false
+    var capTextos = false
+    var capItems = mutableListOf<JSONObject>()
+    override fun estadoCaptura(bot: Long): String {
+        llamadas += "estadoCaptura"; rFalla()
+        return JSONObject().put("activo", capActiva).put("mostrarTextos", capTextos).put("restanSeg", if (capActiva) 540 else 0).put("capturados", capItems.size).put("max", 30).put("items", JSONArray(capItems)).toString()
+    }
+    override fun activarCaptura(bot: Long, activo: Boolean) { llamadas += "activarCaptura:$activo"; rFalla(); capActiva = activo }
+    override fun mostrarTextosCaptura(bot: Long, mostrar: Boolean) { llamadas += "textosCaptura:$mostrar"; rFalla(); capTextos = mostrar }
+    override fun borrarCaptura(bot: Long) { llamadas += "borrarCaptura"; rFalla(); capItems.clear() }
     var proximoAvisoTs = 0L
     var disparo = """{"avisos":[],"siguiente":0}"""
     override fun proximoAviso(bot: Long): Long { llamadas += "proximoAviso"; return proximoAvisoTs }

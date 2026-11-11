@@ -257,8 +257,9 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 composable("politicas_grupos") { PantallaPoliticasGrupo(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("permisos_avanzado") { PantallaPermisosAvanzado(bot.id, alVolver = { nav.popBackStack() }, alRegistro = { nav.navigate("registro_acciones") }) }
                 composable("registro_acciones") { PantallaRegistroAcciones(bot.id, alVolver = { nav.popBackStack() }) }
-                composable("laboratorio") { PantallaLaboratorio(bot.id, alVolver = { nav.popBackStack() }, alAviso = { nav.navigate("laboratorio_aviso") }, alMatriz = { nav.navigate("laboratorio_matriz") }) }
+                composable("laboratorio") { PantallaLaboratorio(bot.id, alVolver = { nav.popBackStack() }, alAviso = { nav.navigate("laboratorio_aviso") }, alMatriz = { nav.navigate("laboratorio_matriz") }, alCaptura = { nav.navigate("laboratorio_captura") }) }
                 composable("laboratorio_aviso") { PantallaAvisoLab(bot.id, alVolver = { nav.popBackStack() }) }
+                composable("laboratorio_captura") { PantallaCapturaLab(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("laboratorio_matriz") { PantallaMatrizLab(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("utilidades") { PantallaUtilidades(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("avisos") { PantallaAvisos(bot.id, alVolver = { nav.popBackStack() }, alRecordatorio = { nav.navigate("recordatorio/$it") }) }
