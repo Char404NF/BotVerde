@@ -152,6 +152,16 @@ func (c *cacheAdmins) esAdmin(chat, persona string) bool {
 	return e.juntos[c.s.perm.Persona(persona)]
 }
 
+// olvida borra lo recordado de un grupo (WhatsApp avisó de un cambio de administradores).
+func (c *cacheAdmins) olvida(chat string) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	delete(c.m, chat)
+	c.mu.Unlock()
+}
+
 func (c *cacheAdmins) cargar(chat string) adminsGrupo {
 	e := adminsGrupo{hasta: time.Now().Add(30 * time.Second), juntos: map[string]bool{}}
 	defer func() {

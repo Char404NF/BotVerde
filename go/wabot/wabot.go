@@ -17,8 +17,10 @@ import (
 	"botchat/internal/avisos"
 	"botchat/internal/comandos"
 	"botchat/internal/envio"
+	"botchat/internal/estadoapp"
 	"botchat/internal/flujo"
 	"botchat/internal/fotos"
+	"botchat/internal/grupos"
 	"botchat/internal/ingesta"
 	"botchat/internal/medios"
 	"botchat/internal/modulos"
@@ -69,6 +71,8 @@ type estado struct {
 	perm          *permisos.Servicio
 	cmd           *comandos.Despachador
 	pers          *personas.Servicio
+	gru           *grupos.Servicio
+	eapp          *estadoapp.Servicio
 	avs           *avisos.Servicio
 	mods          *modulos.Gestor
 	admins        *cacheAdmins
@@ -168,7 +172,9 @@ func (s *estado) armar() {
 	alm.SembrarSaludo(s.botID, flujo.SaludoJSON())
 	s.flujo = s.nuevoFlujo()
 	s.armarPermisos()
+	s.armarGrupos()
 	s.armarPersonas()
+	s.eapp = estadoapp.Nuevo(alm, s.botID, estadoapp.Real{Client: s.cli}, s.log)
 	s.armarModulos()
 	s.armarAuto()
 	s.motor = motor.Nuevo(motor.Config{
@@ -419,6 +425,7 @@ func (s *estado) evento(e any) {
 	case *events.Picture:
 		s.encola(func() { s.alCambiarFoto(v) })
 	case *events.GroupInfo:
+		s.alCambiarGrupo(v.JID.ToNonAD().String())
 		if len(v.Join) > 0 {
 			s.alEntrarAlGrupo(v)
 		}
@@ -428,6 +435,7 @@ func (s *estado) evento(e any) {
 		}
 	case *events.JoinedGroup:
 		nombre, jid := v.GroupName.Name, v.JID.ToNonAD().String()
+		s.alCambiarGrupo(jid)
 		s.encola(func() { s.ing.Asunto(jid, nombre) })
 	case *events.PushName:
 		s.encola(func() { s.ing.NombrePublico(s.ctx, v.JID, v.NewPushName) })

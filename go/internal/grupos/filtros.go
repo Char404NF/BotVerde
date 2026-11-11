@@ -554,6 +554,7 @@ func (s *Servicio) Aplicar(ctx context.Context, inf *Infraccion) {
 	if inf == nil {
 		return
 	}
+	ctx = almacen.ConEtiqueta(ctx, "filtro")
 	f := inf.Filtro
 	reg := func(res, det string) {
 		s.registra(almacen.PersonaDueno, "filtro."+f.Filtro, inf.Persona, inf.Chat, res, "accion="+f.Accion+det)

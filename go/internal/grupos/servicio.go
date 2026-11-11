@@ -680,10 +680,10 @@ func (s *Servicio) ResolverSolicitudes(ctx context.Context, actor, chat string, 
 // BorrarMensaje borra para todos un mensaje de otra persona del grupo (solo siendo administrador). Revisa la jerarquía de rangos
 // cuando quien lo pide no es el dueño.
 func (s *Servicio) BorrarMensaje(ctx context.Context, actor, chat, msgID string) error {
-	if s.Borrar == nil {
-		return ErrNoDisponible
-	}
 	return s.hacer(ctx, actor, "grupo.borrar_mensaje", chat, "", func(_ types.JID, _ *types.GroupInfo) error {
+		if s.Borrar == nil {
+			return ErrNoDisponible
+		}
 		m, _ := s.Alm.ObtenerMensaje(s.BotID, chat, msgID)
 		if m == nil {
 			return ErrSinMensaje

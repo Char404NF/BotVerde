@@ -235,6 +235,7 @@ func (s *Servicio) MencionarTodos(ctx context.Context, actor, chat, citaID, text
 	if s.Enviar == nil {
 		return nil, ErrNoDisponible
 	}
+	ctx = almacen.ConEtiqueta(ctx, "comando")
 	_, inf, err := s.preparar(ctx, chat, false)
 	if err != nil {
 		return nil, err

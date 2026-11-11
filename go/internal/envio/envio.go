@@ -232,6 +232,15 @@ func (s *Servicio) infoGrupo(ctx context.Context, j types.JID) (*types.GroupInfo
 	return info, nil
 }
 
+// InvalidarGrupo olvida la información en memoria de un grupo (WhatsApp avisó de un cambio: administradores, ajustes, miembros).
+func (s *Servicio) InvalidarGrupo(chat string) {
+	if j, err := parsea(chat); err == nil {
+		s.mu.Lock()
+		delete(s.grupos, j.String())
+		s.mu.Unlock()
+	}
+}
+
 // Participante es un miembro de un grupo, para el selector de @menciones.
 type Participante struct {
 	JID      string `json:"jid"` // el que se usa para mencionar (el del grupo: teléfono o LID)

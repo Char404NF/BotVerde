@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"botchat/internal/avisos"
+	"botchat/internal/grupos"
 	"botchat/internal/ingesta"
 	"botchat/internal/modulos"
 	"botchat/internal/motor"
@@ -160,6 +161,9 @@ func (s *estado) alMotor(v *events.Message, sincronizando bool) {
 		}
 	}
 	m.CitaID = c.CitaID
+	if m.EsGrupo && !m.EsMio && !sincronizando && m.Texto != "" {
+		s.filtrarGrupo(grupos.Entrada{Chat: m.Chat, MensajeID: m.ID, Persona: m.Remitente, PersonaWA: m.RemitenteWA, Nombre: m.Nombre, Texto: m.Texto})
+	}
 	if !sincronizando && s.avs != nil {
 		s.avs.AlMensaje(avisos.Mensaje{Chat: m.Chat, Persona: m.Remitente, Nombre: m.Nombre, Texto: m.Texto, EsGrupo: m.EsGrupo, EsMio: m.EsMio, Edicion: m.EsEdicion})
 	}

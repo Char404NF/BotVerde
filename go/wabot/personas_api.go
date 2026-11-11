@@ -13,31 +13,11 @@ import (
 	"botchat/internal/avisos"
 	"botchat/internal/comandos"
 	"botchat/internal/flujo"
-	"botchat/internal/grupos"
 	"botchat/internal/permisos"
 	"botchat/internal/personas"
 )
 
 // ---------- armado dentro del bot ----------
-
-// accionesGrupoWabot: saber si soy administrador es real (información del grupo vía el servicio de envío); borrar un mensaje ajeno
-// y expulsar todavía no existen aquí: los crea la etapa E (grupos). Mientras tanto devuelven "no disponible" y el bot solo alerta.
-type accionesGrupoWabot struct{ s *estado }
-
-func (a accionesGrupoWabot) EsAdmin(ctx context.Context, chat string) (bool, error) {
-	if a.s == nil || a.s.envio == nil {
-		return false, grupos.ErrNoDisponible
-	}
-	return a.s.envio.SoyAdmin(ctx, chat)
-}
-
-func (accionesGrupoWabot) BorrarMensajeAjeno(context.Context, string, string, string) error {
-	return grupos.ErrNoDisponible
-}
-
-func (accionesGrupoWabot) Expulsar(context.Context, string, string) error {
-	return grupos.ErrNoDisponible
-}
 
 // armarPersonas crea los servicios de personas y avisos del bot y registra sus comandos. Va después de armarPermisos.
 func (s *estado) armarPersonas() {
@@ -45,7 +25,9 @@ func (s *estado) armarPersonas() {
 		return
 	}
 	s.pers = personas.Nuevo(alm, s.botID, s.perm)
-	s.pers.Grupo = accionesGrupoWabot{s}
+	if s.gru != nil {
+		s.pers.Grupo = s.gru
+	}
 	s.pers.Log = s.log
 	s.pers.RegistrarComandos(s.cmd)
 	s.avs = avisos.Nuevo(alm, s.botID)
@@ -544,6 +526,14 @@ func validarAjusteB(clave, valor string) (conocido bool, err error) {
 		return true, nil
 	case "auto_activo", "atajos_activo":
 		return true, num(0, 1)
+	case "todos_tope":
+		return true, num(1, 1024)
+	case "todos_lote":
+		return true, num(1, 50)
+	case "todos_espera_seg":
+		return true, num(0, 86400)
+	case "grupo_dias":
+		return true, num(1, 365)
 	case "auto_tope_hora":
 		return true, num(0, 1000)
 	case "auto_zona":
