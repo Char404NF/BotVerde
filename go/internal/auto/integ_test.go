@@ -90,6 +90,7 @@ func (r *reloj) pausas() []time.Duration {
 }
 
 type ent struct {
+	base     int // renglones de actividad "terminados" antes del último mensaje que llegó
 	alm      *almacen.Almacen
 	fm       *flujo.Motor
 	dec      *Decisor
@@ -150,6 +151,7 @@ func (e *ent) crea(t *testing.T, tipo, texto string, ajusta func(*Config), adj .
 
 // llega entrega un mensaje de texto de `de` (privado) y lo deja guardado en el almacén como lo haría la ingesta.
 func (e *ent) llega(de, texto string) motor.Mensaje {
+	e.base = e.terminados()
 	e.seq++
 	m := motor.Mensaje{Chat: de, ID: fmt.Sprintf("IN%d", e.seq), Remitente: de, Texto: texto, EsTexto: true, TS: e.rel.ahora()}
 	_, _ = e.alm.GuardarMensaje(&almacen.Mensaje{ID: m.ID, ChatJID: de, BotID: 1, RemitenteJID: de, Tipo: "texto", Texto: texto, TS: m.TS.Unix()})
@@ -170,9 +172,26 @@ func (e *ent) espera(t *testing.T, n int) []saliente {
 	return nil
 }
 
+// terminados cuenta los mensajes que el motor ya resolvió (los respondió, no coincidieron con nada o los omitió).
+func (e *ent) terminados() int {
+	l, _ := e.alm.UltimaActividad(1, 1000)
+	n := 0
+	for _, a := range l {
+		if a.Evento == almacen.ActSinCoincid || a.Evento == almacen.ActOmitido || a.Evento == almacen.ActCoincidio {
+			n++
+		}
+	}
+	return n
+}
+
 func (e *ent) nada(t *testing.T, n int) {
 	t.Helper()
-	time.Sleep(250 * time.Millisecond)
+	// primero se espera a que el motor termine con el último mensaje (con el equipo cargado puede tardar), y luego un momento más
+	lim := time.Now().Add(10 * time.Second)
+	for e.terminados() <= e.base && time.Now().Before(lim) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	time.Sleep(150 * time.Millisecond)
 	if l := e.env.lista(); len(l) != n {
 		t.Fatalf("esperaba %d envíos y hay %d: %+v", n, len(l), l)
 	}
@@ -610,8 +629,8 @@ func TestProbarNoMandaNiGuardaNada(t *testing.T) {
 		t.Fatalf("%+v", p)
 	}
 	p = e.dec.Probar(m, c, Escenario{Nombre: "Marta", Cuando: "2026-11-10T11:00"}) // martes en horario
-	if p.Aplica || !strings.Contains(p.Motivo, "Cuándo") {
-		t.Fatalf("dentro de horario no se manda: %+v", p)
+	if p.Aplica || !strings.Contains(p.Motivo, "Cuándo") || !strings.HasPrefix(p.Texto, "Hola Marta") {
+		t.Fatalf("dentro de horario no se manda, pero la vista previa del texto sí se arma: %+v", p)
 	}
 	b := almacen.AutoMensaje{Tipo: almacen.AutoBienvenida, Texto: "Bienvenida", Activo: true}
 	bc := ConfigPorDefecto(almacen.AutoBienvenida)

@@ -788,7 +788,7 @@ func (m *Motor) atiende(chat string, lote []Mensaje) {
 				continue
 			}
 			if r.Texto != "" {
-				deComandos = append(deComandos, Salida{Texto: m.sinPrefijo(r.Texto)})
+				deComandos = append(deComandos, Salida{Texto: m.sinPrefijo(r.Texto), Etiqueta: "comando"})
 			}
 			if x.ID == ultimo.ID {
 				ultimoEsComando = true

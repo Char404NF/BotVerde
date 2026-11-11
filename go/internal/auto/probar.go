@@ -52,6 +52,15 @@ func (d *Decisor) Probar(m almacen.AutoMensaje, c Config, esc Escenario) Prueba 
 	if esc.EsGrupo {
 		chat = "prueba@g.us"
 	}
+	// El texto y los archivos se arman siempre (sirven de vista previa aunque en ese momento no se mandaría).
+	nombre := esc.Nombre
+	p.Texto = d.renderCon(m.Texto, c, func() string { return nombre }, t)
+	for i, a := range m.Adjuntos {
+		if i >= almacen.MaxAdjuntos {
+			break
+		}
+		p.Archivos = append(p.Archivos, ArchivoPrueba{Tipo: a.Tipo, Nombre: a.Nombre})
+	}
 	if m.Tipo != almacen.AutoAtajo {
 		if !c.Quien.Aplica(Persona{Clave: persona, Chat: chat, EsGrupo: esc.EsGrupo, Canon: d.c.Persona, Conocida: func() bool { return esc.Conocida }}) {
 			p.Motivo = "No es para esta persona (revisa «A quién»)."
@@ -67,14 +76,6 @@ func (d *Decisor) Probar(m almacen.AutoMensaje, c Config, esc Escenario) Prueba 
 		}
 	}
 	p.Aplica = true
-	nombre := esc.Nombre
-	p.Texto = d.renderCon(m.Texto, c, func() string { return nombre }, t)
-	for i, a := range m.Adjuntos {
-		if i >= almacen.MaxAdjuntos {
-			break
-		}
-		p.Archivos = append(p.Archivos, ArchivoPrueba{Tipo: a.Tipo, Nombre: a.Nombre})
-	}
 	return p
 }
 
