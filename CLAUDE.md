@@ -218,3 +218,21 @@ cada cambio releía todo lo ya cargado.
   Compilar: `./gradlew :app:assembleDebug` / `:app:assembleRendimiento` (el APK sale en `app/build/outputs/apk/<variante>/`). Tests contra la variante:
   `./gradlew -PpruebasRendimiento :app:testRendimientoUnitTest` (la propiedad solo añade `ui-test-manifest` para Robolectric; el APK no la lleva).
   Si se agrega una librería que use reflexión o JNI, revisar `proguard-rules.pro` y comprobar con `apkanalyzer dex packages` que sus clases siguen ahí.
+
+## Estado: 0.5.0 "Todo en uno" (2026-11-11) — versionCode 9
+Por defecto el bot SOLO RESPONDE. Todo lo que toma la iniciativa vive en módulos opcionales (Ajustes → Módulos), apagados, con interruptor propio, aviso de riesgo, límites y registro. Detalle completo, choques y pruebas de teléfono por bloque en `PROGRESO.md`.
+
+- **Bloques**: 0 transiciones/no leídos/"tomar el control" · A rangos, permisos, comandos y confirmaciones con código · H0 marco de módulos · B personas, silencios, advertencias, notas, etiquetas, avisos · C menús ampliados (formularios, grupos, plantillas, .bcm) · D mensajes automáticos con adjuntos/atajos "/x" · E grupos (con y sin admin), filtros y app state · F notas/pendientes y `!sticker` · G Laboratorio (encuestas/botones) · H1–H9 módulos (bienvenida, difusión, programados, invitar, descargas/conectores, traductor, IA, llamadas, juegos).
+- **Migraciones** solo hacia adelante: 9–19 (`go/internal/almacen/migraciones.go`). Textos de usuario siempre cifrados.
+- **Reglas de identidad**: no se simula Business, no se cambia el tipo de dispositivo, no se inventan nodos `<biz>`. La librería añade `<biz>` sola a ButtonsMessage/ListMessage (InteractiveMessage no); se usa solo por defecto y en el Laboratorio.
+- **Dueño** = la cuenta del teléfono; sus comandos solo desde "Mensajes guardados" y la app. Los demás rangos usan comandos como respuestas en su chat, con permisos, límites y confirmación por código de un solo uso.
+- **Llaves**: las de IA se guardan con el Android Keystore y pasan a Go solo en memoria; nunca en base, repo ni registros.
+- **Compilar**: igual que 0.4.1; APK de entrega = variante `rendimiento` en `salida/BotChat-0.5.0.apk`, misma llave (SHA-256 699002c7…40e0), applicationId y versionCode 9: actualizar encima, NUNCA desinstalar.
+
+### Cómo añadir un módulo nuevo
+1. Crear `go/internal/modulos/<id>.go` y, desde `init()`/`registro_h.go`, `Registrar(Nuevo(Def{ID, Nombre, Descripcion, Icono, Riesgo, Iniciativa, Casillas, Esquema, Config, TopeHora/TopeDia, Comandos, AlActivar/AlDesactivar, AlEvento, AlEstado}))`; importarlo/registrarlo en `wabot` al arrancar.
+2. `AlEvento(g, e)` (EvMensaje, EvMiembroEntra, EvLlamada, EvTick) solo anota y encola; nunca envía directo.
+3. Config con `g.Config("id").Texto/Int/Bool/Num`; secretos con campo `secreto` del esquema (Keystore), no en config.
+4. Enviar SOLO con `g.Enviar(modulos.Iniciativa{Modulo, Que, Chat, Personas, Texto|Medio, Noche})`: respeta No molestar, modo seguro, maestro "Iniciativa propia" y topes. La cola es en memoria: si el módulo tiene agenda, guardarla (tabla propia) y reencolar al arrancar.
+5. UI: ventana genérica por esquema/paneles descritos en Go; o `PantallasModulo.registrar("id"){...}` en Kotlin para una propia.
+6. Casillas de permiso en el catálogo (`permisos.Registrar`), texto cifrado, nada de textos en `modulos_registro`. Pruebas siguiendo `modulos_test.go`.
