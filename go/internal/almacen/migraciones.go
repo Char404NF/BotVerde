@@ -586,6 +586,53 @@ var migraciones = [][]string{
 		)`,
 		`CREATE INDEX idx_util_items ON util_items(bot_id, persona, tipo, id)`,
 	},
+	// 17 (v0.5.0, etapa G): Laboratorio. poll_sessions guarda cada menú interactivo que salió (encuesta, botones, lista o mensaje
+	// interactivo): id del mensaje, chat, persona, el MessageSecret y las opciones (los dos CIFRADOS). poll_votos guarda el último
+	// voto de cada votante en cada encuesta (cifrado) para detectar duplicados, cambios y retiros. lab_resultados es la matriz de
+	// pruebas del Laboratorio (llegó, se ve, se puede tocar, respondió, versiones de WhatsApp); sin textos de personas.
+	{
+		`CREATE TABLE poll_sessions (
+			bot_id INTEGER NOT NULL,
+			id TEXT NOT NULL,
+			chat TEXT NOT NULL,
+			persona TEXT NOT NULL DEFAULT '',
+			tipo TEXT NOT NULL,
+			origen TEXT NOT NULL DEFAULT 'menu',
+			prueba_id INTEGER NOT NULL DEFAULT 0,
+			ts INTEGER NOT NULL,
+			expira_ts INTEGER NOT NULL,
+			estado TEXT NOT NULL DEFAULT 'activa',
+			secreto_cifrado BLOB,
+			opciones_cifrado BLOB,
+			PRIMARY KEY (bot_id, id)
+		) WITHOUT ROWID`,
+		`CREATE INDEX idx_poll_sessions_chat ON poll_sessions(bot_id, chat, persona, estado)`,
+		`CREATE TABLE poll_votos (
+			bot_id INTEGER NOT NULL,
+			poll_id TEXT NOT NULL,
+			votante TEXT NOT NULL,
+			seleccion_cifrado BLOB,
+			ts INTEGER NOT NULL,
+			PRIMARY KEY (bot_id, poll_id, votante)
+		) WITHOUT ROWID`,
+		`CREATE TABLE lab_resultados (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			ts INTEGER NOT NULL,
+			tipo TEXT NOT NULL,
+			variante TEXT NOT NULL DEFAULT '',
+			chat TEXT NOT NULL,
+			msg_id TEXT NOT NULL DEFAULT '',
+			enviado INTEGER NOT NULL DEFAULT -1,
+			visible INTEGER NOT NULL DEFAULT -1,
+			tocable INTEGER NOT NULL DEFAULT -1,
+			respondio INTEGER NOT NULL DEFAULT -1,
+			version_wa TEXT NOT NULL DEFAULT '',
+			version_cliente TEXT NOT NULL DEFAULT '',
+			error TEXT NOT NULL DEFAULT ''
+		)`,
+		`CREATE INDEX idx_lab_resultados ON lab_resultados(bot_id, ts)`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

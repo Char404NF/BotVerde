@@ -621,6 +621,7 @@ func (a *Almacen) OlvidarPersona(botID int64, persona string) (*ResultadoOlvidar
 	}
 	res.Notas = del(`DELETE FROM notas_persona WHERE bot_id=? AND persona IN ` + lista)
 	del(`DELETE FROM util_items WHERE bot_id=? AND persona IN ` + lista)
+	a.borrarLabDe(botID, fs)
 	res.Advertencias = del(`DELETE FROM advertencias WHERE bot_id=? AND persona IN ` + lista)
 	del(`DELETE FROM persona_silencio WHERE bot_id=? AND persona IN ` + lista)
 	a.OlvidarAutoPersona(botID, fs)
