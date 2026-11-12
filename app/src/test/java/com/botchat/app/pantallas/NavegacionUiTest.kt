@@ -98,7 +98,7 @@ class NavegacionUiTest {
         regla.onNodeWithTag("nav_bot").performClick()
         regla.esperaEtiqueta("hub_almacenamiento")
         regla.onNodeWithTag("hub_almacenamiento").performClick()
-        regla.esperaTexto("Chats que más ocupan")
+        regla.esperaTexto("Lo que guardo de tus chats") // E8: el medidor contra el tope va primero
         atras()
         regla.esperaEtiqueta("hub_ajustes")
         regla.onNodeWithTag("hub_ajustes").performClick()

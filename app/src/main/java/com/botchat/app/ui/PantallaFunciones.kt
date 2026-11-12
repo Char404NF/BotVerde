@@ -98,6 +98,11 @@ fun PantallaPrivacidad(ajustes: Ajustes, alVolver: () -> Unit) {
         topBar = { LargeTopAppBar(scrollBehavior = barra, navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text("Privacidad") }) },
     ) { relleno ->
         Column(Modifier.fillMaxSize().padding(relleno).verticalScroll(rememberScrollState()).padding(bottom = 32.dp)) {
+            Seccion("Qué cambió en esta versión") {
+                Text(TEXTO_AUDITORIA, Modifier.padding(horizontal = Esp.l).testTag("privacidad_texto_auditoria"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(TEXTO_REGLAS_PRIVACIDAD, Modifier.padding(horizontal = Esp.l).testTag("privacidad_reglas"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Las copias que guardas en la galería salen de Bot Chat SIN cifrar.", Modifier.padding(horizontal = Esp.l), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Seccion("Mensajes eliminados") {
                 Interruptor("Conservar mensajes eliminados por otros", "Cuando alguien elimina un mensaje para todos, aquí se sigue viendo con la etiqueta “Eliminado”.", conservar, true, Ico.Candado) { haptica(Toque.Suave); ajustes.fijarConservarEliminados(it) }
                 Text(

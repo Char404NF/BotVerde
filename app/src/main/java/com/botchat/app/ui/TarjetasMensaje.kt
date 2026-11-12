@@ -39,6 +39,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.ui.viewinterop.AndroidView
 import com.botchat.app.datos.Json
 import com.botchat.app.datos.Msg
@@ -165,5 +169,35 @@ fun StickerAnimado(m: Msg) {
             fallo -> Icon(Ico.Foto, "Sticker", Modifier.size(48.dp))
             else -> Box(Modifier.size(160.dp).clip(RoundedCornerShape(12.dp)).shimmer())
         }
+    }
+}
+
+/**
+ * «Video eliminado»: el video se borró para dejar espacio (o a mano), pero se conserva su portada, la duración, el tamaño, la fecha y
+ * quién lo mandó. No se puede reproducir; si WhatsApp todavía lo tiene, se puede volver a pedir.
+ */
+@Composable
+fun TarjetaVideoEliminado(m: Msg) {
+    val ctx = LocalContext.current
+    var portada by remember(m.portada) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    LaunchedEffect(m.portada) {
+        portada = if (m.portada.isEmpty()) null else runCatching { com.botchat.app.medios.CacheImagenes.cargar(ctx, Repo.archivo(m.portada), 360)?.asImageBitmap() }.getOrNull()
+    }
+    val motivo = when (m.borradoMotivo) { "tope" -> "para dejar espacio"; "limpieza", "manual" -> "al limpiar"; "retencion", "retención" -> "por la retención"; else -> "" }
+    Column(Modifier.widthIn(min = 220.dp, max = 280.dp).testTag("tarjeta_video_eliminado"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(if (m.ancho > 0 && m.alto > 0) (m.ancho.toFloat() / m.alto).coerceIn(0.6f, 1.8f) else 1.33f).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest), Alignment.Center) {
+            portada?.let { androidx.compose.foundation.Image(it, null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop) }
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Ico.Video, null, Modifier.size(34.dp), tint = Color.White)
+                Text("Video eliminado", Modifier.testTag("video_eliminado_titulo"), color = Color.White, fontWeight = FontWeight.SemiBold)
+            }
+            if (m.dur > 0) Text(duracion(m.dur), Modifier.align(Alignment.BottomStart).padding(6.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 6.dp, vertical = 2.dp).testTag("video_eliminado_duracion"), color = Color.White, style = MaterialTheme.typography.labelSmall)
+        }
+        Text(
+            listOfNotNull(m.bytes.takeIf { it > 0 }?.let { formatoBytes(it) }, etiquetaDia(m.ts), m.remitente.takeIf { it.isNotBlank() && !m.esMio }).joinToString(" · "),
+            Modifier.testTag("video_eliminado_datos"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (motivo.isNotEmpty()) Text("Se borró $motivo" + if (m.borradoTs > 0) " · ${etiquetaDia(m.borradoTs)}" else "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

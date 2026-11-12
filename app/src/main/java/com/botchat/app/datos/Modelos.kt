@@ -64,6 +64,14 @@ data class Msg(
     val verExpira: Long = 0,
     /** Si lo mandó una automatización (menu, regla, bienvenida, ausencia, recibido, cierre, atajo, comando, modulo, bot); "" = lo escribí yo. */
     val automatico: String = "",
+    /** Portada del video (se conserva aunque se borre el video), cuándo y por qué se borró el archivo (0 = no se borró). */
+    val portada: String = "",
+    val borradoTs: Long = 0,
+    val borradoMotivo: String = "",
+    /** Se guardó sin texto (auditoría apagada o retención): se muestra «contenido no guardado». */
+    val olvidado: Boolean = false,
+    /** Llegó en la sincronización de historial. */
+    val delHistorial: Boolean = false,
 ) {
     val categoria: String get() = categoriaDe(tipo)
     val descargado: Boolean get() = estado == "descargado" && ruta.isNotEmpty()
@@ -263,6 +271,7 @@ object Json {
             it.optBoolean("reenviado"),
             it.optJSONArray("reacciones").let { a -> List(a?.length() ?: 0) { i -> a!!.getJSONObject(i).let { r -> Reaccion(r.optString("emoji"), r.optInt("cantidad"), r.optBoolean("mia")) } } },
             it.optString("verEstado"), it.optString("verTipo"), it.optLong("verExpira"), it.optString("automatico"),
+            it.optString("portada"), it.optLong("borradoTs"), it.optString("borradoMotivo"), it.optBoolean("olvidado"), it.optBoolean("delHistorial"),
         )
     }
 

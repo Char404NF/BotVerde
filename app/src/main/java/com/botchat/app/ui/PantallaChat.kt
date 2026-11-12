@@ -133,6 +133,7 @@ fun PantallaChat(
     var etiquetando by remember { mutableStateOf(false) }
     var verFoto by remember { mutableStateOf(false) }
     var olvidando by remember { mutableStateOf<Msg?>(null) }
+    var marcando by remember { mutableStateOf<Msg?>(null) }
     var seleccion by remember { mutableStateOf(setOf<String>()) }
     var borrando by remember { mutableStateOf(false) }
     var reenviando by remember { mutableStateOf(false) }
@@ -247,6 +248,7 @@ fun PantallaChat(
                             Toast.makeText(ctx, "Copiado", Toast.LENGTH_SHORT).show()
                             limpiarSeleccion()
                         }, Modifier.testTag("accion_copiar")) { Icon(Ico.Copiar, "Copiar") }
+                        if (unico != null) IconButton({ marcando = unico }, Modifier.testTag("accion_marcar")) { Icon(Ico.Seleccionar, "Marcar") }
                         if (escribirActivo) IconButton({ reenviando = true }, Modifier.testTag("accion_reenviar")) { Icon(Ico.Compartir, "Reenviar") }
                         IconButton({ borrando = true }, Modifier.testTag("accion_borrar")) { Icon(Ico.Borrar, "Borrar") }
                         Box {
@@ -491,6 +493,7 @@ fun PantallaChat(
             limpiarSeleccion()
         }, alCerrar = { reenviando = false })
     }
+    marcando?.let { m -> DialogoMarcarRapido(vm.botId, jid, m.id, alCerrar = { marcando = null; limpiarSeleccion() }) }
     if (infoDe != null) DialogoInfoMensaje(infoCargada, alCerrar = { infoDe = null; limpiarSeleccion() })
 
     confirmaArchivos?.let { lib ->
@@ -634,6 +637,7 @@ private fun Burbuja(
                                 LaunchedEffect(m.id, vm.puntitosVersion) { vm.pedirPuntito(m.id) }
                                 vm.colorDePuntito(m.id)?.let { hex -> PuntoRango(hex, 10, Modifier.testTag("puntito_${m.id}")); Spacer(Modifier.width(6.dp)) }
                             }
+                            if (m.delHistorial) Text("del historial  ", Modifier.testTag("del_historial_${m.id}"), style = MaterialTheme.typography.labelSmall, fontStyle = FontStyle.Italic, color = tinta.copy(alpha = 0.65f))
                             if (m.editado && !m.borrado) Text("(editado)  ", style = MaterialTheme.typography.labelSmall, color = tinta.copy(alpha = 0.65f))
                             Text(horaDe(m.ts), style = MaterialTheme.typography.labelSmall, color = tinta.copy(alpha = 0.65f))
                             if (m.esMio && m.estadoEnvio.isNotEmpty()) { Spacer(Modifier.width(4.dp)); Palomitas(m.estadoEnvio, tinta) }
@@ -709,6 +713,7 @@ private fun ContenidoBase(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit, al
     val cursiva = FontStyle.Italic
     when {
         m.tipo == "ver_una_vez" -> TarjetaVerUnaVez(m, alAbrirUnaVez)
+        m.categoria == "video" && m.estado == "borrado" && (m.portada.isNotEmpty() || m.borradoTs > 0) -> TarjetaVideoEliminado(m)
         m.categoria.isNotEmpty() && m.estado == "borrado" -> {
             Text(etiquetaBorrado(m.tipo), fontStyle = cursiva, color = LocalContentColorSuave())
             if (m.texto.isNotBlank()) Text(m.texto)
@@ -724,6 +729,7 @@ private fun ContenidoBase(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit, al
         m.tipo == "ubicacion" -> TarjetaUbicacion(m)
         m.tipo == "encuesta" -> Text(m.texto)
         m.tipo == "otro" -> TarjetaEspecial()
+        m.olvidado && m.texto.isBlank() -> Text("Contenido no guardado", Modifier.testTag("contenido_no_guardado"), fontStyle = cursiva, color = LocalContentColorSuave())
         else -> TextoMensaje(m)
     }
 }

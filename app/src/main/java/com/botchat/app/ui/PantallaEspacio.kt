@@ -77,7 +77,7 @@ private fun colorDeTipo(cat: String): Color = when (cat) {
 
 /** Espacio: lo que ocupa BotChat, por tipo y por chat, con borrado manual (nada se borra solo). */
 @Composable
-fun PantallaEspacio(alVolver: () -> Unit, alAbrirChat: (String) -> Unit, conBarra: Boolean = true) {
+fun PantallaEspacio(alVolver: () -> Unit, alAbrirChat: (String) -> Unit, conBarra: Boolean = true, ajustes: com.botchat.app.datos.Ajustes? = null) {
     val vm: EspacioVm = viewModel()
     val ctx = LocalContext.current
     val haptica = rememberHaptica()
@@ -87,7 +87,9 @@ fun PantallaEspacio(alVolver: () -> Unit, alAbrirChat: (String) -> Unit, conBarr
     val visibles = vm.visibles()
     LaunchedEffect(vm.mensaje) { vm.mensaje?.let { Toast.makeText(ctx, it, Toast.LENGTH_LONG).show(); vm.mensaje = null } }
     androidx.activity.compose.BackHandler(seleccionando) { vm.limpiarSeleccion() }
+    val e8 = remember { EstadoAlmacenE8() }
 
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         modifier = Modifier.nestedScroll(if (seleccionando) barraSel.nestedScrollConnection else barra.nestedScrollConnection),
         topBar = {
@@ -105,12 +107,13 @@ fun PantallaEspacio(alVolver: () -> Unit, alAbrirChat: (String) -> Unit, conBarr
                 LargeTopAppBar(
                     scrollBehavior = barra,
                     navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } },
-                    title = { Text("Espacio") },
+                    title = { Text(if (ajustes != null) "Almacenamiento" else "Espacio") },
                 )
             }
         },
     ) { relleno ->
         LazyColumn(Modifier.fillMaxSize().padding(relleno), contentPadding = PaddingValues(bottom = 32.dp)) {
+            if (ajustes != null) item { BloqueAlmacenamiento(vm.botId, ajustes, e8) }
             item { ResumenDeTelefono(vm) }
             item { GraficaPorTipo(vm.tipos) }
             item { AccionesRapidas(vm, haptica) }
@@ -139,6 +142,8 @@ fun PantallaEspacio(alVolver: () -> Unit, alAbrirChat: (String) -> Unit, conBarr
         }
     }
 
+    if (ajustes != null) HojasAlmacenamiento(vm.botId, ajustes, e8)
+    }
     vm.pendiente?.let { a ->
         AlertDialog(
             onDismissRequest = { vm.pendiente = null },

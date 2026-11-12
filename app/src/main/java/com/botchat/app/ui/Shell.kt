@@ -41,6 +41,13 @@ import com.botchat.app.AppVm
 import com.botchat.app.datos.Ajustes
 import com.botchat.app.datos.FiltroLista
 import com.botchat.app.datos.Repo
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import com.botchat.app.datos.fijarTopeTotal
+import com.botchat.app.datos.estadoAlmacen
+import com.botchat.app.datos.fijarAvisoAuditoriaVisto
+import com.botchat.app.datos.fijarAuditoria
+import com.botchat.app.datos.auditoriaGlobal
 
 private fun enc(s: String) = Uri.encode(s)
 
@@ -112,6 +119,19 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
         }
     }
 
+    // 0.6.0 (E8): avisos de la primera vez al actualizar: privacidad/retención y tope de espacio. Van después del aviso del modo Simple.
+    val alcance = rememberCoroutineScope()
+    var auditoria by remember { mutableStateOf<com.botchat.app.datos.AuditoriaGlobal?>(null) }
+    var estadoTope by remember { mutableStateOf<com.botchat.app.datos.EstadoAlmacen?>(null) }
+    val topeVisto by ajustes.topeAvisoVisto.collectAsState()
+    LaunchedEffect(bot.id) {
+        auditoria = runCatching { Repo.auditoriaGlobal(bot.id) }.getOrNull()
+        if (!topeVisto) {
+            val e = runCatching { Repo.estadoAlmacen(bot.id) }.getOrNull()
+            if (e != null && !e.pasadoDelTope) ajustes.topeAvisoMarcado() else estadoTope = e
+        }
+    }
+
     fun entre(a: String?, b: String?) = a in RUTAS_PRINCIPALES && b in RUTAS_PRINCIPALES
     fun entra(): AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
         Transiciones.entra(modo, entre(initialState.destination.route, targetState.destination.route))
@@ -169,7 +189,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 composable("grupos") { PantallaGrupos(bot.id, alAbrir = { nav.navigate("grupo_info/${enc(it)}") }) }
                 composable("bot") {
                     PantallaCentroBot(
-                        alMiBot = { nav.navigate("estado_bot") }, alAlmacenamiento = { nav.navigate("espacio") }, alAuditoria = { nav.navigate("privacidad") },
+                        alMiBot = { nav.navigate("estado_bot") }, alAlmacenamiento = { nav.navigate("espacio") }, alAuditoria = { nav.navigate("auditoria") },
                         alSilencios = { nav.navigate("silencios") }, alAdvertencias = { nav.navigate("advertencias") }, alEtiquetas = { nav.navigate("etiquetas") },
                         alAjustes = { nav.navigate("ajustes") }, alComandos = { nav.navigate("comandos_propios") }, alModulos = { nav.navigate("modulos") },
                         alLimites = { nav.navigate("iniciativa") }, alLaboratorio = { nav.navigate("laboratorio") }, alActividad = { nav.navigate("actividad") },
@@ -211,8 +231,27 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                     val jid = be.arguments?.getString("jid") ?: return@composable
                     PantallaCambiosMiembros(bot.id, jid, alVolver = { nav.popBackStack() })
                 }
-                // Pantalla provisoria: la completa E8 (silencios en grupos).
-                composable("silencios") { PantallaProvisoria("Silencios", "Aquí verás a quién silenciaste en tus grupos y por cuánto tiempo. La están terminando.", alVolver = { nav.popBackStack() }, etiqueta = "provisoria_silencios") }
+                // E8: silencios, auditoría y privacidad, tipos de advertencia, reglas de los grupos y lo marcado.
+                composable("silencios") { PantallaSilencios(bot.id, alVolver = { nav.popBackStack() }, alAjustes = { nav.navigate("silencios_ajustes") }, alAbrirPersona = { nav.navigate("persona_perfil/${enc(it)}") }) }
+                composable("silencios_ajustes") { PantallaAjustesSilencio(bot.id, alVolver = { nav.popBackStack() }, ajustesApp = ajustes) }
+                composable("auditoria") { PantallaAuditoria(bot.id, alVolver = { nav.popBackStack() }, alPrivacidad = { nav.navigate("privacidad") }) }
+                composable("advertencias_tipos") { PantallaTiposAdvertencia(bot.id, alVolver = { nav.popBackStack() }, alEditar = { nav.navigate("adv_tipo/$it") }) }
+                composable("adv_tipo/{id}") { be ->
+                    val id = be.arguments?.getString("id")?.toLongOrNull() ?: return@composable
+                    EditorTipoAdvertencia(bot.id, id, alVolver = { nav.popBackStack() })
+                }
+                composable("reglas_grupos") { PantallaReglasGrupos(bot.id, alVolver = { nav.popBackStack() }, alAbrir = { g, n -> nav.navigate("reglas/${enc(g.ifEmpty { "_" })}/${enc(n)}") }) }
+                composable("reglas/{grupo}/{nombre}") { be ->
+                    val g = be.arguments?.getString("grupo")?.takeIf { it != "_" } ?: ""
+                    PantallaReglasGrupo(bot.id, g, be.arguments?.getString("nombre") ?: "Reglas", alVolver = { nav.popBackStack() })
+                }
+                composable("marcados") {
+                    PantallaMarcados(
+                        bot.id, alVolver = { nav.popBackStack() }, alAbrirChat = { nav.navigate("chat/${enc(it)}") },
+                        alIrAlMensaje = { c, id -> nav.navigate("chat/${enc(c)}?ir=${enc(id)}") }, alAbrirPersona = { nav.navigate("persona_perfil/${enc(it)}") },
+                        alAbrirGrupo = { nav.navigate("grupo_info/${enc(it)}") }, alEtiquetas = { nav.navigate("etiquetas") },
+                    )
+                }
                 composable("chat/{jid}?ir={ir}", arguments = listOf(androidx.navigation.navArgument("ir") { type = androidx.navigation.NavType.StringType; defaultValue = "" })) { be ->
                     val jid = be.arguments?.getString("jid") ?: return@composable
                     val ir = be.arguments?.getString("ir") ?: ""
@@ -295,7 +334,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         alAbrirDocumento = { id -> nav.navigate("documento/${enc(jid)}/${enc(id)}") },
                     )
                 }
-                composable("espacio") { PantallaEspacio(alVolver = { nav.popBackStack() }, alAbrirChat = { nav.navigate("chat/${enc(it)}") }) }
+                composable("espacio") { PantallaEspacio(alVolver = { nav.popBackStack() }, alAbrirChat = { nav.navigate("chat/${enc(it)}") }, ajustes = ajustes) }
                 composable("ajustes") {
                     var cuenta by remember { mutableStateOf(0) }
                     LaunchedEffect(bot.id) {
@@ -334,8 +373,8 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                     val id = be.arguments?.getString("id")?.toLongOrNull() ?: return@composable
                     EditorComandoPropio(bot.id, id, alVolver = { nav.popBackStack() })
                 }
-                composable("etiquetas") { PantallaEtiquetas(bot.id, alVolver = { nav.popBackStack() }) }
-                composable("advertencias") { PantallaAdvertencias(bot.id, alVolver = { nav.popBackStack() }, alAbrirPersona = { nav.navigate("persona/${enc(it)}") }) }
+                composable("etiquetas") { PantallaEtiquetas(bot.id, alVolver = { nav.popBackStack() }, alMarcados = { nav.navigate("marcados") }) }
+                composable("advertencias") { PantallaAdvertencias(bot.id, alVolver = { nav.popBackStack() }, alAbrirPersona = { nav.navigate("persona/${enc(it)}") }, alTipos = { nav.navigate("advertencias_tipos") }, alReglas = { nav.navigate("reglas_grupos") }) }
                 composable("persona/{jid}") { be ->
                     val jid = be.arguments?.getString("jid") ?: return@composable
                     PantallaPersonaDetalle(bot.id, jid, alVolver = { nav.popBackStack() })
@@ -431,5 +470,23 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
     }
     }
     DialogoConfirmacion(bot.id)
+    val esperaModo = avisoModo && modulosRevisados
+    auditoria?.let { a ->
+        if (!esperaModo && (!a.avisoVisto || a.retPendiente)) AvisoAuditoria(
+            a.retPendiente,
+            alElegir = { d -> alcance.launch { runCatching { Repo.fijarAuditoria(bot.id, a.defecto, d); Repo.fijarAvisoAuditoriaVisto(bot.id, true) }; auditoria = runCatching { Repo.auditoriaGlobal(bot.id) }.getOrNull() ?: a.copy(avisoVisto = true, retPendiente = false) } },
+            alEntendido = { alcance.launch { runCatching { Repo.fijarAvisoAuditoriaVisto(bot.id, true) }; auditoria = a.copy(avisoVisto = true) } },
+        )
+    }
+    estadoTope?.let { t ->
+        val auditoriaLista = auditoria?.let { it.avisoVisto && !it.retPendiente } ?: true
+        if (!esperaModo && auditoriaLista && !topeVisto) {
+            if (t.pasadoDelTope) AvisoTopeAlmacen(
+                t,
+                alSubir = { bytes -> alcance.launch { runCatching { Repo.fijarTopeTotal(bot.id, bytes) }; ajustes.topeAvisoMarcado(); estadoTope = null } },
+                alEntendido = { ajustes.topeAvisoMarcado(); estadoTope = null },
+            )
+        }
+    }
     if (avisoModo && modulosRevisados) AvisoModoSimple(completo, alCompleto = { ajustes.fijarModoCompleto(true); ajustes.avisoModoVisto() }, alSimple = { ajustes.fijarModoCompleto(false); ajustes.avisoModoVisto() })
 }

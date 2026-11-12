@@ -247,6 +247,15 @@ interface Motor {
     // E7 (0.6.0): textos anteriores de un mensaje editado y puntitos de silenciada/advertida por lote.
     fun versionesDeMensaje(bot: Long, chat: String, id: String): String
     fun estadosDePersonas(bot: Long, personasJson: String): String
+    // E8 (0.6.0): auditoría y privacidad (interruptores, retención, borrar todo de una persona).
+    fun auditoriaAjustes(bot: Long): String
+    fun fijarAuditoria(bot: Long, guardar: Boolean, retDias: Long)
+    fun fijarAvisoAuditoriaVisto(bot: Long, visto: Boolean)
+    fun auditoriaChat(bot: Long, chat: String): String
+    fun fijarAuditoriaChat(bot: Long, chat: String, audit: Long, retDias: Long)
+    fun listarAuditoriaChats(bot: Long, consulta: String, limite: Long, desde: Long): String
+    fun limpiarPorRetencion(bot: Long): String
+    fun borrarTodoDePersona(bot: Long, persona: String): String
     fun listarAlertasPalabra(bot: Long): String
     fun crearAlertaPalabra(bot: Long, palabra: String, chatsJson: String): Long
     fun editarAlertaPalabra(bot: Long, id: Long, chatsJson: String, activa: Boolean)
@@ -557,6 +566,14 @@ object MotorGo : Motor {
     override fun moverReglaItem(bot: Long, id: Long, delta: Long) = Wabot.moverReglaItem(bot, id, delta)
     override fun versionesDeMensaje(bot: Long, chat: String, id: String) = Wabot.versionesDeMensaje(bot, chat, id)
     override fun estadosDePersonas(bot: Long, personasJson: String) = Wabot.estadosDePersonas(bot, personasJson)
+    override fun auditoriaAjustes(bot: Long) = Wabot.auditoriaAjustes(bot)
+    override fun fijarAuditoria(bot: Long, guardar: Boolean, retDias: Long) = Wabot.fijarAuditoria(bot, guardar, retDias)
+    override fun fijarAvisoAuditoriaVisto(bot: Long, visto: Boolean) = Wabot.fijarAvisoAuditoriaVisto(bot, visto)
+    override fun auditoriaChat(bot: Long, chat: String) = Wabot.auditoriaChat(bot, chat)
+    override fun fijarAuditoriaChat(bot: Long, chat: String, audit: Long, retDias: Long) = Wabot.fijarAuditoriaChat(bot, chat, audit, retDias)
+    override fun listarAuditoriaChats(bot: Long, consulta: String, limite: Long, desde: Long) = Wabot.listarAuditoriaChats(bot, consulta, limite, desde)
+    override fun limpiarPorRetencion(bot: Long) = Wabot.limpiarPorRetencion(bot)
+    override fun borrarTodoDePersona(bot: Long, persona: String) = Wabot.borrarTodoDePersona(bot, persona)
     override fun listarAlertasPalabra(bot: Long) = Wabot.listarAlertasPalabra(bot)
     override fun crearAlertaPalabra(bot: Long, palabra: String, chatsJson: String) = Wabot.crearAlertaPalabra(bot, palabra, chatsJson)
     override fun editarAlertaPalabra(bot: Long, id: Long, chatsJson: String, activa: Boolean) = Wabot.editarAlertaPalabra(bot, id, chatsJson, activa)

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -53,11 +54,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.botchat.app.datos.EtiquetaItem
 import com.botchat.app.datos.Repo
+import com.botchat.app.datos.crearEtiquetaEmoji
+import com.botchat.app.datos.editarEtiquetaEmoji
 import kotlinx.coroutines.launch
 
 /** Ajustes → Etiquetas: crea, renombra, cambia el color y borra las etiquetas locales para ordenar tus chats. */
 @Composable
-fun PantallaEtiquetas(botId: Long, alVolver: () -> Unit) {
+fun PantallaEtiquetas(botId: Long, alVolver: () -> Unit, alMarcados: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
     val haptica = rememberHaptica()
@@ -74,14 +77,15 @@ fun PantallaEtiquetas(botId: Long, alVolver: () -> Unit) {
                 Column(verticalArrangement = Arrangement.spacedBy(Esp.s)) {
                     Text("Las etiquetas son solo tuyas (no se mandan a WhatsApp). Ponlas a un chat desde su menú ⋮ y filtra la lista de chats por etiqueta.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (!creando && editando == null) Button({ haptica(Toque.Suave); creando = true }, Modifier.testTag("nueva_etiqueta")) { Text("Crear etiqueta") }
+                    OutlinedButton({ haptica(Toque.Suave); alMarcados() }, Modifier.fillMaxWidth().testTag("ver_marcados")) { Icon(Ico.Seleccionar, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Ver lo marcado") }
                 }
             }
             if (creando || editando != null) item(key = "formulario") {
                 val e = editando
-                FormularioEtiqueta(e, { creando = false; editando = null }) { n, c ->
+                FormularioEtiqueta(e, { creando = false; editando = null }, conEmoji = true) { n, c, em ->
                     creando = false; editando = null
                     scope.launch {
-                        runCatching { if (e == null) Repo.crearEtiqueta(botId, n, c) else Repo.editarEtiqueta(botId, e.id, n, c) }.onFailure { avisaToast(ctx, it.message ?: "No se pudo", true) }
+                        runCatching { if (e == null) Repo.crearEtiquetaEmoji(botId, n, c, em) else Repo.editarEtiquetaEmoji(botId, e.id, n, c, em) }.onFailure { avisaToast(ctx, it.message ?: "No se pudo", true) }
                         version++
                     }
                 }
@@ -92,10 +96,14 @@ fun PantallaEtiquetas(botId: Long, alVolver: () -> Unit) {
                 else -> items(datos, key = { it.id }) { e ->
                     Card(Modifier.fillMaxWidth().testTag("etiqueta_fila_${e.id}"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
                         Row(Modifier.padding(horizontal = Esp.l, vertical = Esp.s), verticalAlignment = Alignment.CenterVertically) {
-                            PuntoRango(e.color, 20)
+                            if (e.emoji.isNotBlank()) Text(e.emoji, Modifier.testTag("emoji_etiqueta_${e.id}"), style = MaterialTheme.typography.titleLarge) else PuntoRango(e.color, 20)
                             Column(Modifier.padding(start = Esp.m).weight(1f)) {
                                 Text(e.nombre, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(if (e.chats == 0) "Sin chats" else plural(e.chats.toLong(), "chat", "chats"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    listOfNotNull(
+                                        plural(e.chats.toLong(), "chat", "chats").takeIf { e.chats > 0 }, plural(e.personas.toLong(), "persona", "personas").takeIf { e.personas > 0 },
+                                        plural(e.mensajes.toLong(), "mensaje", "mensajes").takeIf { e.mensajes > 0 },
+                                    ).joinToString(" · ").ifBlank { "Sin chats" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             IconButton({ haptica(Toque.Suave); editando = e }, Modifier.testTag("editar_etiqueta_${e.id}")) { Icon(Ico.Editar, "Cambiar nombre o color") }
                             IconButton({ haptica(Toque.Fuerte); borrando = e }, Modifier.testTag("borrar_etiqueta_${e.id}")) { Icon(Ico.Borrar, "Borrar la etiqueta") }
@@ -117,13 +125,20 @@ fun PantallaEtiquetas(botId: Long, alVolver: () -> Unit) {
 
 /** Nombre y color de una etiqueta (nueva si `actual` es null), en la misma pantalla (sin ventana aparte, para que el teclado no estorbe). */
 @Composable
-fun FormularioEtiqueta(actual: EtiquetaItem?, alCerrar: () -> Unit, alGuardar: (nombre: String, color: String) -> Unit) {
+fun FormularioEtiqueta(actual: EtiquetaItem?, alCerrar: () -> Unit, alGuardar: (nombre: String, color: String) -> Unit) =
+    FormularioEtiqueta(actual, alCerrar, false) { n, c, _ -> alGuardar(n, c) }
+
+/** Igual que el de arriba; con `conEmoji` se puede poner también un emoji (sin límite de etiquetas). */
+@Composable
+fun FormularioEtiqueta(actual: EtiquetaItem?, alCerrar: () -> Unit, conEmoji: Boolean, alGuardar: (nombre: String, color: String, emoji: String) -> Unit) {
     var nombre by remember(actual) { mutableStateOf(actual?.nombre.orEmpty()) }
+    var emoji by remember(actual) { mutableStateOf(actual?.emoji.orEmpty()) }
     var color by remember(actual) { mutableStateOf(actual?.color ?: COLORES_RANGO.first()) }
     Card(Modifier.fillMaxWidth().testTag("formulario_etiqueta"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
             Text(if (actual == null) "Nueva etiqueta" else "Cambiar etiqueta", style = MaterialTheme.typography.titleSmall)
             OutlinedTextField(nombre, { nombre = it.take(24) }, Modifier.fillMaxWidth().testTag("nombre_etiqueta"), label = { Text("Nombre") }, singleLine = true)
+            if (conEmoji) OutlinedTextField(emoji, { emoji = it.take(4) }, Modifier.fillMaxWidth().testTag("emoji_etiqueta"), label = { Text("Emoji (opcional)") }, singleLine = true)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.s), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
                 COLORES_RANGO.forEach { c ->
                     Box(
@@ -134,7 +149,7 @@ fun FormularioEtiqueta(actual: EtiquetaItem?, alCerrar: () -> Unit, alGuardar: (
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
-                Button({ alGuardar(nombre.trim(), color) }, Modifier.testTag("guardar_etiqueta"), enabled = nombre.isNotBlank()) { Text("Guardar") }
+                Button({ alGuardar(nombre.trim(), color, emoji.trim()) }, Modifier.testTag("guardar_etiqueta"), enabled = nombre.isNotBlank()) { Text("Guardar") }
                 TextButton(alCerrar, Modifier.testTag("cancelar_etiqueta")) { Text("Cancelar") }
             }
         }

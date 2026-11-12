@@ -156,6 +156,11 @@ private fun FilaFiltrada(m: Msg, alAbrir: () -> Unit, alIr: () -> Unit) {
             )
             if (m.borrado) Text("Eliminado", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
         }
+        if (m.descargado && m.categoria.isNotEmpty() && com.botchat.app.medios.Exportar.disponible) {
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
+            IconButton({ scope.launch { guardarCopia(ctx, m, "Bot Chat") } }, Modifier.testTag("guardar_galeria_${m.id}")) { Icon(Ico.Guardar, "Guardar en la galería") }
+        }
         IconButton(alIr, Modifier.testTag("ir_${m.id}")) { Icon(Ico.IrA, "Ir al mensaje en el chat") }
     }
 }

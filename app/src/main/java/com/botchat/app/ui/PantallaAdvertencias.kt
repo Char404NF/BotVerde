@@ -54,33 +54,38 @@ import kotlinx.coroutines.launch
 
 /** Ajustes → Advertencias y notas: a quién se ha advertido y cuántas veces. Tocar una persona abre su detalle. */
 @Composable
-fun PantallaAdvertencias(botId: Long, alVolver: () -> Unit, alAbrirPersona: (String) -> Unit) {
+fun PantallaAdvertencias(botId: Long, alVolver: () -> Unit, alAbrirPersona: (String) -> Unit, alTipos: () -> Unit = {}, alReglas: () -> Unit = {}) {
     var version by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { Repo.cambios.collect { evs -> if (evs.any { it == "personas" || it == "permisos_ajustes" || it.startsWith("persona:") }) version++ } }
     val lista by produceState<List<AdvertidoItem>?>(null, version) { value = runCatching { Repo.personasAdvertidas(botId) }.getOrDefault(emptyList()) }
     Scaffold(topBar = { TopAppBar(navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text("Advertencias y notas") }) }) { relleno ->
         val datos = lista
-        when {
-            datos == null -> Box(Modifier.fillMaxSize().padding(relleno), Alignment.Center) { CircularProgressIndicator() }
-            datos.isEmpty() -> EstadoVacio(
-                Ico.Aviso, "Nadie tiene advertencias", "Para advertir a alguien abre su chat → Info del chat → Advertir, o usa el comando !advertir. Las notas de cada persona están en su ficha.",
-                Modifier.padding(relleno).padding(top = 60.dp).testTag("sin_advertencias"),
-            )
-            else -> LazyColumn(Modifier.fillMaxSize().padding(relleno).testTag("lista_advertidos"), contentPadding = androidx.compose.foundation.layout.PaddingValues(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
-                item { Text("El tope y lo que pasa al llegar a él se cambian en Ajustes → Avanzado → Permisos y comandos.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                items(datos, key = { it.persona }) { x ->
-                    Card(onClick = { alAbrirPersona(x.persona) }, modifier = Modifier.fillMaxWidth().testTag("advertido_${x.persona}"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-                        Row(Modifier.padding(Esp.l), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(x.nombre.ifBlank { numeroDePersona(x.persona) }, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text("Última: ${etiquetaDia(x.ultimaTs)} ${horaDe(x.ultimaTs)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        LazyColumn(Modifier.fillMaxSize().padding(relleno).testTag("lista_advertidos"), contentPadding = androidx.compose.foundation.layout.PaddingValues(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
+            item { CabeceraAdvertencias(botId, alTipos, alReglas) }
+            when {
+                datos == null -> item { Box(Modifier.fillMaxWidth().padding(Esp.xl), Alignment.Center) { CircularProgressIndicator() } }
+                datos.isEmpty() -> item {
+                    EstadoVacio(
+                        Ico.Aviso, "Nadie tiene advertencias", "Para advertir a alguien abre su perfil en Personas y toca Advertir, o usa el comando !advertir. Las notas de cada persona están en su ficha.",
+                        Modifier.padding(top = Esp.xl).testTag("sin_advertencias"),
+                    )
+                }
+                else -> {
+                    item { Text("Aquí cuentan solo las advertencias vigentes. Lo que pasa al llegar al tope depende del tipo (Tipos y escalera).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    items(datos, key = { it.persona }) { x ->
+                        Card(onClick = { alAbrirPersona(x.persona) }, modifier = Modifier.fillMaxWidth().testTag("advertido_${x.persona}"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+                            Row(Modifier.padding(Esp.l), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(x.nombre.ifBlank { numeroDePersona(x.persona) }, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("Última: ${etiquetaDia(x.ultimaTs)} ${horaDe(x.ultimaTs)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                val alTope = x.tope > 0 && x.total >= x.tope
+                                Text(
+                                    if (x.tope > 0) "${x.total} de ${x.tope}" else "${x.total}", Modifier.testTag("total_${x.persona}"),
+                                    style = MaterialTheme.typography.titleMedium, color = if (alTope) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold,
+                                )
+                                Icon(Ico.Siguiente, null, Modifier.padding(start = Esp.s).size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            val alTope = x.tope > 0 && x.total >= x.tope
-                            Text(
-                                if (x.tope > 0) "${x.total} de ${x.tope}" else "${x.total}", Modifier.testTag("total_${x.persona}"),
-                                style = MaterialTheme.typography.titleMedium, color = if (alTope) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold,
-                            )
-                            Icon(Ico.Siguiente, null, Modifier.padding(start = Esp.s).size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -142,10 +147,14 @@ fun PantallaPersonaDetalle(botId: Long, persona: String, alVolver: () -> Unit) {
                     a == null -> CircularProgressIndicator(Modifier.size(24.dp))
                     a.isEmpty() -> Text("No tiene advertencias.", Modifier.testTag("sin_advertencias_persona"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     else -> a.forEach { x ->
-                        Row(Modifier.fillMaxWidth().testTag("advertencia_${x.id}"), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().testTag(if (x.vigente) "advertencia_${x.id}" else "advertencia_vencida_${x.id}"), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
-                                Text(etiquetaDia(x.ts) + " " + horaDe(x.ts), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                Text(etiquetaDia(x.ts) + " " + horaDe(x.ts), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = if (x.vigente) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(x.motivo.ifBlank { "Sin motivo" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    if (x.vigente) (if (x.caducaTs > 0) "Vigente · deja de contar el ${etiquetaDia(x.caducaTs)}" else "Vigente · no caduca") else "Vencida · ya no cuenta",
+                                    Modifier.testTag("estado_adv_${x.id}"), style = MaterialTheme.typography.labelMedium, color = if (x.vigente) AMARILLO_SILENCIO else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                             TextButton({ haptica(Toque.Suave); hacer { Repo.quitarAdvertencia(botId, persona, x.id) } }, Modifier.testTag("quitar_advertencia_${x.id}")) { Text("Quitar") }
                         }

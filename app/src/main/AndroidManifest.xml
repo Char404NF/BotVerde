@@ -46,6 +46,7 @@
         </provider>
 
         <receiver android:name=".RespuestaRapida" android:exported="false" />
+        <receiver android:name=".SancionReceiver" android:exported="false" />
 
         <receiver android:name=".AlarmaAvisosReceiver" android:exported="false" />
         <receiver android:name=".AlarmaModulosReceiver" android:exported="false" />

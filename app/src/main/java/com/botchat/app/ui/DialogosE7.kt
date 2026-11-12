@@ -84,10 +84,11 @@ fun DialogoSilenciarGrupos(botId: Long, persona: String, nombre: String, grupoIn
     val ctx = LocalContext.current
     val grupos by produceState<List<GrupoAdmin>?>(null) { value = runCatching { Repo.gruposAdmin(botId) }.getOrDefault(emptyList()) }
     val textoDefecto by produceState(AVISO_SILENCIO_DEFECTO) { value = runCatching { Repo.textosSilencio(botId)["inicio"]?.first?.ifBlank { null } }.getOrNull() ?: AVISO_SILENCIO_DEFECTO }
-    var duracion by remember { mutableStateOf("1d") }
+    val porDefecto = remember { com.botchat.app.datos.Ajustes.get(ctx) }
+    var duracion by remember { mutableStateOf(when (porDefecto.silencioTiempoDefecto.value) { 60 -> "1h"; 10080 -> "1s"; 0 -> "siempre"; else -> "1d" }) }
     var cantidad by remember { mutableStateOf("2") }
     var unidad by remember { mutableStateOf("h") }
-    var alcance by remember { mutableStateOf(if (grupoInicial.isNotEmpty()) "uno" else "todos") }
+    var alcance by remember { mutableStateOf(if (grupoInicial.isNotEmpty()) "uno" else porDefecto.silencioAlcanceDefecto.value) }
     val elegidos = remember { mutableStateListOf<String>().also { if (grupoInicial.isNotEmpty()) it.add(grupoInicial) } }
     var avisar by remember { mutableStateOf(true) }
     var texto by remember { mutableStateOf<String?>(null) }

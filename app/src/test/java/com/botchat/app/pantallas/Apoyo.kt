@@ -138,7 +138,8 @@ class MotorFalso : Motor {
     override fun abrirVerUnaVez(bot: Long, chat: String, id: String): String { llamadas += "abrirUnaVez:$id"; verUnaVezFalla?.let { throw IllegalStateException(it) }; return verUnaVezJson }
     override fun cerrarVerUnaVez(bot: Long, chat: String, id: String) { llamadas += "cerrarUnaVez:$id" }
     override fun barrerVerUnaVez(bot: Long): Long { llamadas += "barrer"; return 0 }
-    override fun estadoAlmacenamiento(bot: Long) = "{\"topeTotal\":5368709120,\"uso\":0,\"tipos\":[]}"
+    var estadoAlmJson = "{\"topeTotal\":5368709120,\"uso\":0,\"tipos\":[]}"
+    override fun estadoAlmacenamiento(bot: Long) = estadoAlmJson
     override fun topeAlmacenamiento(bot: Long) = 5L shl 30
     override fun fijarTope(bot: Long, bytes: Long) { llamadas += "tope:$bytes" }
     override fun aplicarTopeAhora(bot: Long) = "{\"borrados\":0}"
@@ -451,17 +452,20 @@ class MotorFalso : Motor {
     var contadorJson = """{"usado":0,"tope":10,"color":"verde"}"""
     override fun contadorSilencio(bot: Long, persona: String, grupo: String) = contadorJson
     override fun ponerContadorEnCero(bot: Long, persona: String, grupo: String) { llamadas += "contadorCero:$persona" }
-    override fun ajustesSilencio(bot: Long) = """{"ajustes":{},"textos":{"inicio":{"actual":"Te silencié en {grupo} {duracion}.","defecto":"Te silencié en {grupo} {duracion}."}}}"""
+    var ajustesSilJson = """{"ajustes":{},"textos":{"inicio":{"actual":"Te silencié en {grupo} {duracion}.","defecto":"Te silencié en {grupo} {duracion}."}}}"""
+    override fun ajustesSilencio(bot: Long) = ajustesSilJson
     override fun fijarAjusteSilencio(bot: Long, clave: String, valor: String) { llamadas += "ajusteSilencio:$clave:$valor" }
     override fun fijarTextoSilencio(bot: Long, id: String, texto: String) { llamadas += "textoSilencio:$id" }
-    override fun sancionesPendientes(bot: Long) = "[]"
+    var sancionesJson = "[]"
+    override fun sancionesPendientes(bot: Long) = sancionesJson
     override fun confirmarSancionSilencio(bot: Long, id: Long, si: Boolean): String { llamadas += "sancion:$id:$si"; return "" }
     override fun confirmarSancion(bot: Long, id: Long, si: Boolean): String { llamadas += "sancion:$id:$si"; return "" }
     var gruposAdmin = "[]"
     override fun gruposQueAdministro(bot: Long) = gruposAdmin
     var tiposAdvJson = "[]"
     override fun listarTiposAdvertencia(bot: Long) = tiposAdvJson
-    override fun guardarTipoAdvertencia(bot: Long, tipoJson: String) = 1L
+    val tiposGuardados = mutableListOf<String>()
+    override fun guardarTipoAdvertencia(bot: Long, tipoJson: String): Long { tiposGuardados += tipoJson; return 1L }
     override fun borrarTipoAdvertencia(bot: Long, id: Long) { llamadas += "borrarTipoAdv:$id" }
     override fun listarEscalera(bot: Long, tipoId: Long) = "[]"
     override fun guardarEscalera(bot: Long, tipoId: Long, pasosJson: String) { llamadas += "escalera:$tipoId" }
@@ -469,9 +473,25 @@ class MotorFalso : Motor {
     override fun advertirConTipo(bot: Long, persona: String, chat: String, msgId: String, motivo: String, tipoId: Long, reglaId: Long): String { llamadas += "advertirTipo:$persona:$tipoId:$chat:$reglaId"; return resultadoAdvTipo }
     val reglasPorGrupo = mutableMapOf<String, String>()
     override fun listarReglasGrupo(bot: Long, grupo: String) = reglasPorGrupo[grupo] ?: "[]"
-    override fun guardarReglaItem(bot: Long, grupo: String, id: Long, titulo: String, texto: String, pos: Long) = 1L
+    override fun guardarReglaItem(bot: Long, grupo: String, id: Long, titulo: String, texto: String, pos: Long): Long { llamadas += "guardarRegla:$grupo:$id:$titulo:$pos"; return 1L }
     override fun borrarReglaItem(bot: Long, id: Long) { llamadas += "borrarRegla:$id" }
     override fun moverReglaItem(bot: Long, id: Long, delta: Long) { llamadas += "moverRegla:$id:$delta" }
+    // E8: auditoría y privacidad.
+    var auditoriaJson = """{"defecto":true,"retDias":90,"retPendiente":false,"avisoVisto":true}"""
+    override fun auditoriaAjustes(bot: Long) = auditoriaJson
+    override fun fijarAuditoria(bot: Long, guardar: Boolean, retDias: Long) {
+        llamadas += "fijarAuditoria:$guardar:$retDias"
+        val o = JSONObject(auditoriaJson).put("defecto", guardar).put("retPendiente", false)
+        if (retDias >= 0) o.put("retDias", retDias)
+        auditoriaJson = o.toString()
+    }
+    override fun fijarAvisoAuditoriaVisto(bot: Long, visto: Boolean) { llamadas += "avisoAuditoria:$visto"; auditoriaJson = JSONObject(auditoriaJson).put("avisoVisto", visto).toString() }
+    override fun auditoriaChat(bot: Long, chat: String) = "{}"
+    override fun fijarAuditoriaChat(bot: Long, chat: String, audit: Long, retDias: Long) { llamadas += "auditoriaChat:$chat:$audit:$retDias" }
+    var auditoriaChatsJson = "[]"
+    override fun listarAuditoriaChats(bot: Long, consulta: String, limite: Long, desde: Long) = auditoriaChatsJson
+    override fun limpiarPorRetencion(bot: Long) = "{}"
+    override fun borrarTodoDePersona(bot: Long, persona: String): String { llamadas += "borrarTodo:$persona"; return "{}" }
     var versionesJson = "[]"
     override fun versionesDeMensaje(bot: Long, chat: String, id: String) = versionesJson
     var estadosPersonas = "{}"

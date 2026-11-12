@@ -176,6 +176,21 @@ class Ajustes private constructor(ctx: Context) {
     fun revisarModulosPendiente(): Boolean = p.getBoolean("modo_revisar_modulos", false)
     fun modulosRevisados() { p.edit().putBoolean("modo_revisar_modulos", false).apply() }
 
+    // ---- silencios en grupos: lo que viene elegido al abrir «Silenciar» (0.6.0, E8) ----
+    private val _silTiempo = MutableStateFlow(p.getInt("silencio_tiempo_def", 1440))
+    /** Minutos del silencio de entrada (0 = siempre). */
+    val silencioTiempoDefecto: StateFlow<Int> = _silTiempo
+    fun fijarSilencioTiempoDefecto(min: Int) { p.edit().putInt("silencio_tiempo_def", min).apply(); _silTiempo.value = min }
+    private val _silAlcance = MutableStateFlow(p.getString("silencio_alcance_def", "todos") ?: "todos")
+    /** «uno» (un grupo) o «todos» (todos los que administro). */
+    val silencioAlcanceDefecto: StateFlow<String> = _silAlcance
+    fun fijarSilencioAlcanceDefecto(a: String) { p.edit().putString("silencio_alcance_def", a).apply(); _silAlcance.value = a }
+
+    // ---- aviso de tope de almacenamiento al actualizar (0.6.0, E8): se muestra una vez si el uso ya pasa el tope ----
+    private val _topeAviso = MutableStateFlow(p.getBoolean("tope_aviso_visto", false))
+    val topeAvisoVisto: StateFlow<Boolean> = _topeAviso
+    fun topeAvisoMarcado() { p.edit().putBoolean("tope_aviso_visto", true).apply(); _topeAviso.value = true }
+
     // ---- aviso de herramienta no oficial (se acepta una sola vez) ----
     private val _aviso = MutableStateFlow(p.getBoolean("aviso_aceptado", false))
     val avisoAceptado: StateFlow<Boolean> = _aviso
@@ -197,7 +212,17 @@ class Ajustes private constructor(ctx: Context) {
 
     // ---- descargas automáticas: cada tipo, por Wi-Fi y por datos móviles ----
     data class Regla(val wifi: Boolean, val datos: Boolean)
-    data class Descargas(val foto: Regla, val audio: Regla, val documento: Regla, val video: Regla, val videoMaxMb: Int, val pisoLibreMb: Int)
+    data class Descargas(
+        val foto: Regla, val audio: Regla, val documento: Regla, val video: Regla, val videoMaxMb: Int, val pisoLibreMb: Int,
+        // 0.6.0 (E8): sticker propio, interruptor por tipo, topes por tipo (en MB; 0 = sin tope), Wi-Fi para lo grande y batería baja.
+        val sticker: Regla = Regla(true, true),
+        val apagados: Set<String> = emptySet(),
+        val topeArchivoMb: Map<String, Int> = emptyMap(),
+        val topeTipoMb: Map<String, Int> = emptyMap(),
+        val soloWifiGrandes: Boolean = true,
+        val pausaBateria: Boolean = true,
+        val bateriaMin: Int = 15,
+    )
 
     private val _descargas = MutableStateFlow(leerDescargas())
     val descargas: StateFlow<Descargas> = _descargas
@@ -209,6 +234,13 @@ class Ajustes private constructor(ctx: Context) {
         video = Regla(p.getBoolean("video_wifi", true), p.getBoolean("video_datos", false)), // videos con datos: apagado por defecto
         videoMaxMb = p.getInt("video_max_mb2", 0),
         pisoLibreMb = p.getInt("piso_mb", 500),
+        sticker = Regla(p.getBoolean("sticker_wifi", true), p.getBoolean("sticker_datos", true)),
+        apagados = TIPOS_DESCARGA.filter { p.getBoolean("apagado_$it", false) }.toSet(),
+        topeArchivoMb = TIPOS_DESCARGA.associateWith { p.getInt("tope_archivo_mb_$it", 0) }.filterValues { it > 0 },
+        topeTipoMb = TIPOS_DESCARGA.associateWith { p.getInt("tope_tipo_mb_$it", 0) }.filterValues { it > 0 },
+        soloWifiGrandes = p.getBoolean("solo_wifi_grandes", true),
+        pausaBateria = p.getBoolean("pausa_bateria", true),
+        bateriaMin = p.getInt("bateria_min", 15),
     )
 
     fun cambiarDescargas(f: (Descargas) -> Descargas) {
@@ -218,7 +250,16 @@ class Ajustes private constructor(ctx: Context) {
             .putBoolean("audio_wifi", d.audio.wifi).putBoolean("audio_datos", d.audio.datos)
             .putBoolean("doc_wifi", d.documento.wifi).putBoolean("doc_datos", d.documento.datos)
             .putBoolean("video_wifi", d.video.wifi).putBoolean("video_datos", d.video.datos)
-            .putInt("video_max_mb2", d.videoMaxMb).putInt("piso_mb", d.pisoLibreMb).apply()
+            .putInt("video_max_mb2", d.videoMaxMb).putInt("piso_mb", d.pisoLibreMb)
+            .putBoolean("sticker_wifi", d.sticker.wifi).putBoolean("sticker_datos", d.sticker.datos)
+            .putBoolean("solo_wifi_grandes", d.soloWifiGrandes).putBoolean("pausa_bateria", d.pausaBateria).putInt("bateria_min", d.bateriaMin)
+            .apply {
+                TIPOS_DESCARGA.forEach { t ->
+                    putBoolean("apagado_$t", t in d.apagados)
+                    putInt("tope_archivo_mb_$t", d.topeArchivoMb[t] ?: 0)
+                    putInt("tope_tipo_mb_$t", d.topeTipoMb[t] ?: 0)
+                }
+            }.apply()
         _descargas.value = d
         aplicarAGo()
     }
@@ -237,10 +278,17 @@ class Ajustes private constructor(ctx: Context) {
     companion object {
         private const val MB = 1024L * 1024L
 
+        /** Las claves de tipo de la política de descarga de Go. */
+        val TIPOS_DESCARGA = listOf("foto", "video", "audio", "documento", "sticker")
+
         fun jsonDescargas(d: Descargas): String {
-            fun r(x: Regla) = JSONObject().put("wifi", x.wifi).put("datos", x.datos)
-            return JSONObject().put("foto", r(d.foto)).put("audio", r(d.audio)).put("documento", r(d.documento)).put("video", r(d.video))
-                .put("videoMaxBytes", d.videoMaxMb * MB).put("pisoLibre", d.pisoLibreMb * MB).toString()
+            fun r(x: Regla, tipo: String) = JSONObject().put("wifi", x.wifi).put("datos", x.datos).put("apagada", tipo in d.apagados)
+            fun mapa(m: Map<String, Int>) = JSONObject().also { o -> TIPOS_DESCARGA.forEach { t -> o.put(t, (m[t] ?: 0) * MB) } }
+            return JSONObject().put("foto", r(d.foto, "foto")).put("audio", r(d.audio, "audio")).put("documento", r(d.documento, "documento")).put("video", r(d.video, "video"))
+                .put("sticker", r(d.sticker, "sticker"))
+                .put("videoMaxBytes", d.videoMaxMb * MB).put("pisoLibre", d.pisoLibreMb * MB)
+                .put("topeArchivo", mapa(d.topeArchivoMb)).put("topeTipoTotal", mapa(d.topeTipoMb))
+                .put("soloWifiGrandes", d.soloWifiGrandes).put("pausaBateria", d.pausaBateria).put("bateriaMin", d.bateriaMin).toString()
         }
 
         @Volatile private var inst: Ajustes? = null

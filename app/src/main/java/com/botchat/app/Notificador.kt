@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import com.botchat.app.datos.Ajustes
 import com.botchat.app.datos.Msg
 import com.botchat.app.datos.Repo
+import com.botchat.app.datos.sancionesPendientes
 import com.botchat.app.ui.ChatAbierto
 import com.botchat.app.ui.descripcionCorta
 import kotlinx.coroutines.CoroutineScope
@@ -135,17 +136,29 @@ object Notificador {
                 if (a.tipo == "formulario") putExtra(EXTRA_RUTA, "formularios/0")
                 if (a.tipo == "advertencias" && a.persona.isNotEmpty()) putExtra(EXTRA_RUTA, "persona/" + android.net.Uri.encode(a.persona))
                 if (a.tipo == "recordatorio" || a.tipo == "resumen") putExtra(EXTRA_RUTA, "avisos")
+                if (a.tipo == "sancion" || a.tipo == "silencio_tope" || a.tipo == "silencio_noadmin") putExtra(EXTRA_RUTA, "silencios")
             }.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val publica = NotificationCompat.Builder(ctx, CANAL_AVISOS).setSmallIcon(R.drawable.ic_stat_bot).setContentTitle(a.titulo).build()
-        val n = NotificationCompat.Builder(ctx, CANAL_AVISOS)
+        val notifId = 8000 + (id % 1000).toInt()
+        val b = NotificationCompat.Builder(ctx, CANAL_AVISOS)
             .setSmallIcon(R.drawable.ic_stat_bot).setContentTitle(a.titulo).setContentText(a.detalle.lineSequence().firstOrNull().orEmpty())
             .setStyle(NotificationCompat.BigTextStyle().bigText(a.detalle)).setContentIntent(abrir).setAutoCancel(true)
             .setVisibility(if (detalleVisibleBloqueado) NotificationCompat.VISIBILITY_PUBLIC else NotificationCompat.VISIBILITY_PRIVATE)
             .apply { if (!detalleVisibleBloqueado) setPublicVersion(publica) }
-            .build()
-        nm.notify(8000 + (id % 1000).toInt(), n)
+        // Una expulsión que espera mi decisión: dos botones en la propia notificación («Expulsar» / «Dejarlo»).
+        if (a.tipo == "sancion") {
+            val pendiente = runCatching { Repo.sancionesPendientes(bot.id) }.getOrDefault(emptyList()).firstOrNull { it.avisoId == a.id }
+            if (pendiente != null) {
+                fun accion(si: Boolean) = PendingIntent.getBroadcast(
+                    ctx, (pendiente.id * 2 + (if (si) 1 else 0)).toInt(), SancionReceiver.intent(ctx, bot.id, pendiente.id, si, notifId), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                )
+                b.addAction(NotificationCompat.Action.Builder(0, "Expulsar", accion(true)).build())
+                b.addAction(NotificationCompat.Action.Builder(0, "Dejarlo", accion(false)).build())
+            }
+        }
+        nm.notify(notifId, b.build())
     }
 
     /** El motor se pausó unos minutos porque fallaron varios envíos seguidos. */
@@ -174,6 +187,32 @@ class RespuestaRapida : BroadcastReceiver() {
                 runCatching { Repo.motor.enviarTexto(bot, chat, texto, "", "[]") }
             } finally {
                 Notificador.quitar(ctx, chat)
+                pendiente.finish()
+            }
+        }.start()
+    }
+}
+
+/** «Expulsar» / «Dejarlo» desde la notificación de una sanción pendiente (silencio que insistió o última advertencia de la escalera). */
+class SancionReceiver : BroadcastReceiver() {
+    companion object {
+        const val ACCION = "com.botchat.app.SANCION"
+        fun intent(ctx: Context, bot: Long, id: Long, si: Boolean, notifId: Int) =
+            Intent(ctx, SancionReceiver::class.java).setAction(ACCION).putExtra("bot", bot).putExtra("id", id).putExtra("si", si).putExtra("notif", notifId)
+    }
+
+    override fun onReceive(ctx: Context, intent: Intent) {
+        val bot = intent.getLongExtra("bot", 0L)
+        val id = intent.getLongExtra("id", 0L)
+        val si = intent.getBooleanExtra("si", false)
+        val notif = intent.getIntExtra("notif", 0)
+        if (bot == 0L || id == 0L) return
+        val pendiente = goAsync()
+        Thread {
+            try {
+                runCatching { Repo.motor.confirmarSancionSilencio(bot, id, si) }
+            } finally {
+                ctx.getSystemService(NotificationManager::class.java)?.cancel(notif)
                 pendiente.finish()
             }
         }.start()

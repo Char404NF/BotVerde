@@ -149,11 +149,11 @@ class E6UiTest {
         regla.onNodeWithTag("nav_bot").performClick(); regla.esperaEtiqueta("hub_modulos")
     }
 
-    @Test fun elHubAbreSusPantallasYLaProvisoriaDeSilenciosSeVeClara() {
+    @Test fun elHubAbreSusPantallasYSilenciosYaEsLaReal() {
         Ajustes.get(Apoyo.ctx()).aceptarAviso(); raiz(); regla.esperaTexto("Ana Pérez")
         regla.onNodeWithTag("nav_bot").performClick()
         regla.esperaEtiqueta("hub_silencios"); regla.onNodeWithTag("hub_silencios").performClick()
-        regla.esperaEtiqueta("provisoria_silencios"); regla.esperaTexto("Esta pantalla llega pronto")
+        regla.esperaEtiqueta("pantalla_silencios"); regla.esperaTexto("No hay nadie silenciado") // E8: ya es la pantalla real
         regla.runOnUiThread { regla.activity.onBackPressedDispatcher.onBackPressed() }; regla.waitForIdle()
         regla.esperaEtiqueta("hub_etiquetas"); regla.onNodeWithTag("hub_etiquetas").performClick()
         regla.esperaTexto("Etiquetas")

@@ -21,7 +21,7 @@ data class FichaPersona(
     val rango: String, val rangoColor: String,
 )
 
-data class AdvertenciaItem(val id: Long, val persona: String, val chat: String, val motivo: String, val ts: Long, val por: String)
+data class AdvertenciaItem(val id: Long, val persona: String, val chat: String, val motivo: String, val ts: Long, val por: String, val tipoId: Long = 0, val caducaTs: Long = 0, val vigente: Boolean = true)
 data class AdvertidoItem(val persona: String, val total: Int, val ultimaTs: Long, val nombre: String, val tope: Int)
 data class NotaItem(val id: Long, val persona: String, val texto: String, val ts: Long, val por: String)
 
@@ -89,7 +89,7 @@ object JsonPersonas {
         )
     }
 
-    fun advertencias(json: String) = lista(json) { AdvertenciaItem(it.optLong("id"), it.optString("persona"), it.optString("chat"), it.optString("motivo"), it.optLong("ts"), it.optString("por")) }
+    fun advertencias(json: String) = lista(json) { AdvertenciaItem(it.optLong("id"), it.optString("persona"), it.optString("chat"), it.optString("motivo"), it.optLong("ts"), it.optString("por"), it.optLong("tipoId"), it.optLong("caducaTs"), it.optBoolean("vigente", true)) }
     fun advertidos(json: String) = lista(json) { AdvertidoItem(it.optString("persona"), it.optInt("total"), it.optLong("ultimaTs"), it.optString("nombre"), it.optInt("tope")) }
     fun notas(json: String) = lista(json) { NotaItem(it.optLong("id"), it.optString("persona"), it.optString("texto"), it.optLong("ts"), it.optString("por")) }
 
