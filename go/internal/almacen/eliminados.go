@@ -167,6 +167,7 @@ func (a *Almacen) BorrarParaMi(botID int64, chat string, ids []string) (int, err
 				return n, err
 			}
 		}
+		a.borrarMarcasDeMensaje(botID, chat, id)
 		n++
 	}
 	if n > 0 {

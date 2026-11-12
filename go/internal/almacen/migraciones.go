@@ -742,6 +742,65 @@ var migraciones = [][]string{
 		`CREATE INDEX idx_mensajes_olvidar ON messages(bot_id, ts) WHERE contenido_olvidado=0`,
 		`INSERT OR IGNORE INTO bot_ajustes(bot_id, clave, valor) SELECT DISTINCT bot_id, 'audit_ret_pendiente', '1' FROM messages`,
 	},
+	// 21 · v0.6.0 etapa E3: etiquetas y miembros de grupo. etiquetas.emoji; persona_etiqueta (persona canónica, FK con cascada);
+	// msg_marca (marca de mensaje con nota privada cifrada, AAD nota_marca; etiqueta_id 0 = solo nota, por eso sin FK: se limpia por
+	// código); grupo_miembros (quién está en cada grupo: rol en el grupo, desde/hasta, contador de mensajes y las banderas silenciado/
+	// advertido que llenará E5); grupo_cambios (entradas, salidas, expulsiones, ascensos); persona_foto (foto de perfil de quien no
+	// tiene chat privado). Sin columnas de texto de usuario salvo la nota de la marca.
+	{
+		`ALTER TABLE etiquetas ADD COLUMN emoji TEXT NOT NULL DEFAULT ''`,
+		`CREATE TABLE persona_etiqueta (
+			bot_id INTEGER NOT NULL,
+			persona TEXT NOT NULL,
+			etiqueta_id INTEGER NOT NULL REFERENCES etiquetas(id) ON DELETE CASCADE,
+			PRIMARY KEY (bot_id, persona, etiqueta_id)
+		) WITHOUT ROWID`,
+		`CREATE INDEX idx_persona_etiqueta ON persona_etiqueta(bot_id, etiqueta_id)`,
+		`CREATE TABLE msg_marca (
+			bot_id INTEGER NOT NULL,
+			chat_jid TEXT NOT NULL,
+			msg_id TEXT NOT NULL,
+			etiqueta_id INTEGER NOT NULL DEFAULT 0,
+			nota_cifrado BLOB,
+			ts INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY (bot_id, chat_jid, msg_id, etiqueta_id)
+		) WITHOUT ROWID`,
+		`CREATE INDEX idx_msg_marca_etiqueta ON msg_marca(bot_id, etiqueta_id, ts)`,
+		`CREATE TABLE grupo_miembros (
+			bot_id INTEGER NOT NULL,
+			grupo TEXT NOT NULL,
+			persona TEXT NOT NULL,
+			jid TEXT NOT NULL DEFAULT '',
+			rol TEXT NOT NULL DEFAULT 'miembro',
+			desde_ts INTEGER NOT NULL DEFAULT 0,
+			hasta_ts INTEGER NOT NULL DEFAULT 0,
+			msgs INTEGER NOT NULL DEFAULT 0,
+			silenciado INTEGER NOT NULL DEFAULT 0,
+			advertido INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY (bot_id, grupo, persona)
+		) WITHOUT ROWID`,
+		`CREATE INDEX idx_grupo_miembros_persona ON grupo_miembros(bot_id, persona)`,
+		`CREATE TABLE grupo_cambios (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			grupo TEXT NOT NULL,
+			ts INTEGER NOT NULL,
+			tipo TEXT NOT NULL,
+			persona TEXT NOT NULL DEFAULT '',
+			por TEXT NOT NULL DEFAULT '',
+			via TEXT NOT NULL DEFAULT ''
+		)`,
+		`CREATE INDEX idx_grupo_cambios ON grupo_cambios(bot_id, grupo, ts)`,
+		`CREATE INDEX idx_grupo_cambios_persona ON grupo_cambios(bot_id, persona, ts)`,
+		`CREATE TABLE persona_foto (
+			bot_id INTEGER NOT NULL,
+			persona TEXT NOT NULL,
+			ruta TEXT NOT NULL DEFAULT '',
+			foto_id TEXT NOT NULL DEFAULT '',
+			ts INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY (bot_id, persona)
+		) WITHOUT ROWID`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

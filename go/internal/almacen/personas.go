@@ -407,6 +407,17 @@ func (a *Almacen) FichaDe(botID int64, persona string, ahora time.Time) (*Ficha,
 			}
 		}
 	}
+	if et, err := a.EtiquetasDePersona(botID, canon); err == nil {
+		for _, e := range et {
+			dup := false
+			for _, y := range f.Etiquetas {
+				dup = dup || y.ID == e.ID
+			}
+			if !dup {
+				f.Etiquetas = append(f.Etiquetas, e)
+			}
+		}
+	}
 	lista := enLista(len(fs))
 	_ = a.db.QueryRow(`SELECT COALESCE(SUM(count),0) FROM daily_stats WHERE bot_id=? AND sender IN `+lista, args2(botID, fs)...).Scan(&f.Recibidos)
 	_ = a.db.QueryRow(`SELECT COUNT(DISTINCT chat) FROM daily_stats WHERE bot_id=? AND chat LIKE '%@g.us' AND sender IN `+lista, args2(botID, fs)...).Scan(&f.Grupos)
@@ -603,6 +614,7 @@ func (a *Almacen) OlvidarPersona(botID int64, persona string) (*ResultadoOlvidar
 				return res, err
 			}
 		}
+		a.borrarMarcasDeMensaje(botID, m.chat, m.id)
 		res.Mensajes++
 	}
 	a.mu.Unlock()
@@ -619,6 +631,10 @@ func (a *Almacen) OlvidarPersona(botID int64, persona string) (*ResultadoOlvidar
 		n, _ := r.RowsAffected()
 		return int(n)
 	}
+	del(`DELETE FROM persona_etiqueta WHERE bot_id=? AND persona IN ` + lista)
+	del(`DELETE FROM grupo_miembros WHERE bot_id=? AND persona IN ` + lista)
+	del(`DELETE FROM grupo_cambios WHERE bot_id=? AND (persona IN `+lista+` OR por IN `+lista+`)`, argsSolo(fs)...)
+	a.borrarFotoPersona(botID, fs)
 	res.Notas = del(`DELETE FROM notas_persona WHERE bot_id=? AND persona IN ` + lista)
 	del(`DELETE FROM util_items WHERE bot_id=? AND persona IN ` + lista)
 	a.borrarLabDe(botID, fs)
@@ -702,6 +718,7 @@ type ExportePersona struct {
 	Mensajes     []MensajeExportado   `json:"mensajes"`
 	Formularios  []Formulario         `json:"formularios,omitempty"` // formularios que completó en un menú (etapa C)
 	Utilidades   []ItemUtil           `json:"utilidades,omitempty"`  // sus notas y pendientes propios (etapa F)
+	Etiquetas    []string             `json:"etiquetas,omitempty"`   // nombres de las etiquetas de la persona (v0.6.0)
 	Recortado    bool                 `json:"recortado,omitempty"`
 }
 
@@ -715,6 +732,11 @@ func (a *Almacen) DatosDePersona(botID int64, persona string, ahora time.Time) (
 		return nil, err
 	}
 	ex := &ExportePersona{Version: 1, GeneradoTS: ahora.Unix(), Ficha: f, Mensajes: []MensajeExportado{}}
+	if et, e := a.EtiquetasDePersona(botID, persona); e == nil {
+		for _, x := range et {
+			ex.Etiquetas = append(ex.Etiquetas, x.Emoji+" "+x.Nombre)
+		}
+	}
 	if ex.Advertencias, err = a.ListarAdvertencias(botID, persona, 10000); err != nil {
 		return nil, err
 	}

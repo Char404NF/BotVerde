@@ -394,6 +394,35 @@ class MotorFalso : Motor {
         llamadas += "editarEtiqueta:$id:$nombre:$color"; pFalla()
         etiquetasJson.first { it.getLong("id") == id }.put("nombre", nombre).put("color", color)
     }
+    // E3 (0.6.0): mínimos para compilar; las pantallas (E7/E8) los usarán con sus propias pruebas.
+    var marcadosJson = "[]"
+    var miembrosJson = "[]"
+    var cambiosJson = "[]"
+    override fun crearEtiquetaEmoji(bot: Long, nombre: String, color: String, emoji: String): Long {
+        val id = crearEtiqueta(bot, nombre, color)
+        etiquetasJson.first { it.getLong("id") == id }.put("emoji", emoji)
+        return id
+    }
+    override fun editarEtiquetaEmoji(bot: Long, id: Long, nombre: String, color: String, emoji: String) {
+        editarEtiqueta(bot, id, nombre, color)
+        etiquetasJson.first { it.getLong("id") == id }.put("emoji", emoji)
+    }
+    override fun ponerEtiquetaPersona(bot: Long, persona: String, id: Long, si: Boolean) { llamadas += "etiquetaPersona:$persona:$id:$si"; pFalla() }
+    override fun etiquetasDePersona(bot: Long, persona: String) = "[]"
+    override fun etiquetasDePersonas(bot: Long, personasJson: String) = "{}"
+    override fun etiquetasDeChats(bot: Long, chatsJson: String) = "{}"
+    override fun marcarMensaje(bot: Long, chat: String, msgId: String, etiqueta: Long, nota: String) { llamadas += "marcar:$chat:$msgId:$etiqueta"; pFalla() }
+    override fun quitarMarcaMensaje(bot: Long, chat: String, msgId: String, etiqueta: Long) { llamadas += "quitarMarca:$chat:$msgId:$etiqueta"; pFalla() }
+    override fun marcasDeMensaje(bot: Long, chat: String, msgId: String) = "[]"
+    override fun etiquetasDeMensajes(bot: Long, chat: String, idsJson: String) = "{}"
+    override fun listarMarcados(bot: Long, tipo: String, etiqueta: Long, limite: Long, desde: Long) = marcadosJson
+    override fun contarMarcados(bot: Long, etiqueta: Long) = "{\"mensaje\":0,\"persona\":0,\"chat\":0,\"grupo\":0}"
+    override fun miembrosGrupoDetallado(bot: Long, grupo: String, incluirSalidos: Boolean) = miembrosJson
+    override fun cambiosMiembrosGrupo(bot: Long, grupo: String, antes: Long, limite: Long) = cambiosJson
+    override fun actualizarMiembrosGrupo(bot: Long) { llamadas += "actualizarMiembros" }
+    override fun gruposEnComunPersona(bot: Long, persona: String) = "[]"
+    override fun pedirFotoPersona(bot: Long, persona: String, grupo: String, forzar: Boolean) { llamadas += "fotoPersona:$persona" }
+    override fun fotoPersona(bot: Long, persona: String) = ""
     override fun borrarEtiqueta(bot: Long, id: Long) { llamadas += "borrarEtiqueta:$id"; pFalla(); etiquetasJson.removeAll { it.getLong("id") == id }; etiquetasDeChatMapa.values.forEach { it.remove(id) } }
     override fun ponerEtiquetaChat(bot: Long, chat: String, id: Long, si: Boolean) {
         llamadas += "etiquetaChat:$chat:$id:$si"; pFalla()

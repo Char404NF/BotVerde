@@ -870,6 +870,23 @@ func fusionarPersona(tx *sql.Tx, botID int64, desde, hacia string) error {
 			return err
 		}
 	}
+	// v0.6.0 E3: etiquetas de persona y miembros de grupo pasan a la persona canónica.
+	for _, q := range []string{
+		`INSERT OR IGNORE INTO persona_etiqueta(bot_id,persona,etiqueta_id) SELECT bot_id,?,etiqueta_id FROM persona_etiqueta WHERE bot_id=? AND persona=?`,
+		`UPDATE OR IGNORE grupo_miembros SET persona=? WHERE bot_id=? AND persona=?`,
+	} {
+		if _, err := tx.Exec(q, hacia, botID, desde); err != nil {
+			return err
+		}
+	}
+	for _, q := range []string{`DELETE FROM persona_etiqueta WHERE bot_id=? AND persona=?`, `DELETE FROM grupo_miembros WHERE bot_id=? AND persona=?`} {
+		if _, err := tx.Exec(q, botID, desde); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(`UPDATE grupo_cambios SET persona=? WHERE bot_id=? AND persona=?`, hacia, botID, desde); err != nil {
+		return err
+	}
 	var hD, hH sql.NullInt64
 	sD := tx.QueryRow(`SELECT hasta_ts FROM persona_silencio WHERE bot_id=? AND persona=?`, botID, desde).Scan(&hD) == nil
 	sH := tx.QueryRow(`SELECT hasta_ts FROM persona_silencio WHERE bot_id=? AND persona=?`, botID, hacia).Scan(&hH) == nil

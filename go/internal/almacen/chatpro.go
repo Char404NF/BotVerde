@@ -47,7 +47,18 @@ type Etiqueta struct {
 	Nombre   string `json:"nombre"`
 	Color    string `json:"color"`
 	Posicion int    `json:"posicion"`
-	Chats    int    `json:"chats"` // cuántos chats la tienen (solo al listar)
+	Chats    int    `json:"chats"`    // cuántos chats la tienen (solo al listar)
+	Emoji    string `json:"emoji"`    // opcional (v0.6.0)
+	Personas int    `json:"personas"` // cuántas personas la tienen (solo al listar)
+	Mensajes int    `json:"mensajes"` // cuántos mensajes marcados con ella (solo al listar)
+}
+
+func emojiEtiqueta(e string) (string, error) {
+	e = strings.TrimSpace(e)
+	if len([]rune(e)) > 16 {
+		return "", errors.New("el emoji es muy largo")
+	}
+	return e, nil
 }
 
 func colorEtiqueta(c string) (string, error) {
@@ -80,7 +91,9 @@ func nombreEtiqueta(n string) (string, error) {
 // ListarEtiquetas devuelve las etiquetas en su orden, con cuántos chats tiene cada una.
 func (a *Almacen) ListarEtiquetas(botID int64) ([]Etiqueta, error) {
 	filas, err := a.db.Query(`SELECT e.id,e.nombre,e.color,e.posicion,
-		(SELECT COUNT(*) FROM chat_etiqueta x WHERE x.bot_id=e.bot_id AND x.etiqueta_id=e.id)
+		(SELECT COUNT(*) FROM chat_etiqueta x WHERE x.bot_id=e.bot_id AND x.etiqueta_id=e.id), e.emoji,
+		(SELECT COUNT(*) FROM persona_etiqueta p WHERE p.bot_id=e.bot_id AND p.etiqueta_id=e.id),
+		(SELECT COUNT(*) FROM msg_marca mm WHERE mm.bot_id=e.bot_id AND mm.etiqueta_id=e.id)
 		FROM etiquetas e WHERE e.bot_id=? ORDER BY e.posicion, e.id`, botID)
 	if err != nil {
 		return nil, err
@@ -89,7 +102,7 @@ func (a *Almacen) ListarEtiquetas(botID int64) ([]Etiqueta, error) {
 	out := []Etiqueta{}
 	for filas.Next() {
 		var x Etiqueta
-		if filas.Scan(&x.ID, &x.Nombre, &x.Color, &x.Posicion, &x.Chats) == nil {
+		if filas.Scan(&x.ID, &x.Nombre, &x.Color, &x.Posicion, &x.Chats, &x.Emoji, &x.Personas, &x.Mensajes) == nil {
 			out = append(out, x)
 		}
 	}
@@ -111,10 +124,18 @@ func (a *Almacen) EtiquetaPorNombre(botID int64, nombre string) (*Etiqueta, erro
 	return nil, nil
 }
 
-// CrearEtiqueta crea una etiqueta (el nombre no se puede repetir).
+// CrearEtiqueta crea una etiqueta sin emoji (el nombre no se puede repetir).
 func (a *Almacen) CrearEtiqueta(botID int64, nombre, color string) (int64, error) {
+	return a.CrearEtiquetaEmoji(botID, nombre, color, "")
+}
+
+// CrearEtiquetaEmoji crea una etiqueta con nombre, color y emoji (opcional). No hay límite de etiquetas.
+func (a *Almacen) CrearEtiquetaEmoji(botID int64, nombre, color, emoji string) (int64, error) {
 	nombre, err := nombreEtiqueta(nombre)
 	if err != nil {
+		return 0, err
+	}
+	if emoji, err = emojiEtiqueta(emoji); err != nil {
 		return 0, err
 	}
 	if color, err = colorEtiqueta(color); err != nil {
@@ -125,14 +146,9 @@ func (a *Almacen) CrearEtiqueta(botID int64, nombre, color string) (int64, error
 	if e, _ := a.EtiquetaPorNombre(botID, nombre); e != nil {
 		return 0, errors.New("ya existe una etiqueta con ese nombre")
 	}
-	var n int
-	_ = a.db.QueryRow(`SELECT COUNT(*) FROM etiquetas WHERE bot_id=?`, botID).Scan(&n)
-	if n >= 50 {
-		return 0, errors.New("ya tienes 50 etiquetas: borra alguna")
-	}
 	var pos int
 	_ = a.db.QueryRow(`SELECT COALESCE(MAX(posicion),0)+1 FROM etiquetas WHERE bot_id=?`, botID).Scan(&pos)
-	r, err := a.db.Exec(`INSERT INTO etiquetas(bot_id,nombre,color,posicion,creado_ts) VALUES(?,?,?,?,?)`, botID, nombre, color, pos, time.Now().Unix())
+	r, err := a.db.Exec(`INSERT INTO etiquetas(bot_id,nombre,color,emoji,posicion,creado_ts) VALUES(?,?,?,?,?,?)`, botID, nombre, color, emoji, pos, time.Now().Unix())
 	if err != nil {
 		return 0, err
 	}
@@ -141,10 +157,20 @@ func (a *Almacen) CrearEtiqueta(botID int64, nombre, color string) (int64, error
 	return id, nil
 }
 
-// EditarEtiqueta cambia el nombre y el color.
+// EditarEtiqueta cambia el nombre y el color (el emoji se queda como estaba).
 func (a *Almacen) EditarEtiqueta(botID, id int64, nombre, color string) error {
+	var emoji string
+	_ = a.db.QueryRow(`SELECT emoji FROM etiquetas WHERE bot_id=? AND id=?`, botID, id).Scan(&emoji)
+	return a.EditarEtiquetaEmoji(botID, id, nombre, color, emoji)
+}
+
+// EditarEtiquetaEmoji cambia el nombre, el color y el emoji.
+func (a *Almacen) EditarEtiquetaEmoji(botID, id int64, nombre, color, emoji string) error {
 	nombre, err := nombreEtiqueta(nombre)
 	if err != nil {
+		return err
+	}
+	if emoji, err = emojiEtiqueta(emoji); err != nil {
 		return err
 	}
 	if color, err = colorEtiqueta(color); err != nil {
@@ -155,7 +181,7 @@ func (a *Almacen) EditarEtiqueta(botID, id int64, nombre, color string) error {
 	if e, _ := a.EtiquetaPorNombre(botID, nombre); e != nil && e.ID != id {
 		return errors.New("ya existe una etiqueta con ese nombre")
 	}
-	r, err := a.db.Exec(`UPDATE etiquetas SET nombre=?, color=? WHERE bot_id=? AND id=?`, nombre, color, botID, id)
+	r, err := a.db.Exec(`UPDATE etiquetas SET nombre=?, color=?, emoji=? WHERE bot_id=? AND id=?`, nombre, color, emoji, botID, id)
 	if err != nil {
 		return err
 	}
@@ -166,15 +192,19 @@ func (a *Almacen) EditarEtiqueta(botID, id int64, nombre, color string) error {
 	return nil
 }
 
-// BorrarEtiqueta borra la etiqueta y la quita de todos los chats.
+// BorrarEtiqueta borra la etiqueta y la quita de todos los chats, personas y mensajes marcados (una marca que solo tenía esa etiqueta
+// y ninguna nota desaparece; la nota sola se conserva como marca sin etiqueta).
 func (a *Almacen) BorrarEtiqueta(botID, id int64) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	_, _ = a.db.Exec(`DELETE FROM chat_etiqueta WHERE bot_id=? AND etiqueta_id=?`, botID, id)
+	_, _ = a.db.Exec(`DELETE FROM persona_etiqueta WHERE bot_id=? AND etiqueta_id=?`, botID, id)
+	a.limpiarMarcasDeEtiqueta(botID, id)
 	_, err := a.db.Exec(`DELETE FROM etiquetas WHERE bot_id=? AND id=?`, botID, id)
 	if err == nil {
 		a.avisa("etiquetas")
 		a.avisa("chats")
+		a.avisa("personas")
 	}
 	return err
 }
@@ -203,7 +233,7 @@ func (a *Almacen) PonerEtiqueta(botID int64, chat string, id int64, si bool) err
 
 // EtiquetasDeChat devuelve las etiquetas de un chat.
 func (a *Almacen) EtiquetasDeChat(botID int64, chat string) ([]Etiqueta, error) {
-	filas, err := a.db.Query(`SELECT e.id,e.nombre,e.color,e.posicion FROM etiquetas e JOIN chat_etiqueta x ON x.etiqueta_id=e.id
+	filas, err := a.db.Query(`SELECT e.id,e.nombre,e.color,e.posicion,e.emoji FROM etiquetas e JOIN chat_etiqueta x ON x.etiqueta_id=e.id
 		WHERE x.bot_id=? AND x.chat_jid=? ORDER BY e.posicion, e.id`, botID, chat)
 	if err != nil {
 		return nil, err
@@ -212,7 +242,7 @@ func (a *Almacen) EtiquetasDeChat(botID int64, chat string) ([]Etiqueta, error) 
 	out := []Etiqueta{}
 	for filas.Next() {
 		var x Etiqueta
-		if filas.Scan(&x.ID, &x.Nombre, &x.Color, &x.Posicion) == nil {
+		if filas.Scan(&x.ID, &x.Nombre, &x.Color, &x.Posicion, &x.Emoji) == nil {
 			out = append(out, x)
 		}
 	}

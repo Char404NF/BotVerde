@@ -275,3 +275,29 @@ func TestFotoGrandeSoloAlPedirla(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 }
+
+func TestFotoDePersonaSinChatUsaGrupoEnComun(t *testing.T) {
+	e := nuevoEntorno(t, time.Millisecond)
+	vistoCh := make(chan types.JID, 4)
+	e.cli.pon(func(_ string, p *whatsmeow.GetProfilePictureParams) (*types.ProfilePictureInfo, error) {
+		vistoCh <- p.CommonGID
+		return &types.ProfilePictureInfo{ID: "f1", URL: "http://x/f"}, nil
+	})
+	p := "5215500000001@s.whatsapp.net"
+	e.g.PedirPersona(p, p, "120@g.us", false)
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) && e.alm.FotoDePersona(1, p) == "" {
+		time.Sleep(10 * time.Millisecond)
+	}
+	visto := <-vistoCh
+	if e.alm.FotoDePersona(1, p) == "" || visto.String() != "120@g.us" {
+		t.Fatalf("foto=%q grupo=%v", e.alm.FotoDePersona(1, p), visto)
+	}
+	// vigente: no se vuelve a pedir
+	antes := e.cli.numero()
+	e.g.PedirPersona(p, p, "120@g.us", false)
+	time.Sleep(50 * time.Millisecond)
+	if e.cli.numero() != antes {
+		t.Fatal("no debía pedirse otra vez")
+	}
+}

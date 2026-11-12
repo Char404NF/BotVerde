@@ -188,6 +188,26 @@ interface Motor {
     fun borrarEtiqueta(bot: Long, id: Long)
     fun ponerEtiquetaChat(bot: Long, chat: String, id: Long, si: Boolean)
     fun etiquetasDeChat(bot: Long, chat: String): String
+
+    // Etiquetas de personas y mensajes, "Marcados" y miembros de grupo (0.6.0, E3). Eventos: "etiquetas", "personas", "grupo:<jid>".
+    fun crearEtiquetaEmoji(bot: Long, nombre: String, color: String, emoji: String): Long
+    fun editarEtiquetaEmoji(bot: Long, id: Long, nombre: String, color: String, emoji: String)
+    fun ponerEtiquetaPersona(bot: Long, persona: String, id: Long, si: Boolean)
+    fun etiquetasDePersona(bot: Long, persona: String): String
+    fun etiquetasDePersonas(bot: Long, personasJson: String): String
+    fun etiquetasDeChats(bot: Long, chatsJson: String): String
+    fun marcarMensaje(bot: Long, chat: String, msgId: String, etiqueta: Long, nota: String)
+    fun quitarMarcaMensaje(bot: Long, chat: String, msgId: String, etiqueta: Long)
+    fun marcasDeMensaje(bot: Long, chat: String, msgId: String): String
+    fun etiquetasDeMensajes(bot: Long, chat: String, idsJson: String): String
+    fun listarMarcados(bot: Long, tipo: String, etiqueta: Long, limite: Long, desde: Long): String
+    fun contarMarcados(bot: Long, etiqueta: Long): String
+    fun miembrosGrupoDetallado(bot: Long, grupo: String, incluirSalidos: Boolean): String
+    fun cambiosMiembrosGrupo(bot: Long, grupo: String, antes: Long, limite: Long): String
+    fun actualizarMiembrosGrupo(bot: Long)
+    fun gruposEnComunPersona(bot: Long, persona: String): String
+    fun pedirFotoPersona(bot: Long, persona: String, grupo: String, forzar: Boolean)
+    fun fotoPersona(bot: Long, persona: String): String
     fun listarAlertasPalabra(bot: Long): String
     fun crearAlertaPalabra(bot: Long, palabra: String, chatsJson: String): Long
     fun editarAlertaPalabra(bot: Long, id: Long, chatsJson: String, activa: Boolean)
@@ -447,6 +467,24 @@ object MotorGo : Motor {
     override fun borrarEtiqueta(bot: Long, id: Long) = Wabot.borrarEtiqueta(bot, id)
     override fun ponerEtiquetaChat(bot: Long, chat: String, id: Long, si: Boolean) = Wabot.ponerEtiquetaChat(bot, chat, id, si)
     override fun etiquetasDeChat(bot: Long, chat: String) = Wabot.etiquetasDeChat(bot, chat)
+    override fun crearEtiquetaEmoji(bot: Long, nombre: String, color: String, emoji: String) = Wabot.crearEtiquetaEmoji(bot, nombre, color, emoji)
+    override fun editarEtiquetaEmoji(bot: Long, id: Long, nombre: String, color: String, emoji: String) = Wabot.editarEtiquetaEmoji(bot, id, nombre, color, emoji)
+    override fun ponerEtiquetaPersona(bot: Long, persona: String, id: Long, si: Boolean) = Wabot.ponerEtiquetaPersona(bot, persona, id, si)
+    override fun etiquetasDePersona(bot: Long, persona: String) = Wabot.etiquetasDePersona(bot, persona)
+    override fun etiquetasDePersonas(bot: Long, personasJson: String) = Wabot.etiquetasDePersonas(bot, personasJson)
+    override fun etiquetasDeChats(bot: Long, chatsJson: String) = Wabot.etiquetasDeChats(bot, chatsJson)
+    override fun marcarMensaje(bot: Long, chat: String, msgId: String, etiqueta: Long, nota: String) = Wabot.marcarMensaje(bot, chat, msgId, etiqueta, nota)
+    override fun quitarMarcaMensaje(bot: Long, chat: String, msgId: String, etiqueta: Long) = Wabot.quitarMarcaMensaje(bot, chat, msgId, etiqueta)
+    override fun marcasDeMensaje(bot: Long, chat: String, msgId: String) = Wabot.marcasDeMensaje(bot, chat, msgId)
+    override fun etiquetasDeMensajes(bot: Long, chat: String, idsJson: String) = Wabot.etiquetasDeMensajes(bot, chat, idsJson)
+    override fun listarMarcados(bot: Long, tipo: String, etiqueta: Long, limite: Long, desde: Long) = Wabot.listarMarcados(bot, tipo, etiqueta, limite, desde)
+    override fun contarMarcados(bot: Long, etiqueta: Long) = Wabot.contarMarcados(bot, etiqueta)
+    override fun miembrosGrupoDetallado(bot: Long, grupo: String, incluirSalidos: Boolean) = Wabot.miembrosGrupoDetallado(bot, grupo, incluirSalidos)
+    override fun cambiosMiembrosGrupo(bot: Long, grupo: String, antes: Long, limite: Long) = Wabot.cambiosMiembrosGrupo(bot, grupo, antes, limite)
+    override fun actualizarMiembrosGrupo(bot: Long) = Wabot.actualizarMiembrosGrupo(bot)
+    override fun gruposEnComunPersona(bot: Long, persona: String) = Wabot.gruposEnComunPersona(bot, persona)
+    override fun pedirFotoPersona(bot: Long, persona: String, grupo: String, forzar: Boolean) = Wabot.pedirFotoPersona(bot, persona, grupo, forzar)
+    override fun fotoPersona(bot: Long, persona: String) = Wabot.fotoPersona(bot, persona)
     override fun listarAlertasPalabra(bot: Long) = Wabot.listarAlertasPalabra(bot)
     override fun crearAlertaPalabra(bot: Long, palabra: String, chatsJson: String) = Wabot.crearAlertaPalabra(bot, palabra, chatsJson)
     override fun editarAlertaPalabra(bot: Long, id: Long, chatsJson: String, activa: Boolean) = Wabot.editarAlertaPalabra(bot, id, chatsJson, activa)

@@ -9,7 +9,8 @@ import org.json.JSONObject
 data class SilencioInfo(val persona: String, val hastaTs: Long, val motivo: String, val creadoTs: Long, val por: String)
 
 /** Etiqueta local para ordenar chats. */
-data class EtiquetaItem(val id: Long, val nombre: String, val color: String, val posicion: Int = 0, val chats: Int = 0)
+data class EtiquetaItem(val id: Long, val nombre: String, val color: String, val posicion: Int = 0, val chats: Int = 0,
+    val emoji: String = "", val personas: Int = 0, val mensajes: Int = 0)
 
 /** Todo lo que se sabe de una persona, en una sola vista. */
 data class FichaPersona(
@@ -72,7 +73,8 @@ object JsonPersonas {
     fun silencio(o: JSONObject?) = o?.let { SilencioInfo(it.optString("persona"), it.optLong("hastaTs"), it.optString("motivo"), it.optLong("creadoTs"), it.optString("por")) }
     fun silencios(json: String) = lista(json) { silencio(it)!! }
 
-    fun etiqueta(o: JSONObject) = EtiquetaItem(o.optLong("id"), o.optString("nombre"), o.optString("color", "#2EC4CB"), o.optInt("posicion"), o.optInt("chats"))
+    fun etiqueta(o: JSONObject) = EtiquetaItem(o.optLong("id"), o.optString("nombre"), o.optString("color", "#2EC4CB"), o.optInt("posicion"), o.optInt("chats"),
+        o.optString("emoji"), o.optInt("personas"), o.optInt("mensajes"))
     fun etiquetas(json: String) = lista(json) { etiqueta(it) }
 
     fun ficha(json: String): FichaPersona {

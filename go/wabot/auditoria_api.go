@@ -148,6 +148,7 @@ func (s *estado) pasadaAuditoria(ctx context.Context) {
 	} else if res.Mensajes > 0 {
 		s.log(fmt.Sprintf("Retención: se olvidó el texto de %d mensajes viejos.", res.Mensajes))
 	}
+	s.snapshotSiToca(ctx, false) // miembros de grupos: una vez al conectar la primera vez y cada 24 h
 	for ctx.Err() == nil {
 		_, fin, err := a.RellenarSHA(s.botID, 200)
 		if err != nil {

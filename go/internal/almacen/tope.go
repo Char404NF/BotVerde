@@ -247,8 +247,13 @@ func (a *Almacen) existeTabla(nombre string) bool {
 func (a *Almacen) condicionProtegido() string {
 	c := ` AND m.tipo<>'` + TipoVerUnaVez + `' AND NOT (m.tipo='` + TipoVideo + `' AND m.portada_ruta='')
 		AND NOT EXISTS (SELECT 1 FROM chat_etiqueta ce WHERE ce.bot_id=m.bot_id AND ce.chat_jid=m.chat_jid)`
+	// v0.6.0 E3: tampoco se borra lo de mensajes marcados ni lo de personas con etiqueta (su chat privado o lo que escribieron en grupos).
 	if a.existeTabla("msg_marca") {
 		c += ` AND NOT EXISTS (SELECT 1 FROM msg_marca mm WHERE mm.bot_id=m.bot_id AND mm.chat_jid=m.chat_jid AND mm.msg_id=m.id)`
+	}
+	if a.existeTabla("persona_etiqueta") {
+		c += ` AND NOT EXISTS (SELECT 1 FROM persona_etiqueta pe WHERE pe.bot_id=m.bot_id AND (pe.persona=m.remitente_jid OR pe.persona=m.chat_jid
+			OR EXISTS (SELECT 1 FROM persona_alias pa WHERE pa.bot_id=m.bot_id AND pa.canonica=pe.persona AND (pa.alias=m.remitente_jid OR pa.alias=m.chat_jid))))`
 	}
 	return c
 }

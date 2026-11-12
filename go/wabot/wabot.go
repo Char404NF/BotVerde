@@ -380,6 +380,7 @@ func (s *estado) evento(e any) {
 		s.log("Conectado.")
 		s.status("conectado")
 		go s.fotos.RevisarVencidas()
+		go s.snapshotSiToca(s.ctx, false)
 	case *events.Disconnected:
 		if !s.cerr {
 			s.log("Desconectado; se intentará reconectar.")
@@ -444,6 +445,7 @@ func (s *estado) evento(e any) {
 		s.encola(func() { s.alCambiarFoto(v) })
 	case *events.GroupInfo:
 		s.alCambiarGrupo(v.JID.ToNonAD().String())
+		s.alCambiarMiembros(v)
 		if len(v.Join) > 0 {
 			s.alEntrarAlGrupo(v)
 		}
@@ -455,6 +457,7 @@ func (s *estado) evento(e any) {
 		nombre, jid := v.GroupName.Name, v.JID.ToNonAD().String()
 		s.alCambiarGrupo(jid)
 		s.encola(func() { s.ing.Asunto(jid, nombre) })
+		s.alUnirseAGrupo(v)
 	case *events.PushName:
 		s.encola(func() { s.ing.NombrePublico(s.ctx, v.JID, v.NewPushName) })
 	case *events.Contact, *events.AppStateSyncComplete:

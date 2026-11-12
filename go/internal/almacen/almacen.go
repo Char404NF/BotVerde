@@ -415,6 +415,12 @@ func (a *Almacen) FusionarChat(botID int64, desde, hasta string) error {
 			return err
 		}
 	}
+	if _, err := tx.Exec(`UPDATE OR IGNORE msg_marca SET chat_jid=? WHERE bot_id=? AND chat_jid=?`, hasta, botID, desde); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM msg_marca WHERE bot_id=? AND chat_jid=?`, botID, desde); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`UPDATE OR IGNORE chat_estado SET chat_jid=? WHERE bot_id=? AND chat_jid=?`, hasta, botID, desde); err != nil {
 		return err
 	}

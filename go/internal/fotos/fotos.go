@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -175,7 +176,109 @@ func (g *Gestor) trabajador() {
 	}
 }
 
+// PedirPersona pide la foto de una persona que quizá no tiene chat privado (por ejemplo, solo es miembro de un grupo). jid es la
+// forma con la que se pide; grupoComun (opcional) es un grupo que compartimos: mejora el éxito con quien no es contacto. Usa la misma
+// cola lenta (una petición cada 3 s). forzar salta la vigencia (al abrir el perfil de la persona).
+func (g *Gestor) PedirPersona(persona, jid, grupoComun string, forzar bool) {
+	if persona == "" || jid == "" {
+		return
+	}
+	alm := g.cfg.Alm
+	ahora := g.cfg.Ahora()
+	clave := "p|" + persona + "|" + jid + "|" + grupoComun
+	if !forzar {
+		if _, _, ts := alm.FotoPersonaInfo(g.cfg.BotID, persona); ts > 0 && ahora.Sub(time.Unix(ts, 0)) < g.cfg.Vigencia {
+			return
+		}
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.en[clave] {
+		return
+	}
+	if !forzar {
+		if t, ok := g.visto[clave]; ok && ahora.Sub(t) < time.Hour {
+			return
+		}
+	}
+	g.visto[clave] = ahora
+	g.en[clave] = true
+	g.cola = append(g.cola, clave)
+	select {
+	case g.aviso <- struct{}{}:
+	default:
+	}
+}
+
+func (g *Gestor) procesarPersona(clave string) {
+	partes := strings.SplitN(clave, "|", 4)
+	if len(partes) != 4 {
+		return
+	}
+	persona, jidS, grupoS := partes[1], partes[2], partes[3]
+	olvida := func() {
+		g.mu.Lock()
+		delete(g.visto, clave)
+		g.mu.Unlock()
+	}
+	cli, ok := g.cfg.Cliente()
+	if !ok {
+		olvida()
+		return
+	}
+	jid, err := types.ParseJID(jidS)
+	if err != nil {
+		return
+	}
+	params := &whatsmeow.GetProfilePictureParams{Preview: true}
+	if grupoS != "" {
+		if gj, e := types.ParseJID(grupoS); e == nil {
+			params.CommonGID = gj
+		}
+	}
+	bot, alm := g.cfg.BotID, g.cfg.Alm
+	rutaAnt, idAnt, _ := alm.FotoPersonaInfo(bot, persona)
+	params.ExistingID = idAnt
+	ctx, cancel := context.WithTimeout(g.ctx, 30*time.Second)
+	defer cancel()
+	info, err := cli.GetProfilePictureInfo(ctx, jid, params)
+	ahora := g.cfg.Ahora().Unix()
+	switch {
+	case errors.Is(err, whatsmeow.ErrProfilePictureNotSet), errors.Is(err, whatsmeow.ErrProfilePictureUnauthorized):
+		_ = alm.FijarFotoPersona(bot, persona, "", "", ahora)
+		return
+	case err != nil:
+		g.cfg.Log("no se pudo pedir la foto de una persona")
+		olvida()
+		return
+	case info == nil: // no cambió
+		_ = alm.FijarFotoPersona(bot, persona, rutaAnt, idAnt, ahora)
+		return
+	}
+	datos, err := g.bajar()(ctx, info.URL, 3<<20)
+	if err != nil || len(datos) == 0 {
+		g.cfg.Log("no se pudo bajar la foto de una persona")
+		olvida()
+		return
+	}
+	rel := almacen.RutaFotoPersona(bot, persona)
+	if err := alm.EscribirCifrado(rel, datos); err != nil {
+		g.cfg.Log("no se pudo guardar la foto de una persona")
+		return
+	}
+	_ = alm.FijarFotoPersona(bot, persona, rel, info.ID, ahora)
+}
+
 func (g *Gestor) procesar(chat string) {
+	if strings.HasPrefix(chat, "p|") {
+		defer func() {
+			if r := recover(); r != nil {
+				g.cfg.Log(fmt.Sprintf("error interno con una foto de persona: %v", r))
+			}
+		}()
+		g.procesarPersona(chat)
+		return
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			g.cfg.Log(fmt.Sprintf("error interno con una foto de perfil: %v", r))

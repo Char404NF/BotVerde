@@ -362,7 +362,7 @@ func (a *Almacen) BorrarChat(botID int64, chat string) (bytes int64, err error) 
 	if _, err = a.db.Exec("DELETE FROM daily_stats WHERE bot_id=? AND chat=?", botID, chat); err != nil {
 		return 0, err
 	}
-	for _, t := range []string{"message_receipts", "reacciones", "chat_estado", "dedupe", "chat_etiqueta", "grupo_filtros", "grupo_reglas"} {
+	for _, t := range []string{"message_receipts", "reacciones", "chat_estado", "dedupe", "chat_etiqueta", "msg_marca", "grupo_filtros", "grupo_reglas"} {
 		if _, err = a.db.Exec("DELETE FROM "+t+" WHERE bot_id=? AND chat_jid=?", botID, chat); err != nil {
 			return 0, err
 		}
@@ -488,6 +488,19 @@ func (a *Almacen) Reparar(botID int64) (Reporte, error) {
 			_, _ = a.db.Exec("UPDATE chats SET foto_ruta='', foto_id='', foto_ts=0 WHERE bot_id=? AND jid=?", botID, jid)
 			rep.FotosLimpiadas++
 		}
+	}
+
+	// Fotos de personas sin chat privado (v0.6.0): las usa persona_foto.
+	if cp, e := a.db.Query("SELECT ruta FROM persona_foto WHERE bot_id=? AND ruta<>''", botID); e == nil {
+		for cp.Next() {
+			var ruta string
+			if cp.Scan(&ruta) == nil {
+				if abs, e := a.Abs(ruta); e == nil {
+					usados[filepath.Clean(abs)] = true
+				}
+			}
+		}
+		cp.Close()
 	}
 
 	// Archivos sueltos que ninguna fila usa.
