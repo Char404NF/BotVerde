@@ -37,6 +37,41 @@ func (a *Almacen) FijarTopeTotal(botID int64, bytes int64) error {
 	return nil
 }
 
+// TopePendiente dice si el tope está esperando que el dueño vea el aviso de la primera vez: mientras sea así AplicarTope no borra nada.
+func (a *Almacen) TopePendiente(botID int64) bool {
+	return a.AjusteBot(botID, "tope_confirmado") == "0"
+}
+
+// ConfirmarTope marca que el dueño ya vio el aviso (subió el tope, quitó el límite o dijo «está bien»): desde ahora el tope se aplica.
+func (a *Almacen) ConfirmarTope(botID int64) error {
+	if err := a.FijarAjusteBot(botID, "tope_confirmado", "1"); err != nil {
+		return err
+	}
+	a.avisa("espacio")
+	return nil
+}
+
+// InicializarTope decide, una sola vez por bot, si el tope arranca pendiente. Instalación nueva: confirmado. Actualización desde 0.5.0 o
+// antes (la migración 20 dejó audit_ret_pendiente=1) con más archivos que el tope: pendiente hasta que Kotlin lo confirme.
+func (a *Almacen) InicializarTope(botID int64) {
+	if a.AjusteBot(botID, "tope_conf_init") == "1" {
+		return
+	}
+	pend := false
+	if a.AjusteBot(botID, "audit_ret_pendiente") == "1" {
+		_ = a.FijarAjusteBot(botID, "asistente_visto", "1") // quien actualiza ya tiene su bot: el asistente no se le ofrece solo
+		if t := a.TopeTotal(botID); t > 0 && a.UsoMultimedia(botID) > t {
+			pend = true
+		}
+	}
+	v := "1"
+	if pend {
+		v = "0"
+	}
+	_ = a.FijarAjusteBot(botID, "tope_confirmado", v)
+	_ = a.FijarAjusteBot(botID, "tope_conf_init", "1")
+}
+
 // ConservarPortada dice si al borrar un video se conserva su portada (de fábrica sí).
 func (a *Almacen) ConservarPortada(botID int64) bool {
 	return a.AjusteBot(botID, "conservar_portada") != "0"
@@ -262,7 +297,7 @@ func (a *Almacen) condicionProtegido() string {
 // tope <= 0 no hace nada. Deja un aviso local con lo que se borró. Es seguro llamarlo seguido (si no pasa del tope sale enseguida).
 func (a *Almacen) AplicarTope(botID int64, tope int64, ahora time.Time) (ResultadoTope, error) {
 	res := ResultadoTope{Tope: tope}
-	if tope <= 0 {
+	if tope <= 0 || a.TopePendiente(botID) {
 		return res, nil
 	}
 	res.Antes = a.UsoMultimedia(botID)

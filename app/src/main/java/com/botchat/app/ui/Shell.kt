@@ -44,6 +44,9 @@ import com.botchat.app.datos.Repo
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import com.botchat.app.datos.fijarTopeTotal
+import com.botchat.app.datos.confirmarTope
+import com.botchat.app.datos.asistenteEstado
+import com.botchat.app.datos.asistenteVisto
 import com.botchat.app.datos.estadoAlmacen
 import com.botchat.app.datos.fijarAvisoAuditoriaVisto
 import com.botchat.app.datos.fijarAuditoria
@@ -124,10 +127,16 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
     var auditoria by remember { mutableStateOf<com.botchat.app.datos.AuditoriaGlobal?>(null) }
     var estadoTope by remember { mutableStateOf<com.botchat.app.datos.EstadoAlmacen?>(null) }
     val topeVisto by ajustes.topeAvisoVisto.collectAsState()
+    var ofrecerAsistente by remember { mutableStateOf(false) }
+    LaunchedEffect(bot.id) { ofrecerAsistente = runCatching { !Repo.asistenteEstado(bot.id).visto }.getOrDefault(false) }
     LaunchedEffect(bot.id) {
         auditoria = runCatching { Repo.auditoriaGlobal(bot.id) }.getOrNull()
-        if (!topeVisto) {
-            val e = runCatching { Repo.estadoAlmacen(bot.id) }.getOrNull()
+        // E9: si Go dejó el tope «pendiente» (actualización con más archivos que el tope), el aviso sale aunque ya se hubiera marcado
+        // como visto en el teléfono, y Go no borra nada hasta que se confirme aquí.
+        val e = runCatching { Repo.estadoAlmacen(bot.id) }.getOrNull()
+        if (e != null && e.topePendiente) {
+            if (!e.pasadoDelTope) { runCatching { Repo.confirmarTope(bot.id) }; ajustes.topeAvisoMarcado() } else estadoTope = e
+        } else if (!topeVisto) {
             if (e != null && !e.pasadoDelTope) ajustes.topeAvisoMarcado() else estadoTope = e
         }
     }
@@ -193,6 +202,14 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         alSilencios = { nav.navigate("silencios") }, alAdvertencias = { nav.navigate("advertencias") }, alEtiquetas = { nav.navigate("etiquetas") },
                         alAjustes = { nav.navigate("ajustes") }, alComandos = { nav.navigate("comandos_propios") }, alModulos = { nav.navigate("modulos") },
                         alLimites = { nav.navigate("iniciativa") }, alLaboratorio = { nav.navigate("laboratorio") }, alActividad = { nav.navigate("actividad") },
+                        alAsistente = { nav.navigate("asistente_bot") },
+                    )
+                }
+                // E9: asistente «Crea tu bot» (5 pasos). Reutiliza el editor completo de menús y los mensajes automáticos para seguir editando.
+                composable("asistente_bot") {
+                    PantallaAsistenteBot(
+                        bot.id, alSalir = { nav.popBackStack() },
+                        alEditarMenu = { nav.navigate("automatizacion/$it") }, alEditarBienvenida = { nav.navigate("mensajes_auto") },
                     )
                 }
                 // E7: perfil de la persona (reemplaza a la ficha de siempre) e info del grupo con Miembros y Ajustes.
@@ -480,13 +497,19 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
     }
     estadoTope?.let { t ->
         val auditoriaLista = auditoria?.let { it.avisoVisto && !it.retPendiente } ?: true
-        if (!esperaModo && auditoriaLista && !topeVisto) {
+        if (!esperaModo && auditoriaLista && (!topeVisto || t.topePendiente)) {
             if (t.pasadoDelTope) AvisoTopeAlmacen(
                 t,
-                alSubir = { bytes -> alcance.launch { runCatching { Repo.fijarTopeTotal(bot.id, bytes) }; ajustes.topeAvisoMarcado(); estadoTope = null } },
-                alEntendido = { ajustes.topeAvisoMarcado(); estadoTope = null },
+                alSubir = { bytes -> alcance.launch { runCatching { Repo.fijarTopeTotal(bot.id, bytes) }; runCatching { Repo.confirmarTope(bot.id) }; ajustes.topeAvisoMarcado(); estadoTope = null } },
+                alEntendido = { alcance.launch { runCatching { Repo.confirmarTope(bot.id) }; ajustes.topeAvisoMarcado(); estadoTope = null } },
             )
         }
     }
+    // E9: en una instalación nueva se ofrece una vez el asistente «Crea tu bot», después de los demás avisos.
+    val auditoriaOk = auditoria?.let { it.avisoVisto && !it.retPendiente } ?: true
+    if (ofrecerAsistente && !avisoModo && modulosRevisados && estadoTope == null && auditoriaOk) AvisoAsistenteBot(
+        alEmpezar = { ofrecerAsistente = false; alcance.launch { runCatching { Repo.asistenteVisto(bot.id) } }; nav.navigate("asistente_bot") },
+        alDespues = { ofrecerAsistente = false; alcance.launch { runCatching { Repo.asistenteVisto(bot.id) } } },
+    )
     if (avisoModo && modulosRevisados) AvisoModoSimple(completo, alCompleto = { ajustes.fijarModoCompleto(true); ajustes.avisoModoVisto() }, alSimple = { ajustes.fijarModoCompleto(false); ajustes.avisoModoVisto() })
 }

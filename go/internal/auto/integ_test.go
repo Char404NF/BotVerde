@@ -840,3 +840,67 @@ func TestAtajoConArchivosConPausaYFallo(t *testing.T) {
 		t.Fatalf("pausa de 1 a 3 s antes de cada archivo: %v", e.rel.pausas())
 	}
 }
+
+// v0.6.0 E9: el Saludo de fábrica (regla de Sistema) no tapa bienvenida, ausencia ni recibido.
+func TestSaludoDeFabricaNoTapaBienvenida(t *testing.T) {
+	e := nuevo(t)
+	e.alm.SembrarSaludo(1, flujo.SaludoJSON())
+	e.crea(t, almacen.AutoBienvenida, "Bienvenida real", nil)
+	e.llega(ana, "buenas")
+	l := e.espera(t, 1)
+	if l[0].sal.Texto != "Bienvenida real" || l[0].etiqueta != "bienvenida" {
+		t.Fatalf("debía salir la bienvenida y no hola: %+v", l[0])
+	}
+	// Ana ya no es nueva: ya no le toca bienvenida, así que sí sale el Saludo.
+	e.rel.avanza(2 * time.Minute)
+	e.llega(ana, "otra vez")
+	l = e.espera(t, 2)
+	if l[1].sal.Texto != "hola" {
+		t.Fatalf("sin automático que le toque se queda el Saludo: %+v", l[1])
+	}
+}
+
+func TestSaludoDeFabricaNoTapaAusenciaNiRecibido(t *testing.T) {
+	e := nuevo(t)
+	e.alm.SembrarSaludo(1, flujo.SaludoJSON())
+	e.crea(t, almacen.AutoAusencia, "Fuera de horario", nil)
+	// martes 10:00: dentro de horario, la ausencia no toca: contesta el Saludo
+	e.llega(ana, "hola")
+	l := e.espera(t, 1)
+	if l[0].sal.Texto != "hola" {
+		t.Fatalf("dentro de horario: %+v", l[0])
+	}
+	// fuera de horario: gana la ausencia
+	e.rel.avanza(10 * time.Hour)
+	e.llega(ben, "¿hay alguien?")
+	l = e.espera(t, 2)
+	if l[1].sal.Texto != "Fuera de horario" || l[1].etiqueta != "ausencia" {
+		t.Fatalf("ausencia: %+v", l[1])
+	}
+	e2 := nuevo(t)
+	e2.alm.SembrarSaludo(1, flujo.SaludoJSON())
+	e2.crea(t, almacen.AutoRecibido, "Recibido real", nil)
+	e2.llega(cla, "hola")
+	l = e2.espera(t, 1)
+	if l[0].sal.Texto != "Recibido real" {
+		t.Fatalf("recibido: %+v", l[0])
+	}
+}
+
+func TestSaludoDeFabricaSigueSiNoHayAutomaticosNiTapaReglasDelUsuario(t *testing.T) {
+	e := nuevo(t)
+	e.alm.SembrarSaludo(1, flujo.SaludoJSON())
+	e.llega(ana, "buenas")
+	if l := e.espera(t, 1); l[0].sal.Texto != "hola" {
+		t.Fatalf("%+v", l[0])
+	}
+	regla := &flujo.Def{V: 1, Nombre: "Precios", Inicio: "r", Pasos: []flujo.Paso{{ID: "r", Tipo: flujo.PasoRespuesta, Texto: "Precios web"}},
+		Disparadores: flujo.Disparadores{Palabras: []string{"precios"}}, Alcance: flujo.Alcance{Privados: true}}
+	regla.Normalizar()
+	_, _ = e.alm.CrearMenu(1, regla.JSON(), true, false)
+	e.crea(t, almacen.AutoBienvenida, "Bienvenida", nil)
+	e.llega(ben, "precios")
+	if l := e.espera(t, 2); l[1].sal.Texto != "Precios web" {
+		t.Fatalf("la regla del usuario manda: %+v", l[1])
+	}
+}

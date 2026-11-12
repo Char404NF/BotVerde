@@ -143,6 +143,29 @@ class MotorFalso : Motor {
     override fun topeAlmacenamiento(bot: Long) = 5L shl 30
     override fun fijarTope(bot: Long, bytes: Long) { llamadas += "tope:$bytes" }
     override fun aplicarTopeAhora(bot: Long) = "{\"borrados\":0}"
+    var topePend = false
+    override fun topePendiente(bot: Long) = topePend
+    override fun confirmarTope(bot: Long) { llamadas += "tope_confirmado"; topePend = false }
+    // Asistente «Crea tu bot»: por defecto ya se ofreció (no estorba a las demás pantallas).
+    var asistVisto = true
+    var asistAplicado = false
+    var asistOtroNumero = ""
+    var asistGuardado: String? = null
+    var asistProbarError: String? = null
+    var asistProblemas = "[]"
+    override fun asistenteEstado(bot: Long): String {
+        val b = asistGuardado ?: com.botchat.app.datos.JsonE9.borradorPorDefecto()
+        return "{\"borrador\":$b,\"problemas\":$asistProblemas,\"visto\":$asistVisto,\"aplicado\":$asistAplicado,\"numeroPrueba\":\"$asistOtroNumero\",\"numeroPruebaDe\":\"asistente\"}"
+    }
+    override fun asistenteGuardar(bot: Long, borradorJson: String) { asistGuardado = borradorJson; llamadas += "asist_guardar" }
+    override fun asistenteVisto(bot: Long) { asistVisto = true; llamadas += "asist_visto" }
+    override fun asistenteAplicar(bot: Long): String { llamadas += "asist_aplicar"; asistAplicado = true; return "{\"menu\":7,\"autos\":[3],\"avisos\":[]}" }
+    override fun asistenteDeshacer(bot: Long) { llamadas += "asist_deshacer"; asistAplicado = false }
+    override fun asistenteDescartar(bot: Long) { llamadas += "asist_descartar"; asistGuardado = null }
+    override fun asistenteProbar(bot: Long, numero: String): String {
+        asistProbarError?.let { throw IllegalStateException(it) }
+        llamadas += "asist_probar:$numero"; return "{\"id\":\"X\"}"
+    }
     override fun conservarPortadaVideo(bot: Long) = true
     override fun fijarConservarPortada(bot: Long, si: Boolean) { llamadas += "portada:$si" }
     override fun configurarVerUnaVez(dias: Long) { llamadas += "verDias:$dias" }

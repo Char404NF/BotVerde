@@ -196,6 +196,11 @@ var ajustesBotDefecto = map[string]string{
 	"audit_ret_dias":      "90", // días que se conserva el texto (30, 90 o 0 = siempre); instalación nueva = 90
 	"audit_ret_pendiente": "0",  // 1 = vienes de una versión anterior y todavía no elegiste: no se purga nada
 	"audit_aviso_visto":   "0",  // 1 = ya viste el aviso de auditoría
+	"tope_confirmado":     "1",  // 0 = actualizaste con más archivos que el tope y aún no lo viste: el tope NO borra nada hasta confirmarlo
+	"tope_conf_init":      "0",  // 1 = ya se decidió (una sola vez) si el tope arranca pendiente o confirmado
+	"util_notas":          "1",  // notas y pendientes por comando (el asistente «Crea tu bot» puede apagarlos)
+	"util_recordatorios":  "1",  // !recordar (idem)
+	"asistente_visto":     "0",  // 1 = ya se ofreció el asistente «Crea tu bot» (instalación nueva: se ofrece una vez)
 	"sha_relleno_tope":    "0",  // relleno de la huella de archivos viejos: hasta qué fila
 	"sha_relleno_cursor":  "0",  // ... y por cuál va
 	"sha_relleno_fin":     "0",  // ... 1 = terminó

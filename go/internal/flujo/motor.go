@@ -183,10 +183,11 @@ type resultado struct {
 	Sesion    *motor.RefSesion
 	Termino   bool   // una conversación de menú acaba de terminar bien (para el mensaje automático de cierre)
 	Etiqueta  string // "menu", "regla" o "comando": qué clase de automatización contesta
+	Sistema   bool   // contestó la automatización de fábrica (el Saludo)
 }
 
 func (r resultado) decision() motor.Decision {
-	return motor.Decision{Respuestas: r.Salidas, Coincidio: r.Coincidio, PasarAHumano: r.Humano, Omitir: r.Omitir, Sesion: r.Sesion, Termino: r.Termino, Etiqueta: r.Etiqueta}
+	return motor.Decision{Respuestas: r.Salidas, Coincidio: r.Coincidio, PasarAHumano: r.Humano, Omitir: r.Omitir, Sesion: r.Sesion, Termino: r.Termino, Etiqueta: r.Etiqueta, Sistema: r.Sistema}
 }
 
 // etiquetaDe dice qué clase de automatización es: un comando propio, un menú interactivo o una regla de respuesta suelta.
@@ -308,6 +309,7 @@ func (m *Motor) procesa(e entrada, prueba bool, forzarMenu int64) (resultado, er
 		}
 		r, err := m.inicia(def, mn, e, prueba, ahora, forzarMenu == 0)
 		r.Etiqueta = etiquetaDe(def)
+		r.Sistema = mn.Sistema && !prueba && forzarMenu == 0
 		return r, err
 	}
 	// Citaron un menú que ya terminó: se les dice una sola vez (por persona y menú).

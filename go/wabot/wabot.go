@@ -119,6 +119,8 @@ func Start(raiz string, botID int64, clave []byte, l Listener) error {
 	if err := abrirAlmacenLocked(raiz, clave); err != nil {
 		return err
 	}
+	// v0.6.0 E9: antes de que nada pueda aplicar el tope, se decide si espera el aviso de la primera vez.
+	alm.InicializarTope(botID)
 	sesion := filepath.Join(raiz, "bots", fmt.Sprint(botID))
 	if err := os.MkdirAll(sesion, 0o700); err != nil {
 		return fmt.Errorf("no se pudo crear la carpeta: %w", err)

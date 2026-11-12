@@ -111,6 +111,18 @@ func (d *Decisor) Decidir(ctx context.Context, ultimo motor.Mensaje, lote []moto
 		return dec, err
 	}
 	ev := d.evento(ultimo, lote, d.c.Ahora())
+	// El Saludo de fábrica tiene la prioridad más baja: si hay bienvenida, ausencia o recibido que le toquen, salen ellos y no "hola".
+	if dec.Sistema && !dec.PasarAHumano {
+		salidas := d.elegir(almacen.AutoBienvenida, ev, false)
+		salidas = append(salidas, d.elegir(almacen.AutoAusencia, ev, false)...)
+		if len(salidas) == 0 {
+			salidas = d.elegir(almacen.AutoRecibido, ev, false)
+		}
+		if len(salidas) > 0 {
+			return motor.Decision{Respuestas: salidas, Coincidio: "mensaje automático"}, nil
+		}
+		return dec, nil
+	}
 	// Un menú terminó bien: sale el cierre detrás de su último mensaje.
 	if dec.Termino {
 		if s := d.elegir(almacen.AutoCierre, ev, false); len(s) > 0 {

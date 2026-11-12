@@ -203,6 +203,9 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 	_ = d.Registrar(comandos.Comando{Nombre: "recordar", Alias: []string{"recordatorio"}, Resumen: "Crear un recordatorio para ti", SoloDueno: true,
 		Uso: "recordar mañana 9:00 llamar a Ana",
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
+			if s.Alm.AjusteBot(s.BotID, "util_recordatorios") == "0" { // v0.6.0 E9: lo apaga el asistente «Crea tu bot»
+				return "", errors.New("los recordatorios están apagados")
+			}
 			if len(cx.Args) == 1 && identidad.Normalizar(cx.Args[0]) == "lista" {
 				rs, err := s.Alm.ListarRecordatorios(s.BotID, false)
 				if err != nil {

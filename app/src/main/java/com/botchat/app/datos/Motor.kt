@@ -69,8 +69,20 @@ interface Motor {
     fun fijarTope(bot: Long, bytes: Long)
     /** Aplica el tope ya y devuelve (JSON) lo que borró. */
     fun aplicarTopeAhora(bot: Long): String
+    /** El tope espera que el dueño vea el aviso de la primera vez: mientras sea así Go no borra nada. */
+    fun topePendiente(bot: Long): Boolean
+    /** Marca el aviso como visto y deja que el tope se aplique. */
+    fun confirmarTope(bot: Long)
     fun conservarPortadaVideo(bot: Long): Boolean
     fun fijarConservarPortada(bot: Long, si: Boolean)
+    /** Asistente «Crea tu bot» (E9). */
+    fun asistenteEstado(bot: Long): String
+    fun asistenteGuardar(bot: Long, borradorJson: String)
+    fun asistenteVisto(bot: Long)
+    fun asistenteAplicar(bot: Long): String
+    fun asistenteDeshacer(bot: Long)
+    fun asistenteDescartar(bot: Long)
+    fun asistenteProbar(bot: Long, numero: String): String
     fun configurarVerUnaVez(dias: Long)
     fun configurarMotor(activo: Boolean, ventanaMin: Long)
     fun actividadMotor(bot: Long, limite: Long): String
@@ -402,8 +414,17 @@ object MotorGo : Motor {
     override fun topeAlmacenamiento(bot: Long) = Wabot.topeAlmacenamiento(bot)
     override fun fijarTope(bot: Long, bytes: Long) = Wabot.fijarTope(bot, bytes)
     override fun aplicarTopeAhora(bot: Long) = Wabot.aplicarTopeAhora(bot)
+    override fun topePendiente(bot: Long) = Wabot.topePendiente(bot)
+    override fun confirmarTope(bot: Long) = Wabot.confirmarTope(bot)
     override fun conservarPortadaVideo(bot: Long) = Wabot.conservarPortadaVideo(bot)
     override fun fijarConservarPortada(bot: Long, si: Boolean) = Wabot.fijarConservarPortada(bot, si)
+    override fun asistenteEstado(bot: Long) = Wabot.asistenteEstado(bot)
+    override fun asistenteGuardar(bot: Long, borradorJson: String) = Wabot.asistenteGuardar(bot, borradorJson)
+    override fun asistenteVisto(bot: Long) = Wabot.asistenteVisto(bot)
+    override fun asistenteAplicar(bot: Long) = Wabot.asistenteAplicar(bot)
+    override fun asistenteDeshacer(bot: Long) = Wabot.asistenteDeshacer(bot)
+    override fun asistenteDescartar(bot: Long) = Wabot.asistenteDescartar(bot)
+    override fun asistenteProbar(bot: Long, numero: String) = Wabot.asistenteProbar(bot, numero)
     override fun configurarVerUnaVez(dias: Long) = Wabot.configurarVerUnaVez(dias)
     override fun configurarMotor(activo: Boolean, ventanaMin: Long) = Wabot.configurarMotor(activo, ventanaMin)
     override fun actividadMotor(bot: Long, limite: Long) = Wabot.actividadMotor(bot, limite)

@@ -227,3 +227,86 @@ func TestTopeTotalAjustes(t *testing.T) {
 		t.Fatal("conservar portada de fábrica")
 	}
 }
+
+// v0.6.0 E9: al actualizar con más archivos que el tope, el tope NO borra nada hasta que se confirma el aviso.
+func prepararPasado(t *testing.T) (*Almacen, int64, []*Mensaje) {
+	a := nuevo(t)
+	c := "1@s.whatsapp.net"
+	chatBasico(t, a, c, "525512345678", "Ana", false)
+	base := time.Now().Add(-48 * time.Hour).Unix()
+	var ms []*Mensaje
+	for i := 0; i < 10; i++ {
+		m := conArchivo(t, a, c, string(rune('A'+i)), TipoDocumento, 10000, base+int64(i))
+		viejoEnDisco(t, a, m)
+		ms = append(ms, m)
+	}
+	uso := a.UsoMultimedia(1)
+	return a, uso - uso/10, ms
+}
+
+func TestTopePendienteAlActualizarNoBorraHastaConfirmar(t *testing.T) {
+	a, tope, ms := prepararPasado(t)
+	_ = a.FijarAjusteBot(1, "audit_ret_pendiente", "1") // marca de la migración 20: viene de una versión anterior
+	if err := a.FijarTopeTotal(1, tope); err != nil {
+		t.Fatal(err)
+	}
+	a.InicializarTope(1)
+	if !a.TopePendiente(1) {
+		t.Fatal("debía quedar pendiente")
+	}
+	r, err := a.AplicarTope(1, tope, time.Now())
+	if err != nil || r.Borrados != 0 {
+		t.Fatalf("pendiente no debe borrar: %+v %v", r, err)
+	}
+	for _, m := range ms {
+		if estadoArch(t, a, "1@s.whatsapp.net", m.ID) == EstadoBorrado {
+			t.Fatal("se borró un archivo con el tope pendiente")
+		}
+	}
+	// Reiniciar (volver a inicializar) no lo confirma ni lo cambia.
+	a.InicializarTope(1)
+	if !a.TopePendiente(1) {
+		t.Fatal("la segunda inicialización no debe cambiar nada")
+	}
+	if err := a.ConfirmarTope(1); err != nil {
+		t.Fatal(err)
+	}
+	if a.TopePendiente(1) {
+		t.Fatal("debía quedar confirmado")
+	}
+	if r, _ := a.AplicarTope(1, tope, time.Now()); r.Borrados == 0 {
+		t.Fatalf("confirmado debe borrar: %+v", r)
+	}
+}
+
+func TestTopeInstalacionNuevaYActualizacionSinExcesoEstanConfirmados(t *testing.T) {
+	// Instalación nueva (sin marca de actualización) aunque pase del tope: confirmado y borra.
+	a, tope, _ := prepararPasado(t)
+	_ = a.FijarTopeTotal(1, tope)
+	a.InicializarTope(1)
+	if a.TopePendiente(1) {
+		t.Fatal("instalación nueva debe estar confirmada")
+	}
+	if r, _ := a.AplicarTope(1, tope, time.Now()); r.Borrados == 0 {
+		t.Fatalf("debía borrar: %+v", r)
+	}
+	// Actualización que NO pasa del tope: confirmado.
+	b, _, _ := prepararPasado(t)
+	_ = b.FijarAjusteBot(1, "audit_ret_pendiente", "1")
+	_ = b.FijarTopeTotal(1, b.UsoMultimedia(1)*2)
+	b.InicializarTope(1)
+	if b.TopePendiente(1) {
+		t.Fatal("sin exceso no hay nada pendiente")
+	}
+}
+
+func TestSubirOQuitarElTopeNoConfirmaPorSiSolo(t *testing.T) {
+	a, tope, _ := prepararPasado(t)
+	_ = a.FijarAjusteBot(1, "audit_ret_pendiente", "1")
+	_ = a.FijarTopeTotal(1, tope)
+	a.InicializarTope(1)
+	_ = a.FijarTopeTotal(1, tope/2) // bajarlo desde otra pantalla tampoco borra
+	if r, _ := a.AplicarTope(1, tope/2, time.Now()); r.Borrados != 0 {
+		t.Fatalf("pendiente: %+v", r)
+	}
+}

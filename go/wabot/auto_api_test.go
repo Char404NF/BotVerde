@@ -13,6 +13,7 @@ import (
 	"botchat/internal/almacen"
 	"botchat/internal/auto"
 	"botchat/internal/envio"
+	"botchat/internal/flujo"
 
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
@@ -279,22 +280,44 @@ func TestUnaReglaQueContestaATodoTienePrioridadYSeAvisa(t *testing.T) {
 	cli := &clienteFalso{}
 	s.envio = envio.Nuevo(1, alm, cli, nil)
 	guarda(t, autoEntrada{Tipo: "recibido", Texto: "Recibido", Config: auto.ConfigPorDefecto("recibido"), Activo: true})
+	// v0.6.0 E9: el Saludo de fábrica ya no es un conflicto ni tapa los mensajes automáticos.
 	l := decodifica[autoLista](t, func() (string, error) { return ListarAutos(1, "") })
-	if len(l.Conflictos) != 1 || l.Conflictos[0] != "Saludo" {
-		t.Fatalf("avisa que el Saludo de fábrica contesta a todo: %+v", l.Conflictos)
+	if len(l.Conflictos) != 0 {
+		t.Fatalf("el Saludo de fábrica no debe avisar como conflicto: %+v", l.Conflictos)
 	}
 	ana := types.NewJID("5215511111111", types.DefaultUserServer)
 	s.evento(textoDeChat("W1", ana, "hola"))
-	esperaHasta(t, "no salió el saludo", func() bool { cli.mu.Lock(); defer cli.mu.Unlock(); return len(cli.enviados) >= 1 })
+	esperaHasta(t, "no salió el recibido", func() bool { cli.mu.Lock(); defer cli.mu.Unlock(); return len(cli.enviados) >= 1 })
 	cli.mu.Lock()
 	txt := cli.enviados[0].GetExtendedTextMessage().GetText()
 	cli.mu.Unlock()
-	if txt == "Recibido" {
-		t.Fatal("la regla manda sobre los automáticos")
+	if txt != "Recibido" {
+		t.Fatalf("el automático manda sobre el Saludo: %q", txt)
 	}
 	au, _ := alm.ListarMensajesAuto(1, ana.String(), 0, 10)
-	if len(au) != 1 || au[0].Automatico != "regla" {
-		t.Fatalf("también se etiqueta lo que manda una regla: %+v", au)
+	if len(au) != 1 || au[0].Automatico != "recibido" {
+		t.Fatalf("se etiqueta como automático: %+v", au)
+	}
+	// Una regla PROPIA que contesta a todo sí tapa a los automáticos y se avisa.
+	apagaMenusDeSistema(t)
+	todo := &flujo.Def{V: 1, Nombre: "Todo", Inicio: "r", Pasos: []flujo.Paso{{ID: "r", Tipo: flujo.PasoRespuesta, Texto: "Regla propia"}},
+		Disparadores: flujo.Disparadores{Cualquiera: true}, Alcance: flujo.Alcance{Privados: true}}
+	todo.Normalizar()
+	if _, err := alm.CrearMenu(1, todo.JSON(), true, false); err != nil {
+		t.Fatal(err)
+	}
+	l = decodifica[autoLista](t, func() (string, error) { return ListarAutos(1, "") })
+	if len(l.Conflictos) != 1 || l.Conflictos[0] != "Todo" {
+		t.Fatalf("avisa de la regla propia: %+v", l.Conflictos)
+	}
+	beto := types.NewJID("5215522222222", types.DefaultUserServer)
+	s.evento(textoDeChat("W2", beto, "hola"))
+	esperaHasta(t, "no salió la regla", func() bool { cli.mu.Lock(); defer cli.mu.Unlock(); return len(cli.enviados) >= 2 })
+	cli.mu.Lock()
+	txt = cli.enviados[1].GetExtendedTextMessage().GetText()
+	cli.mu.Unlock()
+	if txt != "Regla propia" {
+		t.Fatalf("la regla propia manda: %q", txt)
 	}
 }
 

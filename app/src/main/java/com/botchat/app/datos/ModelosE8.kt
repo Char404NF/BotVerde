@@ -14,6 +14,8 @@ data class TipoAlmacen(val tipo: String, val bytes: Long, val cantidad: Int, val
 data class EstadoAlmacen(
     val topeTotal: Long, val uso: Long, val libre: Long, val total: Long, val ahorradoBytes: Long, val ahorradoArchivos: Int,
     val conservarPortada: Boolean, val sinPortada: Int, val tipos: List<TipoAlmacen>,
+    /** Actualizaste con más archivos que el tope y aún no viste el aviso: Go no borra nada hasta que lo confirmes. */
+    val topePendiente: Boolean = false,
 ) {
     /** 0 a 1 contra el tope (0 si no hay tope). */
     val fraccion: Float get() = if (topeTotal > 0) (uso.toFloat() / topeTotal).coerceIn(0f, 1f) else 0f
@@ -68,6 +70,7 @@ object JsonE8 {
             o.optLong("topeTotal"), o.optLong("uso"), o.optLong("libre"), o.optLong("total"), o.optLong("ahorradoBytes"), o.optInt("ahorradoArchivos"),
             o.optBoolean("conservarPortada", true), o.optInt("sinPortada"),
             List(t?.length() ?: 0) { i -> t!!.getJSONObject(i).let { TipoAlmacen(it.optString("tipo"), it.optLong("bytes"), it.optInt("cantidad"), it.optBoolean("apagado"), it.optLong("topeArchivo"), it.optLong("topeTotal")) } },
+            o.optBoolean("topePendiente"),
         )
     }
 
@@ -128,6 +131,7 @@ private suspend fun <T> io(f: () -> T): T = withContext(Dispatchers.IO) { f() }
 
 suspend fun Repo.estadoAlmacen(bot: Long) = io { JsonE8.estado(motor.estadoAlmacenamiento(bot)) }
 suspend fun Repo.fijarTopeTotal(bot: Long, bytes: Long) = io { motor.fijarTope(bot, bytes) }
+suspend fun Repo.confirmarTope(bot: Long) = io { motor.confirmarTope(bot) }
 suspend fun Repo.fijarConservarPortada(bot: Long, si: Boolean) = io { motor.fijarConservarPortada(bot, si) }
 suspend fun Repo.estimarLimpieza(bot: Long, f: FiltroLimpieza) = io { Json.liberado(motor.estimarBorrado(bot, f.json())) }
 suspend fun Repo.borrarLimpieza(bot: Long, f: FiltroLimpieza) = io { Json.liberado(motor.borrarArchivos(bot, f.json())) }

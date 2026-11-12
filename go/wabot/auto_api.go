@@ -140,6 +140,9 @@ func ListarAutos(botID int64, tipo string) (string, error) {
 			if !mn.Activo {
 				continue
 			}
+			if mn.Sistema { // v0.6.0 E9: el Saludo de fábrica ya no tapa los mensajes automáticos
+				continue
+			}
 			if d, err := flujo.Parse(mn.Def); err == nil && d.Propio == nil && d.Disparadores.Cualquiera && d.Alcance.Privados {
 				out.Conflictos = append(out.Conflictos, d.Nombre)
 			}

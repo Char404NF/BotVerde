@@ -245,9 +245,11 @@ fun PantallaCentroBot(
     alMiBot: () -> Unit, alAlmacenamiento: () -> Unit, alAuditoria: () -> Unit, alSilencios: () -> Unit, alAdvertencias: () -> Unit,
     alEtiquetas: () -> Unit, alAjustes: () -> Unit,
     alComandos: () -> Unit = {}, alModulos: () -> Unit = {}, alLimites: () -> Unit = {}, alLaboratorio: () -> Unit = {}, alActividad: () -> Unit = {},
+    alAsistente: () -> Unit = {},
 ) {
     val completo = LocalModoCompleto.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Esp.l).testTag("pantalla_centro_bot"), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
+        BotonGrande(Ico.Agregar, "Crea tu bot", "Cinco pasos: dónde responde, bienvenida, menú, reglas y utilidades", "hub_asistente", alAsistente)
         BotonGrande(Ico.Bot, "Mi bot", "Encender, apagar y ver si está conectado", "hub_mi_bot", alMiBot)
         BotonGrande(Ico.Espacio, "Almacenamiento", "Cuánto espacio ocupan tus chats y cómo liberarlo", "hub_almacenamiento", alAlmacenamiento)
         BotonGrande(Ico.Candado, "Auditoría y privacidad", "Qué se guarda y qué pasa con lo que borran", "hub_auditoria", alAuditoria)

@@ -170,6 +170,8 @@ type Decision struct {
 	Termino bool
 	// Etiqueta de las salidas que no traen la suya ("menu", "regla"…).
 	Etiqueta string
+	// Sistema: respondió la automatización de fábrica (el Saludo). Los mensajes automáticos (bienvenida, ausencia, recibido) van antes.
+	Sistema bool
 }
 
 // Decisor decide qué responder. `lote` trae todos los mensajes juntados (en privado) y `ultimo` es el último.

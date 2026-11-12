@@ -38,6 +38,33 @@ func FijarTope(botID int64, bytes int64) error {
 	return nil
 }
 
+// TopePendiente dice si el tope espera que el dueño vea el aviso de la primera vez (mientras tanto no se borra nada).
+func TopePendiente(botID int64) (bool, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return false, err
+	}
+	return a.TopePendiente(botID), nil
+}
+
+// ConfirmarTope marca el aviso como visto y deja que el tope se aplique (en segundo plano si ya se pasó).
+func ConfirmarTope(botID int64) error {
+	a, err := almacenAbierto()
+	if err != nil {
+		return err
+	}
+	if err := a.ConfirmarTope(botID); err != nil {
+		return err
+	}
+	mu.Lock()
+	s := st
+	mu.Unlock()
+	if s != nil && s.botID == botID && s.descargas != nil {
+		s.descargas.PedirTope()
+	}
+	return nil
+}
+
 // AplicarTopeAhora aplica el tope total ya (borra lo más viejo hasta el 90 %) y devuelve (JSON) lo que hizo.
 func AplicarTopeAhora(botID int64) (string, error) {
 	a, err := almacenAbierto()
@@ -74,6 +101,7 @@ type tipoEstado struct {
 
 type estadoAlmacenamiento struct {
 	TopeTotal        int64        `json:"topeTotal"`
+	TopePendiente    bool         `json:"topePendiente"`
 	Uso              int64        `json:"uso"`
 	Libre            int64        `json:"libre"`
 	Total            int64        `json:"total"`
@@ -91,7 +119,7 @@ func EstadoAlmacenamiento(botID int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	e := estadoAlmacenamiento{TopeTotal: a.TopeTotal(botID), Uso: a.UsoMultimedia(botID), ConservarPortada: a.ConservarPortada(botID), SinPortada: a.ContarSinPortada(botID)}
+	e := estadoAlmacenamiento{TopeTotal: a.TopeTotal(botID), TopePendiente: a.TopePendiente(botID), Uso: a.UsoMultimedia(botID), ConservarPortada: a.ConservarPortada(botID), SinPortada: a.ContarSinPortada(botID)}
 	e.Libre, e.Total = a.Libre()
 	e.AhorradoBytes, e.AhorradoArchivos = a.AhorradoPorDuplicados(botID)
 	uso, err := a.UsoPorClave(botID)

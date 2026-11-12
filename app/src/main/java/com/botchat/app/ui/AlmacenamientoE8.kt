@@ -310,7 +310,9 @@ fun AvisoTopeAlmacen(estado: EstadoAlmacen, alSubir: (Long) -> Unit, alEntendido
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Esp.s)) {
                 Text("Bot Chat guarda ${formatoBytes(estado.uso)} de fotos, videos y archivos, y el tope es de ${formatoBytes(estado.topeTotal)}.")
-                Text("Si no haces nada, se borrarán los archivos más viejos hasta quedar en el 90 %. Los mensajes de texto no se tocan, ni lo marcado.")
+                Text(if (estado.topePendiente) "Mientras no elijas, no se borra nada. Si dices «Está bien», se borrarán los archivos más viejos hasta quedar en el 90 %. Los mensajes de texto no se tocan, ni lo marcado."
+                else "Si no haces nada, se borrarán los archivos más viejos hasta quedar en el 90 %. Los mensajes de texto no se tocan, ni lo marcado.",
+                    Modifier.testTag("aviso_tope_texto"))
                 TextButton({ alSubir(propuesto) }, Modifier.testTag("aviso_tope_subir")) { Text("Subir el tope a ${formatoBytes(propuesto)}") }
                 TextButton({ alSubir(0) }, Modifier.testTag("aviso_tope_sin_limite")) { Text("Quitar el límite") }
             }

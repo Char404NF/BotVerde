@@ -123,6 +123,15 @@ func numero(cx *comandos.Contexto, uso string) (int, error) {
 func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 	reg := func(c comandos.Comando) {
 		c.Ambito = comandos.Privado
+		// v0.6.0 E9: el asistente «Crea tu bot» puede apagar las notas y los pendientes (util_notas = 0).
+		if ej := c.Ejecutar; ej != nil {
+			c.Ejecutar = func(cx *comandos.Contexto) (string, error) {
+				if s.Alm.AjusteBot(s.BotID, "util_notas") == "0" {
+					return "", fmt.Errorf("las notas y los pendientes están apagados")
+				}
+				return ej(cx)
+			}
+		}
 		_ = d.Registrar(c)
 	}
 	ag := func(tipo, ok string) func(cx *comandos.Contexto) (string, error) {
