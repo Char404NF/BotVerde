@@ -15,8 +15,8 @@ android {
         applicationId = "com.botchat.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.5.0"
+        versionCode = 10
+        versionName = "0.6.0"
         ndk { abiFilters += "arm64-v8a" }
     }
     // Dos variantes del MISMO app: mismo applicationId, mismo versionCode y la misma llave de firma (la de siempre), para poder
