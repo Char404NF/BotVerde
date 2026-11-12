@@ -2,7 +2,9 @@ package ingesta
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -264,6 +266,11 @@ func (g *Ingesta) preparar(ctx context.Context, evt *events.Message, historial b
 		return nil, err
 	}
 	if c.Editar != nil {
+		if !g.Alm.AuditoriaActiva(g.BotID, jid) {
+			// Auditoría apagada en este chat: se anota que se editó, pero el texto nuevo no se guarda.
+			_, err := g.Alm.MarcarEditado(g.BotID, jid, c.Editar.ID)
+			return nil, err
+		}
 		_, err := g.Alm.EditarTexto(g.BotID, jid, c.Editar.ID, c.Editar.Texto)
 		return nil, err
 	}
@@ -280,6 +287,7 @@ func (g *Ingesta) preparar(ctx context.Context, evt *events.Message, historial b
 		Tipo: c.Tipo, Texto: c.Texto, TS: evt.Info.Timestamp.Unix(), ArchivoMime: c.Mime, ArchivoBytes: c.Bytes, ArchivoNombre: c.Nombre,
 		Ancho: c.Ancho, Alto: c.Alto, DuracionS: c.DurS, NotaVoz: c.NotaVoz, ArchivoInfo: c.Info, ArchivoEstado: almacen.EstadoNinguno,
 		CitaID: c.CitaID, CitaTexto: c.CitaTexto, Menciones: c.Menciones, Reenviado: c.Reenviado,
+		DelHistorial: historial, SHA256: shaDe(c.Info), Enlaces: tieneEnlace(c.Texto),
 	}
 	if c.CitaID != "" {
 		m.CitaAutor = g.autorCitado(ctx, c.CitaAutor, evt.Info, chat, esGrupo)
@@ -325,7 +333,33 @@ func (g *Ingesta) preparar(ctx context.Context, evt *events.Message, historial b
 			l.auto = true
 		}
 	}
+	// Único punto de la auditoría para todo lo que llega (en vivo y del historial): con el interruptor del chat apagado se guarda sin texto.
+	if m.Tipo == almacen.TipoVerUnaVez {
+		m.SHA256 = nil // un "ver una vez" no deja ninguna huella
+	}
+	g.Alm.AplicarAuditoria(m)
 	return l, nil
+}
+
+var reEnlace = regexp.MustCompile(`(?i)(?:https?://|www\.)\S+`)
+
+// tieneEnlace dice si el texto trae un enlace (solo la bandera; el texto no se guarda en otro lado).
+func tieneEnlace(t string) bool { return t != "" && reEnlace.MatchString(t) }
+
+// shaDe saca la huella del archivo de los datos de descarga (nil si no hay).
+func shaDe(info []byte) []byte {
+	if len(info) == 0 {
+		return nil
+	}
+	i, err := ParseInfo(info)
+	if err != nil || i.SHA256 == "" {
+		return nil
+	}
+	b, err := base64.StdEncoding.DecodeString(i.SHA256)
+	if err != nil || len(b) == 0 {
+		return nil
+	}
+	return b
 }
 
 // VerUnaVezSinContenido guarda el aviso de un "ver una vez" que WhatsApp no entregó a este dispositivo.

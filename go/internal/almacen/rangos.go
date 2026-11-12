@@ -188,6 +188,14 @@ var ajustesBotDefecto = map[string]string{
 	"lab_biz_activo":   "0",     // interruptor propio de la prueba experimental "Interactivo + biz" (apagado)
 	"lab_biz_ack":      "0",     // casilla "Entiendo que puede bloquear mi número" de esa prueba
 	"lab_version_wa":   "",      // versión de WhatsApp del teléfono que recibe las pruebas
+	// Auditoría (v0.6.0, etapa E1)
+	"audit_defecto":       "1",  // guardar el texto de los mensajes (interruptor global; cada chat puede tener el suyo)
+	"audit_ret_dias":      "90", // días que se conserva el texto (30, 90 o 0 = siempre); instalación nueva = 90
+	"audit_ret_pendiente": "0",  // 1 = vienes de una versión anterior y todavía no elegiste: no se purga nada
+	"audit_aviso_visto":   "0",  // 1 = ya viste el aviso de auditoría
+	"sha_relleno_tope":    "0",  // relleno de la huella de archivos viejos: hasta qué fila
+	"sha_relleno_cursor":  "0",  // ... y por cuál va
+	"sha_relleno_fin":     "0",  // ... 1 = terminó
 }
 
 // AjusteBot devuelve un ajuste del bot (su valor por defecto si nunca se fijó).

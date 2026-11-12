@@ -183,19 +183,21 @@ type MensajeVista struct {
 	EliminadoEn  int64  `json:"eliminadoEn"`
 	EliminadoPor string `json:"eliminadoPor"` // nombre de quien lo eliminó, solo si no fue su autor
 
-	EstadoEnvio string          `json:"estadoEnvio"` // solo mensajes propios: enviando, enviado, entregado, leido o fallido
-	Entregados  int             `json:"entregados"`
-	Leidos      int             `json:"leidos"`
-	CitaID      string          `json:"citaId"`
-	CitaAutor   string          `json:"citaAutor"` // nombre de quien escribió lo citado ("yo" si fui yo)
-	CitaTexto   string          `json:"citaTexto"`
-	Menciones   []MencionVista  `json:"menciones"`
-	Reenviado   bool            `json:"reenviado"`
-	Reacciones  []ReaccionVista `json:"reacciones"`
-	VerEstado   string          `json:"verEstado"`
-	VerTipo     string          `json:"verTipo"`
-	VerExpira   int64           `json:"verExpira"`
-	Automatico  string          `json:"automatico"` // mensaje mío que mandó una automatización ("" = lo escribí yo)
+	EstadoEnvio  string          `json:"estadoEnvio"` // solo mensajes propios: enviando, enviado, entregado, leido o fallido
+	Entregados   int             `json:"entregados"`
+	Leidos       int             `json:"leidos"`
+	CitaID       string          `json:"citaId"`
+	CitaAutor    string          `json:"citaAutor"` // nombre de quien escribió lo citado ("yo" si fui yo)
+	CitaTexto    string          `json:"citaTexto"`
+	Menciones    []MencionVista  `json:"menciones"`
+	Reenviado    bool            `json:"reenviado"`
+	Reacciones   []ReaccionVista `json:"reacciones"`
+	VerEstado    string          `json:"verEstado"`
+	VerTipo      string          `json:"verTipo"`
+	VerExpira    int64           `json:"verExpira"`
+	Automatico   string          `json:"automatico"`   // mensaje mío que mandó una automatización ("" = lo escribí yo)
+	Olvidado     bool            `json:"olvidado"`     // se guardó sin texto (auditoría apagada o retención): la pantalla dice "contenido no guardado"
+	DelHistorial bool            `json:"delHistorial"` // llegó en la sincronización de historial
 
 	bot int64
 }
@@ -245,6 +247,7 @@ func (a *Almacen) vista(m *Mensaje, nom *nombresPagina) MensajeVista {
 	}
 	v.VerEstado, v.VerTipo, v.VerExpira = m.VerEstado, m.VerTipo, m.VerExpira
 	v.Automatico = m.Automatico
+	v.Olvidado, v.DelHistorial = m.Olvidado, m.DelHistorial
 	v.EstadoEnvio = estadoDe(m.EstadoEnvio, m.EsMio, 0, 0)
 	v.Reacciones = []ReaccionVista{}
 	v.PuedeBajarse = CategoriaDe(m.Tipo) != "" && len(m.ArchivoInfo) > 0 &&

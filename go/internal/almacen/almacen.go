@@ -469,18 +469,22 @@ type Mensaje struct {
 	VerTipo         string // qué era: imagen, video o audio
 	VerExpira       int64  // hora en que caduca si no se abre
 	Automatico      string // solo en mensajes propios: lo mandó una automatización ("menu", "regla", "bienvenida", "ausencia", "recibido", "cierre", "atajo", "comando"…); "" = escrito a mano
+	Olvidado        bool   // se guardó (o se quitó después) SIN texto, cita, nombre de archivo ni menciones: interruptor de auditoría apagado o retención
+	DelHistorial    bool   // llegó en una sincronización de historial, no en vivo
+	SHA256          []byte // huella del archivo según WhatsApp (para no bajar dos veces lo mismo); nil si no se sabe
+	Enlaces         bool   // el texto traía un enlace (se calcula al guardar, sin guardar nada más)
 }
 
-const colsInsertMensaje = "id,chat_jid,bot_id,remitente_jid,remitente_nombre,es_mio,tipo,texto_cifrado,ts,borrado,editado,archivo_ruta,archivo_bytes,archivo_mime,archivo_estado,miniatura_ruta,archivo_nombre_cifrado,archivo_info_cifrado,ancho,alto,duracion_s,nota_voz,estado_envio,cita_id,cita_autor,cita_texto_cifrado,menciones_cifrado,reenviado,ver_estado,ver_tipo,ver_expira,automatico"
+const colsInsertMensaje = "id,chat_jid,bot_id,remitente_jid,remitente_nombre,es_mio,tipo,texto_cifrado,ts,borrado,editado,archivo_ruta,archivo_bytes,archivo_mime,archivo_estado,miniatura_ruta,archivo_nombre_cifrado,archivo_info_cifrado,ancho,alto,duracion_s,nota_voz,estado_envio,cita_id,cita_autor,cita_texto_cifrado,menciones_cifrado,reenviado,ver_estado,ver_tipo,ver_expira,automatico,contenido_olvidado,del_historial,sha256,enlaces"
 const colsMensaje = colsInsertMensaje + ",eliminado_en,eliminado_por"
 
 func (a *Almacen) escanearMensaje(s interface{ Scan(...any) error }) (*Mensaje, error) {
 	var m Mensaje
 	var mio, borrado, editado, nota int
 	var texto, nombre, info, citaTexto, menciones []byte
-	var reenv int
+	var reenv, olvidado, historial, enlaces int
 	if err := s.Scan(&m.ID, &m.ChatJID, &m.BotID, &m.RemitenteJID, &m.RemitenteNombre, &mio, &m.Tipo, &texto, &m.TS, &borrado, &editado,
-		&m.ArchivoRuta, &m.ArchivoBytes, &m.ArchivoMime, &m.ArchivoEstado, &m.MiniaturaRuta, &nombre, &info, &m.Ancho, &m.Alto, &m.DuracionS, &nota, &m.EstadoEnvio, &m.CitaID, &m.CitaAutor, &citaTexto, &menciones, &reenv, &m.VerEstado, &m.VerTipo, &m.VerExpira, &m.Automatico, &m.EliminadoEn, &m.EliminadoPor); err != nil {
+		&m.ArchivoRuta, &m.ArchivoBytes, &m.ArchivoMime, &m.ArchivoEstado, &m.MiniaturaRuta, &nombre, &info, &m.Ancho, &m.Alto, &m.DuracionS, &nota, &m.EstadoEnvio, &m.CitaID, &m.CitaAutor, &citaTexto, &menciones, &reenv, &m.VerEstado, &m.VerTipo, &m.VerExpira, &m.Automatico, &olvidado, &historial, &m.SHA256, &enlaces, &m.EliminadoEn, &m.EliminadoPor); err != nil {
 		return nil, err
 	}
 	m.EsMio, m.Borrado, m.Editado, m.NotaVoz = mio == 1, borrado == 1, editado == 1, nota == 1
@@ -494,6 +498,7 @@ func (a *Almacen) escanearMensaje(s interface{ Scan(...any) error }) (*Mensaje, 
 		m.ArchivoInfo = t
 	}
 	m.Reenviado = reenv == 1
+	m.Olvidado, m.DelHistorial, m.Enlaces = olvidado == 1, historial == 1, enlaces == 1
 	if t, err := cifrado.AbrirTexto(a.clave, "cita_texto", citaTexto); err == nil {
 		m.CitaTexto = string(t)
 	}
@@ -534,10 +539,11 @@ func (a *Almacen) valoresMensaje(m *Mensaje) ([]any, error) {
 	}
 	return []any{m.ID, m.ChatJID, m.BotID, m.RemitenteJID, m.RemitenteNombre, b2i(m.EsMio), m.Tipo, texto, m.TS, b2i(m.Borrado), b2i(m.Editado),
 		m.ArchivoRuta, m.ArchivoBytes, m.ArchivoMime, estado, m.MiniaturaRuta, nombre, info, m.Ancho, m.Alto, m.DuracionS, b2i(m.NotaVoz),
-		m.EstadoEnvio, m.CitaID, m.CitaAutor, cita, menc, b2i(m.Reenviado), m.VerEstado, m.VerTipo, m.VerExpira, m.Automatico}, nil
+		m.EstadoEnvio, m.CitaID, m.CitaAutor, cita, menc, b2i(m.Reenviado), m.VerEstado, m.VerTipo, m.VerExpira, m.Automatico,
+		b2i(m.Olvidado), b2i(m.DelHistorial), m.SHA256, b2i(m.Enlaces)}, nil
 }
 
-const insertMensaje = "INSERT INTO messages(" + colsInsertMensaje + ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id,chat_jid,bot_id) DO NOTHING"
+const insertMensaje = "INSERT INTO messages(" + colsInsertMensaje + ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id,chat_jid,bot_id) DO NOTHING"
 
 // GuardarMensajes guarda varios mensajes en una sola transacción. Los chats deben existir.
 // Devuelve cuáles eran nuevos (los repetidos se ignoran).
@@ -625,20 +631,64 @@ func (a *Almacen) ObtenerMensaje(botID int64, chat, id string) (*Mensaje, error)
 	return m, err
 }
 
-// EditarTexto cambia el texto de un mensaje y lo marca como editado. Devuelve false si no existe.
+// EditarTexto cambia el texto de un mensaje y lo marca como editado. Antes de sobrescribir guarda el texto anterior como una versión
+// más en mensaje_ediciones (en la misma transacción), salvo que no hubiera texto guardado o fuera idéntico. Devuelve false si no existe.
 func (a *Almacen) EditarTexto(botID int64, chat, id, texto string) (bool, error) {
 	sellado, err := cifrado.SellarTexto(a.clave, "texto", []byte(texto))
 	if err != nil {
 		return false, err
 	}
-	r, err := a.db.Exec("UPDATE messages SET texto_cifrado=?, editado=1 WHERE bot_id=? AND chat_jid=? AND id=?", sellado, botID, chat, id)
+	tx, err := a.db.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	var actual []byte
+	var tipo string
+	if err := tx.QueryRow("SELECT texto_cifrado, tipo FROM messages WHERE bot_id=? AND chat_jid=? AND id=?", botID, chat, id).Scan(&actual, &tipo); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	if len(actual) > 0 && tipo != TipoVerUnaVez {
+		if previo, err := cifrado.AbrirTexto(a.clave, "texto", actual); err == nil && string(previo) != texto {
+			ed, err := cifrado.SellarTexto(a.clave, "texto_ed", previo)
+			if err != nil {
+				return false, err
+			}
+			var n int
+			if err := tx.QueryRow("SELECT COALESCE(MAX(n),0)+1 FROM mensaje_ediciones WHERE bot_id=? AND chat_jid=? AND msg_id=?", botID, chat, id).Scan(&n); err != nil {
+				return false, err
+			}
+			if _, err := tx.Exec("INSERT INTO mensaje_ediciones(bot_id, chat_jid, msg_id, n, ts, texto_cifrado) VALUES(?,?,?,?,?,?)",
+				botID, chat, id, n, time.Now().Unix(), ed); err != nil {
+				return false, err
+			}
+		}
+	}
+	// Un texto nuevo vuelve a tener contenido: si antes se había olvidado, deja de estar marcado así.
+	if _, err := tx.Exec("UPDATE messages SET texto_cifrado=?, editado=1, contenido_olvidado=CASE WHEN contenido_olvidado=1 THEN 0 ELSE contenido_olvidado END WHERE bot_id=? AND chat_jid=? AND id=?",
+		sellado, botID, chat, id); err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	a.avisaMsg(chat, id)
+	a.avisa("chats")
+	return true, nil
+}
+
+// MarcarEditado anota que el mensaje fue editado SIN guardar el texto nuevo (auditoría apagada en ese chat).
+func (a *Almacen) MarcarEditado(botID int64, chat, id string) (bool, error) {
+	r, err := a.db.Exec("UPDATE messages SET editado=1 WHERE bot_id=? AND chat_jid=? AND id=?", botID, chat, id)
 	if err != nil {
 		return false, err
 	}
 	n, _ := r.RowsAffected()
 	if n > 0 {
 		a.avisaMsg(chat, id)
-		a.avisa("chats")
 	}
 	return n > 0, nil
 }

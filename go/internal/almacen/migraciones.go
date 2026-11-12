@@ -709,6 +709,39 @@ var migraciones = [][]string{
 			PRIMARY KEY (bot_id, modulo, coleccion, clave)
 		) WITHOUT ROWID`,
 	},
+	// 20 · v0.6.0 etapa E1: auditoría y base para multimedia/UI. chat_estado: interruptor de texto por chat (-1 = usar el global),
+	// retención por chat (-1 = usar la global) y fijado local. messages: marca de "contenido olvidado" (0 = normal, 1 = se quitó el texto,
+	// 2 = revisado sin nada que olvidar), "del historial", huella del archivo (dedupe), portada de video, motivo del borrado del archivo
+	// y bandera de enlaces. mensaje_ediciones guarda las versiones anteriores de un mensaje editado (texto cifrado con AAD texto_ed).
+	// Quien actualiza queda con la retención "pendiente de elegir": no se purga nada hasta que se elija.
+	{
+		`ALTER TABLE chat_estado ADD COLUMN audit_texto INTEGER NOT NULL DEFAULT -1`,
+		`ALTER TABLE chat_estado ADD COLUMN audit_ret_dias INTEGER NOT NULL DEFAULT -1`,
+		`ALTER TABLE chat_estado ADD COLUMN fijado INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE messages ADD COLUMN sha256 BLOB`,
+		`ALTER TABLE messages ADD COLUMN portada_ruta TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE messages ADD COLUMN archivo_borrado_ts INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE messages ADD COLUMN archivo_borrado_motivo TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE messages ADD COLUMN enlaces INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE messages ADD COLUMN contenido_olvidado INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE messages ADD COLUMN del_historial INTEGER NOT NULL DEFAULT 0`,
+		`CREATE TABLE mensaje_ediciones (
+			bot_id INTEGER NOT NULL,
+			chat_jid TEXT NOT NULL,
+			msg_id TEXT NOT NULL,
+			n INTEGER NOT NULL,
+			ts INTEGER NOT NULL,
+			texto_cifrado BLOB,
+			PRIMARY KEY (bot_id, chat_jid, msg_id, n),
+			FOREIGN KEY (msg_id, chat_jid, bot_id) REFERENCES messages(id, chat_jid, bot_id) ON DELETE CASCADE
+		) WITHOUT ROWID`,
+		`CREATE INDEX idx_mensajes_sha ON messages(bot_id, sha256) WHERE sha256 IS NOT NULL AND archivo_estado='descargado'`,
+		`CREATE INDEX idx_mensajes_viejos ON messages(bot_id, archivo_estado, ts) WHERE archivo_estado='descargado'`,
+		`CREATE INDEX idx_mensajes_autor_tipo ON messages(bot_id, chat_jid, remitente_jid, tipo, ts)`,
+		`CREATE INDEX idx_mensajes_autor_global ON messages(bot_id, remitente_jid, ts)`,
+		`CREATE INDEX idx_mensajes_olvidar ON messages(bot_id, ts) WHERE contenido_olvidado=0`,
+		`INSERT OR IGNORE INTO bot_ajustes(bot_id, clave, valor) SELECT DISTINCT bot_id, 'audit_ret_pendiente', '1' FROM messages`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

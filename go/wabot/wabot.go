@@ -140,8 +140,12 @@ func Start(raiz string, botID int64, clave []byte, l Listener) error {
 	s.armar()
 	cli.AddEventHandler(s.evento)
 	st = s
-	s.wg.Add(2)
+	s.wg.Add(3)
 	go s.trabajador()
+	go func() {
+		defer s.wg.Done()
+		s.mantenimientoAuditoria(s.ctx)
+	}()
 	go func() {
 		defer s.wg.Done()
 		(&vigilante{vinculado: func() bool { return cli.Store.ID != nil }, conectado: cli.IsConnected, log: s.log,
