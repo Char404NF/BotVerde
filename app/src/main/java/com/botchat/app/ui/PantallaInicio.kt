@@ -198,6 +198,10 @@ fun FilaChat(c: ChatItem, modifier: Modifier, alAbrir: (String) -> Unit, contado
                     Text(if (contador >= 30) "30+" else contador.toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
                 }
             }
+            if (c.fijado) {
+                Spacer(Modifier.size(4.dp))
+                Icon(Ico.Fijar, "Fijado", Modifier.size(16.dp).testTag("fijado_${c.jid}"), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }

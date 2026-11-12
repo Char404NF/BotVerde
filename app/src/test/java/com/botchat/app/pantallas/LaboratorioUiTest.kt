@@ -325,6 +325,7 @@ class LaboratorioUiTest {
 
     @Test fun avanzadoTieneLaEntradaAlLaboratorio() {
         var abierto = false
+        Ajustes.get(Apoyo.ctx()).fijarModoCompleto(true) // en modo Simple (0.6.0) el Laboratorio está escondido
         regla.setContent { BotChatTema { PantallaAvanzado(Ajustes.get(Apoyo.ctx()), "Mi bot", false, {}, {}, {}, {}, alLaboratorio = { abierto = true }) } }
         regla.esperaEtiqueta("abrir_laboratorio")
         regla.onNodeWithTag("abrir_laboratorio", useUnmergedTree = true).performScrollTo().performClick()

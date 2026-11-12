@@ -398,6 +398,15 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
         viewModelScope.launch { runCatching { Repo.borrarArchivos(botId, chat = jid) }.onSuccess(alTerminar).onFailure { aviso = it.message } }
     }
 
+    fun fijar(si: Boolean) {
+        viewModelScope.launch { runCatching { Repo.fijarChat(botId, jid, si); estadoChat = estadoChat.copy(fijado = si) }.onFailure { aviso = it.message } }
+    }
+
+    /** Borra mensajes y archivos del chat pero deja el chat. No se puede deshacer (la pantalla pide confirmar antes). */
+    fun vaciar(alTerminar: () -> Unit) {
+        viewModelScope.launch { runCatching { Repo.vaciarChat(botId, jid) }.onSuccess { recargar(); alTerminar() }.onFailure { aviso = it.message } }
+    }
+
     fun borrarChat(alTerminar: () -> Unit) {
         viewModelScope.launch { runCatching { Repo.borrarChat(botId, jid) }.onSuccess { alTerminar() }.onFailure { aviso = it.message } }
     }

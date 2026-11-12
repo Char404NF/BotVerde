@@ -64,6 +64,7 @@ type ChatLista struct {
 	UltimoMio     bool    `json:"ultimoMio"`
 	EstadoTrabajo string  `json:"estadoTrabajo"` // "", "pendiente" o "resuelto"
 	Etiquetas     []int64 `json:"etiquetas"`     // ids de las etiquetas del chat
+	Fijado        bool    `json:"fijado"`        // fijado arriba (local)
 }
 
 // ListarChats devuelve los chats de personas o de grupos, del más reciente al más viejo.
@@ -83,7 +84,7 @@ func (a *Almacen) ListarChats(botID int64, grupos bool, consulta string, limite,
 // listaChats arma la consulta de chats con su último mensaje. Con ignoraTipo se devuelven personas y grupos por igual.
 func (a *Almacen) listaChats(extra string, extraArgs []any, botID int64, esGrupo, limite, desde int, ignoraTipo bool) ([]ChatLista, error) {
 	q := `SELECT c.jid,c.nombre_mostrado,c.telefono_mostrado,c.pais_iso,c.es_grupo,c.foto_ruta,c.foto_ts,c.ultimo_ts,
-		m.tipo,m.texto_cifrado,m.borrado,m.es_mio,COALESCE(e.estado_trabajo,'')
+		m.tipo,m.texto_cifrado,m.borrado,m.es_mio,COALESCE(e.estado_trabajo,''),COALESCE(e.fijado,0)
 		FROM chats c LEFT JOIN messages m ON m.rowid = (
 			SELECT rowid FROM messages WHERE bot_id=c.bot_id AND chat_jid=c.jid ORDER BY ts DESC, id DESC LIMIT 1)
 		LEFT JOIN chat_estado e ON e.bot_id=c.bot_id AND e.chat_jid=c.jid
@@ -96,7 +97,7 @@ func (a *Almacen) listaChats(extra string, extraArgs []any, botID int64, esGrupo
 	q += extra
 	args = append(args, extraArgs...)
 	// Los chats sin mensajes (solo creados por nombres de contacto) no se listan.
-	q += ` AND m.id IS NOT NULL ORDER BY c.ultimo_ts DESC, c.jid LIMIT ? OFFSET ?`
+	q += ` AND m.id IS NOT NULL ORDER BY COALESCE(e.fijado,0) DESC, c.ultimo_ts DESC, c.jid LIMIT ? OFFSET ?`
 	args = append(args, limite, desde)
 	filas, err := a.db.Query(q, args...)
 	if err != nil {
@@ -106,13 +107,13 @@ func (a *Almacen) listaChats(extra string, extraArgs []any, botID int64, esGrupo
 	out := []ChatLista{}
 	for filas.Next() {
 		var c ChatLista
-		var g, borrado, mio int
+		var g, borrado, mio, fij int
 		var tipo *string
 		var texto []byte
-		if err := filas.Scan(&c.JID, &c.Nombre, &c.Telefono, &c.Pais, &g, &c.Foto, &c.FotoTS, &c.UltimoTS, &tipo, &texto, &borrado, &mio, &c.EstadoTrabajo); err != nil {
+		if err := filas.Scan(&c.JID, &c.Nombre, &c.Telefono, &c.Pais, &g, &c.Foto, &c.FotoTS, &c.UltimoTS, &tipo, &texto, &borrado, &mio, &c.EstadoTrabajo, &fij); err != nil {
 			return nil, err
 		}
-		c.EsGrupo, c.UltimoBorrado, c.UltimoMio = g == 1, borrado == 1, mio == 1
+		c.EsGrupo, c.UltimoBorrado, c.UltimoMio, c.Fijado = g == 1, borrado == 1, mio == 1, fij == 1
 		if tipo != nil {
 			c.UltimoTipo = *tipo
 		}

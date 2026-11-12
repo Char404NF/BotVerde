@@ -42,18 +42,19 @@ fun PantallaAjustes(ajustes: Ajustes, alSeguridad: () -> Unit, alDescargas: () -
     alAvisos: () -> Unit = {}, alComandosPropios: () -> Unit = {}, alEtiquetas: () -> Unit = {}, alAdvertencias: () -> Unit = {}, alUtilidades: () -> Unit = {},
 ) {
     val modo by ajustes.bloqueo.collectAsState()
+    val completo = LocalModoCompleto.current
     val ctx = LocalContext.current
     val version = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "" }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
         Tarjeta(Ico.Chats, "Automatizaciones", "Menús y respuestas del bot", alAutomatizaciones, "ajuste_automatizaciones")
-        Tarjeta(Ico.Responder, "Comandos propios", "Tus propios comandos: !horario, !precios…", alComandosPropios, "ajuste_comandos_propios")
+        if (completo) Tarjeta(Ico.Responder, "Comandos propios", "Tus propios comandos: !horario, !precios…", alComandosPropios, "ajuste_comandos_propios")
         Tarjeta(Ico.Persona, "Rangos y permisos", if (pendientesSolicitudes > 0) plural(pendientesSolicitudes.toLong(), "solicitud pendiente", "solicitudes pendientes") else "Quién puede usar qué, solicitudes y grupos", alPermisos, "ajuste_permisos")
         Tarjeta(Ico.Aviso, "Advertencias y notas", "A quién has advertido y lo que anotaste de cada persona", alAdvertencias, "ajuste_advertencias")
         Tarjeta(Ico.Seleccionar, "Etiquetas", "Ordena tus chats con etiquetas de colores", alEtiquetas, "ajuste_etiquetas")
         Tarjeta(Ico.Reloj, "Avisos para mí", "Palabras clave, resumen del día y recordatorios", alAvisos, "ajuste_avisos")
         Tarjeta(Ico.Documento, "Notas y pendientes", "Tus notas y tu lista de pendientes; también por comando. Convertir fotos en stickers", alUtilidades, "ajuste_utilidades")
-        Tarjeta(Ico.Agregar, "Módulos", "Extras opcionales, apagados hasta que los enciendas", alModulos, "ajuste_modulos")
-        Tarjeta(Ico.Aviso, "Iniciativa propia", "El interruptor general de lo que el bot escribe solo, topes y No molestar", alIniciativa, "ajuste_iniciativa")
+        if (completo) Tarjeta(Ico.Agregar, "Módulos", "Extras opcionales, apagados hasta que los enciendas", alModulos, "ajuste_modulos")
+        if (completo) Tarjeta(Ico.Aviso, "Iniciativa propia", "El interruptor general de lo que el bot escribe solo, topes y No molestar", alIniciativa, "ajuste_iniciativa")
         Tarjeta(Ico.Candado, "Seguridad", when (modo) { Ajustes.Bloqueo.NINGUNO -> "Sin bloqueo"; Ajustes.Bloqueo.PIN -> "Protegida con PIN"; Ajustes.Bloqueo.HUELLA -> "Protegida con huella" }, alSeguridad, "ajuste_seguridad")
         Tarjeta(Ico.Candado, "Privacidad", "Mensajes eliminados por otros", alPrivacidad, "ajuste_privacidad")
         Tarjeta(Ico.Estadisticas, "Estadísticas", "Mensajes enviados y recibidos, y los chats más activos", alEstadisticas, "ajuste_estadisticas")

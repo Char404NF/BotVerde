@@ -66,7 +66,7 @@ private fun esGrupoDeChat(botId: Long, jid: String): Boolean {
     return grupo
 }
 
-private val RUTAS_PRINCIPALES = listOf("inicio", "espacio", "ajustes")
+private val RUTAS_PRINCIPALES = listOf("inicio", "personas", "grupos", "bot")
 
 private data class Destino(val ruta: String, val titulo: String, val icono: androidx.compose.ui.graphics.vector.ImageVector)
 
@@ -98,7 +98,19 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
     val principal = rutaActual in RUTAS_PRINCIPALES
     val estado by BotState.estado.collectAsState()
     val corriendo by BotState.corriendo.collectAsState()
-    val destinos = remember { listOf(Destino("inicio", "Chats", Ico.Chats), Destino("espacio", "Espacio", Ico.Espacio), Destino("ajustes", "Ajustes", Ico.Ajustes)) }
+    val destinos = remember { listOf(Destino("inicio", "Chats", Ico.Chats), Destino("personas", "Personas", Ico.Persona), Destino("grupos", "Grupos", Ico.Grupo), Destino("bot", "Bot", Ico.Bot)) }
+    // Modo Simple / Completo: solo cambia lo que se muestra. Quien actualizó y tiene módulos encendidos pasa a Completo (se mira una sola vez).
+    val completo by ajustes.modoCompleto.collectAsState()
+    val avisoModo by ajustes.avisoModoPendiente.collectAsState()
+    var modulosRevisados by remember { mutableStateOf(!ajustes.revisarModulosPendiente()) }
+    LaunchedEffect(bot.id) {
+        if (!modulosRevisados) {
+            val hay = runCatching { Repo.modulos(bot.id).any { it.activo } }.getOrNull()
+            if (hay == true) ajustes.fijarModoCompleto(true)
+            if (hay != null) ajustes.modulosRevisados()
+            modulosRevisados = true
+        }
+    }
 
     fun entre(a: String?, b: String?) = a in RUTAS_PRINCIPALES && b in RUTAS_PRINCIPALES
     fun entra(): AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
@@ -125,7 +137,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         topBar = {
             AnimatedVisibility(principal, enter = Transiciones.fundidoEntra(modo), exit = Transiciones.fundidoSale(modo)) {
-                BarraApp(estadoVisible(estado, corriendo, !bot.vinculado)) { nav.navigate("bot") }
+                BarraApp(estadoVisible(estado, corriendo, !bot.vinculado)) { nav.navigate("estado_bot") }
             }
         },
         bottomBar = {
@@ -142,7 +154,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
         },
     ) { relleno ->
     SharedTransitionLayout(Modifier.padding(relleno)) {
-        CompositionLocalProvider(LocalSharedScope provides this, LocalEstiloLetra provides estiloLetra) {
+        CompositionLocalProvider(LocalSharedScope provides this, LocalEstiloLetra provides estiloLetra, LocalModoCompleto provides completo) {
             NavHost(nav, startDestination = "inicio", enterTransition = entra(), exitTransition = sale(), popEnterTransition = vuelveEntra(), popExitTransition = vuelveSale()) {
                 composable("inicio") {
                     CompositionLocalProvider(LocalAnimScope provides this) {
@@ -153,6 +165,35 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         )
                     }
                 }
+                composable("personas") { PantallaPersonas(bot.id, alAbrir = { nav.navigate("persona_perfil/${enc(it)}") }) }
+                composable("grupos") { PantallaGrupos(bot.id, alAbrir = { nav.navigate("grupo_info/${enc(it)}") }) }
+                composable("bot") {
+                    PantallaCentroBot(
+                        alMiBot = { nav.navigate("estado_bot") }, alAlmacenamiento = { nav.navigate("espacio") }, alAuditoria = { nav.navigate("privacidad") },
+                        alSilencios = { nav.navigate("silencios") }, alAdvertencias = { nav.navigate("advertencias") }, alEtiquetas = { nav.navigate("etiquetas") },
+                        alAjustes = { nav.navigate("ajustes") }, alComandos = { nav.navigate("comandos_propios") }, alModulos = { nav.navigate("modulos") },
+                        alLimites = { nav.navigate("iniciativa") }, alLaboratorio = { nav.navigate("laboratorio") }, alActividad = { nav.navigate("actividad") },
+                    )
+                }
+                // Destinos provisorios: la etapa E7 pone aquí el perfil de la persona y la info del grupo. Por ahora abren las pantallas de siempre.
+                composable("persona_perfil/{jid}") { be ->
+                    val jid = be.arguments?.getString("jid") ?: return@composable
+                    PantallaPersonaDetalle(bot.id, jid, alVolver = { nav.popBackStack() })
+                }
+                composable("grupo_info/{jid}") { be ->
+                    val jid = be.arguments?.getString("jid") ?: return@composable
+                    PantallaInfoChat(
+                        bot.id, jid, alVolver = { nav.popBackStack() },
+                        alAbrirVisor = { id -> nav.navigate("visor/${enc(jid)}/${enc(id)}") },
+                        alAbrirDocumento = { id -> nav.navigate("documento/${enc(jid)}/${enc(id)}") },
+                        alAbrirLista = { f -> nav.navigate("lista/${enc(jid)}/${enc(f.json())}") },
+                        alAbrirPersona = { nav.navigate("persona/${enc(jid)}") },
+                        alOlvidada = { nav.popBackStack("inicio", false) },
+                        alAbrirGrupo = { nav.navigate("grupo/${enc(jid)}") },
+                    )
+                }
+                // Pantalla provisoria: la completa E8 (silencios en grupos).
+                composable("silencios") { PantallaProvisoria("Silencios", "Aquí verás a quién silenciaste en tus grupos y por cuánto tiempo. La están terminando.", alVolver = { nav.popBackStack() }, etiqueta = "provisoria_silencios") }
                 composable("chat/{jid}?ir={ir}", arguments = listOf(androidx.navigation.navArgument("ir") { type = androidx.navigation.NavType.StringType; defaultValue = "" })) { be ->
                     val jid = be.arguments?.getString("jid") ?: return@composable
                     val ir = be.arguments?.getString("ir") ?: ""
@@ -235,15 +276,17 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         alAbrirDocumento = { id -> nav.navigate("documento/${enc(jid)}/${enc(id)}") },
                     )
                 }
-                composable("espacio") { PantallaEspacio(alVolver = { irA("inicio") }, alAbrirChat = { nav.navigate("chat/${enc(it)}") }, conBarra = false) }
+                composable("espacio") { PantallaEspacio(alVolver = { nav.popBackStack() }, alAbrirChat = { nav.navigate("chat/${enc(it)}") }) }
                 composable("ajustes") {
                     var cuenta by remember { mutableStateOf(0) }
                     LaunchedEffect(bot.id) {
                         cuenta = runCatching { Repo.contarSolicitudes(bot.id) }.getOrDefault(0)
                         Repo.cambios.collect { evs -> if ("solicitudes" in evs) cuenta = runCatching { Repo.contarSolicitudes(bot.id) }.getOrDefault(0) }
                     }
-                    PantallaAjustes(ajustes, alPermisos = { nav.navigate("permisos") }, pendientesSolicitudes = cuenta, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("bot") }, alAvanzado = { nav.navigate("avanzado") }, alEstadisticas = { nav.navigate("estadisticas") }, alPrivacidad = { nav.navigate("privacidad") }, alAutomatizaciones = { nav.navigate("automatizaciones") }, alModulos = { nav.navigate("modulos") }, alIniciativa = { nav.navigate("iniciativa") },
+                    MarcoPantalla("Ajustes", { nav.popBackStack() }) {
+                    PantallaAjustes(ajustes, alPermisos = { nav.navigate("permisos") }, pendientesSolicitudes = cuenta, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("estado_bot") }, alAvanzado = { nav.navigate("avanzado") }, alEstadisticas = { nav.navigate("estadisticas") }, alPrivacidad = { nav.navigate("privacidad") }, alAutomatizaciones = { nav.navigate("automatizaciones") }, alModulos = { nav.navigate("modulos") }, alIniciativa = { nav.navigate("iniciativa") },
                         alAvisos = { nav.navigate("avisos") }, alComandosPropios = { nav.navigate("comandos_propios") }, alEtiquetas = { nav.navigate("etiquetas") }, alAdvertencias = { nav.navigate("advertencias") }, alUtilidades = { nav.navigate("utilidades") })
+                    }
                 }
                 composable("permisos") {
                     PantallaPermisos(bot.id, alVolver = { nav.popBackStack() }, alRangos = { nav.navigate("rangos") }, alSolicitudes = { nav.navigate("solicitudes") }, alGrupos = { nav.navigate("politicas_grupos") })
@@ -356,12 +399,12 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 composable("avanzado") {
                     PantallaAvanzado(
                         ajustes, bot.nombre, vm.eliminando, alVolver = { nav.popBackStack() },
-                        alAbrirEspacio = { irA("espacio") }, alMedirRendimiento = { nav.navigate("diagnostico") },
+                        alAbrirEspacio = { nav.navigate("espacio") }, alMedirRendimiento = { nav.navigate("diagnostico") },
                         alFunciones = { nav.navigate("funciones") }, alActividad = { nav.navigate("actividad") }, alEliminarBot = { vm.eliminar(ctx) },
                         alPermisosAvanzado = { nav.navigate("permisos_avanzado") }, alMenus = { nav.navigate("ajustes_menus") }, alLaboratorio = { nav.navigate("laboratorio") }, botId = bot.id,
                     )
                 }
-                composable("bot") { PantallaBot(vm, conPermiso, alVolver = { nav.popBackStack() }, alAbrirAvanzado = { nav.navigate("avanzado") }, alAbrirAyuda = { nav.navigate("ayuda") }) }
+                composable("estado_bot") { PantallaBot(vm, conPermiso, alVolver = { nav.popBackStack() }, alAbrirAvanzado = { nav.navigate("avanzado") }, alAbrirAyuda = { nav.navigate("ayuda") }) }
                 composable("ayuda") { AyudaBateria(alVolver = { nav.popBackStack() }) }
                 composable("diagnostico") { PantallaDiagnostico(alVolver = { nav.popBackStack() }, alAbrirChat = { nav.navigate("chat/${enc(it)}") }) }
             }
@@ -369,4 +412,5 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
     }
     }
     DialogoConfirmacion(bot.id)
+    if (avisoModo && modulosRevisados) AvisoModoSimple(completo, alCompleto = { ajustes.fijarModoCompleto(true); ajustes.avisoModoVisto() }, alSimple = { ajustes.fijarModoCompleto(false); ajustes.avisoModoVisto() })
 }

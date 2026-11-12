@@ -417,3 +417,26 @@ func BarrerVerUnaVez(botID int64) (int, error) {
 	c, x, err := a.BarrerVerUnaVez(botID, time.Now())
 	return c + x, err
 }
+
+// FijarChatLocal fija (o suelta) un chat arriba de la lista de la app. Es solo local: no cambia nada en tu WhatsApp.
+func FijarChatLocal(botID int64, chat string, si bool) error {
+	a, err := almacenAbierto()
+	if err != nil {
+		return err
+	}
+	return a.FijarChat(botID, chat, si)
+}
+
+// VaciarChat borra todos los mensajes y archivos de un chat pero deja el chat con sus etiquetas y ajustes. No se puede deshacer.
+// Devuelve (JSON) lo liberado.
+func VaciarChat(botID int64, chat string) (string, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return "", err
+	}
+	b, err := a.VaciarChat(botID, chat)
+	if err == nil {
+		accionDueno(botID, "chat.vaciar", "", "")
+	}
+	return js(resultadoBorrado{Bytes: b}, err)
+}

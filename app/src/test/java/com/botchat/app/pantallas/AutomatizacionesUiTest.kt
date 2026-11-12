@@ -269,8 +269,13 @@ class AutomatizacionesUiTest {
                 .put(JSONObject().put("ts", ahora - 50).put("titulo", "¡Hola! ¿Qué buscas?").put("opcion", "").put("resultado", "mostrado"))
                 .put(JSONObject().put("ts", ahora - 40).put("titulo", "¡Hola! ¿Qué buscas?").put("opcion", "1").put("resultado", "valida"))).toString()
         regla.setContent { BotChatTema { PantallaRecorrido(bot, 7, {}) } }
-        regla.esperaTexto("Se le mostró: ¡Hola! ¿Qué buscas?")
-        regla.onNodeWithText("Eligió la opción 1 en: ¡Hola! ¿Qué buscas?").assertIsDisplayed()
+        // El recorrido se ve como una conversación: el menú del bot, y la elección «1» citando ese menú.
+        regla.esperaEtiqueta("burbuja_bot")
+        regla.onNodeWithTag("burbuja_bot").assertIsDisplayed()
+        regla.onNodeWithTag("burbuja_usuario").assertIsDisplayed()
+        regla.onNodeWithTag("burbuja_cita").assertIsDisplayed()
+        regla.onNodeWithText("1").assertIsDisplayed()
+        assertEquals(2, regla.onAllNodesWithTextSafe("¡Hola! ¿Qué buscas?")) // la burbuja del bot y la cita
         regla.onNodeWithTag("reiniciar_menu").performClick()
         regla.espera { llamo("accionSesion:7:reiniciar") }
         regla.onNodeWithTag("pasar_humano").performClick()

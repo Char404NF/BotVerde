@@ -152,6 +152,30 @@ class Ajustes private constructor(ctx: Context) {
     val mostrarEnLinea: StateFlow<Boolean> = _enLinea
     fun fijarMostrarEnLinea(v: Boolean) { p.edit().putBoolean("mostrar_en_linea", v).apply(); _enLinea.value = v }
 
+    // ---- modo Simple / Completo (0.6.0) ----
+    // Instalación nueva: Simple. Quien actualiza (ya había aceptado el aviso) empieza en Simple pero se revisan sus módulos: si tiene
+    // alguno encendido pasa a Completo, y a todos se les muestra un aviso único con atajo a Completo.
+    init {
+        if (!p.contains("modo_completo")) {
+            val actualiza = p.getBoolean("aviso_aceptado", false)
+            p.edit().putBoolean("modo_completo", false).putBoolean("modo_aviso_pendiente", actualiza).putBoolean("modo_revisar_modulos", actualiza).apply()
+        }
+    }
+
+    private val _completo = MutableStateFlow(p.getBoolean("modo_completo", false))
+    /** true = modo Completo (todo a la vista); false = Simple (se ocultan comandos, módulos, Laboratorio y límites). No borra nada. */
+    val modoCompleto: StateFlow<Boolean> = _completo
+    fun fijarModoCompleto(v: Boolean) { p.edit().putBoolean("modo_completo", v).apply(); _completo.value = v }
+
+    private val _avisoModo = MutableStateFlow(p.getBoolean("modo_aviso_pendiente", false))
+    /** Falta mostrar el aviso único "la app ahora tiene modo Simple" (solo quien actualizó). */
+    val avisoModoPendiente: StateFlow<Boolean> = _avisoModo
+    fun avisoModoVisto() { p.edit().putBoolean("modo_aviso_pendiente", false).apply(); _avisoModo.value = false }
+
+    /** true si todavía hay que mirar si el usuario tiene módulos encendidos (una sola vez, al actualizar). */
+    fun revisarModulosPendiente(): Boolean = p.getBoolean("modo_revisar_modulos", false)
+    fun modulosRevisados() { p.edit().putBoolean("modo_revisar_modulos", false).apply() }
+
     // ---- aviso de herramienta no oficial (se acepta una sola vez) ----
     private val _aviso = MutableStateFlow(p.getBoolean("aviso_aceptado", false))
     val avisoAceptado: StateFlow<Boolean> = _aviso

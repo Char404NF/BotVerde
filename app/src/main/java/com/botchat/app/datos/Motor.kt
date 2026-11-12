@@ -51,6 +51,10 @@ interface Motor {
     fun guardarBorrador(bot: Long, chat: String, texto: String)
     fun leerBorrador(bot: Long, chat: String): String
     fun silenciarChat(bot: Long, chat: String, si: Boolean)
+    /** Fija (o suelta) el chat arriba de la lista; solo en esta app. */
+    fun fijarChatLocal(bot: Long, chat: String, si: Boolean)
+    /** Borra mensajes y archivos del chat pero deja el chat, sus etiquetas y ajustes. No se puede deshacer. */
+    fun vaciarChat(bot: Long, chat: String): String
     fun estadoDelChat(bot: Long, chat: String): String
     fun plazoEdicionSeg(): Long
     fun configurarEnvio(pausaBotMin: Long)
@@ -372,6 +376,8 @@ object MotorGo : Motor {
     override fun guardarBorrador(bot: Long, chat: String, texto: String) = Wabot.guardarBorrador(bot, chat, texto)
     override fun leerBorrador(bot: Long, chat: String) = Wabot.leerBorrador(bot, chat)
     override fun silenciarChat(bot: Long, chat: String, si: Boolean) = Wabot.silenciarChat(bot, chat, si)
+    override fun fijarChatLocal(bot: Long, chat: String, si: Boolean) = Wabot.fijarChatLocal(bot, chat, si)
+    override fun vaciarChat(bot: Long, chat: String) = Wabot.vaciarChat(bot, chat)
     override fun estadoDelChat(bot: Long, chat: String) = Wabot.estadoDelChat(bot, chat)
     override fun plazoEdicionSeg() = Wabot.plazoEdicionSeg().toLong()
     override fun configurarEnvio(pausaBotMin: Long) = Wabot.configurarEnvio(pausaBotMin)

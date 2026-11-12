@@ -232,4 +232,23 @@ object Ico {
         trazo(2f) { moveTo(9f, 5f); curveTo(9f, 3.3f, 10.3f, 2.5f, 12f, 2.5f); curveTo(13.7f, 2.5f, 15f, 3.3f, 15f, 5f); lineTo(15f, 11f); curveTo(15f, 12.7f, 13.7f, 13.5f, 12f, 13.5f); curveTo(10.3f, 13.5f, 9f, 12.7f, 9f, 11f); close() }
         trazo(2f) { moveTo(5.5f, 10.5f); curveTo(5.5f, 14.2f, 8.2f, 16.5f, 12f, 16.5f); curveTo(15.8f, 16.5f, 18.5f, 14.2f, 18.5f, 10.5f); moveTo(12f, 16.5f); lineTo(12f, 21f) }
     }
+
+    /** Dos siluetas: grupo. */
+    val Grupo = icono("grupo") {
+        trazo { moveTo(9f, 5f); curveTo(10.7f, 5f, 12f, 6.3f, 12f, 8f); curveTo(12f, 9.7f, 10.7f, 11f, 9f, 11f); curveTo(7.3f, 11f, 6f, 9.7f, 6f, 8f); curveTo(6f, 6.3f, 7.3f, 5f, 9f, 5f) }
+        trazo { moveTo(3f, 19f); curveTo(3f, 15.5f, 5.7f, 13.5f, 9f, 13.5f); curveTo(12.3f, 13.5f, 15f, 15.5f, 15f, 19f) }
+        trazo { moveTo(15.5f, 6f); curveTo(17f, 6.2f, 18f, 7.3f, 18f, 8.7f); curveTo(18f, 10.1f, 17f, 11.2f, 15.5f, 11.4f); moveTo(17.5f, 14f); curveTo(19.8f, 14.6f, 21f, 16.4f, 21f, 19f) }
+    }
+
+    /** Carita de robot: el bot. */
+    val Bot = icono("bot") {
+        trazo { moveTo(6f, 8f); lineTo(18f, 8f); lineTo(18f, 19f); lineTo(6f, 19f); close() }
+        trazo { moveTo(12f, 8f); lineTo(12f, 4.5f); moveTo(9f, 13f); lineTo(9f, 13.1f); moveTo(15f, 13f); lineTo(15f, 13.1f); moveTo(9.5f, 16.2f); lineTo(14.5f, 16.2f) }
+    }
+
+    /** Chincheta: fijar. */
+    val Fijar = icono("fijar") {
+        trazo { moveTo(9f, 3.5f); lineTo(15f, 3.5f); lineTo(14f, 9f); lineTo(17f, 12.5f); lineTo(7f, 12.5f); lineTo(10f, 9f); close() }
+        trazo { moveTo(12f, 12.5f); lineTo(12f, 20.5f) }
+    }
 }

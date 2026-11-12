@@ -126,6 +126,9 @@ fun PantallaChat(
     var menu by remember { mutableStateOf(false) }
     var confirmaArchivos by remember { mutableStateOf<com.botchat.app.datos.Liberado?>(null) }
     var confirmaChat by remember { mutableStateOf(false) }
+    var confirmaVaciar by remember { mutableStateOf(false) }
+    var exportando by remember { mutableStateOf(false) }
+    val busqueda = remember(jid) { BusquedaChat(vm.botId, jid) }
     var pausandoBot by remember { mutableStateOf(false) }
     var etiquetando by remember { mutableStateOf(false) }
     var verFoto by remember { mutableStateOf(false) }
@@ -257,6 +260,8 @@ fun PantallaChat(
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
                 )
+            } else if (busqueda.activa) {
+                BarraBuscarEnChat(busqueda)
             } else TopAppBar(
                 navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } },
                 title = {
@@ -288,6 +293,10 @@ fun PantallaChat(
                     Box {
                         IconButton({ menu = true }) { Icon(Ico.Mas, "Más opciones") }
                         DropdownMenu(menu, { menu = false }) {
+                            DropdownMenuItem(text = { Text("Buscar") }, onClick = { menu = false; busqueda.abrir() }, modifier = Modifier.testTag("menu_buscar"))
+                            DropdownMenuItem(text = { Text(if (vm.estadoChat.silenciado) "Activar notificaciones" else "Silenciar notificaciones") }, onClick = { menu = false; vm.silenciar(!vm.estadoChat.silenciado) }, modifier = Modifier.testTag("menu_silenciar"))
+                            DropdownMenuItem(text = { Text(if (vm.estadoChat.fijado) "Quitar de los fijados" else "Fijar arriba") }, onClick = { menu = false; haptica(Toque.Suave); vm.fijar(!vm.estadoChat.fijado) }, modifier = Modifier.testTag("menu_fijar"))
+                            DropdownMenuItem(text = { Text("Exportar chat") }, onClick = { menu = false; exportando = true }, modifier = Modifier.testTag("menu_exportar_chat"))
                             if (chat?.esGrupo == true) DropdownMenuItem(
                                 text = { Text(if (vm.estadoChat.botActivo) "Bot en este grupo: Activo (tocar para pausar)" else "Bot en este grupo: Pausado (tocar para activar)") },
                                 onClick = { menu = false; vm.botActivoEnChat(!vm.estadoChat.botActivo) }, modifier = Modifier.testTag("menu_bot_grupo"),
@@ -309,12 +318,12 @@ fun PantallaChat(
                             )
                             DropdownMenuItem(text = { Text("Etiquetas…") }, onClick = { menu = false; etiquetando = true }, modifier = Modifier.testTag("menu_etiquetas"))
                             DropdownMenuItem(text = { Text("Ver solo mensajes automáticos") }, onClick = { menu = false; alVerAutomaticos() }, modifier = Modifier.testTag("menu_ver_automaticos"))
-                            DropdownMenuItem(text = { Text(if (vm.estadoChat.silenciado) "Activar notificaciones" else "Silenciar notificaciones") }, onClick = { menu = false; vm.silenciar(!vm.estadoChat.silenciado) }, modifier = Modifier.testTag("menu_silenciar"))
                             DropdownMenuItem(text = { Text("Borrar archivos de este chat") }, onClick = {
                                 menu = false
                                 haptica(Toque.Fuerte)
                                 vm.estimarArchivos { confirmaArchivos = it }
                             })
+                            DropdownMenuItem(text = { Text("Vaciar chat") }, onClick = { menu = false; haptica(Toque.Fuerte); confirmaVaciar = true }, modifier = Modifier.testTag("menu_vaciar_chat"))
                             DropdownMenuItem(text = { Text("Borrar todo el chat") }, onClick = { menu = false; haptica(Toque.Fuerte); confirmaChat = true })
                         }
                     }
@@ -367,6 +376,10 @@ fun PantallaChat(
         containerColor = MaterialTheme.colorScheme.surface,
     ) { relleno ->
         Box(Modifier.fillMaxSize().padding(relleno)) {
+            if (busqueda.activa) {
+                BackHandler { busqueda.cerrar() }
+                ResultadosBuscarEnChat(busqueda, modifier = Modifier.zIndex(5f), alElegir = { m -> busqueda.cerrar(); scope.launch { irAMensaje(m.id) } })
+            }
             val pausaHasta = vm.estadoChat.botPausaHasta
             val ahoraS = System.currentTimeMillis() / 1000
             if (pausaHasta > ahoraS) {
@@ -503,6 +516,11 @@ fun PantallaChat(
             dismissButton = { TextButton({ olvidando = null }) { Text("Cancelar") } },
         )
     }
+    if (confirmaVaciar) DialogoVaciarChat(chat?.nombre ?: "este contacto", { confirmaVaciar = false }) {
+        confirmaVaciar = false; haptica(Toque.Confirmar)
+        vm.vaciar { Toast.makeText(ctx, "Chat vaciado", Toast.LENGTH_SHORT).show() }
+    }
+    if (exportando) DialogoExportarChat(vm.botId, jid, chat?.nombre ?: "chat") { exportando = false }
     if (confirmaChat) {
         AlertDialog(
             onDismissRequest = { confirmaChat = false },

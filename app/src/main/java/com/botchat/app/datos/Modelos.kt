@@ -21,6 +21,8 @@ data class ChatItem(
     val estadoTrabajo: String = "",
     /** Ids de las etiquetas locales del chat. */
     val etiquetas: List<Long> = emptyList(),
+    /** Fijado arriba de la lista (solo en esta app). */
+    val fijado: Boolean = false,
 )
 
 /** Mensaje listo para mostrar. */
@@ -79,7 +81,7 @@ data class VerUnaVezAbierto(val ruta: String, val tipo: String, val mime: String
 data class ResultadoEnvio(val id: String, val estado: String, val ts: Long)
 data class PresenciaChat(val escribiendo: Boolean = false, val enLinea: Boolean = false, val ultimaVez: Long = 0)
 data class ReenvioResultado(val enviados: Int, val omitidos: Int, val fallidos: Int)
-data class EstadoChat(val silenciado: Boolean = false, val botPausaHasta: Long = 0, val botActivo: Boolean = true, val pausaHumano: Boolean = false, val estadoTrabajo: String = "")
+data class EstadoChat(val silenciado: Boolean = false, val botPausaHasta: Long = 0, val botActivo: Boolean = true, val pausaHumano: Boolean = false, val estadoTrabajo: String = "", val fijado: Boolean = false)
 data class ActividadItem(val ts: Long, val evento: String, val motivo: String, val chat: String, val detalle: String)
 
 /** Qué mensajes de un chat se quieren ver (mismo formato que el filtro del módulo Go). */
@@ -136,6 +138,9 @@ data class EspacioTotal(val multimedia: Long, val miniaturas: Long, val fotos: L
     val ocupaBotChat: Long get() = multimedia + miniaturas + fotos + base
 }
 
+data class ResultadoBusqueda(val items: List<Msg>, val fin: Boolean, val sigTs: Long, val sigId: String)
+data class ExporteChat(val ruta: String, val mensajes: Long)
+data class GrupoAdmin(val jid: String, val nombre: String, val miembros: Int, val soyAdmin: Boolean, val sabido: Boolean)
 data class Liberado(val bytes: Long, val cantidad: Int)
 
 data class ReporteReparacion(
@@ -230,7 +235,7 @@ object Json {
         ChatItem(
             it.optString("jid"), it.optString("nombre"), it.optString("telefono"), it.optString("pais"), it.optBoolean("esGrupo"),
             it.optString("foto"), it.optLong("fotoTs"), it.optLong("ultimoTs"), it.optString("ultimoTexto"), it.optString("ultimoTipo"),
-            it.optBoolean("ultimoBorrado"), it.optBoolean("ultimoMio"), it.optString("estadoTrabajo"), longs(it.optJSONArray("etiquetas")),
+            it.optBoolean("ultimoBorrado"), it.optBoolean("ultimoMio"), it.optString("estadoTrabajo"), longs(it.optJSONArray("etiquetas")), it.optBoolean("fijado"),
         )
     }
 
@@ -242,7 +247,7 @@ object Json {
         return ChatItem(
             o.optString("jid"), o.optString("nombre"), o.optString("telefono"), o.optString("pais"), o.optBoolean("esGrupo"),
             o.optString("foto"), o.optLong("fotoTs"), o.optLong("ultimoTs"), o.optString("ultimoTexto"), o.optString("ultimoTipo"),
-            o.optBoolean("ultimoBorrado"), o.optBoolean("ultimoMio"), o.optString("estadoTrabajo"), longs(o.optJSONArray("etiquetas")),
+            o.optBoolean("ultimoBorrado"), o.optBoolean("ultimoMio"), o.optString("estadoTrabajo"), longs(o.optJSONArray("etiquetas")), o.optBoolean("fijado"),
         )
     }
 
@@ -265,7 +270,7 @@ object Json {
     fun envio(json: String): ResultadoEnvio { val o = JSONObject(json); return ResultadoEnvio(o.optString("id"), o.optString("estado"), o.optLong("ts")) }
     fun presencia(json: String): PresenciaChat = runCatching { JSONObject(json).let { PresenciaChat(it.optBoolean("escribiendo"), it.optBoolean("enLinea"), it.optLong("ultimaVez")) } }.getOrDefault(PresenciaChat())
     fun reenvio(json: String): ReenvioResultado { val o = JSONObject(json); return ReenvioResultado(o.optInt("enviados"), o.optInt("omitidos"), o.optInt("fallidos")) }
-    fun estadoChat(json: String): EstadoChat = runCatching { JSONObject(json).let { EstadoChat(it.optBoolean("silenciado"), it.optLong("botPausaHasta"), it.optBoolean("botActivo", true), it.optBoolean("pausaHumano"), it.optString("estadoTrabajo")) } }.getOrDefault(EstadoChat())
+    fun estadoChat(json: String): EstadoChat = runCatching { JSONObject(json).let { EstadoChat(it.optBoolean("silenciado"), it.optLong("botPausaHasta"), it.optBoolean("botActivo", true), it.optBoolean("pausaHumano"), it.optString("estadoTrabajo"), it.optBoolean("fijado")) } }.getOrDefault(EstadoChat())
     fun actividad(json: String) = lista(json) { ActividadItem(it.optLong("ts"), it.optString("evento"), it.optString("motivo"), it.optString("chat"), it.optString("detalle")) }
     fun participantes(json: String) = lista(json) { Participante(it.optString("jid"), it.optString("usuario"), it.optString("nombre"), it.optString("telefono"), it.optBoolean("esAdmin")) }
     fun infoMensaje(json: String): InfoMsg {
@@ -282,6 +287,14 @@ object Json {
         val o = JSONObject(json)
         return PaginaMensajes(o.optLong("total"), mensajes(o.optJSONArray("items")?.toString() ?: "[]"))
     }
+
+    /** Resultado de buscar una palabra en un chat: `fin` = ya se recorrió todo; si no, seguir con (sigTs, sigId). */
+    fun busqueda(json: String): ResultadoBusqueda {
+        val o = JSONObject(json.ifBlank { "{}" })
+        return ResultadoBusqueda(mensajes(o.optJSONArray("items")?.toString() ?: "[]"), o.optBoolean("fin", true), o.optLong("sigTs"), o.optString("sigId"))
+    }
+    fun exporte(json: String): ExporteChat { val o = JSONObject(json.ifBlank { "{}" }); return ExporteChat(o.optString("ruta"), o.optLong("mensajes")) }
+    fun gruposAdmin(json: String) = lista(json) { GrupoAdmin(it.optString("jid"), it.optString("nombre"), it.optInt("miembros"), it.optBoolean("soyAdmin"), it.optBoolean("sabido")) }
 
     fun personas(json: String) = lista(json) { PersonaChat(it.optString("jid"), it.optString("nombre"), it.optLong("cantidad")) }
 

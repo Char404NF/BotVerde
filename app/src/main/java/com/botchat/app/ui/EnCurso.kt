@@ -103,19 +103,18 @@ fun PantallaRecorrido(botId: Long, sesionId: Long, alVolver: () -> Unit) {
         if (d == null) { Box(Modifier.fillMaxSize().padding(relleno), Alignment.Center) { CircularProgressIndicator() }; return@Scaffold }
         Column(Modifier.fillMaxSize().padding(relleno).padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
             Text("${d.sesion.menu} · ${textoEstado(d.sesion.estado)} · ${haceCuanto(d.sesion.ultima)}", style = MaterialTheme.typography.bodyMedium)
-            LazyColumn(Modifier.weight(1f).testTag("recorrido")) {
+            // El recorrido se ve como una conversación de WhatsApp: el menú del bot a la izquierda y lo que eligió la persona a la derecha,
+            // citando el menú al que respondió.
+            LazyColumn(Modifier.weight(1f).testTag("recorrido"), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(d.pasos.size) { i ->
                     val p = d.pasos[i]
-                    Row(Modifier.padding(vertical = 4.dp)) {
-                        Text(horaDe(p.ts), Modifier.padding(end = Esp.m), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(
-                            when (p.resultado) {
-                                "mostrado" -> "Se le mostró: ${p.titulo}"
-                                "valida" -> if (p.opcion == "dato") "Contestó: ${p.titulo}" else "Eligió la opción ${p.opcion} en: ${p.titulo}"
-                                "invalida" -> "Respuesta no válida en: ${p.titulo}"
-                                else -> p.titulo
-                            },
-                        )
+                    when (p.resultado) {
+                        "mostrado" -> BurbujaDeTexto(true, p.titulo, hora = horaDe(p.ts))
+                        "valida" ->
+                            if (p.opcion == "dato") BurbujaDeTexto(false, "Respondió", cita = p.titulo, hora = horaDe(p.ts))
+                            else BurbujaDeTexto(false, p.opcion, cita = p.titulo, hora = horaDe(p.ts))
+                        "invalida" -> BurbujaDeTexto(false, "Respuesta no válida", cita = p.titulo, hora = horaDe(p.ts))
+                        else -> BurbujaDeTexto(true, p.titulo, hora = horaDe(p.ts))
                     }
                 }
             }

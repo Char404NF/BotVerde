@@ -124,6 +124,8 @@ class MotorFalso : Motor {
     override fun guardarBorrador(bot: Long, chat: String, texto: String) { llamadas += "borrador:$texto"; borrador = texto }
     override fun leerBorrador(bot: Long, chat: String) = borrador
     override fun silenciarChat(bot: Long, chat: String, si: Boolean) { llamadas += "silenciar:$si" }
+    override fun fijarChatLocal(bot: Long, chat: String, si: Boolean) { llamadas += "fijar:$si"; estadoChat = JSONObject(estadoChat).put("fijado", si).toString() }
+    override fun vaciarChat(bot: Long, chat: String): String { llamadas += "vaciarChat:$chat"; mensajes = "[]"; return liberar }
     override fun estadoDelChat(bot: Long, chat: String) = estadoChat
     override fun plazoEdicionSeg() = plazo
     override fun configurarEnvio(pausaBotMin: Long) { llamadas += "configurarEnvio:$pausaBotMin" }
@@ -409,7 +411,8 @@ class MotorFalso : Motor {
     }
     override fun ponerEtiquetaPersona(bot: Long, persona: String, id: Long, si: Boolean) { llamadas += "etiquetaPersona:$persona:$id:$si"; pFalla() }
     override fun etiquetasDePersona(bot: Long, persona: String) = "[]"
-    override fun etiquetasDePersonas(bot: Long, personasJson: String) = "{}"
+    var etiquetasPersonas = "{}"
+    override fun etiquetasDePersonas(bot: Long, personasJson: String) = etiquetasPersonas
     override fun etiquetasDeChats(bot: Long, chatsJson: String) = "{}"
     override fun marcarMensaje(bot: Long, chat: String, msgId: String, etiqueta: Long, nota: String) { llamadas += "marcar:$chat:$msgId:$etiqueta"; pFalla() }
     override fun quitarMarcaMensaje(bot: Long, chat: String, msgId: String, etiqueta: Long) { llamadas += "quitarMarca:$chat:$msgId:$etiqueta"; pFalla() }
@@ -426,9 +429,11 @@ class MotorFalso : Motor {
     override fun perfilPersona(bot: Long, persona: String) = "{}"
     override fun actividadPersona(bot: Long, persona: String) = "[]"
     override fun mensajesDePersona(bot: Long, filtroJson: String, antesTs: Long, antesId: String, limite: Long) = """{"total":0,"items":[],"fin":true,"sigTs":0,"sigId":"","escaneados":0}"""
-    override fun buscarEnChat(bot: Long, chat: String, palabra: String, desde: Long, hasta: Long, antesTs: Long, antesId: String, limite: Long) = """{"total":0,"items":[],"fin":true,"sigTs":0,"sigId":"","escaneados":0}"""
+    var busqueda = """{"total":0,"items":[],"fin":true,"sigTs":0,"sigId":"","escaneados":0}"""
+    val palabrasBuscadas = mutableListOf<String>()
+    override fun buscarEnChat(bot: Long, chat: String, palabra: String, desde: Long, hasta: Long, antesTs: Long, antesId: String, limite: Long): String { palabrasBuscadas += palabra; return busqueda }
     override fun puntitosDeMensajes(bot: Long, chat: String, idsJson: String) = "{}"
-    override fun exportarChat(bot: Long, chat: String, formato: String, desde: Long, hasta: Long) = """{"ruta":"","mensajes":0}"""
+    override fun exportarChat(bot: Long, chat: String, formato: String, desde: Long, hasta: Long): String { llamadas += "exportarChat:$formato"; return """{"ruta":"exportes/chat.txt.bcf","mensajes":3}""" }
     // Silenciar en grupos y advertencias con sanciones (E5): sin pantallas, solo para compilar.
     override fun silenciarEnGrupos(bot: Long, persona: String, segundos: Long, alcance: String, gruposJson: String, avisar: Boolean, texto: String): String { llamadas += "silenciarGrupos:$persona:$segundos:$alcance"; return "{}" }
     override fun quitarSilencioGrupos(bot: Long, persona: String): Boolean { llamadas += "quitarSilencioGrupos:$persona"; return true }
@@ -442,7 +447,8 @@ class MotorFalso : Motor {
     override fun sancionesPendientes(bot: Long) = "[]"
     override fun confirmarSancionSilencio(bot: Long, id: Long, si: Boolean): String { llamadas += "sancion:$id:$si"; return "" }
     override fun confirmarSancion(bot: Long, id: Long, si: Boolean): String { llamadas += "sancion:$id:$si"; return "" }
-    override fun gruposQueAdministro(bot: Long) = "[]"
+    var gruposAdmin = "[]"
+    override fun gruposQueAdministro(bot: Long) = gruposAdmin
     override fun listarTiposAdvertencia(bot: Long) = "[]"
     override fun guardarTipoAdvertencia(bot: Long, tipoJson: String) = 1L
     override fun borrarTipoAdvertencia(bot: Long, id: Long) { llamadas += "borrarTipoAdv:$id" }

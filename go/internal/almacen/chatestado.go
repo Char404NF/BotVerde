@@ -3,6 +3,9 @@ package almacen
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,6 +20,7 @@ type EstadoChat struct {
 	BotActivo      bool   `json:"botActivo"`      // interruptor del bot en este chat (para grupos)
 	PausaHumano    bool   `json:"pausaHumano"`    // la pausa es porque alguien pidió hablar con una persona (no porque escribí yo)
 	EstadoTrabajo  string `json:"estadoTrabajo"`  // "" (sin marca), "pendiente" o "resuelto"
+	Fijado         bool   `json:"fijado"`         // fijado arriba de la lista (solo en esta app; no toca tu WhatsApp)
 }
 
 func (a *Almacen) asegurarEstado(botID int64, chat string) {
@@ -26,13 +30,13 @@ func (a *Almacen) asegurarEstado(botID int64, chat string) {
 // EstadoDeChat devuelve el estado del chat (con valores por defecto si no hay registro).
 func (a *Almacen) EstadoDeChat(botID int64, chat string) EstadoChat {
 	var e EstadoChat
-	var sil, act, hum int
-	err := a.db.QueryRow(`SELECT leido_enviado_ts, silenciado, bot_pausa_hasta, bot_activo, pausa_humano, estado_trabajo FROM chat_estado WHERE bot_id=? AND chat_jid=?`, botID, chat).
-		Scan(&e.LeidoEnviadoTS, &sil, &e.BotPausaHasta, &act, &hum, &e.EstadoTrabajo)
+	var sil, act, hum, fij int
+	err := a.db.QueryRow(`SELECT leido_enviado_ts, silenciado, bot_pausa_hasta, bot_activo, pausa_humano, estado_trabajo, fijado FROM chat_estado WHERE bot_id=? AND chat_jid=?`, botID, chat).
+		Scan(&e.LeidoEnviadoTS, &sil, &e.BotPausaHasta, &act, &hum, &e.EstadoTrabajo, &fij)
 	if errors.Is(err, sql.ErrNoRows) {
 		return EstadoChat{BotActivo: true}
 	}
-	e.Silenciado, e.BotActivo, e.PausaHumano = sil == 1, act == 1, hum == 1
+	e.Silenciado, e.BotActivo, e.PausaHumano, e.Fijado = sil == 1, act == 1, hum == 1, fij == 1
 	return e
 }
 
@@ -44,6 +48,38 @@ func (a *Almacen) Silenciar(botID int64, chat string, si bool) error {
 		a.avisa("chats")
 	}
 	return err
+}
+
+// FijarChat fija (o suelta) un chat arriba de la lista. Es local: no cambia nada en tu WhatsApp.
+func (a *Almacen) FijarChat(botID int64, chat string, si bool) error {
+	a.asegurarEstado(botID, chat)
+	_, err := a.db.Exec(`UPDATE chat_estado SET fijado=? WHERE bot_id=? AND chat_jid=?`, b2i(si), botID, chat)
+	if err == nil {
+		a.avisa("chats")
+	}
+	return err
+}
+
+// VaciarChat borra los mensajes y los archivos de un chat pero deja el chat, sus etiquetas, ajustes, fijado y silencio. No se puede deshacer.
+// Se conservan las marcas de conteo (estadísticas sin texto) y la lista de "ya vistos" para que el historial no vuelva a llenarlo.
+func (a *Almacen) VaciarChat(botID int64, chat string) (bytes int64, err error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	bytes, _, _ = a.EstimarBorrado(botID, Filtro{Chat: chat})
+	_ = os.RemoveAll(filepath.Join(a.raiz, "media", fmt.Sprint(botID), HashChat(botID, chat)))
+	if _, err = a.db.Exec("DELETE FROM messages WHERE bot_id=? AND chat_jid=?", botID, chat); err != nil {
+		return 0, err
+	}
+	for _, t := range []string{"message_receipts", "reacciones", "msg_marca"} {
+		if _, err = a.db.Exec("DELETE FROM "+t+" WHERE bot_id=? AND chat_jid=?", botID, chat); err != nil {
+			return 0, err
+		}
+	}
+	_, _ = a.db.Exec(`UPDATE chat_estado SET borrador_cifrado=NULL WHERE bot_id=? AND chat_jid=?`, botID, chat)
+	a.nombres.limpiar()
+	a.avisa("chats")
+	a.avisa("espacio")
+	return bytes, nil
 }
 
 // PausarBot hace que el bot calle en un chat hasta `hasta` (segundos desde 1970). Con 0 se reactiva.

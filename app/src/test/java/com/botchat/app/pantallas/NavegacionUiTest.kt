@@ -94,10 +94,14 @@ class NavegacionUiTest {
     @Test fun recorridoPorLasPantallas() {
         Apoyo.creaBot(); Ajustes.get(Apoyo.ctx()).aceptarAviso()
         contenido(); regla.esperaTexto("María López")
-        // pestañas de abajo
-        regla.onNodeWithTag("nav_espacio").performClick()
+        // pestañas de abajo (0.6.0): Chats, Personas, Grupos y Bot; Almacenamiento y Ajustes se abren desde Bot
+        regla.onNodeWithTag("nav_bot").performClick()
+        regla.esperaEtiqueta("hub_almacenamiento")
+        regla.onNodeWithTag("hub_almacenamiento").performClick()
         regla.esperaTexto("Chats que más ocupan")
-        regla.onNodeWithTag("nav_ajustes").performClick()
+        atras()
+        regla.esperaEtiqueta("hub_ajustes")
+        regla.onNodeWithTag("hub_ajustes").performClick()
         regla.esperaTexto("Seguridad")
         regla.onNodeWithTag("ajuste_seguridad").performScrollTo().performClick()
         regla.esperaTexto("Proteger la app")
@@ -113,6 +117,7 @@ class NavegacionUiTest {
         regla.onNodeWithTag("ajuste_bot").performScrollTo().performClick()
         regla.esperaTexto("Iniciar")
         atras()
+        atras() // sale de Ajustes y vuelve a Bot
         // chat: la navegación de abajo se esconde y se puede entrar a los archivos compartidos
         regla.onNodeWithTag("nav_inicio").performClick()
         regla.esperaTexto("María López")

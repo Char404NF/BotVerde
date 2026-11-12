@@ -87,6 +87,7 @@ fun PantallaAvanzado(
     val animModo by ajustes.animaciones.collectAsState()
     val pausa by ajustes.pausaBotMin.collectAsState()
     val estiloLetra by ajustes.estiloLetra.collectAsState()
+    val completo by ajustes.modoCompleto.collectAsState()
     var ocultas by remember { mutableStateOf(false) }
     val registro by BotState.registro.collectAsState()
     var confirmaEliminar by remember { mutableStateOf(false) }
@@ -96,6 +97,21 @@ fun PantallaAvanzado(
         topBar = { LargeTopAppBar(scrollBehavior = barra, navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text("Avanzado") }) },
     ) { relleno ->
         Column(Modifier.fillMaxSize().padding(relleno).verticalScroll(rememberScrollState()).padding(bottom = 32.dp)) {
+            Seccion("Modo de la app") {
+                Column(Modifier.padding(horizontal = Esp.l, vertical = Esp.s), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
+                    val modosApp = listOf(false to "Simple", true to "Completo")
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().testTag("modo_app")) {
+                        modosApp.forEachIndexed { i, (v, t) ->
+                            SegmentedButton(completo == v, { haptica(Toque.Suave); ajustes.fijarModoCompleto(v) }, SegmentedButtonDefaults.itemShape(i, modosApp.size), modifier = Modifier.testTag(if (v) "modo_completo" else "modo_simple")) { Text(t) }
+                        }
+                    }
+                    Text(
+                        if (completo) "Completo: ves todo, incluidos comandos propios, módulos, Laboratorio y límites."
+                        else "Simple: se ocultan los comandos propios, los módulos, el Laboratorio y los límites. No se borra nada; vuelven en modo Completo.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("texto_modo_app"),
+                    )
+                }
+            }
             Seccion("Aspecto") {
                 Column(Modifier.padding(horizontal = Esp.l, vertical = Esp.s), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
                     Text("Tema", style = MaterialTheme.typography.bodyLarge)
@@ -127,10 +143,10 @@ fun PantallaAvanzado(
             }
             Seccion("Funciones") {
                 Fila("Funciones", "Apagar motor, escritura, avisos y más sin reinstalar", Ico.Ajustes) { Button(alFunciones, Modifier.testTag("abrir_funciones")) { Text("Abrir") } }
-                Fila("Actividad del bot", "Qué llegó, qué respondió y por qué no", Ico.Estadisticas) { OutlinedButton(alActividad, Modifier.testTag("abrir_actividad")) { Text("Ver") } }
-                Fila("Permisos y comandos", "Prefijo, topes, códigos y registro de acciones", Ico.Candado) { OutlinedButton(alPermisosAvanzado, Modifier.testTag("abrir_permisos_avanzado")) { Text("Abrir") } }
+                if (completo) Fila("Actividad del bot", "Qué llegó, qué respondió y por qué no", Ico.Estadisticas) { OutlinedButton(alActividad, Modifier.testTag("abrir_actividad")) { Text("Ver") } }
+                if (completo) Fila("Permisos y comandos", "Prefijo, topes, códigos y registro de acciones", Ico.Candado) { OutlinedButton(alPermisosAvanzado, Modifier.testTag("abrir_permisos_avanzado")) { Text("Abrir") } }
                 Fila("Menús", "Escalera de errores, saludos, grupos y lo que no entendió", Ico.Chats) { OutlinedButton(alMenus, Modifier.testTag("abrir_ajustes_menus_avanzado")) { Text("Abrir") } }
-                Fila("Laboratorio", "Menús como encuesta o botones (experimental, apagado)", Ico.Aviso) { OutlinedButton(alLaboratorio, Modifier.testTag("abrir_laboratorio")) { Text("Abrir") } }
+                if (completo) Fila("Laboratorio", "Menús como encuesta o botones (experimental, apagado)", Ico.Aviso) { OutlinedButton(alLaboratorio, Modifier.testTag("abrir_laboratorio")) { Text("Abrir") } }
                 Fila("Aa Estilo de letra", "Botón para escribir con letras especiales (𝗡𝗲𝗴𝗿𝗶𝘁𝗮, 𝒮𝒸𝓇𝒾𝓅𝓉…). Puede verse distinto en otros teléfonos, no se puede buscar y los lectores de pantalla lo leen mal", Ico.Editar) {
                     Switch(estiloLetra, { haptica(Toque.Suave); ajustes.fijarEstiloLetra(it) }, Modifier.testTag("sw_estilo_letra"))
                 }

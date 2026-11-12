@@ -123,6 +123,17 @@ object Repo {
     suspend fun guardarBorrador(bot: Long, chat: String, texto: String) = io { motor.guardarBorrador(bot, chat, texto) }
     suspend fun borrador(bot: Long, chat: String) = io { motor.leerBorrador(bot, chat) }
     suspend fun silenciar(bot: Long, chat: String, si: Boolean) = io { motor.silenciarChat(bot, chat, si) }
+    /** Ids de etiqueta de cada persona (de un solo golpe, para pintar los puntitos de la lista). */
+    suspend fun etiquetasDePersonas(bot: Long, personas: List<String>): Map<String, List<Long>> = io {
+        val o = org.json.JSONObject(motor.etiquetasDePersonas(bot, JSONArray(personas).toString()).ifBlank { "{}" })
+        o.keys().asSequence().associateWith { k -> o.optJSONArray(k).let { a -> List(a?.length() ?: 0) { i -> a!!.getLong(i) } } }
+    }
+    suspend fun fijarChat(bot: Long, chat: String, si: Boolean) = io { motor.fijarChatLocal(bot, chat, si) }
+    suspend fun vaciarChat(bot: Long, chat: String) = io { Json.liberado(motor.vaciarChat(bot, chat)) }
+    suspend fun buscarEnChat(bot: Long, chat: String, palabra: String, antesTs: Long = 0, antesId: String = "", limite: Int = 50) =
+        io { Json.busqueda(motor.buscarEnChat(bot, chat, palabra, 0, 0, antesTs, antesId, limite.toLong())) }
+    suspend fun exportarChat(bot: Long, chat: String, formato: String) = io { Json.exporte(motor.exportarChat(bot, chat, formato, 0, 0)) }
+    suspend fun gruposAdmin(bot: Long) = io { Json.gruposAdmin(motor.gruposQueAdministro(bot)) }
     suspend fun estadoChat(bot: Long, chat: String) = io { Json.estadoChat(motor.estadoDelChat(bot, chat)) }
     suspend fun plazoEdicionSeg() = io { motor.plazoEdicionSeg() }
 
