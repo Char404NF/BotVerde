@@ -183,7 +183,7 @@ class Ajustes private constructor(ctx: Context) {
         audio = Regla(p.getBoolean("audio_wifi", true), p.getBoolean("audio_datos", true)),
         documento = Regla(p.getBoolean("doc_wifi", true), p.getBoolean("doc_datos", true)),
         video = Regla(p.getBoolean("video_wifi", true), p.getBoolean("video_datos", false)), // videos con datos: apagado por defecto
-        videoMaxMb = p.getInt("video_max_mb", 50),
+        videoMaxMb = p.getInt("video_max_mb2", 0),
         pisoLibreMb = p.getInt("piso_mb", 500),
     )
 
@@ -194,7 +194,7 @@ class Ajustes private constructor(ctx: Context) {
             .putBoolean("audio_wifi", d.audio.wifi).putBoolean("audio_datos", d.audio.datos)
             .putBoolean("doc_wifi", d.documento.wifi).putBoolean("doc_datos", d.documento.datos)
             .putBoolean("video_wifi", d.video.wifi).putBoolean("video_datos", d.video.datos)
-            .putInt("video_max_mb", d.videoMaxMb).putInt("piso_mb", d.pisoLibreMb).apply()
+            .putInt("video_max_mb2", d.videoMaxMb).putInt("piso_mb", d.pisoLibreMb).apply()
         _descargas.value = d
         aplicarAGo()
     }

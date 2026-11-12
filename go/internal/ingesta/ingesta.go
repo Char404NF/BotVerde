@@ -46,6 +46,9 @@ type Config struct {
 	Politica  func() Politica
 	Red       func() Red
 	Libre     func() int64
+	// TopeTotal y Bateria son opcionales (nil = sin tope total / batería desconocida).
+	TopeTotal func() int64
+	Bateria   func() Bateria
 	// EsPropio dice si un JID es el del propio bot (teléfono o LID). Puede ser nil.
 	EsPropio func(types.JID) bool
 	// VerUnaVezDias son los días que un "ver una vez" espera a que lo abran antes de borrarse (0 = 14).
@@ -75,6 +78,19 @@ func Nueva(c Config) *Ingesta {
 		c.Libre = func() int64 { l, _ := c.Alm.Libre(); return l }
 	}
 	return &Ingesta{Config: c}
+}
+
+// Entorno junta lo que cambia con el tiempo (red, espacio, batería y tope total) para decidir una descarga.
+func (g *Ingesta) Entorno() Entorno {
+	e := Entorno{Red: g.Red(), Libre: g.Libre(), Bateria: Bateria{Nivel: -1}}
+	if g.Bateria != nil {
+		e.Bateria = g.Bateria()
+	}
+	if g.TopeTotal != nil {
+		e.TopeTotal = g.TopeTotal()
+	}
+	e.UsoTipo = func(k string) int64 { return g.Alm.UsoDeTipo(g.BotID, k) }
+	return e
 }
 
 func jidPN(j types.JID) bool  { return j.Server == types.DefaultUserServer }
@@ -327,7 +343,7 @@ func (g *Ingesta) preparar(ctx context.Context, evt *events.Message, historial b
 	case cat != "" && historial:
 		m.ArchivoEstado = almacen.EstadoOmitido // el multimedia del historial solo baja con el botón "Descargar"
 	case cat != "":
-		auto, _ := g.Politica().Decidir(cat, c.Bytes, g.Red(), g.Libre())
+		auto, _ := g.Politica().Evaluar(ClaveTipo(c.Tipo), c.Bytes, g.Entorno())
 		if auto {
 			m.ArchivoEstado = almacen.EstadoPendiente
 			l.auto = true

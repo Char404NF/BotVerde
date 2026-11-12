@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -20,6 +22,8 @@ import (
 // Cliente es lo que se necesita de whatsmeow para bajar un archivo (la implementa *whatsmeow.Client).
 type Cliente interface {
 	DownloadMediaWithPath(ctx context.Context, directPath string, encFileHash, fileHash, mediaKey []byte, mediaType whatsmeow.MediaType, mmsType string, allowNoHash bool) ([]byte, error)
+	// DownloadMediaWithPathToFile baja a un archivo (para lo grande: no pasa por la RAM).
+	DownloadMediaWithPathToFile(ctx context.Context, directPath string, encFileHash, fileHash, mediaKey []byte, mediaType whatsmeow.MediaType, mmsType string, allowNoHash bool, file whatsmeow.File) error
 }
 
 // Config reúne lo que necesita el gestor.
@@ -30,6 +34,16 @@ type Config struct {
 	Cliente  func() (Cliente, bool)
 	Politica func() ingesta.Politica
 	Libre    func() int64
+	// Red, Bateria y TopeTotal son opcionales (nil = red desconocida, batería desconocida, sin tope total).
+	Red       func() ingesta.Red
+	Bateria   func() ingesta.Bateria
+	TopeTotal func() int64
+	// UmbralArchivo: por encima de esto la descarga va a un archivo temporal en vez de la RAM (por defecto 64 MB).
+	UmbralArchivo int64
+	// EsperaPasajera es lo que espera una descarga detenida por red o batería antes de volver a mirar (por defecto 2 min).
+	EsperaPasajera time.Duration
+	// TopeCada es el mínimo entre dos corridas del tope total (por defecto 1 min) y TopeInicio la espera tras arrancar (90 s).
+	TopeCada, TopeInicio time.Duration
 	// Esperas son los tiempos entre reintentos (por defecto 10 s, 1 min y 5 min); después de agotarlos el archivo queda "fallido".
 	Esperas []time.Duration
 	// Trabajadores es el máximo de descargas a la vez (por defecto 2).
@@ -58,6 +72,12 @@ type Gestor struct {
 	cancel   context.CancelFunc
 	ctx      context.Context
 	timers   map[*time.Timer]struct{}
+	// tope total
+	topeMu    sync.Mutex
+	topeUlt   time.Time
+	topeCorre bool
+	topeCita  bool
+	topeWg    sync.WaitGroup
 }
 
 // Nuevo crea el gestor. Hay que llamar a Iniciar.
@@ -71,6 +91,18 @@ func Nuevo(cfg Config) *Gestor {
 	if cfg.UmbralGrande <= 0 {
 		cfg.UmbralGrande = 8 << 20
 	}
+	if cfg.UmbralArchivo <= 0 {
+		cfg.UmbralArchivo = 64 << 20
+	}
+	if cfg.EsperaPasajera <= 0 {
+		cfg.EsperaPasajera = 2 * time.Minute
+	}
+	if cfg.TopeCada <= 0 {
+		cfg.TopeCada = time.Minute
+	}
+	if cfg.TopeInicio <= 0 {
+		cfg.TopeInicio = 90 * time.Second
+	}
 	if cfg.Log == nil {
 		cfg.Log = func(string) {}
 	}
@@ -81,6 +113,7 @@ func Nuevo(cfg Config) *Gestor {
 // Iniciar arranca los trabajadores y reanuda las descargas que quedaron pendientes.
 func (g *Gestor) Iniciar(ctx context.Context) {
 	g.ctx, g.cancel = context.WithCancel(ctx)
+	g.limpiarTemporales()
 	for i := 0; i < g.cfg.Trabajadores; i++ {
 		g.wg.Add(1)
 		go g.trabajador()
@@ -90,6 +123,7 @@ func (g *Gestor) Iniciar(ctx context.Context) {
 			g.poner(item{chat: m.ChatJID, id: m.ID})
 		}
 	}
+	g.pedirTope(g.cfg.TopeInicio)
 }
 
 // Detener cancela lo que está en curso y espera a que terminen los trabajadores.
@@ -104,6 +138,7 @@ func (g *Gestor) Detener() {
 	g.timers = map[*time.Timer]struct{}{}
 	g.mu.Unlock()
 	g.wg.Wait()
+	g.topeWg.Wait()
 }
 
 // Encolar pone en la cola una descarga automática (el mensaje ya está en estado "pendiente").
@@ -171,6 +206,27 @@ var tipoMedio = map[string]whatsmeow.MediaType{
 	"audio": whatsmeow.MediaAudio, "documento": whatsmeow.MediaDocument,
 }
 
+func (g *Gestor) entorno() ingesta.Entorno {
+	e := ingesta.Entorno{Libre: g.cfg.Libre(), Bateria: ingesta.Bateria{Nivel: -1}}
+	if g.cfg.Red != nil {
+		e.Red = g.cfg.Red()
+	}
+	if g.cfg.Bateria != nil {
+		e.Bateria = g.cfg.Bateria()
+	}
+	if g.cfg.TopeTotal != nil {
+		e.TopeTotal = g.cfg.TopeTotal()
+	}
+	e.UsoTipo = func(k string) int64 { return g.cfg.Alm.UsoDeTipo(g.cfg.BotID, k) }
+	return e
+}
+
+// dirTmp es la carpeta de los temporales de descarga (en claro, solo mientras baja el archivo grande).
+func (g *Gestor) dirTmp() string { return filepath.Join(g.cfg.Alm.Raiz(), "tmp", "descargas") }
+
+// limpiarTemporales borra lo que haya quedado de una descarga cortada.
+func (g *Gestor) limpiarTemporales() { _ = os.RemoveAll(g.dirTmp()) }
+
 func (g *Gestor) procesar(it item) {
 	reintentar := false
 	defer func() {
@@ -190,12 +246,6 @@ func (g *Gestor) procesar(it item) {
 	if m.Tipo == almacen.TipoVerUnaVez {
 		it.manual = true // un "ver una vez" siempre se baja al llegar, sin importar las reglas de descarga automática
 	}
-	if !it.manual {
-		if p := g.cfg.Politica(); p.PisoLibre > 0 && g.cfg.Libre() > 0 && g.cfg.Libre() < p.PisoLibre {
-			_ = alm.FijarEstado(bot, it.chat, it.id, almacen.EstadoNinguno) // poco espacio: queda con botón
-			return
-		}
-	}
 	info, err := ingesta.ParseInfo(m.ArchivoInfo)
 	mt, ok := tipoMedio[info.Tipo]
 	if err != nil || !ok {
@@ -206,6 +256,32 @@ func (g *Gestor) procesar(it item) {
 	if err != nil {
 		_ = alm.FijarEstado(bot, it.chat, it.id, almacen.EstadoFallido)
 		return
+	}
+	tipo := ingesta.ClaveTipo(m.Tipo)
+	rel := almacen.RutaMedio(bot, it.chat, it.id)
+
+	// Duplicado: si ya se bajó el mismo archivo, se enlaza (cero bytes y cero red). Si el sistema no deja, se baja normal.
+	if m.Tipo != almacen.TipoVerUnaVez && len(sha) > 0 {
+		if orig, bytes, ok := alm.Duplicado(bot, sha, it.chat, it.id); ok && alm.EnlazarDuplicado(orig, rel) {
+			if err := alm.ActualizarArchivo(bot, it.chat, it.id, almacen.EstadoDescargado, rel, bytes); err == nil {
+				g.mu.Lock()
+				delete(g.intentos, it.clave())
+				g.mu.Unlock()
+				return
+			}
+		}
+	}
+	if !it.manual {
+		ok, motivo := g.cfg.Politica().Evaluar(tipo, m.ArchivoBytes, g.entorno())
+		if !ok {
+			if ingesta.Pasajero(motivo) {
+				reintentar = true // red o batería: espera y vuelve a mirar sin gastar un intento
+				g.despues(it, g.cfg.EsperaPasajera)
+				return
+			}
+			_ = alm.FijarEstado(bot, it.chat, it.id, almacen.EstadoNinguno) // queda con botón
+			return
+		}
 	}
 	cli, conectado := g.cfg.Cliente()
 	if !conectado {
@@ -223,35 +299,52 @@ func (g *Gestor) procesar(it item) {
 			return
 		}
 	}
-	ctx, cancel := context.WithTimeout(g.ctx, 10*time.Minute)
-	defer cancel()
-	datos, err := cli.DownloadMediaWithPath(ctx, info.DirectPath, enc, sha, clave, mt, "", false)
-	if err != nil {
-		if g.ctx.Err() != nil {
-			return // se está cerrando: queda pendiente y se reanuda al iniciar
-		}
-		g.falla(it, err, &reintentar)
-		return
-	}
-	if !it.manual {
-		p := g.cfg.Politica()
-		tope := p.MaxBytes
-		if almacen.CategoriaDe(m.Tipo) == almacen.CatVideo {
-			tope = p.VideoMaxBytes
-		}
-		if tope > 0 && int64(len(datos)) > tope {
+	aArchivo := m.ArchivoBytes > g.cfg.UmbralArchivo ||
+		(m.ArchivoBytes <= 0 && (m.Tipo == almacen.TipoVideo || m.Tipo == almacen.TipoDocumento))
+	if aArchivo {
+		// El temporal en claro más el cifrado final: hace falta lugar para los dos.
+		if libre := g.cfg.Libre(); libre > 0 && m.ArchivoBytes > 0 && libre < 2*m.ArchivoBytes+(64<<20) {
+			g.cfg.Log("no hay espacio para bajar un archivo grande")
 			_ = alm.FijarEstado(bot, it.chat, it.id, almacen.EstadoNinguno)
 			return
 		}
 	}
-	rel := almacen.RutaMedio(bot, it.chat, it.id)
-	n, err := alm.EscribirCifradoDesde(rel, bytes.NewReader(datos))
-	datos = nil
-	if grande {
-		debug.FreeOSMemory()
+	espera := 10 * time.Minute
+	if m.ArchivoBytes > 0 {
+		espera += time.Duration(m.ArchivoBytes/(100<<10)) * time.Second // al menos ~100 KB/s
+		if espera > 3*time.Hour {
+			espera = 3 * time.Hour
+		}
+	}
+	ctx, cancel := context.WithTimeout(g.ctx, espera)
+	defer cancel()
+
+	var n int64
+	if aArchivo {
+		n, err = g.bajarAArchivo(ctx, cli, info, enc, sha, clave, mt, rel, it)
+	} else {
+		var datos []byte
+		datos, err = cli.DownloadMediaWithPath(ctx, info.DirectPath, enc, sha, clave, mt, "", false)
+		if err == nil {
+			if g.sobrepasa(it, tipo, int64(len(datos))) {
+				_ = alm.FijarEstado(bot, it.chat, it.id, almacen.EstadoNinguno)
+				return
+			}
+			n, err = alm.EscribirCifradoDesde(rel, bytes.NewReader(datos))
+			datos = nil
+			if grande {
+				debug.FreeOSMemory()
+			}
+		}
+	}
+	if errors.Is(err, errSobrepasa) {
+		_ = alm.FijarEstado(bot, it.chat, it.id, almacen.EstadoNinguno)
+		return
 	}
 	if err != nil {
-		g.cfg.Log("no se pudo guardar un archivo: " + err.Error())
+		if g.ctx.Err() != nil {
+			return // se está cerrando: queda pendiente y se reanuda al iniciar
+		}
 		g.falla(it, err, &reintentar)
 		return
 	}
@@ -260,6 +353,119 @@ func (g *Gestor) procesar(it item) {
 	g.mu.Unlock()
 	if err := alm.ActualizarArchivo(bot, it.chat, it.id, almacen.EstadoDescargado, rel, n); err != nil {
 		g.cfg.Log("no se pudo anotar un archivo: " + err.Error())
+		return
+	}
+	if m.Tipo != almacen.TipoVerUnaVez {
+		_ = alm.FijarSHASiFalta(bot, it.chat, it.id, sha)
+	}
+	g.pedirTope(0)
+}
+
+var errSobrepasa = errors.New("sobrepasa un tope")
+
+// sobrepasa dice si el tamaño real (ya conocido) rompe un tope; solo cuenta en descargas automáticas.
+func (g *Gestor) sobrepasa(it item, tipo string, n int64) bool {
+	if it.manual {
+		return false
+	}
+	ok, motivo := g.cfg.Politica().Evaluar(tipo, n, g.entorno())
+	return !ok && (motivo == ingesta.MotivoGrande || motivo == ingesta.MotivoTopeTotal || motivo == ingesta.MotivoTopeTipo)
+}
+
+// bajarAArchivo baja un archivo grande a un temporal (sin pasar por la RAM), lo cifra en flujo y borra el temporal.
+func (g *Gestor) bajarAArchivo(ctx context.Context, cli Cliente, info ingesta.InfoDescarga, enc, sha, clave []byte, mt whatsmeow.MediaType, rel string, it item) (int64, error) {
+	if err := os.MkdirAll(g.dirTmp(), 0o700); err != nil {
+		return 0, err
+	}
+	f, err := os.CreateTemp(g.dirTmp(), "dl-*.part")
+	if err != nil {
+		return 0, err
+	}
+	defer func() { f.Close(); os.Remove(f.Name()) }()
+	if err := cli.DownloadMediaWithPathToFile(ctx, info.DirectPath, enc, sha, clave, mt, "", false, f); err != nil {
+		return 0, err
+	}
+	st, err := f.Stat()
+	if err != nil {
+		return 0, err
+	}
+	if g.sobrepasa(it, ingesta.ClaveTipo(tipoDe(info.Tipo)), st.Size()) {
+		return 0, errSobrepasa
+	}
+	if _, err := f.Seek(0, 0); err != nil {
+		return 0, err
+	}
+	n, err := g.cfg.Alm.EscribirCifradoDesde(rel, f)
+	if err != nil {
+		g.cfg.Log("no se pudo guardar un archivo: " + err.Error())
+	}
+	return n, err
+}
+
+func tipoDe(t string) string { return t } // los tipos de InfoDescarga ("imagen", "video"...) son los mismos del mensaje
+
+// ---------- tope total ----------
+
+// PedirTope pide revisar el tope total pronto (por ejemplo, tras cambiarlo).
+func (g *Gestor) PedirTope() { g.pedirTope(0) }
+
+// pedirTope pide revisar el tope total (con `espera` antes); entre dos corridas pasa al menos TopeCada.
+func (g *Gestor) pedirTope(espera time.Duration) {
+	if g.cfg.TopeTotal == nil || g.ctx == nil || g.ctx.Err() != nil {
+		return
+	}
+	g.topeMu.Lock()
+	if g.topeCita {
+		g.topeMu.Unlock()
+		return
+	}
+	d := espera
+	if desde := time.Since(g.topeUlt); desde < g.cfg.TopeCada && g.cfg.TopeCada-desde > d {
+		d = g.cfg.TopeCada - desde
+	}
+	g.topeCita = true
+	g.topeMu.Unlock()
+	g.mu.Lock()
+	var t *time.Timer
+	t = time.AfterFunc(d, func() {
+		g.mu.Lock() // espera a que `t` esté asignado
+		delete(g.timers, t)
+		if g.ctx.Err() != nil {
+			g.mu.Unlock()
+			return
+		}
+		g.topeWg.Add(1)
+		g.mu.Unlock()
+		defer g.topeWg.Done()
+		g.correrTope()
+	})
+	g.timers[t] = struct{}{}
+	g.mu.Unlock()
+}
+
+func (g *Gestor) correrTope() {
+	g.topeMu.Lock()
+	g.topeCita = false
+	if g.topeCorre || g.ctx.Err() != nil {
+		g.topeMu.Unlock()
+		return
+	}
+	g.topeCorre = true
+	g.topeUlt = time.Now()
+	g.topeMu.Unlock()
+	defer func() {
+		if r := recover(); r != nil {
+			g.cfg.Log(fmt.Sprintf("error interno en el tope: %v", r))
+		}
+		g.topeMu.Lock()
+		g.topeCorre = false
+		g.topeMu.Unlock()
+	}()
+	r, err := g.cfg.Alm.AplicarTope(g.cfg.BotID, g.cfg.TopeTotal(), time.Now())
+	if err != nil {
+		g.cfg.Log("tope total: " + err.Error())
+	} else if r.Borrados > 0 {
+		g.cfg.Log(fmt.Sprintf("tope total: se borraron %d archivos viejos", r.Borrados))
 	}
 }
 

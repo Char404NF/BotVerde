@@ -118,6 +118,9 @@ var ajustesBotDefecto = map[string]string{
 	"limite_sin_rango":   "5",
 	"grupo_modo_defecto": "todos",
 	"registro_dias":      "90",
+	// Multimedia (v0.6.0, E2): tope total en bytes (0 = sin límite; de fábrica 5 GB), conservar la portada de un video borrado (1/0)
+	"tope_total_bytes":  "5368709120",
+	"conservar_portada": "1",
 	// Personas y avisos (bloque B)
 	"adv_tope":         "3",      // advertencias para que actúe la regla (0 = nunca)
 	"adv_accion":       "avisar", // avisar | silenciar | borrar | expulsar

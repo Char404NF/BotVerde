@@ -172,11 +172,13 @@ func (s *estado) armar() {
 	conectado := func() bool { return s.cli.IsConnected() && s.cli.IsLoggedIn() }
 	s.descargas = medios.Nuevo(medios.Config{BotID: s.botID, Alm: alm,
 		Cliente:  func() (medios.Cliente, bool) { return s.cli, conectado() },
-		Politica: politicaActual, Libre: func() int64 { l, _ := alm.Libre(); return l }, Log: s.log})
+		Politica: politicaActual, Libre: func() int64 { l, _ := alm.Libre(); return l }, Log: s.log,
+		Red: redActual, Bateria: bateriaActual, TopeTotal: func() int64 { return alm.TopeTotal(s.botID) }})
 	s.fotos = fotos.Nuevo(fotos.Config{BotID: s.botID, Alm: alm, Cliente: func() (fotos.Cliente, bool) { return s.cli, conectado() }, Log: s.log})
 	s.grupos = nuevaColaGrupos(s)
 	s.ing = ingesta.Nueva(ingesta.Config{BotID: s.botID, Alm: alm, Contactos: s.cli.Store.Contacts, Mapa: s.cli.Store.LIDs,
-		Servicios: servicios{s}, EsPropio: s.esPropio, VerUnaVezDias: func() int { return int(verUnaVezDias.Load()) }, Politica: politicaActual, Red: redActual, Libre: func() int64 { l, _ := alm.Libre(); return l }, Log: s.log})
+		Servicios: servicios{s}, EsPropio: s.esPropio, VerUnaVezDias: func() int { return int(verUnaVezDias.Load()) }, Politica: politicaActual, Red: redActual, Libre: func() int64 { l, _ := alm.Libre(); return l }, Log: s.log,
+		Bateria: bateriaActual, TopeTotal: func() int64 { return alm.TopeTotal(s.botID) }})
 	s.envio = envio.Nuevo(s.botID, alm, envio.Real{Client: s.cli}, s.log)
 	s.envio.PausaBot = pausaTrasEscribir
 	alm.SembrarSaludo(s.botID, flujo.SaludoJSON())

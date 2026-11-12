@@ -152,11 +152,12 @@ func TestPoliticaDeDescarga(t *testing.T) {
 		{almacen.CatFoto, 5 * mb, RedDatos, 10 * gb, true, ""},
 		{almacen.CatAudio, 1 * mb, RedWifi, 10 * gb, true, ""},
 		{almacen.CatDocumento, 50 * mb, RedDatos, 10 * gb, true, ""},
-		{almacen.CatDocumento, 51 * mb, RedWifi, 10 * gb, false, "archivo grande"},
+		{almacen.CatDocumento, 51 * mb, RedDatos, 10 * gb, false, "solo con Wi-Fi"}, // más de 50 MB solo con Wi-Fi
+		{almacen.CatDocumento, 900 * mb, RedWifi, 10 * gb, true, ""},                // sin tope por archivo de fábrica
 		{almacen.CatVideo, 10 * mb, RedWifi, 10 * gb, true, ""},
 		{almacen.CatVideo, 10 * mb, RedDatos, 10 * gb, false, "solo con Wi-Fi"},
 		{almacen.CatVideo, 10 * mb, RedDesconocida, 10 * gb, false, "solo con Wi-Fi"},
-		{almacen.CatVideo, 60 * mb, RedWifi, 10 * gb, false, "archivo grande"},
+		{almacen.CatVideo, 600 * mb, RedWifi, 10 * gb, true, ""},
 		{almacen.CatFoto, 1 * mb, RedWifi, 400 * mb, false, "poco espacio libre"},
 		{"", 1, RedWifi, 10 * gb, false, "no es multimedia"},
 	}

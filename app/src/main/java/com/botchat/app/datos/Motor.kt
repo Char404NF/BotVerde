@@ -58,6 +58,15 @@ interface Motor {
     fun abrirVerUnaVez(bot: Long, chat: String, id: String): String
     fun cerrarVerUnaVez(bot: Long, chat: String, id: String)
     fun barrerVerUnaVez(bot: Long): Long
+    /** (JSON) medidor contra el tope total, uso por tipo con sus topes e interruptores, ahorro por duplicados y videos esperando portada. */
+    fun estadoAlmacenamiento(bot: Long): String
+    /** Tope total en bytes (0 = sin límite; de fábrica 5 GB). */
+    fun topeAlmacenamiento(bot: Long): Long
+    fun fijarTope(bot: Long, bytes: Long)
+    /** Aplica el tope ya y devuelve (JSON) lo que borró. */
+    fun aplicarTopeAhora(bot: Long): String
+    fun conservarPortadaVideo(bot: Long): Boolean
+    fun fijarConservarPortada(bot: Long, si: Boolean)
     fun configurarVerUnaVez(dias: Long)
     fun configurarMotor(activo: Boolean, ventanaMin: Long)
     fun actividadMotor(bot: Long, limite: Long): String
@@ -319,6 +328,12 @@ object MotorGo : Motor {
     override fun abrirVerUnaVez(bot: Long, chat: String, id: String) = Wabot.abrirVerUnaVez(bot, chat, id)
     override fun cerrarVerUnaVez(bot: Long, chat: String, id: String) = Wabot.cerrarVerUnaVez(bot, chat, id)
     override fun barrerVerUnaVez(bot: Long) = Wabot.barrerVerUnaVez(bot).toLong()
+    override fun estadoAlmacenamiento(bot: Long) = Wabot.estadoAlmacenamiento(bot)
+    override fun topeAlmacenamiento(bot: Long) = Wabot.topeAlmacenamiento(bot)
+    override fun fijarTope(bot: Long, bytes: Long) = Wabot.fijarTope(bot, bytes)
+    override fun aplicarTopeAhora(bot: Long) = Wabot.aplicarTopeAhora(bot)
+    override fun conservarPortadaVideo(bot: Long) = Wabot.conservarPortadaVideo(bot)
+    override fun fijarConservarPortada(bot: Long, si: Boolean) = Wabot.fijarConservarPortada(bot, si)
     override fun configurarVerUnaVez(dias: Long) = Wabot.configurarVerUnaVez(dias)
     override fun configurarMotor(activo: Boolean, ventanaMin: Long) = Wabot.configurarMotor(activo, ventanaMin)
     override fun actividadMotor(bot: Long, limite: Long) = Wabot.actividadMotor(bot, limite)

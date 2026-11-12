@@ -159,29 +159,32 @@ func escapaLike(s string) string {
 
 // MensajeVista es un mensaje listo para mostrar.
 type MensajeVista struct {
-	ID           string `json:"id"`
-	Chat         string `json:"chat"`
-	RemitenteID  string `json:"remitenteId"` // clave interna para agrupar y dar color; la app no la muestra
-	Remitente    string `json:"remitente"`
-	EsMio        bool   `json:"esMio"`
-	Tipo         string `json:"tipo"`
-	Texto        string `json:"texto"`
-	TS           int64  `json:"ts"`
-	Borrado      bool   `json:"borrado"`
-	Editado      bool   `json:"editado"`
-	Estado       string `json:"estado"` // estado del archivo
-	Bytes        int64  `json:"bytes"`
-	Mime         string `json:"mime"`
-	Nombre       string `json:"nombre"` // nombre del archivo (documentos)
-	Ruta         string `json:"ruta"`
-	Miniatura    string `json:"miniatura"`
-	Ancho        int    `json:"ancho"`
-	Alto         int    `json:"alto"`
-	DuracionS    int    `json:"dur"`
-	NotaVoz      bool   `json:"notaVoz"`
-	PuedeBajarse bool   `json:"puedeBajarse"`
-	EliminadoEn  int64  `json:"eliminadoEn"`
-	EliminadoPor string `json:"eliminadoPor"` // nombre de quien lo eliminó, solo si no fue su autor
+	ID            string `json:"id"`
+	Chat          string `json:"chat"`
+	RemitenteID   string `json:"remitenteId"` // clave interna para agrupar y dar color; la app no la muestra
+	Remitente     string `json:"remitente"`
+	EsMio         bool   `json:"esMio"`
+	Tipo          string `json:"tipo"`
+	Texto         string `json:"texto"`
+	TS            int64  `json:"ts"`
+	Borrado       bool   `json:"borrado"`
+	Editado       bool   `json:"editado"`
+	Estado        string `json:"estado"` // estado del archivo
+	Bytes         int64  `json:"bytes"`
+	Mime          string `json:"mime"`
+	Nombre        string `json:"nombre"` // nombre del archivo (documentos)
+	Ruta          string `json:"ruta"`
+	Miniatura     string `json:"miniatura"`
+	Portada       string `json:"portada"`       // portada del video (se conserva aunque se borre el video)
+	BorradoTS     int64  `json:"borradoTs"`     // cuándo se borró el archivo (0 = no)
+	BorradoMotivo string `json:"borradoMotivo"` // limpieza | tope | manual | retención
+	Ancho         int    `json:"ancho"`
+	Alto          int    `json:"alto"`
+	DuracionS     int    `json:"dur"`
+	NotaVoz       bool   `json:"notaVoz"`
+	PuedeBajarse  bool   `json:"puedeBajarse"`
+	EliminadoEn   int64  `json:"eliminadoEn"`
+	EliminadoPor  string `json:"eliminadoPor"` // nombre de quien lo eliminó, solo si no fue su autor
 
 	EstadoEnvio  string          `json:"estadoEnvio"` // solo mensajes propios: enviando, enviado, entregado, leido o fallido
 	Entregados   int             `json:"entregados"`
@@ -213,7 +216,7 @@ func (a *Almacen) vista(m *Mensaje, nom *nombresPagina) MensajeVista {
 	v := MensajeVista{
 		ID: m.ID, Chat: m.ChatJID, RemitenteID: m.RemitenteJID, Remitente: m.RemitenteNombre, EsMio: m.EsMio, Tipo: m.Tipo, Texto: m.Texto,
 		TS: m.TS, Borrado: m.Borrado, Editado: m.Editado, Estado: m.ArchivoEstado, Bytes: m.ArchivoBytes, Mime: m.ArchivoMime,
-		Nombre: m.ArchivoNombre, Ruta: m.ArchivoRuta, Miniatura: m.MiniaturaRuta, Ancho: m.Ancho, Alto: m.Alto, DuracionS: m.DuracionS, NotaVoz: m.NotaVoz,
+		Nombre: m.ArchivoNombre, Ruta: m.ArchivoRuta, Miniatura: m.MiniaturaRuta, Portada: m.PortadaRuta, BorradoTS: m.ArchivoBorradoTS, BorradoMotivo: m.ArchivoBorradoMotivo, Ancho: m.Ancho, Alto: m.Alto, DuracionS: m.DuracionS, NotaVoz: m.NotaVoz,
 	}
 	v.EliminadoEn = m.EliminadoEn
 	if m.EliminadoPor != "" && m.EliminadoPor != m.RemitenteJID {

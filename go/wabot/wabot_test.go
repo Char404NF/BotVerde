@@ -203,7 +203,7 @@ func TestConfigurarDescargas(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := politicaActual()
-	if !p.Video.Datos || p.VideoMaxBytes != 1000 || p.PisoLibre != 42 || !p.Foto.Wifi || p.MaxBytes != 50<<20 {
+	if !p.Video.Datos || p.VideoMaxBytes != 1000 || p.PisoLibre != 42 || !p.Foto.Wifi || p.MaxBytes != 0 || !p.SoloWifiGrandes || p.GrandePct != 25 {
 		t.Fatalf("%+v", p)
 	}
 	if !strings.Contains(DescargasConfig(), `"pisoLibre":42`) {

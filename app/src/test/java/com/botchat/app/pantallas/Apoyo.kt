@@ -136,6 +136,12 @@ class MotorFalso : Motor {
     override fun abrirVerUnaVez(bot: Long, chat: String, id: String): String { llamadas += "abrirUnaVez:$id"; verUnaVezFalla?.let { throw IllegalStateException(it) }; return verUnaVezJson }
     override fun cerrarVerUnaVez(bot: Long, chat: String, id: String) { llamadas += "cerrarUnaVez:$id" }
     override fun barrerVerUnaVez(bot: Long): Long { llamadas += "barrer"; return 0 }
+    override fun estadoAlmacenamiento(bot: Long) = "{\"topeTotal\":5368709120,\"uso\":0,\"tipos\":[]}"
+    override fun topeAlmacenamiento(bot: Long) = 5L shl 30
+    override fun fijarTope(bot: Long, bytes: Long) { llamadas += "tope:$bytes" }
+    override fun aplicarTopeAhora(bot: Long) = "{\"borrados\":0}"
+    override fun conservarPortadaVideo(bot: Long) = true
+    override fun fijarConservarPortada(bot: Long, si: Boolean) { llamadas += "portada:$si" }
     override fun configurarVerUnaVez(dias: Long) { llamadas += "verDias:$dias" }
     var actividad = "[]"
     var autos = "[]"

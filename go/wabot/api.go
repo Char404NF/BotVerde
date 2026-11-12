@@ -38,6 +38,31 @@ func politicaActual() ingesta.Politica {
 
 func redActual() ingesta.Red { return ingesta.Red(redAhora.Load()) }
 
+var (
+	bateriaNivel    atomic.Int32 // -1 = no se sabe
+	bateriaCargando atomic.Bool
+	bateriaIniciada atomic.Bool
+)
+
+func bateriaActual() ingesta.Bateria {
+	if !bateriaIniciada.Load() {
+		return ingesta.Bateria{Nivel: -1}
+	}
+	return ingesta.Bateria{Nivel: int(bateriaNivel.Load()), Cargando: bateriaCargando.Load()}
+}
+
+// EstablecerBateria avisa el nivel de batería del teléfono (0 a 100) y si está cargando. Con el nivel bajo y sin cargar, las descargas
+// automáticas esperan (ver DescargasConfig: pausaBateria y bateriaMin).
+func EstablecerBateria(nivel int, cargando bool) {
+	if nivel < 0 || nivel > 100 {
+		bateriaIniciada.Store(false)
+		return
+	}
+	bateriaNivel.Store(int32(nivel))
+	bateriaCargando.Store(cargando)
+	bateriaIniciada.Store(true)
+}
+
 // abrirAlmacenLocked abre messages.db si todavía no está abierto. Hay que tener `mu`.
 func abrirAlmacenLocked(raiz string, clave []byte) error {
 	if alm != nil {

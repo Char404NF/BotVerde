@@ -436,47 +436,50 @@ func (a *Almacen) FusionarChat(botID int64, desde, hasta string) error {
 
 // Mensaje es un mensaje guardado, con sus textos ya descifrados.
 type Mensaje struct {
-	ID              string
-	ChatJID         string
-	BotID           int64
-	RemitenteJID    string
-	RemitenteNombre string
-	EsMio           bool
-	Tipo            string
-	Texto           string
-	TS              int64
-	Borrado         bool
-	Editado         bool
-	ArchivoRuta     string
-	ArchivoBytes    int64
-	ArchivoMime     string
-	ArchivoEstado   string
-	MiniaturaRuta   string
-	ArchivoNombre   string
-	ArchivoInfo     []byte // datos para descargar de nuevo (JSON); nunca sale de la base en claro
-	Ancho, Alto     int
-	DuracionS       int
-	NotaVoz         bool
-	EliminadoEn     int64    // hora en que llegó la eliminación (0 = no se sabe)
-	EliminadoPor    string   // JID de quien lo eliminó si no fue su autor (un admin); vacío si no se sabe o fue el autor
-	EstadoEnvio     string   // solo en mensajes propios: "enviando", "enviado" o "fallido" ("" si llegó de otra persona)
-	CitaID          string   // id del mensaje al que responde
-	CitaAutor       string   // JID de quien escribió el mensaje citado
-	CitaTexto       string   // vista previa del mensaje citado (cifrada en la base)
-	Menciones       []string // JIDs mencionados (cifrados en la base)
-	Reenviado       bool
-	VerEstado       string // "ver una vez": "" (sin contenido), "pendiente", "abierto", "visto" o "expirado"
-	VerTipo         string // qué era: imagen, video o audio
-	VerExpira       int64  // hora en que caduca si no se abre
-	Automatico      string // solo en mensajes propios: lo mandó una automatización ("menu", "regla", "bienvenida", "ausencia", "recibido", "cierre", "atajo", "comando"…); "" = escrito a mano
-	Olvidado        bool   // se guardó (o se quitó después) SIN texto, cita, nombre de archivo ni menciones: interruptor de auditoría apagado o retención
-	DelHistorial    bool   // llegó en una sincronización de historial, no en vivo
-	SHA256          []byte // huella del archivo según WhatsApp (para no bajar dos veces lo mismo); nil si no se sabe
-	Enlaces         bool   // el texto traía un enlace (se calcula al guardar, sin guardar nada más)
+	ID                   string
+	ChatJID              string
+	BotID                int64
+	RemitenteJID         string
+	RemitenteNombre      string
+	EsMio                bool
+	Tipo                 string
+	Texto                string
+	TS                   int64
+	Borrado              bool
+	Editado              bool
+	ArchivoRuta          string
+	ArchivoBytes         int64
+	ArchivoMime          string
+	ArchivoEstado        string
+	MiniaturaRuta        string
+	ArchivoNombre        string
+	ArchivoInfo          []byte // datos para descargar de nuevo (JSON); nunca sale de la base en claro
+	Ancho, Alto          int
+	DuracionS            int
+	NotaVoz              bool
+	EliminadoEn          int64    // hora en que llegó la eliminación (0 = no se sabe)
+	PortadaRuta          string   // portada de un video (JPEG cifrado ~720 px); vacía si no tiene
+	ArchivoBorradoTS     int64    // cuándo se borró el archivo (0 = no se borró)
+	ArchivoBorradoMotivo string   // limpieza | tope | manual | retención
+	EliminadoPor         string   // JID de quien lo eliminó si no fue su autor (un admin); vacío si no se sabe o fue el autor
+	EstadoEnvio          string   // solo en mensajes propios: "enviando", "enviado" o "fallido" ("" si llegó de otra persona)
+	CitaID               string   // id del mensaje al que responde
+	CitaAutor            string   // JID de quien escribió el mensaje citado
+	CitaTexto            string   // vista previa del mensaje citado (cifrada en la base)
+	Menciones            []string // JIDs mencionados (cifrados en la base)
+	Reenviado            bool
+	VerEstado            string // "ver una vez": "" (sin contenido), "pendiente", "abierto", "visto" o "expirado"
+	VerTipo              string // qué era: imagen, video o audio
+	VerExpira            int64  // hora en que caduca si no se abre
+	Automatico           string // solo en mensajes propios: lo mandó una automatización ("menu", "regla", "bienvenida", "ausencia", "recibido", "cierre", "atajo", "comando"…); "" = escrito a mano
+	Olvidado             bool   // se guardó (o se quitó después) SIN texto, cita, nombre de archivo ni menciones: interruptor de auditoría apagado o retención
+	DelHistorial         bool   // llegó en una sincronización de historial, no en vivo
+	SHA256               []byte // huella del archivo según WhatsApp (para no bajar dos veces lo mismo); nil si no se sabe
+	Enlaces              bool   // el texto traía un enlace (se calcula al guardar, sin guardar nada más)
 }
 
 const colsInsertMensaje = "id,chat_jid,bot_id,remitente_jid,remitente_nombre,es_mio,tipo,texto_cifrado,ts,borrado,editado,archivo_ruta,archivo_bytes,archivo_mime,archivo_estado,miniatura_ruta,archivo_nombre_cifrado,archivo_info_cifrado,ancho,alto,duracion_s,nota_voz,estado_envio,cita_id,cita_autor,cita_texto_cifrado,menciones_cifrado,reenviado,ver_estado,ver_tipo,ver_expira,automatico,contenido_olvidado,del_historial,sha256,enlaces"
-const colsMensaje = colsInsertMensaje + ",eliminado_en,eliminado_por"
+const colsMensaje = colsInsertMensaje + ",eliminado_en,eliminado_por,portada_ruta,archivo_borrado_ts,archivo_borrado_motivo"
 
 func (a *Almacen) escanearMensaje(s interface{ Scan(...any) error }) (*Mensaje, error) {
 	var m Mensaje
@@ -484,7 +487,7 @@ func (a *Almacen) escanearMensaje(s interface{ Scan(...any) error }) (*Mensaje, 
 	var texto, nombre, info, citaTexto, menciones []byte
 	var reenv, olvidado, historial, enlaces int
 	if err := s.Scan(&m.ID, &m.ChatJID, &m.BotID, &m.RemitenteJID, &m.RemitenteNombre, &mio, &m.Tipo, &texto, &m.TS, &borrado, &editado,
-		&m.ArchivoRuta, &m.ArchivoBytes, &m.ArchivoMime, &m.ArchivoEstado, &m.MiniaturaRuta, &nombre, &info, &m.Ancho, &m.Alto, &m.DuracionS, &nota, &m.EstadoEnvio, &m.CitaID, &m.CitaAutor, &citaTexto, &menciones, &reenv, &m.VerEstado, &m.VerTipo, &m.VerExpira, &m.Automatico, &olvidado, &historial, &m.SHA256, &enlaces, &m.EliminadoEn, &m.EliminadoPor); err != nil {
+		&m.ArchivoRuta, &m.ArchivoBytes, &m.ArchivoMime, &m.ArchivoEstado, &m.MiniaturaRuta, &nombre, &info, &m.Ancho, &m.Alto, &m.DuracionS, &nota, &m.EstadoEnvio, &m.CitaID, &m.CitaAutor, &citaTexto, &menciones, &reenv, &m.VerEstado, &m.VerTipo, &m.VerExpira, &m.Automatico, &olvidado, &historial, &m.SHA256, &enlaces, &m.EliminadoEn, &m.EliminadoPor, &m.PortadaRuta, &m.ArchivoBorradoTS, &m.ArchivoBorradoMotivo); err != nil {
 		return nil, err
 	}
 	m.EsMio, m.Borrado, m.Editado, m.NotaVoz = mio == 1, borrado == 1, editado == 1, nota == 1

@@ -85,7 +85,7 @@ class VisoresUiTest {
         motor.archivos = Apoyo.arreglo(Apoyo.msgJson("F1", 1_700_000_000, tipo = "imagen", estado = "descargado", ruta = "media/1/ab/F1.enc", bytes = png.size.toLong()))
         regla.setContent { BotChatTema { PantallaVisor(1, jid, "F1", "María López", {}) } }
         regla.esperaTexto("María López")
-        regla.onNodeWithContentDescription("Guardar copia en mi carpeta").assertIsDisplayed()
+        regla.onNodeWithContentDescription("Guardar en la galería").assertIsDisplayed()
         regla.onNodeWithContentDescription("Compartir").assertIsDisplayed()
         regla.onNodeWithContentDescription("Volver").assertIsDisplayed()
         Thread.sleep(500); regla.waitForIdle()
@@ -99,7 +99,7 @@ class VisoresUiTest {
         regla.esperaTexto("Abrir con…")
         regla.onAllNodesWithText("notas.txt", substring = true).onFirst().assertIsDisplayed()
         regla.onNodeWithText("Se abre una copia temporal", substring = true).assertIsDisplayed()
-        regla.onNodeWithContentDescription("Guardar copia en mi carpeta").assertIsDisplayed()
+        regla.onNodeWithContentDescription("Guardar en la galería").assertIsDisplayed()
     }
 
     @Test fun documentoNoDescargadoExplicaQueHacer() {

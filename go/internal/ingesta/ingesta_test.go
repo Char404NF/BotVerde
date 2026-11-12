@@ -293,7 +293,8 @@ func TestDescargaAutomaticaSegunPolitica(t *testing.T) {
 	if m, _ := e.alm.ObtenerMensaje(1, pn.String(), "VID2"); m.ArchivoEstado != almacen.EstadoPendiente {
 		t.Fatalf("VID2: %s", m.ArchivoEstado)
 	}
-	// Archivo grande: queda con botón.
+	// Archivo de 80 MB: sin tope por archivo de fábrica, con Wi-Fi baja solo; con datos queda con botón.
+	e.red = RedDatos
 	grande := &waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{FileLength: proto.Uint64(80 << 20), MediaKey: []byte("k"), DirectPath: proto.String("/d"), FileName: proto.String("x.zip")}}
 	e.g.Mensaje(ctx, mensajeEvt(pn, pn, "DOC", false, grande), false)
 	if m, _ := e.alm.ObtenerMensaje(1, pn.String(), "DOC"); m.ArchivoEstado != almacen.EstadoNinguno {

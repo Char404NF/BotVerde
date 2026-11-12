@@ -3,6 +3,7 @@ package medios
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"os"
@@ -20,10 +21,13 @@ import (
 type clienteFalso struct {
 	mu        sync.Mutex
 	llamadas  int
+	aArchivo  int
 	enVuelo   int32
 	maxVuelo  int32
 	respuesta func(path string) ([]byte, error)
-	bloqueo   chan struct{} // si no es nil, cada descarga espera aquí
+	// respuestaArchivo, si existe, escribe el contenido directo al archivo (para simular lo muy grande sin RAM).
+	respuestaArchivo func(f whatsmeow.File) error
+	bloqueo          chan struct{} // si no es nil, cada descarga espera aquí
 }
 
 func (c *clienteFalso) DownloadMediaWithPath(ctx context.Context, directPath string, enc, sha, clave []byte, mt whatsmeow.MediaType, mms string, sinHash bool) ([]byte, error) {
@@ -48,6 +52,21 @@ func (c *clienteFalso) DownloadMediaWithPath(ctx context.Context, directPath str
 	return c.respuesta(directPath)
 }
 
+func (c *clienteFalso) DownloadMediaWithPathToFile(ctx context.Context, directPath string, enc, sha, clave []byte, mt whatsmeow.MediaType, mms string, sinHash bool, f whatsmeow.File) error {
+	c.mu.Lock()
+	c.aArchivo++
+	c.mu.Unlock()
+	if c.respuestaArchivo != nil {
+		return c.respuestaArchivo(f)
+	}
+	b, err := c.DownloadMediaWithPath(ctx, directPath, enc, sha, clave, mt, mms, sinHash)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(b)
+	return err
+}
+
 type entorno struct {
 	alm       *almacen.Almacen
 	g         *Gestor
@@ -56,9 +75,15 @@ type entorno struct {
 	pol       ingesta.Politica
 	logs      []string
 	conectado atomic.Bool
+	red       atomic.Int32
+	bat       atomic.Int32 // -1 = no se sabe
+	cargando  atomic.Bool
+	tope      atomic.Int64
 }
 
-func nuevoEntorno(t *testing.T) *entorno {
+func nuevoEntorno(t *testing.T) *entorno { return nuevoEntornoCfg(t, nil) }
+
+func nuevoEntornoCfg(t *testing.T, ajusta func(*Config)) *entorno {
 	t.Helper()
 	k := make([]byte, 32)
 	for i := range k {
@@ -70,10 +95,18 @@ func nuevoEntorno(t *testing.T) *entorno {
 	}
 	e := &entorno{alm: alm, libre: 100 << 30, pol: ingesta.PoliticaPorDefecto(), cli: &clienteFalso{respuesta: func(string) ([]byte, error) { return []byte("contenido de prueba"), nil }}}
 	e.conectado.Store(true)
-	e.g = Nuevo(Config{BotID: 1, Alm: alm,
-		Cliente:  func() (Cliente, bool) { return e.cli, e.conectado.Load() },
-		Politica: func() ingesta.Politica { return e.pol }, Libre: func() int64 { return e.libre },
-		Esperas: []time.Duration{20 * time.Millisecond, 20 * time.Millisecond}, Log: func(s string) { e.logs = append(e.logs, s) }})
+	e.red.Store(int32(ingesta.RedWifi))
+	e.bat.Store(-1)
+	cfg := Config{BotID: 1, Alm: alm,
+		Cliente:   func() (Cliente, bool) { return e.cli, e.conectado.Load() },
+		Red:       func() ingesta.Red { return ingesta.Red(e.red.Load()) },
+		Bateria:   func() ingesta.Bateria { return ingesta.Bateria{Nivel: int(e.bat.Load()), Cargando: e.cargando.Load()} },
+		TopeTotal: func() int64 { return e.tope.Load() }, Politica: func() ingesta.Politica { return e.pol }, Libre: func() int64 { return e.libre },
+		Esperas: []time.Duration{20 * time.Millisecond, 20 * time.Millisecond}, Log: func(s string) { e.logs = append(e.logs, s) }}
+	if ajusta != nil {
+		ajusta(&cfg)
+	}
+	e.g = Nuevo(cfg)
 	e.g.Iniciar(context.Background())
 	t.Cleanup(func() { e.g.Detener(); _ = alm.Cerrar() })
 	return e
@@ -81,12 +114,17 @@ func nuevoEntorno(t *testing.T) *entorno {
 
 func (e *entorno) mensaje(t *testing.T, id, tipo string, bytes int64) {
 	t.Helper()
+	e.mensajeSHA(t, id, tipo, bytes, []byte("sha-"+id))
+}
+
+func (e *entorno) mensajeSHA(t *testing.T, id, tipo string, bytes int64, sha []byte) {
+	t.Helper()
 	chat := "1@s.whatsapp.net"
 	if _, err := e.alm.ActualizarChat(1, chat, false, func(c *almacen.Chat) { c.TelE164 = "+521" }); err != nil {
 		t.Fatal(err)
 	}
-	info, _ := json.Marshal(ingesta.InfoDescarga{Tipo: tipo, DirectPath: "/v/" + id, MediaKey: "Y2xhdmU=", SHA256: "c2hh", EncSHA256: "ZXNoYQ=="})
-	_, err := e.alm.GuardarMensaje(&almacen.Mensaje{ID: id, ChatJID: chat, BotID: 1, Tipo: tipo, TS: 10, ArchivoInfo: info, ArchivoBytes: bytes, ArchivoEstado: almacen.EstadoPendiente})
+	info, _ := json.Marshal(ingesta.InfoDescarga{Tipo: tipo, DirectPath: "/v/" + id, MediaKey: "Y2xhdmU=", SHA256: base64.StdEncoding.EncodeToString(sha), EncSHA256: "ZXNoYQ=="})
+	_, err := e.alm.GuardarMensaje(&almacen.Mensaje{ID: id, ChatJID: chat, BotID: 1, Tipo: tipo, TS: 10, ArchivoInfo: info, SHA256: sha, ArchivoBytes: bytes, ArchivoEstado: almacen.EstadoPendiente})
 	if err != nil {
 		t.Fatal(err)
 	}

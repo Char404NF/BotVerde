@@ -55,14 +55,24 @@ func (a *Almacen) Libre() (libre, total int64) {
 	return int64(st.Bavail) * int64(st.Bsize), int64(st.Blocks) * int64(st.Bsize)
 }
 
+// tamDir suma lo que ocupan los archivos de una carpeta. Un archivo con varios enlaces duros (duplicados) se cuenta una sola vez.
 func tamDir(dir string, filtro func(nombre string) bool) int64 {
 	var n int64
+	type clave struct{ dev, ino uint64 }
+	vistos := map[clave]bool{}
 	_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return nil
 		}
 		if filtro == nil || filtro(d.Name()) {
 			if i, err := d.Info(); err == nil {
+				if st, ok := i.Sys().(*syscall.Stat_t); ok && st.Nlink > 1 {
+					k := clave{uint64(st.Dev), uint64(st.Ino)}
+					if vistos[k] {
+						return nil
+					}
+					vistos[k] = true
+				}
 				n += i.Size()
 			}
 		}
@@ -71,12 +81,16 @@ func tamDir(dir string, filtro func(nombre string) bool) int64 {
 	return n
 }
 
+func (a *Almacen) dirMedia(botID int64) string {
+	return filepath.Join(a.raiz, "media", fmt.Sprint(botID))
+}
+
 // EspacioTotal calcula el uso de disco de BotChat para un bot.
 func (a *Almacen) EspacioTotal(botID int64) EspacioTotal {
 	var e EspacioTotal
-	media := filepath.Join(a.raiz, "media", fmt.Sprint(botID))
-	e.Multimedia = tamDir(media, func(n string) bool { return !strings.HasSuffix(n, ".thumb.enc") })
-	e.Miniaturas = tamDir(media, func(n string) bool { return strings.HasSuffix(n, ".thumb.enc") })
+	media := a.dirMedia(botID)
+	e.Multimedia = tamDir(media, func(n string) bool { return !esMini(n) })
+	e.Miniaturas = tamDir(media, esMini) // miniaturas y portadas
 	e.Fotos = tamDir(filepath.Join(a.raiz, "avatars", fmt.Sprint(botID)), nil)
 	for _, suf := range []string{"", "-wal", "-shm"} {
 		if i, err := os.Stat(filepath.Join(a.raiz, "messages.db"+suf)); err == nil {
@@ -92,15 +106,11 @@ func (a *Almacen) EspacioPorTipo(botID int64) ([]EspacioTipo, error) {
 	out := make([]EspacioTipo, len(Categorias))
 	for i, c := range Categorias {
 		out[i].Categoria = c
-		tipos := tiposDe(c)
-		q := "SELECT COALESCE(SUM(archivo_bytes),0), COUNT(*) FROM messages WHERE bot_id=? AND archivo_estado='descargado' AND tipo IN (" + marcas(len(tipos)) + ")"
-		args := []any{botID}
-		for _, t := range tipos {
-			args = append(args, t)
-		}
-		if err := a.db.QueryRow(q, args...).Scan(&out[i].Bytes, &out[i].Cantidad); err != nil {
+		b, n, err := a.sumaUnica(botID, tiposDe(c)) // los duplicados enlazados cuentan una vez
+		if err != nil {
 			return nil, err
 		}
+		out[i].Bytes, out[i].Cantidad = b, n
 	}
 	return out, nil
 }
@@ -162,6 +172,11 @@ type Filtro struct {
 	Chat      string `json:"chat"`
 	Categoria string `json:"categoria"`
 	DiasMin   int    `json:"diasMin"` // solo los de más de N días
+	// Persona (v0.6.0): solo lo que mandó esa persona (cualquier forma de su identificador), en todos los chats o en `Chat`.
+	Persona string `json:"persona"`
+	// Desde y Hasta (segundos Unix; 0 = sin límite): solo los mensajes de ese rango de fechas.
+	Desde int64 `json:"desde"`
+	Hasta int64 `json:"hasta"`
 }
 
 // Item identifica un archivo concreto.
@@ -172,10 +187,11 @@ type Item struct {
 
 type filaArchivo struct {
 	chat, id, ruta, mini string
+	portada, tipo        string
 	bytes                int64
 }
 
-func (f Filtro) donde(botID int64, ahora time.Time) (string, []any) {
+func (f Filtro) donde(a *Almacen, botID int64, ahora time.Time) (string, []any) {
 	q := " WHERE bot_id=? AND archivo_estado='descargado'"
 	args := []any{botID}
 	if f.Chat != "" {
@@ -192,11 +208,31 @@ func (f Filtro) donde(botID int64, ahora time.Time) (string, []any) {
 		q += " AND ts < ?"
 		args = append(args, ahora.Add(-time.Duration(f.DiasMin)*24*time.Hour).Unix())
 	}
+	if f.Desde > 0 {
+		q += " AND ts >= ?"
+		args = append(args, f.Desde)
+	}
+	if f.Hasta > 0 {
+		q += " AND ts < ?"
+		args = append(args, f.Hasta)
+	}
+	if f.Persona != "" {
+		fs := []string{f.Persona}
+		if a != nil {
+			if canon := a.ResolverPersona(botID, f.Persona); canon != "" {
+				fs = a.formas(botID, canon)
+			}
+		}
+		q += " AND es_mio=0 AND remitente_jid IN " + enLista(len(fs))
+		for _, x := range fs {
+			args = append(args, x)
+		}
+	}
 	return q, args
 }
 
 func (a *Almacen) filas(q string, args []any) ([]filaArchivo, error) {
-	r, err := a.db.Query("SELECT chat_jid,id,archivo_ruta,miniatura_ruta,archivo_bytes FROM messages"+q, args...)
+	r, err := a.db.Query("SELECT chat_jid,id,archivo_ruta,miniatura_ruta,archivo_bytes,portada_ruta,tipo FROM messages"+q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +240,7 @@ func (a *Almacen) filas(q string, args []any) ([]filaArchivo, error) {
 	var out []filaArchivo
 	for r.Next() {
 		var f filaArchivo
-		if err := r.Scan(&f.chat, &f.id, &f.ruta, &f.mini, &f.bytes); err != nil {
+		if err := r.Scan(&f.chat, &f.id, &f.ruta, &f.mini, &f.bytes, &f.portada, &f.tipo); err != nil {
 			return nil, err
 		}
 		out = append(out, f)
@@ -213,28 +249,32 @@ func (a *Almacen) filas(q string, args []any) ([]filaArchivo, error) {
 }
 
 // EstimarBorrado dice cuántos archivos y bytes se liberarían con el filtro, sin borrar nada.
+// Un archivo con duplicados enlazados que quedan fuera del filtro no libera nada, y no se cuenta.
 func (a *Almacen) EstimarBorrado(botID int64, f Filtro) (bytes int64, n int, err error) {
-	q, args := f.donde(botID, time.Now())
-	err = a.db.QueryRow("SELECT COALESCE(SUM(archivo_bytes),0), COUNT(*) FROM messages"+q, args...).Scan(&bytes, &n)
+	q, args := f.donde(a, botID, time.Now())
+	filas, err := a.filas(q, args)
+	if err != nil {
+		return 0, 0, err
+	}
+	n = len(filas)
+	bytes, _ = a.liberables(filas)
 	return
 }
 
 // BorrarArchivos borra los archivos (y sus miniaturas) que cumplen el filtro. Conserva el texto de los mensajes.
 func (a *Almacen) BorrarArchivos(botID int64, f Filtro) (bytes int64, n int, err error) {
-	q, args := f.donde(botID, time.Now())
+	q, args := f.donde(a, botID, time.Now())
 	filas, err := a.filas(q, args)
 	if err != nil {
 		return 0, 0, err
 	}
-	return a.borrarFilas(botID, filas)
+	return a.borrarFilas(botID, filas, "limpieza")
 }
 
 // EstimarLista calcula lo que se liberaría al borrar archivos concretos.
 func (a *Almacen) EstimarLista(botID int64, items []Item) (bytes int64, n int, err error) {
 	filas, err := a.filasDeItems(botID, items)
-	for _, f := range filas {
-		bytes += f.bytes
-	}
+	bytes, _ = a.liberables(filas)
 	return bytes, len(filas), err
 }
 
@@ -244,7 +284,7 @@ func (a *Almacen) BorrarLista(botID int64, items []Item) (bytes int64, n int, er
 	if err != nil {
 		return 0, 0, err
 	}
-	return a.borrarFilas(botID, filas)
+	return a.borrarFilas(botID, filas, "manual")
 }
 
 func (a *Almacen) filasDeItems(botID int64, items []Item) ([]filaArchivo, error) {
@@ -269,16 +309,31 @@ func (a *Almacen) quita(rel string) {
 	}
 }
 
-func (a *Almacen) borrarFilas(botID int64, filas []filaArchivo) (bytes int64, n int, err error) {
+// borrarFilas quita los archivos de esas filas. Un video con portada y el interruptor `conservar_portada` encendido conserva su
+// portada y su miniatura: la fila queda en estado "borrado" con duración, tamaño, hora y remitente, que son los de la tarjeta
+// "Video eliminado". `motivo` (limpieza, tope, manual, retención) se anota junto con la hora.
+// Devuelve los bytes que de verdad se liberan (un archivo con otro enlace que sigue vivo no libera nada).
+func (a *Almacen) borrarFilas(botID int64, filas []filaArchivo, motivo string) (bytes int64, n int, err error) {
+	bytes, _ = a.liberables(filas)
+	conservar := a.ConservarPortada(botID)
+	ahora := time.Now().Unix()
 	for _, f := range filas {
+		quedaPortada := conservar && f.portada != "" && f.tipo == TipoVideo
 		a.quita(f.ruta)
-		a.quita(f.mini)
-		if _, e := a.db.Exec(`UPDATE messages SET archivo_estado='borrado', archivo_ruta='', miniatura_ruta='' WHERE bot_id=? AND chat_jid=? AND id=?`,
-			botID, f.chat, f.id); e != nil {
+		var e error
+		if quedaPortada {
+			_, e = a.db.Exec(`UPDATE messages SET archivo_estado='borrado', archivo_ruta='', archivo_borrado_ts=?, archivo_borrado_motivo=? WHERE bot_id=? AND chat_jid=? AND id=?`,
+				ahora, motivo, botID, f.chat, f.id)
+		} else {
+			a.quita(f.mini)
+			a.quita(f.portada)
+			_, e = a.db.Exec(`UPDATE messages SET archivo_estado='borrado', archivo_ruta='', miniatura_ruta='', portada_ruta='', archivo_borrado_ts=?, archivo_borrado_motivo=? WHERE bot_id=? AND chat_jid=? AND id=?`,
+				ahora, motivo, botID, f.chat, f.id)
+		}
+		if e != nil {
 			err = errors.Join(err, e)
 			continue
 		}
-		bytes += f.bytes
 		n++
 		a.avisa(fmt.Sprintf("archivo:%s:%s", f.chat, f.id))
 	}
@@ -336,19 +391,19 @@ type Reporte struct {
 // No toca los archivos que están en descarga (pendiente).
 func (a *Almacen) Reparar(botID int64) (Reporte, error) {
 	var rep Reporte
-	filas, err := a.db.Query(`SELECT chat_jid,id,archivo_ruta,miniatura_ruta,archivo_bytes,archivo_estado FROM messages
-		WHERE bot_id=? AND (archivo_estado='descargado' OR miniatura_ruta<>'')`, botID)
+	filas, err := a.db.Query(`SELECT chat_jid,id,archivo_ruta,miniatura_ruta,archivo_bytes,archivo_estado,portada_ruta FROM messages
+		WHERE bot_id=? AND (archivo_estado='descargado' OR miniatura_ruta<>'' OR portada_ruta<>'')`, botID)
 	if err != nil {
 		return rep, err
 	}
 	type fila struct {
-		chat, id, ruta, mini, estado string
-		bytes                        int64
+		chat, id, ruta, mini, estado, portada string
+		bytes                                 int64
 	}
 	var todas []fila
 	for filas.Next() {
 		var f fila
-		if err := filas.Scan(&f.chat, &f.id, &f.ruta, &f.mini, &f.bytes, &f.estado); err != nil {
+		if err := filas.Scan(&f.chat, &f.id, &f.ruta, &f.mini, &f.bytes, &f.estado, &f.portada); err != nil {
 			filas.Close()
 			return rep, err
 		}
@@ -362,6 +417,16 @@ func (a *Almacen) Reparar(botID int64) (Reporte, error) {
 			if abs, err := a.Abs(f.mini); err == nil {
 				if _, err := os.Stat(abs); err != nil {
 					_, _ = a.db.Exec("UPDATE messages SET miniatura_ruta='' WHERE bot_id=? AND chat_jid=? AND id=?", botID, f.chat, f.id)
+					rep.MiniaturasLimpiadas++
+				} else {
+					usados[filepath.Clean(abs)] = true
+				}
+			}
+		}
+		if f.portada != "" {
+			if abs, err := a.Abs(f.portada); err == nil {
+				if _, err := os.Stat(abs); err != nil {
+					_, _ = a.db.Exec("UPDATE messages SET portada_ruta='' WHERE bot_id=? AND chat_jid=? AND id=?", botID, f.chat, f.id)
 					rep.MiniaturasLimpiadas++
 				} else {
 					usados[filepath.Clean(abs)] = true

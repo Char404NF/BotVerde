@@ -17,6 +17,14 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import android.os.BatteryManager
+import com.botchat.app.medios.GeneradorPortadas
+import org.json.JSONArray
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import wabot.Listener
 import wabot.Wabot
 import java.util.concurrent.Executors
@@ -56,6 +64,47 @@ class BotService : Service() {
         Notificador.crearCanal(this)
         Notificador.iniciar(this, ambito)
         vigilaRed()
+        vigilaBateria()
+        generaPortadas()
+    }
+
+    private var bateriaReceptor: BroadcastReceiver? = null
+
+    /** Avisa al módulo Go el nivel de batería y si carga: con la batería baja las descargas automáticas esperan. */
+    private fun vigilaBateria() {
+        fun avisa(i: Intent?) {
+            i ?: return
+            val nivel = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val escala = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100).coerceAtLeast(1)
+            val estado = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            val carga = estado == BatteryManager.BATTERY_STATUS_CHARGING || estado == BatteryManager.BATTERY_STATUS_FULL
+            runCatching { Wabot.establecerBateria(if (nivel < 0) -1L else (nivel * 100L / escala), carga) }
+        }
+        val r = object : BroadcastReceiver() { override fun onReceive(c: Context?, i: Intent?) = avisa(i) }
+        bateriaReceptor = r
+        avisa(runCatching { ContextCompat.registerReceiver(this, r, IntentFilter(Intent.ACTION_BATTERY_CHANGED), ContextCompat.RECEIVER_NOT_EXPORTED) }.getOrNull())
+    }
+
+    /** Portadas de video: cada tanto busca videos descargados sin portada y se la saca (de a pocos, sin prisa). */
+    private fun generaPortadas() {
+        val origen = object : GeneradorPortadas.Origen {
+            override fun pendientes(limite: Int): List<GeneradorPortadas.Pendiente> {
+                val id = bot?.id ?: return emptyList()
+                val a = JSONArray(Wabot.videosSinPortada(id, limite.toLong()))
+                return (0 until a.length()).map { val o = a.getJSONObject(it); GeneradorPortadas.Pendiente(o.getString("chat"), o.getString("id"), o.getString("ruta")) }
+            }
+            override fun guardar(chat: String, id: String, jpeg: ByteArray, ancho: Int, alto: Int) {
+                Wabot.guardarPortada(bot?.id ?: return, chat, id, jpeg, ancho.toLong(), alto.toLong())
+            }
+        }
+        ambito.launch {
+            val gen = GeneradorPortadas(filesDir, ClaveDatos.obtener(this@BotService), origen)
+            delay(30_000)
+            while (isActive) {
+                if (bot != null) runCatching { gen.pasada(3) { !isActive } }
+                delay(45_000)
+            }
+        }
     }
 
     /** Avisa al módulo Go si el teléfono usa Wi-Fi (o una red sin costo) o datos móviles, para las reglas de descarga. */
@@ -160,6 +209,7 @@ class BotService : Service() {
     override fun onDestroy() {
         BotState.corriendo.value = false
         ambito.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        bateriaReceptor?.let { r -> runCatching { unregisterReceiver(r) } }
         redCallback?.let { cb -> runCatching { getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(cb) } }
         hilo.execute { Wabot.stop() }
         hilo.shutdown()

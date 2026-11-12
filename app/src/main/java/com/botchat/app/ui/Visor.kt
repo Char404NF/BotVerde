@@ -144,7 +144,7 @@ fun PantallaVisor(botId: Long, jid: String, idInicial: String, nombreChat: Strin
                     if (Exportar.disponible) IconButton({
                         haptica(Toque.Fuerte)
                         scope.launch { guardarCopia(ctx, actual, nombreChat) }
-                    }) { Icon(Ico.Guardar, "Guardar copia en mi carpeta", tint = Color.White) }
+                    }) { Icon(Ico.Guardar, "Guardar en la galería", tint = Color.White) }
                     IconButton({
                         haptica(Toque.Suave)
                         scope.launch { compartirTemporal(ctx, actual, nombreDe(actual)) }
@@ -169,10 +169,10 @@ private fun nombreDe(m: Msg): String {
     return "${m.categoria.ifEmpty { "archivo" }}_${m.id.takeLast(8)}.$ext"
 }
 
-/** Copia sin cifrar a Documents/BotChat/<chat>/. Avisa claramente que la copia ya no está cifrada. */
+/** "Guardar en la galería": copia sin cifrar a Pictures, Movies o Music/BotChat/<chat>/ (Documents para lo demás). Avisa que ya no está cifrada. */
 suspend fun guardarCopia(ctx: Context, m: Msg, nombreChat: String) {
-    val r = Exportar.guardarCopia(ctx, Repo.archivo(m.ruta), nombreChat, nombreDe(m), m.mime)
-    val texto = r.fold({ "Copia guardada en $it. Esa copia ya NO está cifrada." }, { "No se pudo guardar la copia: ${it.message}" })
+    val r = Exportar.guardarEnGaleria(ctx, Repo.archivo(m.ruta), nombreChat, nombreDe(m), com.botchat.app.medios.TipoArchivo.mimeEfectivo(nombreDe(m), m.mime))
+    val texto = r.fold({ "Copia guardada en $it. ${Exportar.AVISO_SIN_CIFRAR}" }, { "No se pudo guardar la copia: ${it.message}" })
     Toast.makeText(ctx, texto, Toast.LENGTH_LONG).show()
 }
 

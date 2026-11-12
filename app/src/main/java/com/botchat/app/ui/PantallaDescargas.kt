@@ -47,7 +47,7 @@ fun PantallaDescargas(ajustes: Ajustes, alVolver: () -> Unit) {
                 FilaDescarga("Audios", Ico.Audio, d.audio) { r -> ajustes.cambiarDescargas { it.copy(audio = r) } }
                 FilaDescarga("Documentos", Ico.Documento, d.documento) { r -> ajustes.cambiarDescargas { it.copy(documento = r) } }
                 FilaDescarga("Videos", Ico.Video, d.video) { r -> ajustes.cambiarDescargas { it.copy(video = r) } }
-                Deslizador("Tamaño máximo de videos", "${d.videoMaxMb} MB", d.videoMaxMb.toFloat(), 10f..200f, 18) { ajustes.cambiarDescargas { x -> x.copy(videoMaxMb = (it / 10).roundToInt() * 10) } }
+                Deslizador("Tamaño máximo de videos", if (d.videoMaxMb == 0) "Sin tope" else "${d.videoMaxMb} MB", d.videoMaxMb.toFloat(), 0f..200f, 19) { ajustes.cambiarDescargas { x -> x.copy(videoMaxMb = (it / 10).roundToInt() * 10) } }
                 Deslizador("Espacio libre mínimo", if (d.pisoLibreMb >= 1000) "${"%.1f".format(d.pisoLibreMb / 1000f)} GB" else "${d.pisoLibreMb} MB", d.pisoLibreMb.toFloat(), 100f..3000f, 28, "Con menos espacio libre se pausan las descargas automáticas.") { ajustes.cambiarDescargas { x -> x.copy(pisoLibreMb = (it / 100).roundToInt() * 100) } }
             }
         }

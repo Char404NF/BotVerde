@@ -85,7 +85,7 @@ fun PantallaDocumento(botId: Long, jid: String, id: String, nombreChat: String, 
                 navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } },
                 title = { Text(m?.let { TipoArchivo.nombreMostrable(it.nombre, it.mime) } ?: "Documento", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
-                    if (m != null && Exportar.disponible) IconButton({ scope.launch { guardarCopia(ctx, m, nombreChat) } }) { Icon(Ico.Guardar, "Guardar copia en mi carpeta") }
+                    if (m != null && Exportar.disponible) IconButton({ scope.launch { guardarCopia(ctx, m, nombreChat) } }) { Icon(Ico.Guardar, "Guardar en la galería") }
                     if (m != null) IconButton({ scope.launch { compartirTemporal(ctx, m, TipoArchivo.nombreMostrable(m.nombre, m.mime)) } }) { Icon(Ico.Compartir, "Compartir") }
                 },
             )

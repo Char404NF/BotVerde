@@ -39,7 +39,7 @@ class AvanzadoUiTest {
         val d = ajustes.descargas.value
         assertTrue(d.foto.wifi && d.foto.datos && d.audio.wifi && d.audio.datos && d.documento.wifi && d.documento.datos)
         assertTrue(d.video.wifi); assertFalse("los videos con datos móviles vienen apagados", d.video.datos)
-        assertEquals(50, d.videoMaxMb); assertEquals(500, d.pisoLibreMb)
+        assertEquals("sin tope por archivo de fábrica", 0, d.videoMaxMb); assertEquals(500, d.pisoLibreMb)
     }
 
     @Test fun descargasGuardanSusCambios() {
@@ -94,7 +94,7 @@ class AvanzadoUiTest {
     @Test fun reglasDeDescargaViajanAlModuloGo() {
         val json = Ajustes.jsonDescargas(ajustes.descargas.value)
         val o = org.json.JSONObject(json)
-        assertEquals(50L * 1024 * 1024, o.getLong("videoMaxBytes"))
+        assertEquals(0L, o.getLong("videoMaxBytes")) // sin tope por archivo de fábrica (0.6.0)
         assertEquals(500L * 1024 * 1024, o.getLong("pisoLibre"))
         assertFalse(o.getJSONObject("video").getBoolean("datos")); assertTrue(o.getJSONObject("video").getBoolean("wifi"))
     }
