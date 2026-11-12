@@ -17,6 +17,7 @@ import com.botchat.app.datos.Msg
 import com.botchat.app.datos.Participante
 import com.botchat.app.datos.PresenciaChat
 import com.botchat.app.datos.Repo
+import com.botchat.app.datos.puntitosEnBruto
 import com.botchat.app.medios.AdjuntoListo
 import com.botchat.app.medios.GrabadorVoz
 import com.botchat.app.medios.Grabadores
@@ -76,6 +77,39 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
     /** Etiquetas locales del chat (las que pone el dueño), distintas de la etiqueta de menú de arriba. */
     var etiquetasLocales by mutableStateOf<List<com.botchat.app.datos.EtiquetaItem>>(emptyList())
         private set
+
+    // ---- puntito de color de la etiqueta de quien escribió (solo grupos) ----
+    // Consulta por lotes (hasta 400 ids por golpe), con caché en memoria que se vacía cuando cambian las etiquetas.
+    var puntitosVersion by androidx.compose.runtime.mutableIntStateOf(0)
+        private set
+    private val puntitos = HashMap<String, String>() // id de mensaje -> color de su primera etiqueta ("" = ninguna)
+    private val porPedir = LinkedHashSet<String>()
+    private var puntitosJob: Job? = null
+    private var catalogoEtiquetas: Map<Long, com.botchat.app.datos.EtiquetaItem>? = null
+
+    /** El color (#RRGGBB) del puntito de ese mensaje, o null si no tiene (o aún no se sabe). Lee la versión para que la burbuja se repinte. */
+    fun colorDePuntito(id: String): String? { puntitosVersion; return puntitos[id]?.ifEmpty { null } }
+
+    /** Pide el puntito de un mensaje; los pedidos se juntan y se resuelven en un solo golpe. */
+    fun pedirPuntito(id: String) {
+        if (puntitos.containsKey(id)) return
+        porPedir.add(id)
+        if (puntitosJob?.isActive == true) return
+        puntitosJob = viewModelScope.launch {
+            delay(40)
+            while (porPedir.isNotEmpty()) {
+                val ids = porPedir.take(400)
+                porPedir.removeAll(ids.toSet())
+                val catalogo = catalogoEtiquetas ?: runCatching { Repo.etiquetas(botId).associateBy { it.id } }.getOrDefault(emptyMap()).also { catalogoEtiquetas = it }
+                val mapa = runCatching { com.botchat.app.datos.JsonE7.puntitos(Repo.puntitosEnBruto(botId, jid, ids)) }.getOrDefault(emptyMap())
+                if (puntitos.size > 3000) puntitos.clear()
+                ids.forEach { id -> puntitos[id] = mapa[id]?.firstNotNullOfOrNull { catalogo[it]?.color } ?: "" }
+                puntitosVersion++
+            }
+        }
+    }
+
+    private fun invalidarPuntitos() { puntitos.clear(); catalogoEtiquetas = null; puntitosVersion++ }
 
     // ---- adjuntos y notas de voz ----
     var adjuntos by mutableStateOf<List<AdjuntoListo>>(emptyList())
@@ -169,6 +203,7 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
                 if (evs.any { it == "presencia:$jid" }) actualizarPresencia()
                 if (evs.any { it == "sesiones" || it == "chat:$jid" }) actualizarEtiqueta()
                 if (evs.any { it == "etiquetas" || it == "chat:$jid" }) actualizarEtiquetasLocales()
+                if ("etiquetas" in evs) invalidarPuntitos()
             }
         }
     }

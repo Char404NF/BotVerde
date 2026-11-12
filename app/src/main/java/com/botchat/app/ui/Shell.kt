@@ -175,22 +175,41 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         alLimites = { nav.navigate("iniciativa") }, alLaboratorio = { nav.navigate("laboratorio") }, alActividad = { nav.navigate("actividad") },
                     )
                 }
-                // Destinos provisorios: la etapa E7 pone aquí el perfil de la persona y la info del grupo. Por ahora abren las pantallas de siempre.
+                // E7: perfil de la persona (reemplaza a la ficha de siempre) e info del grupo con Miembros y Ajustes.
                 composable("persona_perfil/{jid}") { be ->
                     val jid = be.arguments?.getString("jid") ?: return@composable
-                    PantallaPersonaDetalle(bot.id, jid, alVolver = { nav.popBackStack() })
+                    PantallaPerfilPersona(
+                        bot.id, jid, alVolver = { nav.popBackStack() },
+                        alAbrirActividad = { persona, chat, nombre -> nav.navigate("actividad_persona/${enc(persona)}/${enc(chat)}/${enc(nombre)}") },
+                        alVerMensajes = { nav.navigate("chat/${enc(it)}") },
+                        alAbrirGrupo = { nav.navigate("grupo_info/${enc(it)}") },
+                        alAbrirDetalle = { nav.navigate("persona/${enc(it)}") },
+                        alAbrirEtiquetas = { nav.navigate("etiquetas") },
+                        alOlvidada = { nav.popBackStack("inicio", false) },
+                    )
+                }
+                composable("actividad_persona/{persona}/{chat}/{titulo}") { be ->
+                    val persona = be.arguments?.getString("persona") ?: return@composable
+                    val chat = be.arguments?.getString("chat") ?: return@composable
+                    PantallaActividadPersona(
+                        bot.id, persona, chat, be.arguments?.getString("titulo") ?: "", alVolver = { nav.popBackStack() },
+                        alIrAlMensaje = { c, id -> nav.navigate("chat/${enc(c)}?ir=${enc(id)}") },
+                    )
                 }
                 composable("grupo_info/{jid}") { be ->
                     val jid = be.arguments?.getString("jid") ?: return@composable
-                    PantallaInfoChat(
+                    PantallaInfoGrupo(
                         bot.id, jid, alVolver = { nav.popBackStack() },
-                        alAbrirVisor = { id -> nav.navigate("visor/${enc(jid)}/${enc(id)}") },
-                        alAbrirDocumento = { id -> nav.navigate("documento/${enc(jid)}/${enc(id)}") },
-                        alAbrirLista = { f -> nav.navigate("lista/${enc(jid)}/${enc(f.json())}") },
-                        alAbrirPersona = { nav.navigate("persona/${enc(jid)}") },
-                        alOlvidada = { nav.popBackStack("inicio", false) },
-                        alAbrirGrupo = { nav.navigate("grupo/${enc(jid)}") },
+                        alAbrirMiembro = { persona, nombre -> nav.navigate("actividad_persona/${enc(persona)}/${enc(jid)}/${enc(nombre)}") },
+                        alVerCambios = { nav.navigate("grupo_cambios/${enc(jid)}") },
+                        alAbrirAdministrar = { nav.navigate("grupo/${enc(jid)}") },
+                        alAbrirResumen = { nav.navigate("info/${enc(jid)}") },
+                        alAbrirChat = { nav.navigate("chat/${enc(jid)}") },
                     )
+                }
+                composable("grupo_cambios/{jid}") { be ->
+                    val jid = be.arguments?.getString("jid") ?: return@composable
+                    PantallaCambiosMiembros(bot.id, jid, alVolver = { nav.popBackStack() })
                 }
                 // Pantalla provisoria: la completa E8 (silencios en grupos).
                 composable("silencios") { PantallaProvisoria("Silencios", "Aquí verás a quién silenciaste en tus grupos y por cuánto tiempo. La están terminando.", alVolver = { nav.popBackStack() }, etiqueta = "provisoria_silencios") }

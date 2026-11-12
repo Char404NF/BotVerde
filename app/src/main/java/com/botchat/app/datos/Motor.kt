@@ -244,6 +244,9 @@ interface Motor {
     fun guardarReglaItem(bot: Long, grupo: String, id: Long, titulo: String, texto: String, pos: Long): Long
     fun borrarReglaItem(bot: Long, id: Long)
     fun moverReglaItem(bot: Long, id: Long, delta: Long)
+    // E7 (0.6.0): textos anteriores de un mensaje editado y puntitos de silenciada/advertida por lote.
+    fun versionesDeMensaje(bot: Long, chat: String, id: String): String
+    fun estadosDePersonas(bot: Long, personasJson: String): String
     fun listarAlertasPalabra(bot: Long): String
     fun crearAlertaPalabra(bot: Long, palabra: String, chatsJson: String): Long
     fun editarAlertaPalabra(bot: Long, id: Long, chatsJson: String, activa: Boolean)
@@ -552,6 +555,8 @@ object MotorGo : Motor {
     override fun guardarReglaItem(bot: Long, grupo: String, id: Long, titulo: String, texto: String, pos: Long) = Wabot.guardarReglaItem(bot, grupo, id, titulo, texto, pos)
     override fun borrarReglaItem(bot: Long, id: Long) = Wabot.borrarReglaItem(bot, id)
     override fun moverReglaItem(bot: Long, id: Long, delta: Long) = Wabot.moverReglaItem(bot, id, delta)
+    override fun versionesDeMensaje(bot: Long, chat: String, id: String) = Wabot.versionesDeMensaje(bot, chat, id)
+    override fun estadosDePersonas(bot: Long, personasJson: String) = Wabot.estadosDePersonas(bot, personasJson)
     override fun listarAlertasPalabra(bot: Long) = Wabot.listarAlertasPalabra(bot)
     override fun crearAlertaPalabra(bot: Long, palabra: String, chatsJson: String) = Wabot.crearAlertaPalabra(bot, palabra, chatsJson)
     override fun editarAlertaPalabra(bot: Long, id: Long, chatsJson: String, activa: Boolean) = Wabot.editarAlertaPalabra(bot, id, chatsJson, activa)

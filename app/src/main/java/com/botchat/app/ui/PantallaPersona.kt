@@ -147,7 +147,7 @@ fun ChipEtiqueta(e: com.botchat.app.datos.EtiquetaItem, modifier: Modifier = Mod
     ) {
         PuntoRango(e.color, 8)
         Spacer(Modifier.width(4.dp))
-        Text(e.nombre, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text((e.emoji + " " + e.nombre).trim(), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

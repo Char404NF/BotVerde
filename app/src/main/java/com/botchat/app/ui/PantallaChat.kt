@@ -630,6 +630,10 @@ private fun Burbuja(
                         ContenidoMensaje(m, vm, alAbrirVisor, alAbrirDocumento, alAbrirUnaVez)
                         FilaReacciones(m.reacciones, Modifier.padding(top = 3.dp))
                         Row(Modifier.align(Alignment.End).padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            if (!m.esMio && vm.chat?.esGrupo == true) {
+                                LaunchedEffect(m.id, vm.puntitosVersion) { vm.pedirPuntito(m.id) }
+                                vm.colorDePuntito(m.id)?.let { hex -> PuntoRango(hex, 10, Modifier.testTag("puntito_${m.id}")); Spacer(Modifier.width(6.dp)) }
+                            }
                             if (m.editado && !m.borrado) Text("(editado)  ", style = MaterialTheme.typography.labelSmall, color = tinta.copy(alpha = 0.65f))
                             Text(horaDe(m.ts), style = MaterialTheme.typography.labelSmall, color = tinta.copy(alpha = 0.65f))
                             if (m.esMio && m.estadoEnvio.isNotEmpty()) { Spacer(Modifier.width(4.dp)); Palomitas(m.estadoEnvio, tinta) }

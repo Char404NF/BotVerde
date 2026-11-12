@@ -416,7 +416,8 @@ class MotorFalso : Motor {
     override fun etiquetasDeChats(bot: Long, chatsJson: String) = "{}"
     override fun marcarMensaje(bot: Long, chat: String, msgId: String, etiqueta: Long, nota: String) { llamadas += "marcar:$chat:$msgId:$etiqueta"; pFalla() }
     override fun quitarMarcaMensaje(bot: Long, chat: String, msgId: String, etiqueta: Long) { llamadas += "quitarMarca:$chat:$msgId:$etiqueta"; pFalla() }
-    override fun marcasDeMensaje(bot: Long, chat: String, msgId: String) = "[]"
+    var marcasJson = "[]"
+    override fun marcasDeMensaje(bot: Long, chat: String, msgId: String) = marcasJson
     override fun etiquetasDeMensajes(bot: Long, chat: String, idsJson: String) = "{}"
     override fun listarMarcados(bot: Long, tipo: String, etiqueta: Long, limite: Long, desde: Long) = marcadosJson
     override fun contarMarcados(bot: Long, etiqueta: Long) = "{\"mensaje\":0,\"persona\":0,\"chat\":0,\"grupo\":0}"
@@ -426,22 +427,31 @@ class MotorFalso : Motor {
     override fun gruposEnComunPersona(bot: Long, persona: String) = "[]"
     override fun pedirFotoPersona(bot: Long, persona: String, grupo: String, forzar: Boolean) { llamadas += "fotoPersona:$persona" }
     override fun fotoPersona(bot: Long, persona: String) = ""
-    override fun perfilPersona(bot: Long, persona: String) = "{}"
-    override fun actividadPersona(bot: Long, persona: String) = "[]"
-    override fun mensajesDePersona(bot: Long, filtroJson: String, antesTs: Long, antesId: String, limite: Long) = """{"total":0,"items":[],"fin":true,"sigTs":0,"sigId":"","escaneados":0}"""
+    var perfilJson = "{}"
+    override fun perfilPersona(bot: Long, persona: String) = perfilJson
+    var actividadJson = "[]"
+    override fun actividadPersona(bot: Long, persona: String) = actividadJson
+    var paginaPersona = """{"total":0,"items":[],"fin":true,"sigTs":0,"sigId":"","escaneados":0}"""
+    val filtrosPersona = mutableListOf<String>()
+    val paginasPersona = ArrayDeque<String>()
+    override fun mensajesDePersona(bot: Long, filtroJson: String, antesTs: Long, antesId: String, limite: Long): String { filtrosPersona += filtroJson; return paginasPersona.removeFirstOrNull() ?: paginaPersona }
     var busqueda = """{"total":0,"items":[],"fin":true,"sigTs":0,"sigId":"","escaneados":0}"""
     val palabrasBuscadas = mutableListOf<String>()
     override fun buscarEnChat(bot: Long, chat: String, palabra: String, desde: Long, hasta: Long, antesTs: Long, antesId: String, limite: Long): String { palabrasBuscadas += palabra; return busqueda }
-    override fun puntitosDeMensajes(bot: Long, chat: String, idsJson: String) = "{}"
+    var puntitosJson = "{}"
+    var consultasPuntitos = 0
+    override fun puntitosDeMensajes(bot: Long, chat: String, idsJson: String): String { consultasPuntitos++; return puntitosJson }
     override fun exportarChat(bot: Long, chat: String, formato: String, desde: Long, hasta: Long): String { llamadas += "exportarChat:$formato"; return """{"ruta":"exportes/chat.txt.bcf","mensajes":3}""" }
     // Silenciar en grupos y advertencias con sanciones (E5): sin pantallas, solo para compilar.
-    override fun silenciarEnGrupos(bot: Long, persona: String, segundos: Long, alcance: String, gruposJson: String, avisar: Boolean, texto: String): String { llamadas += "silenciarGrupos:$persona:$segundos:$alcance"; return "{}" }
+    override fun silenciarEnGrupos(bot: Long, persona: String, segundos: Long, alcance: String, gruposJson: String, avisar: Boolean, texto: String): String { llamadas += "silenciarGrupos:$persona:$segundos:$alcance:$gruposJson:$avisar:$texto"; return "{}" }
     override fun quitarSilencioGrupos(bot: Long, persona: String): Boolean { llamadas += "quitarSilencioGrupos:$persona"; return true }
-    override fun listarSilenciosGrupos(bot: Long) = "[]"
+    var silenciosGruposJson = "[]"
+    override fun listarSilenciosGrupos(bot: Long) = silenciosGruposJson
     override fun historialSilencios(bot: Long, persona: String) = "[]"
-    override fun contadorSilencio(bot: Long, persona: String, grupo: String) = """{"usado":0,"tope":10,"color":"verde"}"""
+    var contadorJson = """{"usado":0,"tope":10,"color":"verde"}"""
+    override fun contadorSilencio(bot: Long, persona: String, grupo: String) = contadorJson
     override fun ponerContadorEnCero(bot: Long, persona: String, grupo: String) { llamadas += "contadorCero:$persona" }
-    override fun ajustesSilencio(bot: Long) = """{"ajustes":{},"textos":{}}"""
+    override fun ajustesSilencio(bot: Long) = """{"ajustes":{},"textos":{"inicio":{"actual":"Te silencié en {grupo} {duracion}.","defecto":"Te silencié en {grupo} {duracion}."}}}"""
     override fun fijarAjusteSilencio(bot: Long, clave: String, valor: String) { llamadas += "ajusteSilencio:$clave:$valor" }
     override fun fijarTextoSilencio(bot: Long, id: String, texto: String) { llamadas += "textoSilencio:$id" }
     override fun sancionesPendientes(bot: Long) = "[]"
@@ -449,16 +459,23 @@ class MotorFalso : Motor {
     override fun confirmarSancion(bot: Long, id: Long, si: Boolean): String { llamadas += "sancion:$id:$si"; return "" }
     var gruposAdmin = "[]"
     override fun gruposQueAdministro(bot: Long) = gruposAdmin
-    override fun listarTiposAdvertencia(bot: Long) = "[]"
+    var tiposAdvJson = "[]"
+    override fun listarTiposAdvertencia(bot: Long) = tiposAdvJson
     override fun guardarTipoAdvertencia(bot: Long, tipoJson: String) = 1L
     override fun borrarTipoAdvertencia(bot: Long, id: Long) { llamadas += "borrarTipoAdv:$id" }
     override fun listarEscalera(bot: Long, tipoId: Long) = "[]"
     override fun guardarEscalera(bot: Long, tipoId: Long, pasosJson: String) { llamadas += "escalera:$tipoId" }
-    override fun advertirConTipo(bot: Long, persona: String, chat: String, msgId: String, motivo: String, tipoId: Long, reglaId: Long): String { llamadas += "advertirTipo:$persona:$tipoId"; return "{}" }
-    override fun listarReglasGrupo(bot: Long, grupo: String) = "[]"
+    var resultadoAdvTipo = "{}"
+    override fun advertirConTipo(bot: Long, persona: String, chat: String, msgId: String, motivo: String, tipoId: Long, reglaId: Long): String { llamadas += "advertirTipo:$persona:$tipoId:$chat:$reglaId"; return resultadoAdvTipo }
+    val reglasPorGrupo = mutableMapOf<String, String>()
+    override fun listarReglasGrupo(bot: Long, grupo: String) = reglasPorGrupo[grupo] ?: "[]"
     override fun guardarReglaItem(bot: Long, grupo: String, id: Long, titulo: String, texto: String, pos: Long) = 1L
     override fun borrarReglaItem(bot: Long, id: Long) { llamadas += "borrarRegla:$id" }
     override fun moverReglaItem(bot: Long, id: Long, delta: Long) { llamadas += "moverRegla:$id:$delta" }
+    var versionesJson = "[]"
+    override fun versionesDeMensaje(bot: Long, chat: String, id: String) = versionesJson
+    var estadosPersonas = "{}"
+    override fun estadosDePersonas(bot: Long, personasJson: String) = estadosPersonas
     override fun borrarEtiqueta(bot: Long, id: Long) { llamadas += "borrarEtiqueta:$id"; pFalla(); etiquetasJson.removeAll { it.getLong("id") == id }; etiquetasDeChatMapa.values.forEach { it.remove(id) } }
     override fun ponerEtiquetaChat(bot: Long, chat: String, id: Long, si: Boolean) {
         llamadas += "etiquetaChat:$chat:$id:$si"; pFalla()

@@ -83,3 +83,17 @@ func ExportarChat(botID int64, chat, formato string, desde, hasta int64) (string
 	b, _ := json.Marshal(map[string]any{"ruta": rel, "mensajes": n})
 	return string(b), nil
 }
+
+// EstadosDePersonas devuelve (JSON) {persona: {silenciado, ignorada, advertido}} solo de quienes tienen algo, para los puntitos de la
+// lista de Personas (personasJSON: arreglo de JIDs de chats privados). Tres consultas en total.
+func EstadosDePersonas(botID int64, personasJSON string) (string, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return "", err
+	}
+	var ps []string
+	if err := jsonEn(personasJSON, &ps); err != nil {
+		return "", err
+	}
+	return js(a.EstadosDePersonas(botID, ps, time.Now()), nil)
+}

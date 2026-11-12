@@ -58,6 +58,7 @@ import com.botchat.app.Paises
 import com.botchat.app.datos.ChatItem
 import com.botchat.app.datos.EtiquetaItem
 import com.botchat.app.datos.Repo
+import com.botchat.app.datos.estadosEnBruto
 import kotlinx.coroutines.delay
 
 // ---------- marco de una pantalla interna: barra con «Volver» y una sola cosa debajo ----------
@@ -104,12 +105,12 @@ fun PuntitosEtiqueta(puestas: List<EtiquetaItem>, modifier: Modifier = Modifier)
     }
 }
 
-private data class CargaLista(val chats: List<ChatItem>?, val etiquetas: List<EtiquetaItem>, val porId: Map<String, List<Long>>, val admin: Map<String, com.botchat.app.datos.GrupoAdmin>)
+private data class CargaLista(val chats: List<ChatItem>?, val etiquetas: List<EtiquetaItem>, val porId: Map<String, List<Long>>, val admin: Map<String, com.botchat.app.datos.GrupoAdmin>, val estados: Map<String, com.botchat.app.datos.EstadoPersonaLista> = emptyMap())
 
 @Composable
 private fun cargaLista(botId: Long, grupos: Boolean, consulta: String): CargaLista {
     var version by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) { Repo.cambios.collect { evs -> if ("chats" in evs || "etiquetas" in evs) version++ } }
+    LaunchedEffect(Unit) { Repo.cambios.collect { evs -> if ("chats" in evs || "etiquetas" in evs || "personas" in evs || evs.any { it.startsWith("silenc") || it.startsWith("advert") }) version++ } }
     val estado by produceState(CargaLista(null, emptyList(), emptyMap(), emptyMap()), consulta, version) {
         if (consulta.isNotBlank()) delay(200)
         val chats = runCatching { Repo.chats(botId, grupos, consulta, 500) }.getOrDefault(emptyList())
@@ -119,7 +120,8 @@ private fun cargaLista(botId: Long, grupos: Boolean, consulta: String): CargaLis
             chats.associate { it.jid to (it.etiquetas + (dePersona[it.jid] ?: emptyList())).distinct() }
         }
         val admin = if (grupos) runCatching { Repo.gruposAdmin(botId).associateBy { it.jid } }.getOrDefault(emptyMap()) else emptyMap()
-        value = CargaLista(chats, et, porId, admin)
+        val estados = if (grupos) emptyMap() else runCatching { com.botchat.app.datos.JsonE7.estados(Repo.estadosEnBruto(botId, chats.map { it.jid })) }.getOrDefault(emptyMap())
+        value = CargaLista(chats, et, porId, admin, estados)
     }
     return estado
 }
@@ -145,7 +147,7 @@ fun PantallaPersonas(botId: Long, alAbrir: (String) -> Unit) {
             else -> LazyColumn(Modifier.fillMaxSize().testTag("lista_personas"), contentPadding = PaddingValues(bottom = 24.dp)) {
                 items(lista, key = { it.jid }) { p ->
                     val puestas = c.etiquetas.filter { it.id in (c.porId[p.jid] ?: emptyList()) }
-                    FilaPersona(p, puestas) { alAbrir(p.jid) }
+                    FilaPersona(p, puestas, c.estados[p.jid]) { alAbrir(p.jid) }
                     HorizontalDivider(Modifier.padding(start = 84.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 }
             }
@@ -154,7 +156,7 @@ fun PantallaPersonas(botId: Long, alAbrir: (String) -> Unit) {
 }
 
 @Composable
-private fun FilaPersona(p: ChatItem, puestas: List<EtiquetaItem>, alPulsar: () -> Unit) {
+private fun FilaPersona(p: ChatItem, puestas: List<EtiquetaItem>, estado: com.botchat.app.datos.EstadoPersonaLista?, alPulsar: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickableEscala { alPulsar() }.padding(horizontal = Esp.l, vertical = Esp.m).testTag("persona_${p.jid}"), verticalAlignment = Alignment.CenterVertically) {
         Avatar(p.nombre, p.foto, p.fotoTs, p.jid, 52.dp)
         Spacer(Modifier.width(Esp.l))
@@ -164,6 +166,11 @@ private fun FilaPersona(p: ChatItem, puestas: List<EtiquetaItem>, alPulsar: () -
                 if (p.pais.isNotEmpty()) { Spacer(Modifier.width(6.dp)); Text(Paises.banderaDe(p.pais), style = MaterialTheme.typography.bodyMedium) }
             }
             if (p.telefono.isNotBlank() && p.telefono != p.nombre) TextoUnaLinea(p.telefono)
+        }
+        if (estado != null) {
+            if (estado.silenciado) Icon(Ico.Volumen, "Silenciada", Modifier.size(18.dp).testTag("silenciada_${p.jid}"), tint = ROJO_SILENCIO)
+            if (estado.advertido) Icon(Ico.Aviso, "Advertida", Modifier.padding(start = 2.dp).size(18.dp).testTag("advertida_${p.jid}"), tint = AMARILLO_SILENCIO)
+            Spacer(Modifier.width(6.dp))
         }
         PuntitosEtiqueta(puestas, Modifier.testTag("puntitos_${p.jid}"))
     }
