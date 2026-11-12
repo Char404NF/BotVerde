@@ -148,6 +148,10 @@ func (s *estado) pasadaAuditoria(ctx context.Context) {
 	} else if res.Mensajes > 0 {
 		s.log(fmt.Sprintf("Retención: se olvidó el texto de %d mensajes viejos.", res.Mensajes))
 	}
+	// Advertencias que caducaron hace más de 90 días: se borran del historial (las vigentes y las recién vencidas se conservan).
+	if n := a.BorrarAdvertenciasVencidas(s.botID, time.Now(), 90*24*time.Hour); n > 0 {
+		s.log(fmt.Sprintf("Advertencias: se borraron %d vencidas hace más de 90 días.", n))
+	}
 	s.snapshotSiToca(ctx, false) // miembros de grupos: una vez al conectar la primera vez y cada 24 h
 	for ctx.Err() == nil {
 		_, fin, err := a.RellenarSHA(s.botID, 200)

@@ -15,6 +15,7 @@ import (
 	"botchat/internal/flujo"
 	"botchat/internal/permisos"
 	"botchat/internal/personas"
+	"botchat/internal/silencio"
 )
 
 // ---------- armado dentro del bot ----------
@@ -29,9 +30,16 @@ func (s *estado) armarPersonas() {
 		s.pers.Grupo = s.gru
 	}
 	s.pers.Log = s.log
+	if s.sil != nil {
+		s.pers.Sil = s.sil
+		s.pers.Avisar = s.sil.AvisoPrivado
+	}
 	s.pers.RegistrarComandos(s.cmd)
 	s.avs = avisos.Nuevo(alm, s.botID)
 	s.avs.Log = s.log
+	if s.sil != nil {
+		s.avs.Extras = []avisos.Fuente{s.sil}
+	}
 	s.avs.RegistrarComandos(s.cmd)
 	s.armarUtilidades()
 	s.cmd.Extra = func(cx *comandos.Contexto) []string {
@@ -87,6 +95,10 @@ func servicioPersonas(botID int64) (*personas.Servicio, error) {
 		return x, nil
 	}
 	x := personas.Nuevo(a, botID, p)
+	if sl, err := servicioSilencio(botID); err == nil {
+		x.Sil = sl
+		x.Avisar = sl.AvisoPrivado
+	}
 	persLibres[botID] = x
 	return x, nil
 }
@@ -102,7 +114,11 @@ func servicioAvisos(botID int64) (*avisos.Servicio, error) {
 	if err != nil {
 		return nil, err
 	}
-	return avisos.Nuevo(a, botID), nil
+	v := avisos.Nuevo(a, botID)
+	if sl, err := servicioSilencio(botID); err == nil {
+		v.Extras = []avisos.Fuente{sl}
+	}
+	return v, nil
 }
 
 // ---------- API de personas (la usa el dueño desde la app) ----------
@@ -501,6 +517,9 @@ func VistaPreviaResumen(botID int64) (string, error) {
 
 // ValidarAjusteAvisos revisa un ajuste de personas y avisos. Devuelve "" si es válido.
 func validarAjusteB(clave, valor string) (conocido bool, err error) {
+	if c, e := silencio.ValidarAjuste(clave, valor); c {
+		return true, e
+	}
 	num := func(min, max int) error {
 		var n int
 		if _, e := fmt.Sscanf(valor, "%d", &n); e != nil || n < min || n > max || fmt.Sprint(n) != valor {

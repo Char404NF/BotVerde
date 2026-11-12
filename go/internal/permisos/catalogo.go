@@ -139,7 +139,7 @@ func init() {
 		Casilla{ID: "rangos.ver", Nombre: "Ver quién tiene cada rango", Descripcion: "Ve la lista de rangos y de personas.", Grupo: GRangos},
 
 		// ---- Personas (Bloque B) ----
-		Casilla{ID: "personas.silenciar", Nombre: "Silenciar al bot para una persona", Descripcion: "El bot deja de contestarle por un rato o para siempre.", Grupo: GPersonas},
+		Casilla{ID: "personas.silenciar", Nombre: "Ignorar a una persona", Descripcion: "El bot deja de contestarle por un rato o para siempre (comandos !ignorar y !designorar). Su id sigue siendo personas.silenciar para no perder los permisos ya dados.", Grupo: GPersonas},
 		Casilla{ID: "personas.bloquear", Nombre: "Bloquear y desbloquear", Descripcion: "El bot ignora por completo a esa persona.", Grupo: GPersonas, Riesgo: RiesgoMedio},
 		Casilla{ID: "personas.advertir", Nombre: "Advertir", Descripcion: "Pone o quita advertencias y ve el historial.", Grupo: GPersonas, Riesgo: RiesgoMedio},
 		Casilla{ID: "personas.notas", Nombre: "Notas de una persona", Descripcion: "Escribe y lee notas privadas sobre una persona.", Grupo: GPersonas},
@@ -169,6 +169,8 @@ func init() {
 		Casilla{ID: "grupos.renombrar", Nombre: "Cambiar nombre y descripción", Descripcion: "Edita el nombre y la descripción del grupo.", Grupo: GGruposAdmin, Riesgo: RiesgoMedio, Grupos: true},
 		Casilla{ID: "grupos.enlace", Nombre: "Enlace de invitación", Descripcion: "Pide o reinicia el enlace del grupo.", Grupo: GGruposAdmin, Riesgo: RiesgoMedio, Grupos: true},
 		Casilla{ID: "grupos.borrar_mensaje", Nombre: "Borrar mensajes de otros", Descripcion: "Borra un mensaje ajeno en el grupo.", Grupo: GGruposAdmin, Riesgo: RiesgoAlto, Confirma: true, Grupos: true},
+		Casilla{ID: "silencio.silenciar", Nombre: "Silenciar en grupos", Descripcion: "El bot borra lo que escribe una persona en los grupos que administra (comandos !silenciar, !desilenciar y !contador).", Grupo: GGruposAdmin, Riesgo: RiesgoAlto, Grupos: true},
+		Casilla{ID: "silencio.ver", Nombre: "Ver quién está silenciado en grupos", Descripcion: "Ve la lista de silenciados y sus contadores (!silenciados).", Grupo: GGruposAdmin, Grupos: true},
 		Casilla{ID: "grupos.filtros", Nombre: "Filtros del grupo", Descripcion: "Enlaces, palabras prohibidas, repetidos y flood.", Grupo: GGruposAdmin, Riesgo: RiesgoMedio, Grupos: true},
 
 		// ---- Utilidades (Bloque F) ----

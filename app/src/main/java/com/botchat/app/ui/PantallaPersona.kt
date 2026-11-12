@@ -69,8 +69,8 @@ internal val DURACIONES_SILENCIO = listOf(30, 60, 480, 1440, 10080, 0)
 private fun fechaCorta(ts: Long) = etiquetaDia(ts) + " " + horaDe(ts)
 
 /**
- * La ficha de una persona: estado del bot con ella (silenciada, bloqueada), advertencias, notas, primera y última vez, y las acciones
- * (silenciar, bloquear, advertir, nota, exportar y olvidar). Todo es local; "bloquear" es solo del bot, no de WhatsApp.
+ * La ficha de una persona: estado del bot con ella (ignorada, bloqueada), advertencias, notas, primera y última vez, y las acciones
+ * (ignorar, bloquear, advertir, nota, exportar y olvidar). Todo es local; "bloquear" es solo del bot, no de WhatsApp.
  */
 @Composable
 fun TarjetaPersona(botId: Long, jid: String, nombre: String, alAbrirDetalle: () -> Unit = {}, alOlvidada: () -> Unit = {}) {
@@ -112,8 +112,8 @@ fun TarjetaPersona(botId: Long, jid: String, nombre: String, alAbrirDetalle: () 
             }
             datos.forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.s), verticalArrangement = Arrangement.spacedBy(Esp.xs), modifier = Modifier.padding(top = Esp.xs)) {
-                if (f.silencio != null) OutlinedButton({ haptica(Toque.Suave); hacer("El bot vuelve a contestarle") { Repo.quitarSilencioPersona(botId, jid) } }, Modifier.testTag("quitar_silencio")) { Text("Quitar silencio") }
-                else OutlinedButton({ haptica(Toque.Suave); dialogo = "silenciar" }, Modifier.testTag("silenciar_persona")) { Text("Silenciar al bot") }
+                if (f.silencio != null) OutlinedButton({ haptica(Toque.Suave); hacer("El bot vuelve a contestarle") { Repo.quitarSilencioPersona(botId, jid) } }, Modifier.testTag("quitar_silencio")) { Text("Dejar de ignorar") }
+                else OutlinedButton({ haptica(Toque.Suave); dialogo = "silenciar" }, Modifier.testTag("silenciar_persona")) { Text("Ignorar") }
                 if (f.bloqueada) OutlinedButton({ haptica(Toque.Suave); hacer("El bot vuelve a atenderla") { Repo.desbloquearPersona(botId, jid) } }, Modifier.testTag("desbloquear_persona")) { Text("Desbloquear") }
                 else OutlinedButton({ haptica(Toque.Fuerte); dialogo = "bloquear" }, Modifier.testTag("bloquear_persona")) { Text("Bloquear en el bot") }
                 OutlinedButton({ haptica(Toque.Suave); dialogo = "advertir" }, Modifier.testTag("advertir_persona")) { Text("Advertir") }
@@ -124,7 +124,7 @@ fun TarjetaPersona(botId: Long, jid: String, nombre: String, alAbrirDetalle: () 
         }
     }
     when (dialogo) {
-        "silenciar" -> DialogoSilenciar(nombre, { dialogo = null }) { min, motivo -> dialogo = null; hacer("Listo: el bot no le contestará") { Repo.silenciarPersona(botId, jid, min, motivo) } }
+        "silenciar" -> DialogoSilenciar(nombre, { dialogo = null }) { min, motivo -> dialogo = null; hacer("Listo: el bot ya no le contestará") { Repo.silenciarPersona(botId, jid, min, motivo) } }
         "bloquear" -> AlertDialog(
             onDismissRequest = { dialogo = null }, title = { Text("¿Bloquear a $nombre en el bot?") },
             text = { Text("El bot la ignorará por completo: no le contesta ni le atiende comandos. No es un bloqueo de WhatsApp: ella puede seguir escribiéndote y tú verás sus mensajes. Puedes desbloquearla cuando quieras.") },
@@ -155,7 +155,7 @@ fun ChipEtiqueta(e: com.botchat.app.datos.EtiquetaItem, modifier: Modifier = Mod
 private fun DialogoSilenciar(nombre: String, alCerrar: () -> Unit, alElegir: (minutos: Int, motivo: String) -> Unit) {
     var minutos by remember { mutableIntStateOf(60) }
     AlertDialog(
-        onDismissRequest = alCerrar, title = { Text("Silenciar al bot para $nombre") },
+        onDismissRequest = alCerrar, title = { Text("Ignorar a $nombre") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Esp.s)) {
                 Text("El bot no le contestará durante este tiempo (tampoco comandos). Tú puedes seguir hablando con ella.", style = MaterialTheme.typography.bodySmall)
@@ -164,7 +164,7 @@ private fun DialogoSilenciar(nombre: String, alCerrar: () -> Unit, alElegir: (mi
                 }
             }
         },
-        confirmButton = { TextButton({ alElegir(minutos, "") }, Modifier.testTag("confirmar_silenciar")) { Text("Silenciar") } },
+        confirmButton = { TextButton({ alElegir(minutos, "") }, Modifier.testTag("confirmar_silenciar")) { Text("Ignorar") } },
         dismissButton = { TextButton(alCerrar) { Text("Cancelar") } },
     )
 }

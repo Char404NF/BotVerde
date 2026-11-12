@@ -1,4 +1,4 @@
-// Package personas reúne lo que se puede hacer con una persona o con un chat desde el bot (bloque B): silenciar al bot para ella,
+// Package personas reúne lo que se puede hacer con una persona o con un chat desde el bot (bloque B): ignorar al bot para ella (antes «silenciar»),
 // bloquear en el bot, advertir (con regla al llegar al tope), notas, ficha, olvidar y exportar; y del chat: pausar, tomar el control,
 // Pendiente / Resuelto, etiquetas y "!reportar". Todo va por persona canónica (número con sus alias LID), respeta la jerarquía de
 // rangos y deja una línea en el registro de acciones SIN textos. Lo que avisa al dueño es siempre una notificación local de
@@ -16,6 +16,7 @@ import (
 	"botchat/internal/almacen"
 	"botchat/internal/grupos"
 	"botchat/internal/permisos"
+	"botchat/internal/silencio"
 )
 
 // Servicio es el conjunto de acciones sobre personas y chats de un bot.
@@ -25,8 +26,12 @@ type Servicio struct {
 	Perm  *permisos.Servicio
 	// Grupo hace lo que solo puede un administrador de grupo (borrar un mensaje ajeno, expulsar). nil = implementación nula.
 	Grupo grupos.AccionesGrupo
-	Ahora func() time.Time
-	Log   func(string)
+	// Sil es el silencio de grupos (v0.6.0): los pasos «silenciar» y «expulsar» de la escalera de advertencias lo usan. nil = sin silencio.
+	Sil *silencio.Servicio
+	// Avisar le manda un aviso privado a la persona (con los topes sil_*). nil = no se avisa a nadie.
+	Avisar func(persona, texto string) (bool, string)
+	Ahora  func() time.Time
+	Log    func(string)
 }
 
 // Nuevo crea el servicio.
@@ -109,6 +114,17 @@ func (s *Servicio) Nombre(persona string) string {
 }
 
 // ---------- silencio y bloqueo ----------
+
+// Ignorar hace que el bot no le conteste a esa persona durante `dur` (0 = siempre). Es el «silenciar» de antes de la 0.6.0; ahora
+// «silenciar» es borrar sus mensajes en grupos (paquete silencio). El método se sigue llamando Silenciar por compatibilidad.
+func (s *Servicio) Ignorar(actor, objetivo string, dur time.Duration, motivo string) error {
+	return s.Silenciar(actor, objetivo, dur, motivo)
+}
+
+// Designorar quita el «ignorar». Devuelve si lo había.
+func (s *Servicio) Designorar(actor, objetivo string) (bool, error) {
+	return s.Desilenciar(actor, objetivo)
+}
 
 // Silenciar hace que el bot no le conteste a esa persona durante `dur` (0 = siempre).
 func (s *Servicio) Silenciar(actor, objetivo string, dur time.Duration, motivo string) error {
@@ -199,6 +215,13 @@ type ResultadoAdvertir struct {
 	Accion      string `json:"accion"` // la acción de la regla (si llegó al tope)
 	Hecho       string `json:"hecho"`  // "avisado", "silenciado", "borrado", "expulsado" o "solo_aviso" (no se pudo hacer)
 	Motivo      string `json:"motivo"` // por qué no se pudo ("no soy administrador", "no disponible", "sin mensaje")
+	// Escalera por tipo (v0.6.0)
+	TipoID    int64  `json:"tipoId"`
+	ReglaID   int64  `json:"reglaId"`
+	Nivel     int    `json:"nivel"`     // cuántas lleva vigentes de ese tipo
+	Paso      string `json:"paso"`      // acción del paso de la escalera que tocó ("" = ninguno)
+	Regla     string `json:"regla"`     // «Regla N: título» si la advertencia está ligada a una
+	SancionID int64  `json:"sancionId"` // expulsión que espera mi confirmación
 }
 
 // Advertir pone una advertencia. `chat` es donde pasó (grupo o privado) y `msgID` el mensaje al que se refiere (para la acción
@@ -209,7 +232,7 @@ func (s *Servicio) Advertir(ctx context.Context, actor, objetivo, chat, msgID, m
 		s.registra(actor, "persona.advertir", objetivo, chat, "denegado", "")
 		return nil, err
 	}
-	_, total, err := s.Alm.AgregarAdvertencia(s.BotID, objetivo, chat, motivo, s.persona(actor), s.ahora())
+	_, total, err := s.Alm.AgregarAdvertenciaTipo(s.BotID, objetivo, chat, motivo, s.persona(actor), 0, 0, s.ahora())
 	if err != nil {
 		s.registra(actor, "persona.advertir", objetivo, chat, "error", "")
 		return nil, err
@@ -310,7 +333,7 @@ func (s *Servicio) QuitarAdvertencia(actor, objetivo string, id int64) (int, boo
 		s.registra(actor, "persona.quitar_advertencia", objetivo, "", "denegado", "")
 		return 0, false, err
 	}
-	quedan, quitada, err := s.Alm.QuitarAdvertencia(s.BotID, objetivo, id)
+	quedan, quitada, err := s.Alm.QuitarAdvertenciaEn(s.BotID, objetivo, id, s.ahora())
 	if err != nil {
 		s.registra(actor, "persona.quitar_advertencia", objetivo, "", "error", "")
 		return 0, false, err

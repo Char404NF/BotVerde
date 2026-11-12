@@ -374,7 +374,7 @@ func TestBotAvisosSilencioYComandosPropiosDeExtremoAExtremo(t *testing.T) {
 	espera(func() bool { return actividad("Comando horario") >= 1 }, "el comando propio debía coincidir")
 	// !ayuda lo lista.
 	r := decodifica[resultadoComando](t, func() (string, error) { return EjecutarComando(1, "!ayuda") })
-	if !strings.Contains(r.Texto, "!horario — Nuestro horario") || !strings.Contains(r.Texto, "!silenciar") || !strings.Contains(r.Texto, "!recordar") {
+	if !strings.Contains(r.Texto, "!horario — Nuestro horario") || !strings.Contains(r.Texto, "!ignorar") || !strings.Contains(r.Texto, "!recordar") {
 		t.Fatalf("%q", r.Texto)
 	}
 	// 5. !reportar citando un mensaje: solo un aviso local para mí.

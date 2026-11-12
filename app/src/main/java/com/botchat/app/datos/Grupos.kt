@@ -54,7 +54,7 @@ val ACCIONES_FILTRO = listOf(
     AccionFiltro("avisar_grupo", "Avisar al grupo", "Respondo al mensaje con un aviso amable.", false),
     AccionFiltro("borrar", "Borrar el mensaje", "Borra el mensaje para todos.", true),
     AccionFiltro("advertir", "Advertir", "Pone una advertencia a la persona.", false),
-    AccionFiltro("silenciar", "Silenciar al bot para ella", "El bot deja de contestarle un rato.", false),
+    AccionFiltro("silenciar", "Ignorarla (el bot no le contesta)", "El bot deja de contestarle un rato.", false),
     AccionFiltro("expulsar", "Expulsar", "La saca del grupo.", true),
 )
 

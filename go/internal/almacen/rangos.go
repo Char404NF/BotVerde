@@ -199,6 +199,25 @@ var ajustesBotDefecto = map[string]string{
 	"sha_relleno_tope":    "0",  // relleno de la huella de archivos viejos: hasta qué fila
 	"sha_relleno_cursor":  "0",  // ... y por cuál va
 	"sha_relleno_fin":     "0",  // ... 1 = terminó
+	// Silenciar en grupos (v0.6.0, etapa E5). Los avisos privados al silenciado tienen topes PROPIOS (no gastan los de iniciativa).
+	"sil_activo":             "1",         // interruptor: borrar lo que escribe quien está silenciado
+	"sil_avisos_hora":        "12",        // avisos privados por hora (todos los silenciados juntos)
+	"sil_avisos_dia":         "60",        // avisos privados por día lógico (todos juntos)
+	"sil_avisos_persona_dia": "4",         // avisos privados por persona y día lógico
+	"sil_borrados_min":       "20",        // mensajes ajenos que el silencio borra por minuto
+	"sil_aviso_cada":         "3",         // cada cuántos mensajes borrados se le avisa a la persona (0 = nunca)
+	"sil_tope":               "10",        // mensajes borrados en el día para aplicar la sanción (0 = sin sanción)
+	"sil_sancion":            "confirmar", // confirmar (avisarme y expulsar con un toque) | avisar (solo avisarme) | silencio_largo | expulsar
+	"sil_expulsion_auto":     "0",         // 1 = con sanción «expulsar» sí expulsa sola (de fábrica NUNCA)
+	"sil_largo_min":          "10080",     // cuánto dura el «silencio más largo» de la sanción (una semana)
+	"sil_conteo_por_grupo":   "0",         // 1 = el tope cuenta por grupo; 0 = suma todos los grupos
+	"sil_reinicio_hora":      "00:00",     // hora a la que empieza el día lógico del contador (zona del teléfono)
+	"sil_avisar_inicio":      "1",         // avisarle a la persona cuando la silencio
+	"sil_avisar_fin":         "1",         // avisarle a la persona (y a mí) cuando termina su silencio
+	"sil_aviso_noadmin":      "1",         // avisarme (máx. 1 por día y grupo) cuando no soy admin donde alguien está silenciado
+	// Advertencias con sanciones (v0.6.0, etapa E5)
+	"adv_caducidad_dias":  "30", // días que vale una advertencia nueva (0 = no caduca); las que ya existían no caducan
+	"adv_tipos_sembrados": "0",  // 1 = ya se crearon los tipos de fábrica (Spam, Insultos, Enlaces, Otro)
 }
 
 // AjusteBot devuelve un ajuste del bot (su valor por defecto si nunca se fijó).
@@ -885,6 +904,10 @@ func fusionarPersona(tx *sql.Tx, botID int64, desde, hacia string) error {
 		}
 	}
 	if _, err := tx.Exec(`UPDATE grupo_cambios SET persona=? WHERE bot_id=? AND persona=?`, hacia, botID, desde); err != nil {
+		return err
+	}
+	// v0.6.0 E5: silencios de grupo, contadores y sanciones pendientes pasan a la persona canónica.
+	if err := fusionaSilencioDe(tx, botID, desde, hacia); err != nil {
 		return err
 	}
 	var hD, hH sql.NullInt64

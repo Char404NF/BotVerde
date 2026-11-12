@@ -21,8 +21,17 @@ type Servicio struct {
 	Ahora func() time.Time
 	Log   func(string)
 
+	// Extras son otras fuentes de alarmas (por ejemplo el vencimiento de silencios de grupo): entran en Siguiente y Disparar.
+	Extras []Fuente
+
 	mu     sync.Mutex
 	ultimo map[string]time.Time // chat -> última alerta por palabra (para no llenar de avisos)
+}
+
+// Fuente es algo que también necesita una alarma: dice cuándo toca lo siguiente y, al disparar, devuelve los avisos que creó.
+type Fuente interface {
+	Siguiente() int64
+	Disparar() []int64
 }
 
 // Nuevo crea el servicio.
@@ -241,6 +250,11 @@ func (s *Servicio) Siguiente() int64 {
 	if r := s.proximoResumen(ahora); r != 0 && (sig == 0 || r < sig) {
 		sig = r
 	}
+	for _, f := range s.Extras {
+		if r := f.Siguiente(); r != 0 && (sig == 0 || r < sig) {
+			sig = r
+		}
+	}
 	return sig
 }
 
@@ -267,6 +281,9 @@ func (s *Servicio) Disparar() Resultado {
 			res.Avisos = append(res.Avisos, id)
 			s.log("Aviso local: resumen del día.")
 		}
+	}
+	for _, f := range s.Extras {
+		res.Avisos = append(res.Avisos, f.Disparar()...)
 	}
 	s.Alm.LimpiarRecordatoriosHechos(s.BotID, 30, ahora)
 	res.Siguiente = s.Siguiente()

@@ -29,6 +29,7 @@ import (
 	"botchat/internal/motor"
 	"botchat/internal/permisos"
 	"botchat/internal/personas"
+	"botchat/internal/silencio"
 	"botchat/internal/utilidades"
 
 	"go.mau.fi/whatsmeow"
@@ -74,6 +75,7 @@ type estado struct {
 	perm          *permisos.Servicio
 	cmd           *comandos.Despachador
 	pers          *personas.Servicio
+	sil           *silencio.Servicio
 	gru           *grupos.Servicio
 	eapp          *estadoapp.Servicio
 	avs           *avisos.Servicio
@@ -185,6 +187,7 @@ func (s *estado) armar() {
 	s.flujo = s.nuevoFlujo()
 	s.armarPermisos()
 	s.armarGrupos()
+	s.armarSilencio()
 	s.armarPersonas()
 	s.eapp = estadoapp.Nuevo(alm, s.botID, estadoapp.Real{Client: s.cli}, s.log)
 	s.armarModulos()
@@ -216,6 +219,7 @@ func (s *estado) armar() {
 	s.descargas.Iniciar(s.ctx)
 	s.fotos.Iniciar(s.ctx)
 	s.grupos.iniciar(s.ctx)
+	s.iniciarSilencio()
 }
 
 // trabajador procesa en orden lo que llega (mensajes, historial, nombres) para no frenar el bucle de eventos de whatsmeow.
@@ -319,6 +323,9 @@ func Stop() {
 	s.cli.Disconnect()
 	s.motor.Detener()
 	s.mods.Detener()
+	if s.sil != nil {
+		s.sil.Detener()
+	}
 	olvidarGestoresLibres()
 	s.descargas.Detener()
 	s.fotos.Detener()
@@ -410,6 +417,7 @@ func (s *estado) evento(e any) {
 		s.encola(func() {
 			s.capturar(v) // diagnóstico (apagado por defecto): solo estructura, en memoria
 			s.ing.Mensaje(s.ctx, v, false)
+			s.alSilencio(v, sinc) // silenciar en grupos: solo encola (nada de red aquí)
 			s.pausaPorTelefono(v)
 			// Votos y toques de nuestros menús interactivos (Laboratorio): se atienden aquí, en el trabajador.
 			if !s.alLab(v, sinc) {

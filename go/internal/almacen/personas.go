@@ -137,18 +137,31 @@ func (a *Almacen) EstaBloqueada(botID int64, persona string) bool {
 
 // ---------- advertencias ----------
 
-// Advertencia es un aviso de conducta a una persona.
+// Advertencia es un aviso de conducta a una persona. Desde la 0.6.0 puede tener tipo, regla del grupo y fecha de caducidad
+// (CaducaTS = 0: no caduca, así quedan las que ya existían).
 type Advertencia struct {
-	ID      int64  `json:"id"`
-	Persona string `json:"persona"`
-	Chat    string `json:"chat"`
-	Motivo  string `json:"motivo"`
-	TS      int64  `json:"ts"`
-	Por     string `json:"por"`
+	ID       int64  `json:"id"`
+	Persona  string `json:"persona"`
+	Chat     string `json:"chat"`
+	Motivo   string `json:"motivo"`
+	TS       int64  `json:"ts"`
+	Por      string `json:"por"`
+	TipoID   int64  `json:"tipoId"`
+	ReglaID  int64  `json:"reglaId"`
+	CaducaTS int64  `json:"caducaTs"`
+	Vigente  bool   `json:"vigente"`
 }
 
-// AgregarAdvertencia anota una advertencia (motivo opcional, cifrado) y devuelve su id y cuántas lleva la persona.
+const condVigente = ` AND (caduca_ts=0 OR caduca_ts>?)`
+
+// AgregarAdvertencia anota una advertencia sin tipo (motivo opcional, cifrado) y devuelve su id y cuántas vigentes lleva la persona.
 func (a *Almacen) AgregarAdvertencia(botID int64, persona, chat, motivo, por string, ahora time.Time) (id int64, total int, err error) {
+	return a.AgregarAdvertenciaTipo(botID, persona, chat, motivo, por, 0, 0, ahora)
+}
+
+// AgregarAdvertenciaTipo anota una advertencia con tipo y regla (0 = sin tipo / sin regla). La caducidad sale del tipo, o del ajuste
+// adv_caducidad_dias si el tipo no tiene la suya (0 = no caduca).
+func (a *Almacen) AgregarAdvertenciaTipo(botID int64, persona, chat, motivo, por string, tipoID, reglaID int64, ahora time.Time) (id int64, total int, err error) {
 	persona = a.ResolverPersona(botID, persona)
 	if persona == "" || persona == PersonaDueno {
 		return 0, 0, ErrRolDueno
@@ -159,31 +172,56 @@ func (a *Almacen) AgregarAdvertencia(botID int64, persona, chat, motivo, por str
 			return 0, 0, err
 		}
 	}
-	r, err := a.db.Exec(`INSERT INTO advertencias(bot_id,persona,chat,motivo_cifrado,ts,por) VALUES(?,?,?,?,?,?)`, botID, persona, chat, sel, ahora.Unix(), por)
+	var caduca int64
+	if dias := a.CaducidadDias(botID, tipoID); dias > 0 {
+		caduca = ahora.Add(time.Duration(dias) * 24 * time.Hour).Unix()
+	}
+	r, err := a.db.Exec(`INSERT INTO advertencias(bot_id,persona,chat,motivo_cifrado,ts,por,tipo_id,caduca_ts,regla_id) VALUES(?,?,?,?,?,?,?,?,?)`,
+		botID, persona, chat, sel, ahora.Unix(), por, tipoID, caduca, reglaID)
 	if err != nil {
 		return 0, 0, err
 	}
 	id, _ = r.LastInsertId()
+	a.RefrescarBanderas(botID, persona, ahora)
 	a.avisa("personas")
 	a.avisa("persona:" + persona)
-	return id, a.ContarAdvertencias(botID, persona), nil
+	return id, a.ContarAdvertenciasEn(botID, persona, ahora), nil
 }
 
-// ContarAdvertencias cuenta las advertencias de la persona (todas sus formas).
+// ContarAdvertencias cuenta las advertencias VIGENTES de la persona (todas sus formas), a la hora de ahora.
 func (a *Almacen) ContarAdvertencias(botID int64, persona string) int {
+	return a.ContarAdvertenciasEn(botID, persona, a.reloj())
+}
+
+// ContarAdvertenciasEn cuenta las vigentes a esa hora (las que no caducaron).
+func (a *Almacen) ContarAdvertenciasEn(botID int64, persona string, ahora time.Time) int {
 	fs := a.formas(botID, persona)
 	var n int
-	_ = a.db.QueryRow(`SELECT COUNT(*) FROM advertencias WHERE bot_id=? AND persona IN `+enLista(len(fs)), args2(botID, fs)...).Scan(&n)
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM advertencias WHERE bot_id=? AND persona IN `+enLista(len(fs))+condVigente, append(args2(botID, fs), ahora.Unix())...).Scan(&n)
 	return n
 }
 
-// ListarAdvertencias devuelve las advertencias de la persona, la más reciente primero.
+// ContarAdvertenciasTipo cuenta las vigentes de un tipo (0 = sin tipo).
+func (a *Almacen) ContarAdvertenciasTipo(botID int64, persona string, tipoID int64, ahora time.Time) int {
+	fs := a.formas(botID, persona)
+	var n int
+	_ = a.db.QueryRow(`SELECT COUNT(*) FROM advertencias WHERE bot_id=? AND persona IN `+enLista(len(fs))+` AND tipo_id=?`+condVigente,
+		append(append(args2(botID, fs), tipoID), ahora.Unix())...).Scan(&n)
+	return n
+}
+
+// ListarAdvertencias devuelve las advertencias de la persona (vigentes y vencidas, con la bandera Vigente), la más reciente primero.
 func (a *Almacen) ListarAdvertencias(botID int64, persona string, limite int) ([]Advertencia, error) {
+	return a.ListarAdvertenciasEn(botID, persona, limite, a.reloj())
+}
+
+// ListarAdvertenciasEn es ListarAdvertencias con la hora de ahora dada.
+func (a *Almacen) ListarAdvertenciasEn(botID int64, persona string, limite int, ahora time.Time) ([]Advertencia, error) {
 	if limite <= 0 {
 		limite = 200
 	}
 	fs := a.formas(botID, persona)
-	filas, err := a.db.Query(`SELECT id,persona,chat,motivo_cifrado,ts,por FROM advertencias WHERE bot_id=? AND persona IN `+enLista(len(fs))+` ORDER BY ts DESC, id DESC LIMIT ?`,
+	filas, err := a.db.Query(`SELECT id,persona,chat,motivo_cifrado,ts,por,tipo_id,regla_id,caduca_ts FROM advertencias WHERE bot_id=? AND persona IN `+enLista(len(fs))+` ORDER BY ts DESC, id DESC LIMIT ?`,
 		append(args2(botID, fs), limite)...)
 	if err != nil {
 		return nil, err
@@ -193,9 +231,10 @@ func (a *Almacen) ListarAdvertencias(botID int64, persona string, limite int) ([
 	for filas.Next() {
 		var x Advertencia
 		var m []byte
-		if filas.Scan(&x.ID, &x.Persona, &x.Chat, &m, &x.TS, &x.Por) != nil {
+		if filas.Scan(&x.ID, &x.Persona, &x.Chat, &m, &x.TS, &x.Por, &x.TipoID, &x.ReglaID, &x.CaducaTS) != nil {
 			continue
 		}
+		x.Vigente = x.CaducaTS == 0 || x.CaducaTS > ahora.Unix()
 		if len(m) > 0 {
 			if t, e := cifrado.AbrirTexto(a.clave, "advertencia", m); e == nil {
 				x.Motivo = string(t)
@@ -206,7 +245,7 @@ func (a *Almacen) ListarAdvertencias(botID int64, persona string, limite int) ([
 	return out, filas.Err()
 }
 
-// ListarPersonasAdvertidas devuelve quién tiene advertencias y cuántas: [{persona, total, ultimaTs}].
+// ListarPersonasAdvertidas devuelve quién tiene advertencias vigentes y cuántas: [{persona, total, ultimaTs}].
 type ResumenAdvertencias struct {
 	Persona  string `json:"persona"`
 	Total    int    `json:"total"`
@@ -214,7 +253,7 @@ type ResumenAdvertencias struct {
 }
 
 func (a *Almacen) ListarPersonasAdvertidas(botID int64) ([]ResumenAdvertencias, error) {
-	filas, err := a.db.Query(`SELECT persona,COUNT(*),MAX(ts) FROM advertencias WHERE bot_id=? GROUP BY persona ORDER BY MAX(ts) DESC`, botID)
+	filas, err := a.db.Query(`SELECT persona,COUNT(*),MAX(ts) FROM advertencias WHERE bot_id=?`+condVigente+` GROUP BY persona ORDER BY MAX(ts) DESC`, botID, a.reloj().Unix())
 	if err != nil {
 		return nil, err
 	}
@@ -229,12 +268,17 @@ func (a *Almacen) ListarPersonasAdvertidas(botID int64) ([]ResumenAdvertencias, 
 	return out, filas.Err()
 }
 
-// QuitarAdvertencia borra una advertencia concreta (id>0) o la más reciente de la persona (id 0). Devuelve cuántas quedan.
+// QuitarAdvertencia borra una advertencia concreta (id>0) o la más reciente VIGENTE de la persona (id 0). Devuelve cuántas quedan.
 func (a *Almacen) QuitarAdvertencia(botID int64, persona string, id int64) (quedan int, quitada bool, err error) {
+	return a.QuitarAdvertenciaEn(botID, persona, id, a.reloj())
+}
+
+// QuitarAdvertenciaEn es QuitarAdvertencia con la hora de ahora dada.
+func (a *Almacen) QuitarAdvertenciaEn(botID int64, persona string, id int64, ahora time.Time) (quedan int, quitada bool, err error) {
 	fs := a.formas(botID, persona)
 	lista := enLista(len(fs))
 	if id == 0 {
-		err = a.db.QueryRow(`SELECT id FROM advertencias WHERE bot_id=? AND persona IN `+lista+` ORDER BY ts DESC, id DESC LIMIT 1`, args2(botID, fs)...).Scan(&id)
+		err = a.db.QueryRow(`SELECT id FROM advertencias WHERE bot_id=? AND persona IN `+lista+condVigente+` ORDER BY ts DESC, id DESC LIMIT 1`, append(args2(botID, fs), ahora.Unix())...).Scan(&id)
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, false, nil
 		}
@@ -247,12 +291,14 @@ func (a *Almacen) QuitarAdvertencia(botID int64, persona string, id int64) (qued
 		return 0, false, err
 	}
 	n, _ := r.RowsAffected()
+	canon := a.ResolverPersona(botID, persona)
+	a.RefrescarBanderas(botID, canon, ahora)
 	a.avisa("personas")
-	a.avisa("persona:" + a.ResolverPersona(botID, persona))
-	return a.ContarAdvertencias(botID, persona), n > 0, nil
+	a.avisa("persona:" + canon)
+	return a.ContarAdvertenciasEn(botID, persona, ahora), n > 0, nil
 }
 
-// BorrarAdvertencias borra todo el historial de advertencias de la persona. Devuelve cuántas había.
+// BorrarAdvertencias borra todo el historial de advertencias de la persona (también las vencidas). Devuelve cuántas había.
 func (a *Almacen) BorrarAdvertencias(botID int64, persona string) (int, error) {
 	fs := a.formas(botID, persona)
 	r, err := a.db.Exec(`DELETE FROM advertencias WHERE bot_id=? AND persona IN `+enLista(len(fs)), args2(botID, fs)...)
@@ -260,8 +306,10 @@ func (a *Almacen) BorrarAdvertencias(botID int64, persona string) (int, error) {
 		return 0, err
 	}
 	n, _ := r.RowsAffected()
+	canon := a.ResolverPersona(botID, persona)
+	a.RefrescarBanderas(botID, canon, a.reloj())
 	a.avisa("personas")
-	a.avisa("persona:" + a.ResolverPersona(botID, persona))
+	a.avisa("persona:" + canon)
 	return int(n), nil
 }
 
@@ -393,7 +441,7 @@ func (a *Almacen) FichaDe(botID int64, persona string, ahora time.Time) (*Ficha,
 	}
 	fs := a.formas(botID, canon)
 	f := &Ficha{Persona: canon, Alias: fs, Silencio: a.SilencioDe(botID, canon, ahora), Bloqueada: a.EstaBloqueada(botID, canon),
-		NoMolestar: a.EstaNoMolestar(botID, canon), Advertencias: a.ContarAdvertencias(botID, canon), Notas: a.ContarNotas(botID, canon), Etiquetas: []Etiqueta{}}
+		NoMolestar: a.EstaNoMolestar(botID, canon), Advertencias: a.ContarAdvertenciasEn(botID, canon, ahora), Notas: a.ContarNotas(botID, canon), Etiquetas: []Etiqueta{}}
 	for _, x := range fs {
 		if c, _ := a.ObtenerChat(botID, x); c != nil && !c.EsGrupo {
 			if f.Nombre == "" {
@@ -641,6 +689,7 @@ func (a *Almacen) OlvidarPersona(botID int64, persona string) (*ResultadoOlvidar
 	a.olvidarModulosPersona(botID, lista, fs)
 	res.Advertencias = del(`DELETE FROM advertencias WHERE bot_id=? AND persona IN ` + lista)
 	del(`DELETE FROM persona_silencio WHERE bot_id=? AND persona IN ` + lista)
+	a.limpiaSilencioDe(botID, lista, fs)
 	a.OlvidarAutoPersona(botID, fs)
 	del(`DELETE FROM persona_rol WHERE bot_id=? AND persona IN ` + lista)
 	del(`DELETE FROM codigos_confirmacion WHERE bot_id=? AND persona IN ` + lista)

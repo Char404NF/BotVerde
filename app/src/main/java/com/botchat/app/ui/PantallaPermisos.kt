@@ -417,7 +417,7 @@ fun PantallaPermisosAvanzado(botId: Long, alVolver: () -> Unit, alRegistro: () -
                 Column(Modifier.padding(horizontal = Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
                     Text("Qué hace al llegar al tope", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
-                        listOf("avisar" to "Solo avisarme", "silenciar" to "Silenciar al bot para esa persona", "borrar" to "Borrar su mensaje", "expulsar" to "Expulsarla del grupo").forEach { (v, t) ->
+                        listOf("avisar" to "Solo avisarme", "silenciar" to "Ignorar: que el bot deje de contestarle", "borrar" to "Borrar su mensaje", "expulsar" to "Expulsarla del grupo").forEach { (v, t) ->
                             FilterChip((a["adv_accion"] ?: "avisar") == v, {
                                 scope.launch { runCatching { Repo.fijarAjustePermisos(botId, "adv_accion", v) }.onFailure { avisaToast(ctx, it.message, true) }; version++ }
                             }, { Text(t, maxLines = 1) }, modifier = Modifier.testTag("adv_accion_$v"))

@@ -23,7 +23,7 @@ var (
 	ErrSinMensaje   = errors.New("no encuentro ese mensaje en este teléfono")
 	ErrNoHaySolic   = errors.New("no hay solicitudes pendientes")
 	ErrFiltroNoHay  = errors.New("ese filtro no existe: usa enlaces, palabras, repetidos o flood")
-	ErrAccionNoHay  = errors.New("esa acción no existe: usa avisarme, avisar_grupo, borrar, advertir, silenciar o expulsar")
+	ErrAccionNoHay  = errors.New("esa acción no existe: usa avisarme, avisar_grupo, borrar, advertir, silenciar (que el bot la ignore) o expulsar")
 	ErrSinMenciones = errors.New("no hay a quién mencionar")
 )
 

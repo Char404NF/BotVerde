@@ -801,6 +801,104 @@ var migraciones = [][]string{
 			PRIMARY KEY (bot_id, persona)
 		) WITHOUT ROWID`,
 	},
+	// 22 · v0.6.0 etapa E5: silenciar en grupos y advertencias con sanciones. silencio_grupo (un silencio de una persona en uno,
+	// varios o todos los grupos, con vencimiento; el texto editable de ese silencio va cifrado con AAD texto_silencio) y sus grupos;
+	// silencio_conteo (intentos borrados por día lógico y persona/grupo, avisos mandados y la sanción ya aplicada; con persona ''
+	// lleva el tope global de avisos del día y con grupo 'na:...' los avisos de "no soy admin" de ese día); silencio_textos (los
+	// textos editables de los avisos, cifrados con AAD texto_silencio); sancion_pendiente (expulsiones que esperan mi confirmación,
+	// del silencio o de la escalera de advertencias). Advertencias: adv_tipos (Spam, Insultos, Enlaces, Otro se siembran desde código;
+	// los nombres van en claro), adv_escalera (pasos por tipo; el texto del aviso cifrado con AAD aviso_esc), advertencias gana
+	// tipo_id, caduca_ts (0 = no caduca: así quedan las que ya existían) y regla_id; grupo_regla_items (reglas del grupo como
+	// lista; título y texto cifrados con AAD titulo_regla y texto_regla; grupo '' = reglas globales).
+	{
+		`CREATE TABLE silencio_grupo (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			persona TEXT NOT NULL,
+			alcance TEXT NOT NULL DEFAULT 'uno',
+			hasta_ts INTEGER NOT NULL DEFAULT 0,
+			creado_ts INTEGER NOT NULL DEFAULT 0,
+			por TEXT NOT NULL DEFAULT '',
+			origen TEXT NOT NULL DEFAULT 'manual',
+			aviso_ts INTEGER NOT NULL DEFAULT 0,
+			avisar INTEGER NOT NULL DEFAULT 1,
+			texto_cifrado BLOB,
+			activo INTEGER NOT NULL DEFAULT 1,
+			fin_ts INTEGER NOT NULL DEFAULT 0,
+			fin_motivo TEXT NOT NULL DEFAULT ''
+		)`,
+		`CREATE INDEX idx_silencio_persona ON silencio_grupo(bot_id, persona, activo, hasta_ts)`,
+		`CREATE TABLE silencio_grupo_chats (
+			silencio_id INTEGER NOT NULL REFERENCES silencio_grupo(id) ON DELETE CASCADE,
+			grupo TEXT NOT NULL,
+			PRIMARY KEY (silencio_id, grupo)
+		) WITHOUT ROWID`,
+		`CREATE TABLE silencio_conteo (
+			bot_id INTEGER NOT NULL,
+			persona TEXT NOT NULL,
+			grupo TEXT NOT NULL,
+			dia_logico TEXT NOT NULL,
+			n INTEGER NOT NULL DEFAULT 0,
+			avisos INTEGER NOT NULL DEFAULT 0,
+			ultimo_aviso_ts INTEGER NOT NULL DEFAULT 0,
+			sancion_ts INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY (bot_id, persona, grupo, dia_logico)
+		) WITHOUT ROWID`,
+		`CREATE TABLE silencio_textos (
+			bot_id INTEGER NOT NULL,
+			texto_id TEXT NOT NULL,
+			texto_cifrado BLOB,
+			PRIMARY KEY (bot_id, texto_id)
+		) WITHOUT ROWID`,
+		`CREATE TABLE sancion_pendiente (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			origen TEXT NOT NULL,
+			persona TEXT NOT NULL,
+			grupo TEXT NOT NULL DEFAULT '',
+			accion TEXT NOT NULL DEFAULT 'expulsar',
+			aviso_id INTEGER NOT NULL DEFAULT 0,
+			creado_ts INTEGER NOT NULL,
+			estado TEXT NOT NULL DEFAULT 'pendiente',
+			resuelto_ts INTEGER NOT NULL DEFAULT 0,
+			resultado TEXT NOT NULL DEFAULT ''
+		)`,
+		`CREATE INDEX idx_sancion_pendiente ON sancion_pendiente(bot_id, estado, persona)`,
+		`CREATE TABLE adv_tipos (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			nombre TEXT NOT NULL,
+			emoji TEXT NOT NULL DEFAULT '',
+			color TEXT NOT NULL DEFAULT '',
+			posicion INTEGER NOT NULL DEFAULT 0,
+			caducidad_dias INTEGER NOT NULL DEFAULT -1,
+			regla_id INTEGER NOT NULL DEFAULT 0,
+			activo INTEGER NOT NULL DEFAULT 1
+		)`,
+		`CREATE INDEX idx_adv_tipos ON adv_tipos(bot_id, posicion)`,
+		`CREATE TABLE adv_escalera (
+			tipo_id INTEGER NOT NULL REFERENCES adv_tipos(id) ON DELETE CASCADE,
+			nivel INTEGER NOT NULL,
+			accion TEXT NOT NULL,
+			minutos INTEGER NOT NULL DEFAULT 0,
+			alcance TEXT NOT NULL DEFAULT 'grupo',
+			aviso_cifrado BLOB,
+			PRIMARY KEY (tipo_id, nivel)
+		) WITHOUT ROWID`,
+		`ALTER TABLE advertencias ADD COLUMN tipo_id INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE advertencias ADD COLUMN caduca_ts INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE advertencias ADD COLUMN regla_id INTEGER NOT NULL DEFAULT 0`,
+		`CREATE INDEX idx_adv_vigentes ON advertencias(bot_id, persona, tipo_id, caduca_ts)`,
+		`CREATE TABLE grupo_regla_items (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			grupo TEXT NOT NULL DEFAULT '',
+			pos INTEGER NOT NULL DEFAULT 0,
+			titulo_cifrado BLOB,
+			texto_cifrado BLOB
+		)`,
+		`CREATE INDEX idx_regla_items ON grupo_regla_items(bot_id, grupo, pos)`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

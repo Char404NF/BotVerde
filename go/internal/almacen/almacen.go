@@ -66,6 +66,16 @@ type Almacen struct {
 	// Cambio, si no es nil, se llama cuando algo cambia (sin bloquear la operación). Los eventos son:
 	// "chats", "chat:<jid>", "msg:<jid>:<id>", "archivo:<jid>:<id>" y "espacio".
 	Cambio func(evento string)
+	// Reloj, si no es nil, da la hora «de ahora» para lo que caduca (advertencias vencidas). Solo lo cambian las pruebas.
+	Reloj func() time.Time
+}
+
+// reloj es la hora de ahora para lo que caduca.
+func (a *Almacen) reloj() time.Time {
+	if a.Reloj != nil {
+		return a.Reloj()
+	}
+	return time.Now()
 }
 
 // Abrir abre (o crea) raiz/messages.db y aplica las migraciones pendientes.

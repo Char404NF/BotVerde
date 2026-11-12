@@ -429,6 +429,30 @@ class MotorFalso : Motor {
     override fun buscarEnChat(bot: Long, chat: String, palabra: String, desde: Long, hasta: Long, antesTs: Long, antesId: String, limite: Long) = """{"total":0,"items":[],"fin":true,"sigTs":0,"sigId":"","escaneados":0}"""
     override fun puntitosDeMensajes(bot: Long, chat: String, idsJson: String) = "{}"
     override fun exportarChat(bot: Long, chat: String, formato: String, desde: Long, hasta: Long) = """{"ruta":"","mensajes":0}"""
+    // Silenciar en grupos y advertencias con sanciones (E5): sin pantallas, solo para compilar.
+    override fun silenciarEnGrupos(bot: Long, persona: String, segundos: Long, alcance: String, gruposJson: String, avisar: Boolean, texto: String): String { llamadas += "silenciarGrupos:$persona:$segundos:$alcance"; return "{}" }
+    override fun quitarSilencioGrupos(bot: Long, persona: String): Boolean { llamadas += "quitarSilencioGrupos:$persona"; return true }
+    override fun listarSilenciosGrupos(bot: Long) = "[]"
+    override fun historialSilencios(bot: Long, persona: String) = "[]"
+    override fun contadorSilencio(bot: Long, persona: String, grupo: String) = """{"usado":0,"tope":10,"color":"verde"}"""
+    override fun ponerContadorEnCero(bot: Long, persona: String, grupo: String) { llamadas += "contadorCero:$persona" }
+    override fun ajustesSilencio(bot: Long) = """{"ajustes":{},"textos":{}}"""
+    override fun fijarAjusteSilencio(bot: Long, clave: String, valor: String) { llamadas += "ajusteSilencio:$clave:$valor" }
+    override fun fijarTextoSilencio(bot: Long, id: String, texto: String) { llamadas += "textoSilencio:$id" }
+    override fun sancionesPendientes(bot: Long) = "[]"
+    override fun confirmarSancionSilencio(bot: Long, id: Long, si: Boolean): String { llamadas += "sancion:$id:$si"; return "" }
+    override fun confirmarSancion(bot: Long, id: Long, si: Boolean): String { llamadas += "sancion:$id:$si"; return "" }
+    override fun gruposQueAdministro(bot: Long) = "[]"
+    override fun listarTiposAdvertencia(bot: Long) = "[]"
+    override fun guardarTipoAdvertencia(bot: Long, tipoJson: String) = 1L
+    override fun borrarTipoAdvertencia(bot: Long, id: Long) { llamadas += "borrarTipoAdv:$id" }
+    override fun listarEscalera(bot: Long, tipoId: Long) = "[]"
+    override fun guardarEscalera(bot: Long, tipoId: Long, pasosJson: String) { llamadas += "escalera:$tipoId" }
+    override fun advertirConTipo(bot: Long, persona: String, chat: String, msgId: String, motivo: String, tipoId: Long, reglaId: Long): String { llamadas += "advertirTipo:$persona:$tipoId"; return "{}" }
+    override fun listarReglasGrupo(bot: Long, grupo: String) = "[]"
+    override fun guardarReglaItem(bot: Long, grupo: String, id: Long, titulo: String, texto: String, pos: Long) = 1L
+    override fun borrarReglaItem(bot: Long, id: Long) { llamadas += "borrarRegla:$id" }
+    override fun moverReglaItem(bot: Long, id: Long, delta: Long) { llamadas += "moverRegla:$id:$delta" }
     override fun borrarEtiqueta(bot: Long, id: Long) { llamadas += "borrarEtiqueta:$id"; pFalla(); etiquetasJson.removeAll { it.getLong("id") == id }; etiquetasDeChatMapa.values.forEach { it.remove(id) } }
     override fun ponerEtiquetaChat(bot: Long, chat: String, id: Long, si: Boolean) {
         llamadas += "etiquetaChat:$chat:$id:$si"; pFalla()
@@ -708,7 +732,7 @@ object Apoyo {
 
     val catalogoEjemplo = arreglo(
         casillaJson("cmd.ayuda", "Ver la ayuda", "Lo básico", base = true),
-        casillaJson("personas.silenciar", "Silenciar al bot para una persona", "Personas"),
+        casillaJson("personas.silenciar", "Ignorar a una persona", "Personas"),
         casillaJson("personas.olvidar", "Olvidar o exportar datos", "Personas", riesgo = "alto", confirma = true),
         casillaJson("chat.pausar", "Pausar y reanudar el bot", "Chat"),
         casillaJson("grupos.expulsar", "Expulsar", "Grupos (siendo administrador)", riesgo = "alto", privado = false, confirma = true),

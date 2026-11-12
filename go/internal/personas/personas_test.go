@@ -129,39 +129,39 @@ func TestSilenciarDeLaAppYDelChatConJerarquia(t *testing.T) {
 	e.da(pnAna, "Jefe")
 	e.da(pnLuis, "Raso")
 	// El jefe silencia a Luis (rango más abajo) 2 horas y a alguien sin rango.
-	if r := e.priv(pnAna, "!silenciar 5215522222222 2h"); !strings.Contains(r.Texto, "2 horas") {
+	if r := e.priv(pnAna, "!ignorar 5215522222222 2h"); !strings.Contains(r.Texto, "2 horas") {
 		t.Fatalf("%q", r.Texto)
 	}
 	if s := e.alm.SilencioDe(1, pnLuis, e.hora); s == nil || s.HastaTS != e.hora.Add(2*time.Hour).Unix() {
 		t.Fatalf("%+v", s)
 	}
-	if r := e.priv(pnAna, "!silenciar 5215533333333 siempre"); !strings.Contains(r.Texto, "para siempre") {
+	if r := e.priv(pnAna, "!ignorar 5215533333333 siempre"); !strings.Contains(r.Texto, "para siempre") {
 		t.Fatalf("%q", r.Texto)
 	}
-	if r := e.priv(pnAna, "!desilenciar 5215533333333"); !strings.Contains(r.Texto, "vuelve a contestarle") {
+	if r := e.priv(pnAna, "!designorar 5215533333333"); !strings.Contains(r.Texto, "vuelve a contestarle") {
 		t.Fatalf("%q", r.Texto)
 	}
-	if r := e.priv(pnAna, "!desilenciar 5215533333333"); !strings.Contains(r.Texto, "no estaba silenciada") {
+	if r := e.priv(pnAna, "!designorar 5215533333333"); !strings.Contains(r.Texto, "no estaba ignorada") {
 		t.Fatalf("%q", r.Texto)
 	}
 	// Luis (Raso) no tiene la casilla.
-	if r := e.priv(pnLuis, "!silenciar 5215511111111"); !strings.Contains(r.Texto, "No tienes permiso") {
+	if r := e.priv(pnLuis, "!ignorar 5215511111111"); !strings.Contains(r.Texto, "No tienes permiso") {
 		t.Fatalf("%q", r.Texto)
 	}
 	// El jefe no puede silenciar a otro jefe ni a sí mismo ni al Dueño (por su número).
 	e.rol("Jefe2", "personas.silenciar")
 	e.da(pnRosa, "Jefe2") // Jefe2 está más abajo que Jefe: el jefe sí puede; al revés no
-	if r := e.priv(pnRosa, "!silenciar 5215511111111"); !strings.Contains(r.Texto, "rangos más bajos") {
+	if r := e.priv(pnRosa, "!ignorar 5215511111111"); !strings.Contains(r.Texto, "rangos más bajos") {
 		t.Fatalf("hacia arriba: %q", r.Texto)
 	}
-	if r := e.priv(pnAna, "!silenciar 5215511111111"); !strings.Contains(r.Texto, "contigo mismo") {
+	if r := e.priv(pnAna, "!ignorar 5215511111111"); !strings.Contains(r.Texto, "contigo mismo") {
 		t.Fatalf("a sí mismo: %q", r.Texto)
 	}
-	if r := e.priv(pnAna, "!silenciar "+strings.TrimSuffix(propio, "@s.whatsapp.net")); !strings.Contains(r.Texto, "rangos más bajos") {
+	if r := e.priv(pnAna, "!ignorar "+strings.TrimSuffix(propio, "@s.whatsapp.net")); !strings.Contains(r.Texto, "rangos más bajos") {
 		t.Fatalf("al Dueño: %q", r.Texto)
 	}
 	// Duración mal escrita.
-	if r := e.priv(pnAna, "!silenciar 5215522222222 mañana"); !strings.Contains(r.Texto, "30m, 2h, 1d o siempre") {
+	if r := e.priv(pnAna, "!ignorar 5215522222222 mañana"); !strings.Contains(r.Texto, "30m, 2h, 1d o siempre") {
 		t.Fatalf("%q", r.Texto)
 	}
 	// Todo quedó en el registro de acciones sin textos.
@@ -583,11 +583,11 @@ func TestAyudaListaLosComandosDeBSegunRango(t *testing.T) {
 	e.rol("Mod", "personas.silenciar", "personas.advertir")
 	e.da(pnAna, "Mod")
 	sin := e.priv(pnRosa, "!ayuda").Texto
-	if !strings.Contains(sin, "!reportar") || strings.Contains(sin, "!silenciar") || strings.Contains(sin, "!olvidar") || strings.Contains(sin, "!recordar") {
+	if !strings.Contains(sin, "!reportar") || strings.Contains(sin, "!ignorar") || strings.Contains(sin, "!olvidar") || strings.Contains(sin, "!recordar") {
 		t.Fatalf("sin rango:\n%s", sin)
 	}
 	mod := e.priv(pnAna, "!ayuda").Texto
-	for _, c := range []string{"!silenciar", "!desilenciar", "!advertir", "!advertencias", "!reportar"} {
+	for _, c := range []string{"!ignorar", "!designorar", "!advertir", "!advertencias", "!reportar"} {
 		if !strings.Contains(mod, c) {
 			t.Fatalf("falta %s:\n%s", c, mod)
 		}

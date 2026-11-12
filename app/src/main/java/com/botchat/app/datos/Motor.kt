@@ -216,6 +216,30 @@ interface Motor {
     fun buscarEnChat(bot: Long, chat: String, palabra: String, desde: Long, hasta: Long, antesTs: Long, antesId: String, limite: Long): String
     fun puntitosDeMensajes(bot: Long, chat: String, idsJson: String): String
     fun exportarChat(bot: Long, chat: String, formato: String, desde: Long, hasta: Long): String
+    // Silenciar en grupos y advertencias con sanciones (v0.6.0, E5). Sin pantallas todavía (E7/E8).
+    fun silenciarEnGrupos(bot: Long, persona: String, segundos: Long, alcance: String, gruposJson: String, avisar: Boolean, texto: String): String
+    fun quitarSilencioGrupos(bot: Long, persona: String): Boolean
+    fun listarSilenciosGrupos(bot: Long): String
+    fun historialSilencios(bot: Long, persona: String): String
+    fun contadorSilencio(bot: Long, persona: String, grupo: String): String
+    fun ponerContadorEnCero(bot: Long, persona: String, grupo: String)
+    fun ajustesSilencio(bot: Long): String
+    fun fijarAjusteSilencio(bot: Long, clave: String, valor: String)
+    fun fijarTextoSilencio(bot: Long, id: String, texto: String)
+    fun sancionesPendientes(bot: Long): String
+    fun confirmarSancionSilencio(bot: Long, id: Long, si: Boolean): String
+    fun confirmarSancion(bot: Long, id: Long, si: Boolean): String
+    fun gruposQueAdministro(bot: Long): String
+    fun listarTiposAdvertencia(bot: Long): String
+    fun guardarTipoAdvertencia(bot: Long, tipoJson: String): Long
+    fun borrarTipoAdvertencia(bot: Long, id: Long)
+    fun listarEscalera(bot: Long, tipoId: Long): String
+    fun guardarEscalera(bot: Long, tipoId: Long, pasosJson: String)
+    fun advertirConTipo(bot: Long, persona: String, chat: String, msgId: String, motivo: String, tipoId: Long, reglaId: Long): String
+    fun listarReglasGrupo(bot: Long, grupo: String): String
+    fun guardarReglaItem(bot: Long, grupo: String, id: Long, titulo: String, texto: String, pos: Long): Long
+    fun borrarReglaItem(bot: Long, id: Long)
+    fun moverReglaItem(bot: Long, id: Long, delta: Long)
     fun listarAlertasPalabra(bot: Long): String
     fun crearAlertaPalabra(bot: Long, palabra: String, chatsJson: String): Long
     fun editarAlertaPalabra(bot: Long, id: Long, chatsJson: String, activa: Boolean)
@@ -499,6 +523,29 @@ object MotorGo : Motor {
     override fun buscarEnChat(bot: Long, chat: String, palabra: String, desde: Long, hasta: Long, antesTs: Long, antesId: String, limite: Long) = Wabot.buscarEnChat(bot, chat, palabra, desde, hasta, antesTs, antesId, limite)
     override fun puntitosDeMensajes(bot: Long, chat: String, idsJson: String) = Wabot.puntitosDeMensajes(bot, chat, idsJson)
     override fun exportarChat(bot: Long, chat: String, formato: String, desde: Long, hasta: Long) = Wabot.exportarChat(bot, chat, formato, desde, hasta)
+    override fun silenciarEnGrupos(bot: Long, persona: String, segundos: Long, alcance: String, gruposJson: String, avisar: Boolean, texto: String) = Wabot.silenciarEnGrupos(bot, persona, segundos, alcance, gruposJson, avisar, texto)
+    override fun quitarSilencioGrupos(bot: Long, persona: String) = Wabot.quitarSilencioGrupos(bot, persona)
+    override fun listarSilenciosGrupos(bot: Long) = Wabot.listarSilenciosGrupos(bot)
+    override fun historialSilencios(bot: Long, persona: String) = Wabot.historialSilencios(bot, persona)
+    override fun contadorSilencio(bot: Long, persona: String, grupo: String) = Wabot.contadorSilencio(bot, persona, grupo)
+    override fun ponerContadorEnCero(bot: Long, persona: String, grupo: String) = Wabot.ponerContadorEnCero(bot, persona, grupo)
+    override fun ajustesSilencio(bot: Long) = Wabot.ajustesSilencio(bot)
+    override fun fijarAjusteSilencio(bot: Long, clave: String, valor: String) = Wabot.fijarAjusteSilencio(bot, clave, valor)
+    override fun fijarTextoSilencio(bot: Long, id: String, texto: String) = Wabot.fijarTextoSilencio(bot, id, texto)
+    override fun sancionesPendientes(bot: Long) = Wabot.sancionesPendientes(bot)
+    override fun confirmarSancionSilencio(bot: Long, id: Long, si: Boolean) = Wabot.confirmarSancionSilencio(bot, id, si)
+    override fun confirmarSancion(bot: Long, id: Long, si: Boolean) = Wabot.confirmarSancion(bot, id, si)
+    override fun gruposQueAdministro(bot: Long) = Wabot.gruposQueAdministro(bot)
+    override fun listarTiposAdvertencia(bot: Long) = Wabot.listarTiposAdvertencia(bot)
+    override fun guardarTipoAdvertencia(bot: Long, tipoJson: String) = Wabot.guardarTipoAdvertencia(bot, tipoJson)
+    override fun borrarTipoAdvertencia(bot: Long, id: Long) = Wabot.borrarTipoAdvertencia(bot, id)
+    override fun listarEscalera(bot: Long, tipoId: Long) = Wabot.listarEscalera(bot, tipoId)
+    override fun guardarEscalera(bot: Long, tipoId: Long, pasosJson: String) = Wabot.guardarEscalera(bot, tipoId, pasosJson)
+    override fun advertirConTipo(bot: Long, persona: String, chat: String, msgId: String, motivo: String, tipoId: Long, reglaId: Long) = Wabot.advertirConTipo(bot, persona, chat, msgId, motivo, tipoId, reglaId)
+    override fun listarReglasGrupo(bot: Long, grupo: String) = Wabot.listarReglasGrupo(bot, grupo)
+    override fun guardarReglaItem(bot: Long, grupo: String, id: Long, titulo: String, texto: String, pos: Long) = Wabot.guardarReglaItem(bot, grupo, id, titulo, texto, pos)
+    override fun borrarReglaItem(bot: Long, id: Long) = Wabot.borrarReglaItem(bot, id)
+    override fun moverReglaItem(bot: Long, id: Long, delta: Long) = Wabot.moverReglaItem(bot, id, delta)
     override fun listarAlertasPalabra(bot: Long) = Wabot.listarAlertasPalabra(bot)
     override fun crearAlertaPalabra(bot: Long, palabra: String, chatsJson: String) = Wabot.crearAlertaPalabra(bot, palabra, chatsJson)
     override fun editarAlertaPalabra(bot: Long, id: Long, chatsJson: String, activa: Boolean) = Wabot.editarAlertaPalabra(bot, id, chatsJson, activa)

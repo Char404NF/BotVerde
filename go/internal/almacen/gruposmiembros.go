@@ -303,7 +303,7 @@ func (a *Almacen) MiembrosDe(botID int64, grupo string, incluirSalidos bool, aho
 		if m.Foto == "" {
 			m.Foto = a.FotoDePersona(botID, m.Persona)
 		}
-		if a.ContarAdvertencias(botID, m.Persona) > 0 {
+		if a.ContarAdvertenciasEn(botID, m.Persona, ahora) > 0 {
 			m.Advertido = true
 		}
 	}

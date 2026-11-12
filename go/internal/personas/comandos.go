@@ -104,7 +104,9 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 		return context.WithTimeout(context.Background(), 20*time.Second)
 	}
 
-	reg(comandos.Comando{Nombre: "silenciar", Resumen: "Que el bot deje de contestarle a alguien", Uso: "silenciar <persona> [30m|2h|1d|siempre]", Casilla: "personas.silenciar",
+	// Desde la 0.6.0 «silenciar» y «desilenciar» son de los grupos (paquete silencio: borrar lo que escribe alguien). Lo de antes (que el
+	// bot deje de contestarle) se llama «ignorar»: no hay alias con los nombres viejos porque chocarían con los nuevos.
+	reg(comandos.Comando{Nombre: "ignorar", Resumen: "Que el bot deje de contestarle a alguien", Uso: "ignorar <persona> [30m|2h|1d|siempre]", Casilla: "personas.silenciar",
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
 			p, resto, err := objetivo(cx)
 			if err != nil {
@@ -123,7 +125,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			}
 			return "Listo: el bot no le contestará " + map[bool]string{true: "para siempre", false: "durante " + TextoDuracion(dur)}[dur == 0] + ".", nil
 		}})
-	reg(comandos.Comando{Nombre: "desilenciar", Resumen: "Que el bot vuelva a contestarle", Uso: "desilenciar <persona>", Casilla: "personas.silenciar",
+	reg(comandos.Comando{Nombre: "designorar", Resumen: "Que el bot vuelva a contestarle", Uso: "designorar <persona>", Casilla: "personas.silenciar",
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
 			p, _, err := objetivo(cx)
 			if err != nil {
@@ -134,7 +136,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 				return "", err
 			}
 			if !ok {
-				return "Esa persona no estaba silenciada.", nil
+				return "Esa persona no estaba ignorada. Si querías quitarle el silencio de grupos, usa " + cx.D.Prefijo() + "desilenciar.", nil
 			}
 			return "Listo: el bot vuelve a contestarle.", nil
 		}})
@@ -164,7 +166,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			}
 			return "Listo: el bot vuelve a atenderla.", nil
 		}})
-	reg(comandos.Comando{Nombre: "advertir", Alias: []string{"warn"}, Resumen: "Poner una advertencia", Uso: "advertir <persona> [motivo]", Casilla: "personas.advertir",
+	reg(comandos.Comando{Nombre: "advertir", Alias: []string{"warn"}, Resumen: "Poner una advertencia", Uso: "advertir <persona> [tipo] [motivo]", Casilla: "personas.advertir",
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
 			p, resto, err := objetivo(cx)
 			if err != nil {
@@ -176,15 +178,39 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			if cx.Dueno {
 				chat = s.ChatPrivadoDe(p)
 			}
-			r, err := s.Advertir(c, cx.Persona, p, chat, cx.CitaID, strings.Join(resto, " "))
-			if err != nil {
-				return "", err
+			var tipoID int64
+			if len(resto) > 0 {
+				if tp := s.tipoPorNombre(resto[0]); tp != nil {
+					tipoID, resto = tp.ID, resto[1:]
+				}
+			}
+			var r *ResultadoAdvertir
+			var err2 error
+			if tipoID > 0 {
+				r, err2 = s.AdvertirConTipo(c, cx.Persona, p, chat, cx.CitaID, strings.Join(resto, " "), tipoID, 0)
+			} else {
+				r, err2 = s.Advertir(c, cx.Persona, p, chat, cx.CitaID, strings.Join(resto, " "))
+			}
+			if err2 != nil {
+				return "", err2
 			}
 			t := fmt.Sprintf("Advertencia puesta (lleva %d", r.Total)
 			if r.Tope > 0 {
 				t += fmt.Sprintf(" de %d", r.Tope)
 			}
 			t += ")."
+			if r.Nivel > 0 && r.Hecho != "" {
+				switch r.Hecho {
+				case "avisado":
+					t += " Le avisé."
+				case "silenciado":
+					t += " La silencié en grupos."
+				case "pendiente":
+					t += " Te pedí confirmar su expulsión (no se expulsa sola)."
+				case "solo_aviso":
+					t += " No hice el paso de la escalera (" + r.Motivo + ")."
+				}
+			}
 			if r.LlegoAlTope {
 				switch r.Hecho {
 				case "silenciado":
@@ -208,11 +234,17 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			if err := s.puede(cx.Persona, p); err != nil {
 				return "", err
 			}
-			xs, err := s.Alm.ListarAdvertencias(s.BotID, p, 5)
+			todas, err := s.Alm.ListarAdvertenciasEn(s.BotID, p, 200, s.ahora())
 			if err != nil {
 				return "", err
 			}
-			total := s.Alm.ContarAdvertencias(s.BotID, p)
+			var xs []almacen.Advertencia
+			for _, x := range todas {
+				if x.Vigente && len(xs) < 5 {
+					xs = append(xs, x)
+				}
+			}
+			total := s.Alm.ContarAdvertenciasEn(s.BotID, p, s.ahora())
 			if total == 0 {
 				return s.Nombre(p) + " no tiene advertencias.", nil
 			}
@@ -438,9 +470,9 @@ func TextoFicha(f *FichaCompleta, loc *time.Location) string {
 	case f.Bloqueada:
 		estado = "bloqueada en el bot"
 	case f.Silencio != nil && f.Silencio.HastaTS == 0:
-		estado = "silenciada para siempre"
+		estado = "ignorada por el bot para siempre"
 	case f.Silencio != nil:
-		estado = "silenciada hasta " + time.Unix(f.Silencio.HastaTS, 0).In(loc).Format("02/01 15:04")
+		estado = "ignorada por el bot hasta " + time.Unix(f.Silencio.HastaTS, 0).In(loc).Format("02/01 15:04")
 	}
 	if f.NoMolestar {
 		estado += " · en No molestar"

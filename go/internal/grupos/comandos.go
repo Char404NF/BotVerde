@@ -229,7 +229,7 @@ func textoAccion(a string) string {
 	case AccAdvertir:
 		return "advertir"
 	case AccSilenciar:
-		return "silenciar al bot para esa persona"
+		return "ignorar al bot para esa persona (que no le conteste)"
 	case AccExpulsar:
 		return "expulsar"
 	}

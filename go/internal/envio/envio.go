@@ -593,6 +593,16 @@ func (s *Servicio) Editar(ctx context.Context, chat, id, texto string) error {
 
 // BorrarParaTodos pide a WhatsApp borrar un mensaje para todos. Siempre se intenta; si WhatsApp lo rechaza se devuelve su error.
 func (s *Servicio) BorrarParaTodos(ctx context.Context, chat, id string) error {
+	return s.borrarParaTodos(ctx, chat, id, true)
+}
+
+// BorrarSilencio borra el mensaje de alguien silenciado en un grupo. NO gasta la ráfaga de mensajes manuales (tomarFicha): el
+// silencio tiene su propio tope de borrados por minuto (sil_borrados_min) en el paquete silencio.
+func (s *Servicio) BorrarSilencio(ctx context.Context, chat, id string) error {
+	return s.borrarParaTodos(ctx, chat, id, false)
+}
+
+func (s *Servicio) borrarParaTodos(ctx context.Context, chat, id string, usaFicha bool) error {
 	j, err := parsea(chat)
 	if err != nil {
 		return err
@@ -607,7 +617,7 @@ func (s *Servicio) BorrarParaTodos(ctx context.Context, chat, id string) error {
 	if !s.Cli.Conectado() {
 		return ErrSinConexion
 	}
-	if !s.tomarFicha() {
+	if usaFicha && !s.tomarFicha() {
 		return ErrDemasiados
 	}
 	autor := types.EmptyJID
