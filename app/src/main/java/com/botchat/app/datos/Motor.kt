@@ -208,6 +208,14 @@ interface Motor {
     fun gruposEnComunPersona(bot: Long, persona: String): String
     fun pedirFotoPersona(bot: Long, persona: String, grupo: String, forzar: Boolean)
     fun fotoPersona(bot: Long, persona: String): String
+
+    // Perfil de persona, actividad, lista de lo que envió, búsqueda en un chat, puntitos y exportar chat (0.6.0, E4).
+    fun perfilPersona(bot: Long, persona: String): String
+    fun actividadPersona(bot: Long, persona: String): String
+    fun mensajesDePersona(bot: Long, filtroJson: String, antesTs: Long, antesId: String, limite: Long): String
+    fun buscarEnChat(bot: Long, chat: String, palabra: String, desde: Long, hasta: Long, antesTs: Long, antesId: String, limite: Long): String
+    fun puntitosDeMensajes(bot: Long, chat: String, idsJson: String): String
+    fun exportarChat(bot: Long, chat: String, formato: String, desde: Long, hasta: Long): String
     fun listarAlertasPalabra(bot: Long): String
     fun crearAlertaPalabra(bot: Long, palabra: String, chatsJson: String): Long
     fun editarAlertaPalabra(bot: Long, id: Long, chatsJson: String, activa: Boolean)
@@ -485,6 +493,12 @@ object MotorGo : Motor {
     override fun gruposEnComunPersona(bot: Long, persona: String) = Wabot.gruposEnComunPersona(bot, persona)
     override fun pedirFotoPersona(bot: Long, persona: String, grupo: String, forzar: Boolean) = Wabot.pedirFotoPersona(bot, persona, grupo, forzar)
     override fun fotoPersona(bot: Long, persona: String) = Wabot.fotoPersona(bot, persona)
+    override fun perfilPersona(bot: Long, persona: String) = Wabot.perfilPersona(bot, persona)
+    override fun actividadPersona(bot: Long, persona: String) = Wabot.actividadPersona(bot, persona)
+    override fun mensajesDePersona(bot: Long, filtroJson: String, antesTs: Long, antesId: String, limite: Long) = Wabot.mensajesDePersona(bot, filtroJson, antesTs, antesId, limite)
+    override fun buscarEnChat(bot: Long, chat: String, palabra: String, desde: Long, hasta: Long, antesTs: Long, antesId: String, limite: Long) = Wabot.buscarEnChat(bot, chat, palabra, desde, hasta, antesTs, antesId, limite)
+    override fun puntitosDeMensajes(bot: Long, chat: String, idsJson: String) = Wabot.puntitosDeMensajes(bot, chat, idsJson)
+    override fun exportarChat(bot: Long, chat: String, formato: String, desde: Long, hasta: Long) = Wabot.exportarChat(bot, chat, formato, desde, hasta)
     override fun listarAlertasPalabra(bot: Long) = Wabot.listarAlertasPalabra(bot)
     override fun crearAlertaPalabra(bot: Long, palabra: String, chatsJson: String) = Wabot.crearAlertaPalabra(bot, palabra, chatsJson)
     override fun editarAlertaPalabra(bot: Long, id: Long, chatsJson: String, activa: Boolean) = Wabot.editarAlertaPalabra(bot, id, chatsJson, activa)
