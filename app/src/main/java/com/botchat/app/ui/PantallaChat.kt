@@ -47,7 +47,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.botchat.app.ui.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
+import com.botchat.app.ui.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -792,7 +792,7 @@ private fun MiniaturaMedia(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         val img = imagen ?: miniatura
-        if (img != null) androidx.compose.animation.Crossfade(img, Modifier.fillMaxSize(), animationSpec = Mov.tiempo(LocalReducirMovimiento.current, Mov.NORMAL), label = "foto") { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+        if (img != null) androidx.compose.animation.Crossfade(img, Modifier.fillMaxSize(), animationSpec = androidx.compose.animation.core.snap(), label = "foto") { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
         else if (m.estado == "pendiente" || ruta.isNotEmpty()) Box(Modifier.fillMaxSize().shimmer())
         if (m.categoria == "video" && m.descargado) {
             Box(Modifier.size(48.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.45f)), contentAlignment = Alignment.Center) { Icon(Ico.Reproducir, null, tint = Color.White, modifier = Modifier.size(30.dp)) }

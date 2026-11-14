@@ -43,14 +43,8 @@ object EntradaLista {
     @Volatile var hecha = false
 }
 
-/** Cada fila entra con un pequeño retraso respecto a la anterior (solo la primera vez y sin pasar de 12 filas). */
-fun Modifier.entradaEscalonada(indice: Int): Modifier = composed {
-    val reducir = LocalReducirMovimiento.current
-    val animar = remember { !EntradaLista.hecha && !reducir && indice < 12 }
-    val avance = remember { Animatable(if (animar) 0f else 1f) }
-    LaunchedEffect(Unit) { if (animar) { delay(indice * 28L); avance.animateTo(1f, androidx.compose.animation.core.spring(1f, androidx.compose.animation.core.Spring.StiffnessLow)) } }
-    if (!animar) this else graphicsLayer { alpha = avance.value; translationY = (1f - avance.value) * 14.dp.toPx() }
-}
+/** Ya no se anima la entrada de las filas (una sola animación por pantalla); se deja la función para no tocar los usos. */
+fun Modifier.entradaEscalonada(indice: Int): Modifier = this
 
 /** Una burbuja nueva se desliza desde abajo y se desvanece hacia adentro. */
 fun Modifier.apareceDesdeAbajo(activo: Boolean): Modifier = if (!activo) this else apareceDesdeAbajoAnimado()
@@ -172,7 +166,7 @@ fun CheckAnimado(modifier: Modifier = Modifier, tam: Dp = 96.dp, color: Color = 
  *  - Ninguna: sin transiciones.
  */
 /** Cómo se relacionan dos pantallas al navegar (ver [Transiciones]). */
-enum class TipoTransicion { PESTANA, EJE, CONTENEDOR }
+enum class TipoTransicion { PESTANA, EJE }
 
 object Transiciones {
     const val DESLIZAR_MS = 280
@@ -188,61 +182,28 @@ object Transiciones {
     private const val ENTRA_MS = 420
     private const val SALE_MS = 260
 
-    // Tres lenguajes, según la relación entre las pantallas (guía de movimiento de Material):
-    //  - PESTANA: entre Chats, Grupos, Bot y Tú no hay relación → "fade through": sale una y después entra la otra.
-    //  - EJE: de una pantalla a otra dentro de un flujo (menús, ajustes, detalles) → "shared axis X": 30 dp de recorrido, 300 ms, con el
-    //    fundido en dos tiempos (sale en 90 ms y entra en 210) para que nunca se vean las dos encimadas.
-    //  - CONTENEDOR: de la lista de chats al chat → la fila crece hasta ser el chat (lo hace el elemento compartido de la fila);
-    //    aquí solo se pone el fundido de fondo, sin mover ni escalar la pantalla.
+    // Un solo movimiento para toda la pantalla: "fade through". Sale la anterior (100 ms) y, apenas termina, se aclara la nueva
+    // (220 ms). Nada se desliza, nada se escala y nunca se ven las dos encimadas; dentro de la pantalla nueva no se anima ninguna pieza
+    // suelta (ni filas, ni burbujas, ni fotos), así que se ve como una sola cosa que cambia.
     private val APARECE = androidx.compose.animation.core.LinearOutSlowInEasing
     private val DESAPARECE = androidx.compose.animation.core.FastOutLinearInEasing
-    private val EJE_EASING = androidx.compose.animation.core.FastOutSlowInEasing
-    private const val EJE_MS = 300
 
-    fun entra(modo: ModoAnim, tipo: TipoTransicion, px: Int): androidx.compose.animation.EnterTransition = when (modo) {
+    fun entra(modo: ModoAnim, tipo: TipoTransicion): androidx.compose.animation.EnterTransition = when (modo) {
         ModoAnim.NINGUNA -> androidx.compose.animation.EnterTransition.None
         ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeIn(tween(FUNDIDO_CORTO_MS))
-        ModoAnim.NATURAL -> when (tipo) {
-            TipoTransicion.PESTANA -> androidx.compose.animation.fadeIn(tween(210, 90, APARECE))
-            TipoTransicion.EJE -> androidx.compose.animation.slideInHorizontally(tween(EJE_MS, easing = EJE_EASING)) { px } +
-                androidx.compose.animation.fadeIn(tween(210, 90, APARECE))
-            TipoTransicion.CONTENEDOR -> androidx.compose.animation.fadeIn(tween(180, easing = APARECE))
-        }
+        ModoAnim.NATURAL -> androidx.compose.animation.fadeIn(tween(220, 80, APARECE))
     }
 
-    fun sale(modo: ModoAnim, tipo: TipoTransicion, px: Int): androidx.compose.animation.ExitTransition = when (modo) {
+    fun sale(modo: ModoAnim, tipo: TipoTransicion): androidx.compose.animation.ExitTransition = when (modo) {
         ModoAnim.NINGUNA -> androidx.compose.animation.ExitTransition.None
         ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeOut(tween(FUNDIDO_CORTO_MS))
-        ModoAnim.NATURAL -> when (tipo) {
-            TipoTransicion.PESTANA -> androidx.compose.animation.fadeOut(tween(90, easing = DESAPARECE))
-            TipoTransicion.EJE -> androidx.compose.animation.slideOutHorizontally(tween(EJE_MS, easing = EJE_EASING)) { -px } +
-                androidx.compose.animation.fadeOut(tween(90, easing = DESAPARECE))
-            TipoTransicion.CONTENEDOR -> androidx.compose.animation.fadeOut(tween(220, easing = DESAPARECE))
-        }
+        ModoAnim.NATURAL -> androidx.compose.animation.fadeOut(tween(100, easing = DESAPARECE))
     }
 
-    // Al volver es el mismo movimiento al revés: la de encima se va hacia la derecha y la de abajo regresa desde la izquierda.
-    fun vuelveEntra(modo: ModoAnim, tipo: TipoTransicion, px: Int): androidx.compose.animation.EnterTransition = when (modo) {
-        ModoAnim.NINGUNA -> androidx.compose.animation.EnterTransition.None
-        ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeIn(tween(FUNDIDO_CORTO_MS))
-        ModoAnim.NATURAL -> when (tipo) {
-            TipoTransicion.PESTANA -> androidx.compose.animation.fadeIn(tween(210, 90, APARECE))
-            TipoTransicion.EJE -> androidx.compose.animation.slideInHorizontally(tween(EJE_MS, easing = EJE_EASING)) { -px } +
-                androidx.compose.animation.fadeIn(tween(210, 90, APARECE))
-            TipoTransicion.CONTENEDOR -> androidx.compose.animation.fadeIn(tween(220, 40, APARECE))
-        }
-    }
+    // Al volver es lo mismo: se va la de encima y reaparece la de abajo.
+    fun vuelveEntra(modo: ModoAnim, tipo: TipoTransicion): androidx.compose.animation.EnterTransition = entra(modo, tipo)
 
-    fun vuelveSale(modo: ModoAnim, tipo: TipoTransicion, px: Int): androidx.compose.animation.ExitTransition = when (modo) {
-        ModoAnim.NINGUNA -> androidx.compose.animation.ExitTransition.None
-        ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeOut(tween(FUNDIDO_CORTO_MS))
-        ModoAnim.NATURAL -> when (tipo) {
-            TipoTransicion.PESTANA -> androidx.compose.animation.fadeOut(tween(90, easing = DESAPARECE))
-            TipoTransicion.EJE -> androidx.compose.animation.slideOutHorizontally(tween(EJE_MS, easing = EJE_EASING)) { px } +
-                androidx.compose.animation.fadeOut(tween(90, easing = DESAPARECE))
-            TipoTransicion.CONTENEDOR -> androidx.compose.animation.fadeOut(tween(200, easing = DESAPARECE))
-        }
-    }
+    fun vuelveSale(modo: ModoAnim, tipo: TipoTransicion): androidx.compose.animation.ExitTransition = sale(modo, tipo)
 
     /** Fundido de una pieza que aparece/desaparece (barras, visor): Natural 220 ms, Reducidas corto, Ninguna nada. */
     fun fundidoEntra(modo: ModoAnim): androidx.compose.animation.EnterTransition = when (modo) {
@@ -257,14 +218,11 @@ object Transiciones {
         ModoAnim.NATURAL -> androidx.compose.animation.fadeOut(tween(Mov.CORTA))
     }
 
-    /** El visor de fotos aparece con un fundido y un leve crecimiento (94 % → 100 %); al cerrar se achica y se aclara. */
-    fun visorEntra(modo: ModoAnim): androidx.compose.animation.EnterTransition =
-        if (modo == ModoAnim.NATURAL) fundidoEntra(modo) + androidx.compose.animation.scaleIn(tween(300, easing = DESACELERA), 0.94f) else fundidoEntra(modo)
+    /** El visor de fotos aparece y se va con un fundido. */
+    fun visorEntra(modo: ModoAnim): androidx.compose.animation.EnterTransition = fundidoEntra(modo)
 
-    fun visorSale(modo: ModoAnim): androidx.compose.animation.ExitTransition =
-        if (modo == ModoAnim.NATURAL) fundidoSale(modo) + androidx.compose.animation.scaleOut(tween(200, easing = ACELERA), 0.94f) else fundidoSale(modo)
+    fun visorSale(modo: ModoAnim): androidx.compose.animation.ExitTransition = fundidoSale(modo)
 
-    /** Duración del fundido esqueleto → contenido del chat: 100 ms, instantáneo con "Ninguna". */
-    fun fundidoChat(modo: ModoAnim): androidx.compose.animation.core.FiniteAnimationSpec<Float> =
-        if (modo == ModoAnim.NINGUNA) androidx.compose.animation.core.snap() else tween(FUNDIDO_CHAT_MS)
+    /** El esqueleto → contenido del chat no se anima: la única animación al abrir es la de la pantalla. */
+    fun fundidoChat(modo: ModoAnim): androidx.compose.animation.core.FiniteAnimationSpec<Float> = androidx.compose.animation.core.snap()
 }

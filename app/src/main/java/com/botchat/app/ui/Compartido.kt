@@ -12,6 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 
+/** Apagado: la foto y el nombre ya no vuelan entre la lista y el chat (con el deslizamiento de pantalla se veía doble movimiento). */
+private const val ELEMENTOS_COMPARTIDOS = false
+
 val LocalSharedScope = compositionLocalOf<SharedTransitionScope?> { null }
 val LocalAnimScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
 
@@ -21,6 +24,7 @@ val LocalAnimScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
  */
 @Composable
 fun Modifier.compartido(clave: String, limites: Boolean = false): Modifier {
+    if (!ELEMENTOS_COMPARTIDOS) return this
     val sh = LocalSharedScope.current ?: return this
     val an = LocalAnimScope.current ?: return this
     val reducir = LocalReducirMovimiento.current
