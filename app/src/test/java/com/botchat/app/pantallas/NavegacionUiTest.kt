@@ -51,17 +51,17 @@ class NavegacionUiTest {
         regla.esperaTexto("María López")
         assertEquals(0, regla.onAllNodesWithTextSafe("Protege tus mensajes con un PIN"))
         assertEquals(0, regla.onAllNodesWithTextSafe("está bloqueado", substring = true))
-        regla.onNodeWithText("Bot Chat").assertIsDisplayed() // barra superior con el logo
-        regla.onNodeWithText("Detenido").assertIsDisplayed()
+        regla.onNodeWithText("BotChat").assertIsDisplayed() // título de la barra superior
+        regla.onNodeWithText("El bot está detenido. Toca para encenderlo").assertIsDisplayed()
     }
 
     @Test fun estadoDelBotEnLaBarraSuperior() {
         Apoyo.creaBot(); Ajustes.get(Apoyo.ctx()).aceptarAviso()
         BotState.corriendo.value = true; BotState.estado.value = "conectado"
         contenido(); regla.esperaTexto("María López")
-        regla.onNodeWithText("Conectado").assertIsDisplayed()
+        assertEquals("conectado: no hay cinta de aviso", 0, regla.onAllNodesWithTextSafe("detenido", substring = true))
         regla.runOnUiThread { BotState.estado.value = "conectando" }
-        regla.esperaTexto("Reconectando")
+        regla.esperaTexto("Reconectando", substring = true)
     }
 
     @Test fun actualizacionYaVinculadaSoloVeElAvisoUnaVez() {
@@ -124,7 +124,8 @@ class NavegacionUiTest {
         regla.onNodeWithText("María López").performClick()
         regla.esperaTexto("nos vemos", substring = false)
         regla.onNodeWithTag("nav_inicio").assertDoesNotExist()
-        regla.onNodeWithContentDescription("Archivos compartidos").performClick()
+        regla.onNodeWithContentDescription("Más opciones").performClick()
+        regla.esperaEtiqueta("menu_archivos"); regla.onNodeWithTag("menu_archivos").performClick() // "Archivos, enlaces y docs" ahora va en el menú
         regla.esperaTexto("Archivos compartidos")
         regla.onNodeWithText("Fotos").assertIsDisplayed(); regla.onNodeWithText("Videos").assertIsDisplayed()
         atras(); atras()
@@ -154,7 +155,7 @@ class NavegacionUiTest {
         BotState.corriendo.value = true; BotState.estado.value = "conectado"
         contenido(); regla.esperaTexto("María López")
         assertFalse(EstadoBloqueo.bloqueado.value)
-        regla.onNodeWithText("Conectado").assertIsDisplayed()
+        assertEquals(0, regla.onAllNodesWithTextSafe("detenido", substring = true))
         regla.runOnUiThread { com.botchat.app.datos.Repo.emitirParaPruebas("chats") }
         regla.esperaTexto("María López")
     }
@@ -164,7 +165,7 @@ class NavegacionUiTest {
         com.botchat.app.Datos.get(Apoyo.ctx()).marcarVinculado(1, false) // WhatsApp cerró la sesión; el bot se había vinculado antes
         contenido()
         regla.esperaTexto("WhatsApp cerró la sesión de este bot")
-        regla.onNodeWithText("Desvinculado").assertIsDisplayed()
+        regla.onNodeWithText("WhatsApp cerró la sesión. Toca para ver qué hacer").assertIsDisplayed()
         regla.onNodeWithText("María López").assertIsDisplayed() // los mensajes siguen ahí
         regla.onNodeWithText("Vincular de nuevo").performClick()
         regla.esperaTexto("Vincular de nuevo")

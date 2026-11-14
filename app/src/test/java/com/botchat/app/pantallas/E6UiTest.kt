@@ -64,9 +64,9 @@ class E6UiTest {
     @Test fun laBarraDeAbajoTieneCuatroPestanasYYaNoEspacioNiAjustes() {
         Ajustes.get(Apoyo.ctx()).aceptarAviso(); raiz()
         regla.esperaTexto("Ana Pérez")
-        listOf("nav_inicio", "nav_personas", "nav_grupos", "nav_bot").forEach { assertTrue(it, hay(it)) }
-        assertFalse(hay("nav_espacio")); assertFalse(hay("nav_ajustes"))
-        regla.onNodeWithTag("nav_personas").performClick(); regla.esperaEtiqueta("pantalla_personas")
+        listOf("nav_inicio", "nav_grupos", "nav_bot", "nav_ajustes").forEach { assertTrue(it, hay(it)) }
+        assertFalse(hay("nav_espacio")); assertFalse(hay("nav_personas"))
+        regla.onNodeWithTag("nav_ajustes").performClick(); regla.esperaTexto("Seguridad")
         regla.onNodeWithTag("nav_grupos").performClick(); regla.esperaEtiqueta("pantalla_grupos")
         regla.onNodeWithTag("nav_bot").performClick(); regla.esperaEtiqueta("pantalla_centro_bot")
     }
@@ -189,10 +189,12 @@ class E6UiTest {
 
     @Test fun tocarUnGrupoOUnaPersonaAbreSusDestinosDesdeLaApp() {
         Ajustes.get(Apoyo.ctx()).aceptarAviso(); raiz(); regla.esperaTexto("Ana Pérez")
-        regla.onNodeWithTag("nav_personas").performClick()
+        regla.onNodeWithTag("fab_nuevo_chat").performClick() // "Seleccionar contacto": tocar a alguien abre su chat
         regla.esperaTexto("Beto Ruiz"); regla.onNodeWithTag("persona_$beto").performClick()
         regla.runOnUiThread { regla.activity.onBackPressedDispatcher.onBackPressed() }; regla.waitForIdle()
         regla.esperaTexto("Beto Ruiz")
+        regla.runOnUiThread { regla.activity.onBackPressedDispatcher.onBackPressed() }; regla.waitForIdle()
+        regla.esperaTexto("Ana Pérez")
         regla.onNodeWithTag("nav_grupos").performClick()
         regla.esperaTexto("Vecinos del 5"); regla.onNodeWithTag("grupo_$grupo").performClick()
         regla.waitForIdle()
@@ -212,7 +214,9 @@ class E6UiTest {
 
     @Test fun elMenuTrae_Buscar_Exportar_Vaciar_Silenciar_Y_Fijar() {
         chat(); abreMenu()
-        listOf("menu_buscar", "menu_exportar_chat", "menu_vaciar_chat", "menu_silenciar", "menu_fijar").forEach { assertTrue(it, hay(it)) }
+        listOf("menu_buscar", "menu_silenciar", "menu_fijar", "menu_mas").forEach { assertTrue(it, hay(it)) }
+        regla.onNodeWithTag("menu_mas").performClick(); regla.esperaEtiqueta("menu_exportar_chat")
+        listOf("menu_exportar_chat", "menu_vaciar_chat").forEach { assertTrue(it, hay(it)) }
     }
 
     @Test fun fijarYSilenciarVanAlMotor() {
@@ -251,11 +255,13 @@ class E6UiTest {
 
     @Test fun vaciarPideConfirmarDiceQueNoHayDeshacerYSoloEntoncesBorra() {
         chat(); abreMenu()
+        regla.onNodeWithTag("menu_mas").performClick(); regla.esperaEtiqueta("menu_vaciar_chat")
         regla.onNodeWithTag("menu_vaciar_chat").performClick()
         regla.esperaEtiqueta("aviso_sin_deshacer"); regla.esperaTexto("no hay «Deshacer»", substring = true)
         regla.onNodeWithTag("cancelar_vaciar").performClick()
         regla.waitForIdle(); assertFalse(llamo("vaciarChat"))
-        regla.onNodeWithContentDescription("Más opciones").performClick(); regla.esperaEtiqueta("menu_vaciar_chat")
+        regla.onNodeWithContentDescription("Más opciones").performClick(); regla.esperaEtiqueta("menu_mas")
+        regla.onNodeWithTag("menu_mas").performClick(); regla.esperaEtiqueta("menu_vaciar_chat")
         regla.onNodeWithTag("menu_vaciar_chat").performClick()
         regla.esperaEtiqueta("confirmar_vaciar"); regla.onNodeWithTag("confirmar_vaciar").performClick()
         regla.espera { llamo("vaciarChat:$ana") }
@@ -264,6 +270,7 @@ class E6UiTest {
 
     @Test fun exportarElChatPideElFormatoYPreparaElArchivo() {
         chat(); abreMenu()
+        regla.onNodeWithTag("menu_mas").performClick(); regla.esperaEtiqueta("menu_exportar_chat")
         regla.onNodeWithTag("menu_exportar_chat").performClick()
         regla.esperaEtiqueta("exportar_txt")
         regla.onNodeWithTag("exportar_txt").performClick()

@@ -74,6 +74,7 @@ class MotorUiTest {
         regla.setContent { BotChatTema { PantallaChat(g, {}, {}, {}, {}) } }
         regla.esperaTexto("hola")
         regla.onNodeWithContentDescription("Más opciones").performClick()
+        regla.esperaEtiqueta("menu_mas"); regla.onNodeWithTag("menu_mas").performClick()
         regla.esperaEtiqueta("menu_bot_grupo")
         regla.onNodeWithTag("menu_bot_grupo").performClick()
         regla.espera { llamo("botChat:false") }
@@ -108,9 +109,10 @@ class MotorUiTest {
         regla.esperaTexto("hola")
         assertFalse(hay("aviso_bot_pausado"))
         regla.onNodeWithContentDescription("Más opciones").performClick()
-        regla.esperaEtiqueta("menu_tomar_control")
-        regla.onNodeWithText("Tomar el control (el bot calla aquí)").assertIsDisplayed()
-        regla.onNodeWithTag("menu_tomar_control").performClick()
+        regla.esperaEtiqueta("menu_pausar_bot")
+        regla.onNodeWithTag("menu_pausar_bot").performClick()
+        regla.esperaEtiqueta("pausa_control")
+        regla.onNodeWithTag("pausa_control").performClick()
         regla.espera { llamo("pausarBot:${com.botchat.app.ui.MINUTOS_CONTROL}") }
         regla.esperaEtiqueta("aviso_control")
         regla.esperaTexto("Tienes el control de este chat: el bot no responde aquí")

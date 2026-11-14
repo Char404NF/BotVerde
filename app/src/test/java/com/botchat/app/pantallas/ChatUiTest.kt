@@ -11,6 +11,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -43,7 +46,7 @@ class ChatUiTest {
         pantalla()
         regla.esperaTexto("hasta luego")
         regla.onNodeWithText("Ana Pérez").assertIsDisplayed()
-        regla.onNodeWithText("+52 55 1234 5678", substring = true).assertIsDisplayed() // teléfono con la bandera, nunca el JID
+        regla.onNodeWithText("Bot activo").assertIsDisplayed() // estado del bot en la cabecera; el teléfono va en la info del contacto
         assertEquals(0, regla.onAllNodesWithTextSafe("@s.whatsapp.net", substring = true))
         regla.onNodeWithText("(editado)", substring = true).assertIsDisplayed()
         regla.onNodeWithText("pie de foto").assertIsDisplayed()
@@ -72,8 +75,8 @@ class ChatUiTest {
         )
         regla.setContent { BotChatTema { PantallaChat("120@g.us", {}, {}, {}, {}) } }
         regla.esperaTexto("tres")
-        regla.onNodeWithText("Equipo").assertIsDisplayed()
-        regla.onNodeWithText("Grupo").assertIsDisplayed()
+        regla.onAllNodesWithText("Equipo").onFirst().assertIsDisplayed() // cabecera (y la tarjeta de inicio del grupo)
+        regla.onNodeWithText("Bot activo").assertIsDisplayed()
         regla.onNodeWithText("Ana").assertIsDisplayed()
         assertEquals("Luis aparece una sola vez porque sus dos mensajes van seguidos", 1, regla.onAllNodesWithTextSafe("Luis"))
     }
@@ -85,6 +88,7 @@ class ChatUiTest {
         pantalla()
         regla.esperaTexto("hola")
         regla.onNodeWithContentDescription("Más opciones").performClick()
+        regla.onNodeWithTag("menu_mas").performClick()
         regla.onNodeWithText("Borrar archivos de este chat").performClick()
         regla.esperaTexto("Se liberarán 3 KB", substring = true)
         regla.onNodeWithText("Los mensajes de texto se conservan.", substring = true).assertIsDisplayed()
@@ -92,6 +96,7 @@ class ChatUiTest {
         assertTrue(motor.llamadas.none { it.startsWith("borrarArchivos") })
         // Ahora confirmando
         regla.onNodeWithContentDescription("Más opciones").performClick()
+        regla.onNodeWithTag("menu_mas").performClick()
         regla.onNodeWithText("Borrar archivos de este chat").performClick()
         regla.esperaTexto("Borrar archivos", substring = false)
         regla.onNodeWithText("Borrar archivos").performClick()
@@ -106,6 +111,7 @@ class ChatUiTest {
         pantalla(alVolver = { volvio = true })
         regla.esperaTexto("hola")
         regla.onNodeWithContentDescription("Más opciones").performClick()
+        regla.onNodeWithTag("menu_mas").performClick()
         regla.onNodeWithText("Borrar todo el chat").performClick()
         regla.onNodeWithText("No se borra nada en WhatsApp.", substring = true).assertIsDisplayed()
         regla.onNodeWithText("Borrar todo").performClick()

@@ -146,6 +146,7 @@ class ChatEscribirUiTest {
         regla.onNodeWithTag("cerrar_seleccion").performClick()
         regla.espera { !hay("contador_seleccion") }
         selecciona("nuevo")
+        regla.esperaEtiqueta("accion_mas"); regla.onNodeWithTag("accion_mas").performClick()
         regla.esperaEtiqueta("accion_editar")
         regla.onNodeWithTag("accion_editar").performClick()
         regla.esperaEtiqueta("banner_edicion")
@@ -206,7 +207,7 @@ class ChatEscribirUiTest {
     @Test fun elEncabezadoMuestraEscribiendoEnLineaOUltimaVezSoloSiLlega() {
         motor.mensajes = Apoyo.arreglo(Apoyo.msgJson("a", ahora, texto = "hola", remitente = "Ana"))
         pantalla()
-        regla.esperaTexto("+52", substring = true)   // sin datos de presencia: la línea de siempre
+        regla.esperaTexto("Bot activo")   // sin datos de presencia: el estado del bot
         assertFalse(hay("presencia"))
     }
 

@@ -53,6 +53,7 @@ class ChatTrabajoUiTest {
         regla.esperaTexto("hola")
         assertFalse(hay("marcas_chat"))
         regla.onNodeWithContentDescription("Más opciones").performClick()
+        regla.esperaEtiqueta("menu_mas"); regla.onNodeWithTag("menu_mas").performClick()
         regla.esperaEtiqueta("menu_pendiente")
         regla.onNodeWithText("Marcar como pendiente").assertIsDisplayed()
         regla.onNodeWithTag("menu_pendiente").performClick()
@@ -61,6 +62,7 @@ class ChatTrabajoUiTest {
         regla.esperaTexto("Pendiente")
         // Ahora el menú ofrece quitar la marca y marcar como resuelto.
         regla.onNodeWithContentDescription("Más opciones").performClick()
+        regla.esperaEtiqueta("menu_mas"); regla.onNodeWithTag("menu_mas").performClick()
         regla.esperaEtiqueta("menu_resuelto")
         regla.onNodeWithText("Quitar la marca de pendiente").assertIsDisplayed()
         regla.onNodeWithTag("menu_resuelto").performClick()
@@ -92,6 +94,7 @@ class ChatTrabajoUiTest {
         regla.setContent { BotChatTema { PantallaChat(jid, {}, {}, {}, {}) } }
         regla.esperaTexto("hola")
         regla.onNodeWithContentDescription("Más opciones").performClick()
+        regla.esperaEtiqueta("menu_mas"); regla.onNodeWithTag("menu_mas").performClick()
         regla.esperaEtiqueta("menu_etiquetas")
         regla.onNodeWithTag("menu_etiquetas").performClick()
         regla.esperaEtiqueta("elegir_etiqueta_1")
@@ -110,6 +113,7 @@ class ChatTrabajoUiTest {
         regla.setContent { BotChatTema { PantallaChat(jid, {}, {}, {}, {}, alAbrirEtiquetas = { abierto = true }) } }
         regla.esperaTexto("hola")
         regla.onNodeWithContentDescription("Más opciones").performClick()
+        regla.esperaEtiqueta("menu_mas"); regla.onNodeWithTag("menu_mas").performClick()
         regla.esperaEtiqueta("menu_etiquetas")
         regla.onNodeWithTag("menu_etiquetas").performClick()
         regla.esperaEtiqueta("sin_etiquetas_chat")

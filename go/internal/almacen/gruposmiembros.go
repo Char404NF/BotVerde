@@ -289,7 +289,9 @@ func (a *Almacen) MiembrosDe(botID int64, grupo string, incluirSalidos bool, aho
 			m.Etiquetas = e
 		}
 		m.Nombre = a.nombreDe(botID, grupo, m.JID)
-		if m.Nombre == "Participante" || m.Nombre == "" {
+		if m.Persona == PersonaDueno {
+			m.Nombre = "Tú" // la dueña del bot
+		} else if m.Nombre == "Participante" || m.Nombre == "" {
 			if n := a.NombreDePersona(botID, m.Persona); n != "" {
 				m.Nombre = n
 			}

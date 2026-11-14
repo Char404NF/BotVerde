@@ -108,7 +108,7 @@ fun PantallaInicio(
         val p = personales
         val g = grupos
         if (p == null || g == null) null
-        else (p + g).sortedWith(compareByDescending<ChatItem> { it.fijado }.thenByDescending { it.ultimoTs })
+        else (p + g).distinctBy { it.jid }.sortedWith(compareByDescending<ChatItem> { it.fijado }.thenByDescending { it.ultimoTs })
             .filter { (!soloGrupos || it.esGrupo) && (!soloNoLeidos || (contadores[it.jid] ?: 0) > 0) }
     }
     BackHandler(seleccion.isNotEmpty()) { seleccion = emptySet() }

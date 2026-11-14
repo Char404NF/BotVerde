@@ -208,8 +208,8 @@ private fun PestanaAjustes(botId: Long, jid: String, nombre: String, alAdministr
         TituloSeccion("El bot en este grupo")
         TarjetaPoliticaGrupo(botId, jid, nombre)
         TituloSeccion("Administrar")
-        FilaAjuste(Ico.Ajustes, "Administrar el grupo", "Nombre, descripción, enlace, reglas, solicitudes, filtros y actividad", Modifier.testTag("abrir_grupo"), alAdministrar)
-        FilaAjuste(Ico.Estadisticas, "Resumen, calendario y archivos", "Cuánto se escribe, cuándo, y las fotos y documentos del grupo", Modifier.testTag("abrir_resumen_grupo"), alResumen)
+        Box(Modifier.testTag("tarjeta_administrar_grupo")) { FilaAjuste(Ico.Ajustes, "Administrar el grupo", "Nombre, descripción, enlace, reglas, solicitudes, filtros y actividad", Modifier.testTag("abrir_grupo"), alAdministrar) }
+        Box(Modifier.testTag("tarjeta_resumen_grupo")) { FilaAjuste(Ico.Estadisticas, "Resumen, calendario y archivos", "Cuánto se escribe, cuándo, y las fotos y documentos del grupo", Modifier.testTag("abrir_resumen_grupo"), alResumen) }
         TarjetaMiWhatsApp(botId, jid, nombre)
     }
 }
@@ -222,9 +222,9 @@ internal fun textoCambio(c: CambioMiembro): String {
     return when (c.tipo) {
         "entra" -> "$quien entró"
         "enlace" -> "$quien entró con el enlace"
-        "agregado" -> if (por.isNotBlank()) "$quien fue agregado por $por" else "$quien fue agregado"
+        "agregado" -> if (por == "Yo") "Añadiste a $quien" else if (por.isNotBlank()) "$quien fue agregado por $por" else "$quien fue agregado"
         "sale" -> "$quien salió"
-        "expulsado" -> if (por.isNotBlank()) "$quien fue sacado por $por" else "$quien fue sacado del grupo"
+        "expulsado" -> if (por == "Yo") "Quitaste a $quien" else if (por.isNotBlank()) "$quien fue sacado por $por" else "$quien fue sacado del grupo"
         "promovido" -> "$quien ahora es administrador"
         "degradado" -> "$quien ya no es administrador"
         else -> "$quien: ${c.tipo}"

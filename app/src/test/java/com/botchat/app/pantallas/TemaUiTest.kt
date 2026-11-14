@@ -59,19 +59,19 @@ class TemaUiTest {
 
     @Test fun oscuroTieneLosColoresDelIcono() {
         val e = esquema(ModoTema.OSCURO)
-        assertEquals(Color(0xFF0F1330), e.background); assertEquals(Color(0xFF151A38), e.surface); assertEquals(Color(0xFF1F2547), e.surfaceVariant)
-        assertEquals(Color(0xFF2EC4CB), e.primary); assertEquals(Color(0xFF003739), e.onPrimary)
-        assertEquals(Color(0xFF00494D), e.primaryContainer); assertEquals(Color(0xFFA0F1F5), e.onPrimaryContainer)
+        assertEquals(Color(0xFF0B141A), e.background); assertEquals(Color(0xFF0B141A), e.surface); assertEquals(Color(0xFF1F2C34), e.surfaceVariant)
+        assertEquals(Color(0xFF2EC4CB), e.primary); assertEquals(Color(0xFF00363A), e.onPrimary)
+        assertEquals(Color(0xFF0B3A3D), e.primaryContainer); assertEquals(Color(0xFFBFF4F7), e.onPrimaryContainer)
         assertEquals(Color(0xFFF59E28), e.tertiary); assertEquals(Color(0xFF4A2A00), e.onTertiary); assertEquals(Color(0xFF6A3F00), e.tertiaryContainer)
-        assertEquals(Color(0xFFE3E5F5), e.onSurface); assertEquals(Color(0xFF8A90B5), e.outline)
+        assertEquals(Color(0xFFE9EDEF), e.onSurface); assertEquals(Color(0xFF667781), e.outline)
         assertTrue(e.background.luminance() < 0.1f)
     }
 
     @Test fun claroTieneLosColoresDelIcono() {
         val e = esquema(ModoTema.CLARO)
-        assertEquals(Color(0xFFF6F8FF), e.background); assertEquals(Color(0xFFFBFCFF), e.surface)
-        assertEquals(Color(0xFF00727A), e.primary); assertEquals(Color(0xFFFFFFFF), e.onPrimary); assertEquals(Color(0xFF9EF0F6), e.primaryContainer)
-        assertEquals(Color(0xFF8A5100), e.tertiary); assertEquals(Color(0xFFFFDCBA), e.tertiaryContainer); assertEquals(Color(0xFF151A38), e.onSurface)
+        assertEquals(Color(0xFFFFFFFF), e.background); assertEquals(Color(0xFFFFFFFF), e.surface)
+        assertEquals(Color(0xFF00727A), e.primary); assertEquals(Color(0xFFFFFFFF), e.onPrimary); assertEquals(Color(0xFFD3F3F4), e.primaryContainer)
+        assertEquals(Color(0xFF8A5100), e.tertiary); assertEquals(Color(0xFFFFDCBA), e.tertiaryContainer); assertEquals(Color(0xFF111B21), e.onSurface)
         assertTrue(e.background.luminance() > 0.9f)
     }
 

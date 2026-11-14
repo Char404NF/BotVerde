@@ -73,6 +73,7 @@ class AutomaticosChatUiTest {
         regla.setContent { BotChatTema { PantallaChat(jid, {}, {}, {}, {}, alVerAutomaticos = { abierto = true }) } }
         regla.esperaTexto("hola")
         regla.onNodeWithContentDescription("Más opciones").performClick()
+        regla.esperaEtiqueta("menu_mas"); regla.onNodeWithTag("menu_mas").performClick()
         regla.esperaEtiqueta("menu_ver_automaticos")
         regla.onNodeWithTag("menu_ver_automaticos", useUnmergedTree = true).performClick()
         assertTrue(abierto)

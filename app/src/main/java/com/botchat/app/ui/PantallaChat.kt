@@ -555,6 +555,7 @@ fun PantallaChat(
                     listOf(30 to "30 minutos", 60 to "1 hora", 480 to "8 horas", 1440 to "1 día").forEach { (min, t) ->
                         TextButton({ pausandoBot = false; haptica(Toque.Suave); vm.pausarBot(min) }, Modifier.fillMaxWidth().testTag("pausa_$min")) { Text(t) }
                     }
+                    TextButton({ pausandoBot = false; haptica(Toque.Suave); vm.tomarControl() }, Modifier.fillMaxWidth().testTag("pausa_control")) { Text("Hasta que yo lo active") }
                 }
             },
             confirmButton = {},
@@ -913,7 +914,7 @@ fun FotoGrandeDialogo(botId: Long, chat: String, nombre: String, alCerrar: () ->
             Box(contentAlignment = Alignment.Center) {
                 val img = imagen
                 when {
-                    img != null -> Image(img, "Foto de perfil de $nombre", Modifier.fillMaxWidth().clickable(onClick = alCerrar), contentScale = ContentScale.Fit)
+                    img != null -> Image(img, "Foto de perfil de $nombre", Modifier.fillMaxWidth().aspectRatio(img.width.toFloat() / img.height.toFloat()).clickable(onClick = alCerrar), contentScale = ContentScale.Fit)
                     error != null -> EstadoVacio(Ico.Foto, "Sin foto", error ?: "")
                     else -> CircularProgressIndicator(color = Color.White)
                 }

@@ -45,9 +45,9 @@ internal fun textoSistema(c: com.botchat.app.datos.CambioMiembro): String {
     return when (c.tipo) {
         "entra" -> "$quien se unió al grupo"
         "enlace" -> "$quien se unió con el enlace"
-        "agregado" -> if (por.isNotBlank() && por != quien) "$por añadió a $quien" else "Se añadió a $quien"
+        "agregado" -> if (por == "Yo") "Añadiste a $quien" else if (por.isNotBlank() && por != quien) "$por añadió a $quien" else "Se añadió a $quien"
         "sale" -> "$quien salió"
-        "expulsado" -> if (por.isNotBlank() && por != quien) "$por eliminó a $quien" else "Se eliminó a $quien"
+        "expulsado" -> if (por == "Yo") "Quitaste a $quien" else if (por.isNotBlank() && por != quien) "$por eliminó a $quien" else "Se eliminó a $quien"
         "promovido" -> "$quien ahora es admin"
         "degradado" -> "$quien ya no es admin"
         else -> "$quien: ${c.tipo}"

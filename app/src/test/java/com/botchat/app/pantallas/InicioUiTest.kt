@@ -42,18 +42,18 @@ class InicioUiTest {
         motor.chatsGrupos = Apoyo.arreglo(Apoyo.chatJson("g@g.us", "Familia", tel = "", pais = "", grupo = true, texto = "¿quién viene?"))
         pantalla()
         regla.esperaTexto("María López")
-        regla.onNodeWithText("Personales").assertIsDisplayed()
-        regla.onNodeWithText("Grupos").assertIsDisplayed()
+        regla.onNodeWithTag("filtro_grupos").assertIsDisplayed()
         regla.onNodeWithText("Foto · mira").assertIsDisplayed()
         regla.onNodeWithText("Hola José").assertIsDisplayed()
         regla.onNodeWithText("José Peña").assertIsDisplayed()
-        assertEquals(0, regla.onAllNodesWithTextSafe("Familia"))
-        // Pestaña Grupos
-        regla.onNodeWithText("Grupos").performClick()
-        regla.esperaTexto("Familia")
-        regla.onNodeWithText("¿quién viene?").assertIsDisplayed()
+        regla.onNodeWithText("Familia").assertIsDisplayed() // personas y grupos juntos en una sola lista
+        // Filtro Grupos: solo el grupo
+        regla.onNodeWithTag("filtro_grupos").performClick()
+        regla.esperaTexto("¿quién viene?")
+        regla.waitUntil(5_000) { regla.onAllNodesWithTextSafe("María López") == 0 }
         // Buscador
-        regla.onNodeWithText("Personales").performClick()
+        regla.onNodeWithTag("filtro_todos").performClick()
+        regla.esperaTexto("María López")
         regla.onNode(hasSetTextAction()).performTextInput("jos")
         regla.waitUntil(5_000) { regla.onAllNodesWithTextSafe("María López") == 0 }
         regla.onNodeWithText("José Peña").assertIsDisplayed()
