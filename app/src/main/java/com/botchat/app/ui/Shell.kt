@@ -304,8 +304,8 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         )
                     }
                 }
-                composable("visor/{jid}/{id}", enterTransition = { Transiciones.fundidoEntra(modo) }, exitTransition = { ExitTransition.None },
-                    popExitTransition = { Transiciones.fundidoSale(modo) }) { be ->
+                composable("visor/{jid}/{id}", enterTransition = { Transiciones.visorEntra(modo) }, exitTransition = { ExitTransition.None },
+                    popExitTransition = { Transiciones.visorSale(modo) }) { be ->
                     val jid = be.arguments?.getString("jid") ?: return@composable
                     val id = be.arguments?.getString("id") ?: return@composable
                     PantallaVisor(bot.id, jid, id, nombreDeChat(bot.id, jid), alCerrar = { nav.popBackStack() }, alIrAlMensaje = { m -> nav.navigate("chat/${enc(jid)}?ir=${enc(m)}") })

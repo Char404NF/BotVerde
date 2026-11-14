@@ -31,8 +31,18 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+        pideTasaAlta()
         pideChatDe(intent)
         setContent { BotChatTema { Raiz() } }
+    }
+
+    /** Pide la tasa de refresco más alta de la pantalla (120 Hz si la tiene) para que las animaciones se vean fluidas. */
+    private fun pideTasaAlta() {
+        runCatching {
+            val d = if (android.os.Build.VERSION.SDK_INT >= 30) display else @Suppress("DEPRECATION") windowManager.defaultDisplay
+            val modo = d?.supportedModes?.filter { it.physicalWidth == d.mode.physicalWidth && it.physicalHeight == d.mode.physicalHeight }?.maxByOrNull { it.refreshRate } ?: return
+            window.attributes = window.attributes.apply { preferredDisplayModeId = modo.modeId }
+        }
     }
 
     override fun onNewIntent(intent: android.content.Intent) {

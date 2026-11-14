@@ -2,6 +2,7 @@
 
 package com.botchat.app.ui
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -21,7 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import com.botchat.app.ui.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -413,7 +414,7 @@ private fun OpcionesSueltas(botId: Long, menuId: Long, menus: androidx.compose.r
             Repo.automatizacion(botId, menuId).def.pasos.filter { it.tipo == "menu" }.flatMap { p -> p.opciones.filter { it.id.isNotEmpty() }.map { it.id to it.texto } }
         }.getOrDefault(emptyList())
     }
-    Column(Modifier.padding(start = Esp.xl)) {
+    Column(Modifier.animateContentSize().padding(start = Esp.xl)) {
         TextButton({ abierto = !abierto }, Modifier.testTag("opciones_sueltas_$menuId")) { Text(if (abierto) "Ocultar opciones" else "Elegir solo algunas opciones…", style = MaterialTheme.typography.labelMedium) }
         if (abierto) {
             val lista = opciones

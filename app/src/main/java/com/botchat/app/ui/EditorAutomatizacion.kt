@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import com.botchat.app.ui.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -243,7 +243,7 @@ private fun TarjetaPaso(
                 Text("${i + 1}. ${o.texto} → " + (d.paso(o.destino)?.let { resumenPaso(it).take(28) } ?: "sin destino"), style = MaterialTheme.typography.bodySmall,
                     color = if (d.paso(o.destino) == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (abierto) EditorDePaso(botId, d, p, cambia, borra, agrega, alHacerInicial)
+            androidx.compose.animation.AnimatedVisibility(abierto) { EditorDePaso(botId, d, p, cambia, borra, agrega, alHacerInicial) }
         }
     }
 }

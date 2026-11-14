@@ -7,7 +7,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.activity.compose.BackHandler
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.AlertDialog
+import com.botchat.app.ui.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.BoxScope

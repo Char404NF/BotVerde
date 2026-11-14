@@ -173,7 +173,7 @@ fun DialogoMarcarRapido(botId: Long, chat: String, msgId: String, alCerrar: () -
     val todas by produceState<List<EtiquetaItem>?>(null) { value = runCatching { Repo.etiquetas(botId) }.getOrDefault(emptyList()) }
     val activas = remember { androidx.compose.runtime.mutableStateListOf<Long>() }
     LaunchedEffect(chat, msgId) { runCatching { Repo.marcasDeMensaje(botId, chat, msgId) }.onSuccess { ms -> activas.clear(); activas.addAll(ms.filter { it.etiquetaId > 0 }.map { it.etiquetaId }) } }
-    androidx.compose.material3.AlertDialog(
+    AlertDialog(
         onDismissRequest = alCerrar, title = { Text("Marcar este mensaje") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Esp.s)) {

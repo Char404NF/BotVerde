@@ -2,6 +2,8 @@
 
 package com.botchat.app.ui
 
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -172,12 +174,19 @@ fun Compositor(
                 } else {
                     Spacer(Modifier.weight(1f))
                 }
-                if (mostrarMicrofono) {
+                androidx.compose.animation.AnimatedContent(
+                    targetState = mostrarMicrofono, label = "micro_enviar",
+                    transitionSpec = {
+                        (androidx.compose.animation.scaleIn(tween(200, easing = Transiciones.DESACELERA_ENFATIZADA), 0.6f) + androidx.compose.animation.fadeIn(tween(120))) togetherWith
+                            (androidx.compose.animation.scaleOut(tween(120), 0.6f) + androidx.compose.animation.fadeOut(tween(90)))
+                    },
+                ) { micro ->
+                if (micro) {
                     val iniciar = rememberUpdatedState(alIniciarGrabacion)
                     val terminar = rememberUpdatedState(alTerminarGrabacion)
                     val umbral = with(LocalDensity.current) { 90.dp.toPx() }
                     Box(
-                        Modifier.size(if (grabando) 64.dp else 48.dp).clip(CircleShape).background(if (grabando) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary).testTag("microfono")
+                        Modifier.size(androidx.compose.animation.core.animateDpAsState(if (grabando) 64.dp else 48.dp, tween(Mov.CORTA), label = "tam_micro").value).clip(CircleShape).background(androidx.compose.animation.animateColorAsState(if (grabando) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary, tween(Mov.CORTA), label = "color_micro").value).testTag("microfono")
                             .pointerInput(Unit) {
                                 awaitEachGesture {
                                     val down = awaitFirstDown()
@@ -207,6 +216,7 @@ fun Compositor(
                         },
                         Modifier.size(48.dp).testTag("enviar"), enabled = puedeEnviar,
                     ) { Icon(if (editando != null) Ico.Listo else Ico.Enviar, if (editando != null) "Guardar cambio" else "Enviar") }
+                }
                 }
             }
             if (menuAdjuntar) HojaAdjuntar(alElegir = { f -> menuAdjuntar = false; alAdjuntar(f) }, alCerrar = { menuAdjuntar = false })

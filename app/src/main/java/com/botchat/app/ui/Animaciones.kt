@@ -234,6 +234,13 @@ object Transiciones {
         ModoAnim.NATURAL -> androidx.compose.animation.fadeOut(tween(Mov.CORTA))
     }
 
+    /** El visor de fotos aparece con un fundido y un leve crecimiento (94 % → 100 %); al cerrar se achica y se aclara. */
+    fun visorEntra(modo: ModoAnim): androidx.compose.animation.EnterTransition =
+        if (modo == ModoAnim.NATURAL) fundidoEntra(modo) + androidx.compose.animation.scaleIn(tween(300, easing = DESACELERA), 0.94f) else fundidoEntra(modo)
+
+    fun visorSale(modo: ModoAnim): androidx.compose.animation.ExitTransition =
+        if (modo == ModoAnim.NATURAL) fundidoSale(modo) + androidx.compose.animation.scaleOut(tween(200, easing = ACELERA), 0.94f) else fundidoSale(modo)
+
     /** Duración del fundido esqueleto → contenido del chat: 100 ms, instantáneo con "Ninguna". */
     fun fundidoChat(modo: ModoAnim): androidx.compose.animation.core.FiniteAnimationSpec<Float> =
         if (modo == ModoAnim.NINGUNA) androidx.compose.animation.core.snap() else tween(FUNDIDO_CHAT_MS)

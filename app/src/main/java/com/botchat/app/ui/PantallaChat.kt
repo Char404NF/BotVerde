@@ -2,6 +2,7 @@
 
 package com.botchat.app.ui
 
+import androidx.compose.animation.core.tween
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.zIndex
@@ -44,7 +45,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import com.botchat.app.ui.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -477,7 +478,7 @@ fun PantallaChat(
                             Text(etiquetaDia(diaArriba ?: 0), Modifier.padding(horizontal = 14.dp, vertical = 6.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
                         }
                     }
-                    AnimatedVisibility(lejosDelFinal, Modifier.align(Alignment.BottomEnd).padding(Esp.l), enter = fadeIn(), exit = fadeOut()) {
+                    AnimatedVisibility(lejosDelFinal, Modifier.align(Alignment.BottomEnd).padding(Esp.l), enter = fadeIn(tween(160)) + androidx.compose.animation.scaleIn(tween(220, easing = Transiciones.DESACELERA_ENFATIZADA), 0.7f), exit = fadeOut(tween(100)) + androidx.compose.animation.scaleOut(tween(120), 0.7f)) {
                         SmallFloatingActionButton({ haptica(Toque.Suave); scope.launch { estadoLista.animateScrollToItem(0) } }, Modifier.testTag("bajar_al_final")) { Icon(Ico.Abajo, "Ir al último mensaje") }
                     }
                 }
@@ -607,7 +608,7 @@ private fun Burbuja(
     val m = e.m
     val esquema = MaterialTheme.colorScheme
     val colores = LocalColoresChat.current
-    val fondo = if (resaltar) esquema.tertiaryContainer else if (m.esMio) colores.enviada else colores.recibida
+    val fondo = androidx.compose.animation.animateColorAsState(if (resaltar) esquema.tertiaryContainer else if (m.esMio) colores.enviada else colores.recibida, tween(Mov.LARGA), label = "fondo_burbuja").value
     val tinta = if (resaltar) esquema.onTertiaryContainer else if (m.esMio) colores.textoEnviada else colores.textoRecibida
     val forma = FormaBurbuja(m.esMio, conCola = e.primeroDelGrupo)
     val sangria = 8.dp // espacio de la colita del lado de quien habla
@@ -617,7 +618,7 @@ private fun Burbuja(
     var desplazado by remember { mutableStateOf(0f) }
     val umbral = with(androidx.compose.ui.platform.LocalDensity.current) { 56.dp.toPx() }
     val nav = androidx.compose.animation.core.animateFloatAsState(desplazado, label = "desliza").value
-    Box(modifier.fillMaxWidth().then(if (seleccionado) Modifier.background(colores.seleccion) else Modifier)) {
+    Box(modifier.fillMaxWidth().background(androidx.compose.animation.animateColorAsState(if (seleccionado) colores.seleccion else Color.Transparent, tween(Mov.CORTA), label = "seleccion").value)) {
         if (nav > 8f) Icon(Ico.Responder, null, Modifier.align(Alignment.CenterStart).padding(start = 8.dp).size(22.dp), tint = esquema.primary.copy(alpha = (nav / umbral).coerceIn(0f, 1f)))
         Row(
             Modifier.fillMaxWidth().graphicsLayer { translationX = nav }
@@ -910,7 +911,7 @@ fun FotoGrandeDialogo(botId: Long, chat: String, nombre: String, alCerrar: () ->
         }
     }
     androidx.compose.ui.window.Dialog(alCerrar, androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize().testTag("visor_foto_perfil"), color = Color.Black) {
+        Surface(Modifier.fillMaxSize().apareceDialogo().testTag("visor_foto_perfil"), color = Color.Black) {
             Box(contentAlignment = Alignment.Center) {
                 val img = imagen
                 when {
