@@ -48,8 +48,8 @@ fun Modifier.entradaEscalonada(indice: Int): Modifier = composed {
     val reducir = LocalReducirMovimiento.current
     val animar = remember { !EntradaLista.hecha && !reducir && indice < 12 }
     val avance = remember { Animatable(if (animar) 0f else 1f) }
-    LaunchedEffect(Unit) { if (animar) { delay(indice * 35L); avance.animateTo(1f, tween(Mov.LARGA)) } }
-    if (!animar) this else graphicsLayer { alpha = avance.value; translationY = (1f - avance.value) * 24.dp.toPx() }
+    LaunchedEffect(Unit) { if (animar) { delay(indice * 28L); avance.animateTo(1f, tween(280, easing = Transiciones.DESACELERA_ENFATIZADA)) } }
+    if (!animar) this else graphicsLayer { alpha = avance.value; translationY = (1f - avance.value) * 14.dp.toPx() }
 }
 
 /** Una burbuja nueva se desliza desde abajo y se desvanece hacia adentro. */
@@ -60,8 +60,8 @@ private fun Modifier.apareceDesdeAbajoAnimado(): Modifier = composed {
     val reducir = LocalReducirMovimiento.current
     val animar = remember { activo && !reducir }
     val avance = remember { Animatable(if (animar) 0f else 1f) }
-    LaunchedEffect(Unit) { if (animar) avance.animateTo(1f, tween(Mov.LARGA)) }
-    if (!animar) this else graphicsLayer { alpha = avance.value; translationY = (1f - avance.value) * 32.dp.toPx() }
+    LaunchedEffect(Unit) { if (animar) avance.animateTo(1f, tween(240, easing = Transiciones.DESACELERA_ENFATIZADA)) }
+    if (!animar) this else graphicsLayer { alpha = avance.value; translationY = (1f - avance.value) * 18.dp.toPx() }
 }
 
 /** Aparece con un desvanecido (miniaturas y fotos que cargan: el tamaño no cambia, solo la opacidad). */
@@ -179,6 +179,8 @@ object Transiciones {
 
     /** Curvas "enfatizadas" de Material 3: arrancan rápido y frenan largo, como las transiciones del sistema. */
     private val DESACELERA = androidx.compose.animation.core.CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+    /** La misma curva, para las piezas que entran dentro de una pantalla (filas de la lista, burbujas nuevas). */
+    val DESACELERA_ENFATIZADA get() = DESACELERA
     private val ACELERA = androidx.compose.animation.core.CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
     private const val ENTRA_MS = 350
     private const val SALE_MS = 220
