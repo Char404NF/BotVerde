@@ -371,7 +371,7 @@ func TestGuardarFiltroValidaYSePersiste(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, f := range otro.FiltrosDe(grupoJID) {
-		if f.Filtro == FiltroPalabras && (f.Activo || len(f.Config.Palabras) != 0) {
+		if f.Filtro == FiltroPalabras && (f.Activo || len(f.Config.Palabras) != len(PalabrasDeFabrica)) {
 			t.Fatalf("%+v", f)
 		}
 	}
@@ -413,7 +413,7 @@ func TestComandoFiltros(t *testing.T) {
 		fs[f.Filtro] = f
 	}
 	if !fs["enlaces"].Activo || fs["enlaces"].Accion != AccBorrar || fs["enlaces"].Config.Permitidos[0] != "youtube.com" ||
-		fs["palabras"].Config.Palabras[0] != "mala palabra" || fs["flood"].Config.Max != 8 || fs["flood"].Config.Segundos != 20 {
+		fs["palabras"].Config.Palabras[len(fs["palabras"].Config.Palabras)-1] != "mala palabra" || fs["flood"].Config.Max != 8 || fs["flood"].Config.Segundos != 20 {
 		t.Fatalf("%+v", fs)
 	}
 	if r := e.en(pnAna, "!filtros enlaces quitar youtube.com"); !strings.Contains(r.Texto, "quité") || len(e.s.FiltrosDe(grupoJID)[0].Config.Permitidos) != 0 {

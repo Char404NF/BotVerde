@@ -71,6 +71,9 @@ type ConfigFiltro struct {
 	Segundos     int      `json:"segundos"`     // repetidos y flood: ventana de tiempo
 	SilencioMin  int      `json:"silencioMin"`  // acción silenciar: minutos
 	Aviso        string   `json:"aviso"`        // acción avisar al grupo: texto ("" = el de siempre)
+	Modo         string   `json:"modo"`         // enlaces: "todos" (cualquier enlace, menos los permitidos) o "adultos" (solo adultos, bloqueados y acortadores si se pide)
+	Bloqueados   []string `json:"bloqueados"`   // enlaces: dominios que nunca se permiten (modo adultos)
+	Acortadores  bool     `json:"acortadores"`  // enlaces: bloquear también los acortadores (bit.ly…)
 }
 
 // Filtro es un filtro de un grupo, con sus valores de fábrica si nunca se tocó.
@@ -101,8 +104,12 @@ func nombreFiltro(f string) (nombre, desc string) {
 func filtroDefecto(chat, f string) Filtro {
 	n, d := nombreFiltro(f)
 	x := Filtro{Chat: chat, Filtro: f, Nombre: n, Descripcion: d, Accion: AccAvisarme,
-		Config: ConfigFiltro{ExentoAdmins: true, ExentoRangos: []int64{}, Permitidos: []string{}, Palabras: []string{}, SilencioMin: 60}}
+		Config: ConfigFiltro{ExentoAdmins: true, ExentoRangos: []int64{}, Permitidos: []string{}, Palabras: []string{}, Bloqueados: []string{}, Modo: "todos", SilencioMin: 60}}
 	switch f {
+	case FiltroEnlaces:
+		x.Config.Modo = "todos"
+	case FiltroPalabras:
+		x.Config.Palabras = append([]string{}, PalabrasDeFabrica...)
 	case FiltroRepetidos:
 		x.Config.Max, x.Config.Segundos = 3, 120
 	case FiltroFlood:
@@ -143,6 +150,12 @@ func (s *Servicio) FiltrosDe(chat string) []Filtro {
 		}
 		if f.Config.Palabras == nil {
 			f.Config.Palabras = []string{}
+		}
+		if f.Config.Bloqueados == nil {
+			f.Config.Bloqueados = []string{}
+		}
+		if f.Config.Modo == "" {
+			f.Config.Modo = "todos"
 		}
 		out = append(out, f)
 	}
@@ -198,6 +211,10 @@ func (s *Servicio) GuardarFiltro(actor string, f Filtro) error {
 	}
 	c := f.Config
 	c.Permitidos = limpiaLista(c.Permitidos, 100, 100, normalizaDominio)
+	c.Bloqueados = limpiaLista(c.Bloqueados, 100, 100, normalizaDominio)
+	if c.Modo != "adultos" {
+		c.Modo = "todos"
+	}
 	c.Palabras = limpiaLista(c.Palabras, 300, 80, func(p string) string { return strings.TrimSpace(p) })
 	switch f.Filtro {
 	case FiltroRepetidos:
@@ -392,15 +409,21 @@ func (s *Servicio) Evaluar(e Entrada) *Infraccion {
 		switch f.Filtro {
 		case FiltroEnlaces:
 			for _, d := range DominiosDe(e.Texto) {
-				if !dominioPermitido(d, f.Config.Permitidos) {
+				if dominioPermitido(d, f.Config.Permitidos) {
+					continue
+				}
+				if f.Config.Modo != "adultos" {
+					motivo = "enlace"
+					break
+				}
+				if DominioAdulto(d) || dominioPermitido(d, f.Config.Bloqueados) || (f.Config.Acortadores && DominioAcortador(d)) {
 					motivo = "enlace"
 					break
 				}
 			}
 		case FiltroPalabras:
-			t := quitaAcentos(e.Texto)
 			for _, p := range f.Config.Palabras {
-				if q := quitaAcentos(p); strings.TrimSpace(q) != "" && strings.Contains(t, q) {
+				if ContienePalabra(e.Texto, p) {
 					motivo = "palabra"
 					break
 				}
