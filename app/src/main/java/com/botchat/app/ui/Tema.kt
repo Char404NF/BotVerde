@@ -135,7 +135,7 @@ private val Tipografia = Typography(
     headlineSmall = Base.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
     titleLarge = Base.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.Medium),
     titleMedium = Base.titleMedium.copy(fontSize = 17.sp, fontWeight = FontWeight.Normal),
-    bodyLarge = Base.bodyLarge.copy(fontSize = 17.sp, lineHeight = 24.sp),
+    bodyLarge = Base.bodyLarge.copy(fontSize = 16.sp, lineHeight = 22.sp),
     bodyMedium = Base.bodyMedium.copy(fontSize = 15.sp, lineHeight = 21.sp),
     labelLarge = Base.labelLarge.copy(fontSize = 15.sp),
 )

@@ -283,15 +283,16 @@ fun FilaChat(
         Spacer(Modifier.width(Esp.l))
         Column(Modifier.weight(1f)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    c.nombre, Modifier.weight(1f, fill = false).compartido("nombre-${c.jid}", limites = true),
-                    style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                )
-                if (c.estadoTrabajo.isNotEmpty()) {
-                    Spacer(Modifier.width(6.dp))
-                    MarcaEstadoTrabajo(c.estadoTrabajo, Modifier.testTag("marca_${c.jid}"))
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        c.nombre, Modifier.weight(1f, fill = false).compartido("nombre-${c.jid}", limites = true),
+                        style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                    if (c.estadoTrabajo.isNotEmpty()) {
+                        Spacer(Modifier.width(6.dp))
+                        MarcaEstadoTrabajo(c.estadoTrabajo, Modifier.testTag("marca_${c.jid}"))
+                    }
                 }
-                Spacer(Modifier.weight(1f))
                 Spacer(Modifier.width(Esp.s))
                 Text(
                     horaLista(c.ultimoTs), style = MaterialTheme.typography.labelMedium,

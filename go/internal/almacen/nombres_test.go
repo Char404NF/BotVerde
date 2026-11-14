@@ -144,3 +144,27 @@ func TestMensajesPorIDYEventos(t *testing.T) {
 		t.Fatalf("no se reflejaron: %+v", por)
 	}
 }
+
+// Una mención que viene con el LID de alguien se muestra con el nombre que esa persona tiene por su número (no "Participante").
+func TestMencionPorLIDUsaElNombreDelNumero(t *testing.T) {
+	a := nuevo(t)
+	chat := "120363222@g.us"
+	chatBasico(t, a, chat, "", "Equipo", true)
+	ahora := time.Now().Unix() - 1000
+	hola := msg(chat, "H1", ahora, "hola")
+	hola.RemitenteJID, hola.RemitenteNombre = "5215588@s.whatsapp.net", "Lupe"
+	resp := msg(chat, "H2", ahora+5, "contesto")
+	resp.RemitenteJID, resp.RemitenteNombre = "5215599@s.whatsapp.net", "Zoe"
+	resp.Menciones = []string{"777000111@lid"}
+	if _, err := a.GuardarMensajes([]*Mensaje{hola, resp}); err != nil {
+		t.Fatal(err)
+	}
+	a.AprenderAlias(1, "5215588@s.whatsapp.net", "777000111@lid")
+	vs, err := a.MensajesPorID(1, chat, []string{"H2"})
+	if err != nil || len(vs) != 1 || len(vs[0].Menciones) != 1 {
+		t.Fatal(err, vs)
+	}
+	if vs[0].Menciones[0].Nombre != "Lupe" {
+		t.Fatalf("la mención debía llamarse Lupe y salió %q", vs[0].Menciones[0].Nombre)
+	}
+}

@@ -154,6 +154,9 @@ func (a *Almacen) resolverNombres(ms []*Mensaje) *nombresPagina {
 			if n := vistos[j]; n != "" {
 				return n
 			}
+			if n := a.nombrePorAlias(g.bot, g.chat, j); n != "" {
+				return n
+			}
 			return "Participante"
 		}
 		for _, j := range faltaMsg {
@@ -226,4 +229,34 @@ func (a *Almacen) nombresDeMensajes(bot int64, chat string, jids []string) map[s
 		filas.Close()
 	}
 	return out
+}
+
+// nombrePorAlias busca el nombre de una persona por las otras formas de su identificador (número y LID): a veces la mención
+// viene con una forma y sus mensajes con la otra. Si la persona es la dueña del bot se llama "Tú".
+func (a *Almacen) nombrePorAlias(bot int64, chat, j string) string {
+	if a.ResolverPersona(bot, j) == PersonaDueno {
+		return "Tú"
+	}
+	var otros []string
+	for _, x := range a.AliasDe(bot, j) {
+		if x != j {
+			otros = append(otros, x)
+		}
+	}
+	if len(otros) == 0 {
+		return ""
+	}
+	contactos := a.nombresDeContactos(bot, otros)
+	for _, x := range otros {
+		if v := contactos[x]; v != "" {
+			return v
+		}
+	}
+	vistos := a.nombresDeMensajes(bot, chat, otros)
+	for _, x := range otros {
+		if v := vistos[x]; v != "" {
+			return v
+		}
+	}
+	return ""
 }
