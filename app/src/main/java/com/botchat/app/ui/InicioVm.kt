@@ -84,6 +84,40 @@ class InicioVm(app: Application) : AndroidViewModel(app) {
         _contadores.value = nuevo
     }
 
+    /** Marca como leídos todos los chats que se ven ahora. */
+    fun marcarTodosLeidos() {
+        val todos = (_personales.value.orEmpty() + _grupos.value.orEmpty())
+        todos.forEach { ajustes.marcarVisto(it.jid, it.ultimoTs) }
+        _contadores.value = emptyMap()
+    }
+
+    /** Marca un chat como leído sin abrirlo. */
+    fun marcarLeido(jids: Collection<String>) {
+        val todos = (_personales.value.orEmpty() + _grupos.value.orEmpty()).filter { it.jid in jids }
+        todos.forEach { ajustes.marcarVisto(it.jid, it.ultimoTs) }
+        _contadores.value = _contadores.value - jids.toSet()
+    }
+
+    /** Fija o desfija varios chats a la vez (solo en esta app). */
+    fun fijar(jids: Collection<String>, si: Boolean) {
+        viewModelScope.launch { jids.forEach { runCatching { Repo.fijarChat(botId, it, si) } }; recargar() }
+    }
+
+    /** Silencia o quita el silencio de las notificaciones de varios chats. */
+    fun silenciar(jids: Collection<String>, si: Boolean) {
+        viewModelScope.launch { jids.forEach { runCatching { Repo.silenciar(botId, it, si) } } }
+    }
+
+    /** El bot no contesta en estos chats durante [minutos] (0 = lo reanuda). */
+    fun pausarBot(jids: Collection<String>, minutos: Int) {
+        viewModelScope.launch { jids.forEach { runCatching { Repo.pausarBotEnChat(botId, it, minutos) } } }
+    }
+
+    /** Vacía los mensajes de varios chats. */
+    fun vaciar(jids: Collection<String>) {
+        viewModelScope.launch { jids.forEach { runCatching { Repo.vaciarChat(botId, it) } }; recargar() }
+    }
+
     private fun recargar() {
         trabajo?.cancel()
         trabajo = viewModelScope.launch { cargar() }

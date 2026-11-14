@@ -127,7 +127,7 @@ fun inicial(nombre: String): String {
 
 /** Foto de perfil redonda; si no hay, un círculo con la inicial y un color estable por persona. */
 @Composable
-fun Avatar(nombre: String, foto: String, fotoTs: Long, clave: String, tam: Dp, modifier: Modifier = Modifier) {
+fun Avatar(nombre: String, foto: String, fotoTs: Long, clave: String, tam: Dp, modifier: Modifier = Modifier, grupo: Boolean = false) {
     val ctx = LocalContext.current
     val px = with(LocalDensity.current) { tam.roundToPx() * 2 }
     var imagen by remember(foto, fotoTs) { mutableStateOf<ImageBitmap?>(null) }
@@ -140,7 +140,8 @@ fun Avatar(nombre: String, foto: String, fotoTs: Long, clave: String, tam: Dp, m
         if (img != null) {
             Image(img, null, Modifier.size(tam), contentScale = ContentScale.Crop)
         } else {
-            Text(inicial(nombre), color = Color.White, fontSize = (tam.value * 0.42f).sp, fontWeight = FontWeight.SemiBold)
+            if (grupo) Icon(Ico.Grupo, null, Modifier.size(tam * 0.55f), tint = Color.White)
+            else Text(inicial(nombre), color = Color.White, fontSize = (tam.value * 0.42f).sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

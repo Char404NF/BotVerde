@@ -14,6 +14,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -76,7 +78,7 @@ private fun esGrupoDeChat(botId: Long, jid: String): Boolean {
     return grupo
 }
 
-private val RUTAS_PRINCIPALES = listOf("inicio", "personas", "grupos", "bot")
+private val RUTAS_PRINCIPALES = listOf("inicio", "grupos", "bot", "ajustes")
 
 private data class Destino(val ruta: String, val titulo: String, val icono: androidx.compose.ui.graphics.vector.ImageVector)
 
@@ -108,7 +110,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
     val principal = rutaActual in RUTAS_PRINCIPALES
     val estado by BotState.estado.collectAsState()
     val corriendo by BotState.corriendo.collectAsState()
-    val destinos = remember { listOf(Destino("inicio", "Chats", Ico.Chats), Destino("personas", "Personas", Ico.Persona), Destino("grupos", "Grupos", Ico.Grupo), Destino("bot", "Bot", Ico.Bot)) }
+    val destinos = remember { listOf(Destino("inicio", "Chats", Ico.Chats), Destino("grupos", "Grupos", Ico.Grupo), Destino("bot", "Bot", Ico.Bot), Destino("ajustes", "Tú", Ico.Persona)) }
     // Modo Simple / Completo: solo cambia lo que se muestra. Quien actualizó y tiene módulos encendidos pasa a Completo (se mira una sola vez).
     val completo by ajustes.modoCompleto.collectAsState()
     val avisoModo by ajustes.avisoModoPendiente.collectAsState()
@@ -165,8 +167,12 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
     Scaffold(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         topBar = {
-            AnimatedVisibility(principal, enter = Transiciones.fundidoEntra(modo), exit = Transiciones.fundidoSale(modo)) {
-                BarraApp(estadoVisible(estado, corriendo, !bot.vinculado)) { nav.navigate("estado_bot") }
+            // La lista de chats dibuja su propia barra (menú, selección); las demás pestañas usan esta con su título.
+            AnimatedVisibility(principal && rutaActual != "inicio", enter = Transiciones.fundidoEntra(modo), exit = Transiciones.fundidoSale(modo)) {
+                BarraApp(
+                    estadoVisible(estado, corriendo, !bot.vinculado), { nav.navigate("estado_bot") },
+                    when (rutaActual) { "grupos" -> "Grupos"; "bot" -> "Bot"; else -> "Ajustes" },
+                )
             }
         },
         bottomBar = {
@@ -191,10 +197,21 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                             sinSesion = !bot.vinculado,
                             alAbrirChat = { nav.navigate("chat/${enc(it)}") },
                             alRevincular = { vm.revincular() },
+                            estado = estadoVisible(estado, corriendo, !bot.vinculado),
+                            alPulsarEstado = { nav.navigate("estado_bot") },
+                            alNuevoChat = { nav.navigate("contactos") },
+                            alMarcados = { nav.navigate("marcados") },
+                            alAjustes = { irA("ajustes") },
                         )
                     }
                 }
                 composable("personas") { PantallaPersonas(bot.id, alAbrir = { nav.navigate("persona_perfil/${enc(it)}") }) }
+                // Botón flotante de la lista: elegir con quién hablar (tocar a alguien abre su chat).
+                composable("contactos") {
+                    MarcoPantalla("Seleccionar contacto", { nav.popBackStack() }) {
+                        PantallaPersonas(bot.id, alAbrir = { nav.navigate("chat/${enc(it)}") { popUpTo("contactos") { inclusive = true } } })
+                    }
+                }
                 composable("grupos") { PantallaGrupos(bot.id, alAbrir = { nav.navigate("grupo_info/${enc(it)}") }) }
                 composable("bot") {
                     PantallaCentroBot(
@@ -358,7 +375,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         cuenta = runCatching { Repo.contarSolicitudes(bot.id) }.getOrDefault(0)
                         Repo.cambios.collect { evs -> if ("solicitudes" in evs) cuenta = runCatching { Repo.contarSolicitudes(bot.id) }.getOrDefault(0) }
                     }
-                    MarcoPantalla("Ajustes", { nav.popBackStack() }) {
+                    Box(Modifier.fillMaxSize()) {
                     PantallaAjustes(ajustes, alPermisos = { nav.navigate("permisos") }, pendientesSolicitudes = cuenta, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("estado_bot") }, alAvanzado = { nav.navigate("avanzado") }, alEstadisticas = { nav.navigate("estadisticas") }, alPrivacidad = { nav.navigate("privacidad") }, alAutomatizaciones = { nav.navigate("automatizaciones") }, alModulos = { nav.navigate("modulos") }, alIniciativa = { nav.navigate("iniciativa") },
                         alAvisos = { nav.navigate("avisos") }, alComandosPropios = { nav.navigate("comandos_propios") }, alEtiquetas = { nav.navigate("etiquetas") }, alAdvertencias = { nav.navigate("advertencias") }, alUtilidades = { nav.navigate("utilidades") })
                     }

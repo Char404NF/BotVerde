@@ -251,4 +251,23 @@ object Ico {
         trazo { moveTo(9f, 3.5f); lineTo(15f, 3.5f); lineTo(14f, 9f); lineTo(17f, 12.5f); lineTo(7f, 12.5f); lineTo(10f, 9f); close() }
         trazo { moveTo(12f, 12.5f); lineTo(12f, 20.5f) }
     }
+
+    /** Campana: avisos activos. */
+    val Campana = icono("campana") {
+        trazo { moveTo(6f, 17f); lineTo(18f, 17f); lineTo(16.5f, 15f); lineTo(16.5f, 10.5f); curveTo(16.5f, 7.8f, 14.6f, 6f, 12f, 6f); curveTo(9.4f, 6f, 7.5f, 7.8f, 7.5f, 10.5f); lineTo(7.5f, 15f); close() }
+        trazo { moveTo(10.2f, 19.5f); curveTo(10.6f, 20.4f, 11.2f, 20.8f, 12f, 20.8f); curveTo(12.8f, 20.8f, 13.4f, 20.4f, 13.8f, 19.5f) }
+    }
+
+    /** Campana tachada: chat silenciado. */
+    val CampanaTachada = icono("campana_tachada") {
+        trazo { moveTo(6f, 17f); lineTo(18f, 17f); lineTo(16.5f, 15f); lineTo(16.5f, 10.5f); curveTo(16.5f, 7.8f, 14.6f, 6f, 12f, 6f); curveTo(9.4f, 6f, 7.5f, 7.8f, 7.5f, 10.5f); lineTo(7.5f, 15f); close() }
+        trazo { moveTo(10.2f, 19.5f); curveTo(10.6f, 20.4f, 11.2f, 20.8f, 12f, 20.8f); curveTo(12.8f, 20.8f, 13.4f, 20.4f, 13.8f, 19.5f) }
+        trazo(2.2f) { moveTo(4f, 4f); lineTo(20f, 20f) }
+    }
+
+    /** Globo con un más: nuevo chat. */
+    val NuevoChat = icono("nuevo_chat") {
+        trazo { moveTo(5f, 4f); lineTo(19f, 4f); curveTo(20.1f, 4f, 21f, 4.9f, 21f, 6f); lineTo(21f, 14f); curveTo(21f, 15.1f, 20.1f, 16f, 19f, 16f); lineTo(11f, 16f); lineTo(6f, 20.5f); lineTo(6f, 16f); lineTo(5f, 16f); curveTo(3.9f, 16f, 3f, 15.1f, 3f, 14f); lineTo(3f, 6f); curveTo(3f, 4.9f, 3.9f, 4f, 5f, 4f); close() }
+        trazo { moveTo(12f, 7.5f); lineTo(12f, 12.5f); moveTo(9.5f, 10f); lineTo(14.5f, 10f) }
+    }
 }

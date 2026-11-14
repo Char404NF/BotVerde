@@ -10,6 +10,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
@@ -85,19 +86,39 @@ fun IndicadorEstado(e: EstadoVisible, modifier: Modifier = Modifier, alPulsar: (
     }
 }
 
-/** Barra superior de las pantallas principales: logo pequeño, nombre y estado del bot. */
+/** Barra superior de las pantallas principales: título grande a la izquierda y las acciones (como el menú de tres puntos) a la derecha. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BarraApp(estado: EstadoVisible, alPulsarEstado: () -> Unit) {
-    TopAppBar(
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                LogoBot(Modifier.size(32.dp))
-                Spacer(Modifier.width(10.dp))
-                Text("Bot Chat", style = MaterialTheme.typography.titleLarge)
-            }
-        },
-        actions = { IndicadorEstado(estado, Modifier.padding(end = 8.dp), alPulsarEstado) },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-    )
+fun BarraApp(
+    estado: EstadoVisible, alPulsarEstado: () -> Unit, titulo: String = "BotChat",
+    acciones: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
+) {
+    androidx.compose.foundation.layout.Column {
+        TopAppBar(
+            title = { Text(titulo, style = MaterialTheme.typography.titleLarge, fontWeight = if (titulo == "BotChat") androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Medium) },
+            actions = acciones,
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+            modifier = Modifier.testTag("barra_app"),
+        )
+        AvisoDeEstado(estado, alPulsarEstado)
+    }
+}
+
+/** Cinta discreta bajo la barra: solo aparece cuando algo no está bien (el bot no está conectado). */
+@Composable
+fun AvisoDeEstado(estado: EstadoVisible, alPulsar: () -> Unit) {
+    if (estado == EstadoVisible.CONECTADO) return
+    val (texto, color) = when (estado) {
+        EstadoVisible.RECONECTANDO -> "Reconectando con WhatsApp…" to LocalColoresApp.current.reconectando
+        EstadoVisible.DESVINCULADO -> "WhatsApp cerró la sesión. Toca para ver qué hacer" to MaterialTheme.colorScheme.error
+        else -> "El bot está detenido. Toca para encenderlo" to MaterialTheme.colorScheme.outline
+    }
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = alPulsar).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(horizontal = 16.dp, vertical = 10.dp).testTag("aviso_estado"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(10.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(10.dp))
+        Text(texto, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+    }
 }

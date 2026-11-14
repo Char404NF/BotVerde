@@ -66,31 +66,53 @@ val Turquesa = Color(0xFF2EC4CB)
 val Ambar = Color(0xFFF59E28)
 val FondoIcono = Color(0xFF151A38)
 
+// Paleta del rediseño: fondos y superficies como una app de mensajería moderna (casi negro azulado, gris verdoso en claro) con el turquesa propio de BotChat en botones y acentos.
 private val Oscuro = darkColorScheme(
-    primary = Color(0xFF2EC4CB), onPrimary = Color(0xFF003739), primaryContainer = Color(0xFF00494D), onPrimaryContainer = Color(0xFFA0F1F5),
-    secondary = Color(0xFF9FB3D9), onSecondary = Color(0xFF112447), secondaryContainer = Color(0xFF2A3560), onSecondaryContainer = Color(0xFFD8E0FF),
+    primary = Color(0xFF2EC4CB), onPrimary = Color(0xFF00363A), primaryContainer = Color(0xFF0B3A3D), onPrimaryContainer = Color(0xFFBFF4F7),
+    secondary = Color(0xFF8696A0), onSecondary = Color(0xFF0B141A), secondaryContainer = Color(0xFF1F2C34), onSecondaryContainer = Color(0xFFE9EDEF),
     tertiary = Color(0xFFF59E28), onTertiary = Color(0xFF4A2A00), tertiaryContainer = Color(0xFF6A3F00), onTertiaryContainer = Color(0xFFFFDCBA),
     error = Color(0xFFFFB4AB), onError = Color(0xFF690005), errorContainer = Color(0xFF93000A), onErrorContainer = Color(0xFFFFDAD6),
-    background = Color(0xFF0F1330), onBackground = Color(0xFFE3E5F5), surface = Color(0xFF151A38), onSurface = Color(0xFFE3E5F5),
-    surfaceVariant = Color(0xFF1F2547), onSurfaceVariant = Color(0xFFB8BDE0), outline = Color(0xFF8A90B5), outlineVariant = Color(0xFF353C66),
-    surfaceContainerLowest = Color(0xFF0B0F28), surfaceContainerLow = Color(0xFF121734), surfaceContainer = Color(0xFF151A38),
-    surfaceContainerHigh = Color(0xFF1F2547), surfaceContainerHighest = Color(0xFF2A3157),
-    inverseSurface = Color(0xFFE3E5F5), inverseOnSurface = Color(0xFF151A38), inversePrimary = Color(0xFF00727A),
+    background = Color(0xFF0B141A), onBackground = Color(0xFFE9EDEF), surface = Color(0xFF0B141A), onSurface = Color(0xFFE9EDEF),
+    surfaceVariant = Color(0xFF1F2C34), onSurfaceVariant = Color(0xFF8696A0), outline = Color(0xFF667781), outlineVariant = Color(0xFF222E35),
+    surfaceContainerLowest = Color(0xFF081015), surfaceContainerLow = Color(0xFF0F1A20), surfaceContainer = Color(0xFF111B21),
+    surfaceContainerHigh = Color(0xFF1F2C34), surfaceContainerHighest = Color(0xFF2A3942),
+    inverseSurface = Color(0xFFE9EDEF), inverseOnSurface = Color(0xFF111B21), inversePrimary = Color(0xFF00727A),
     scrim = Color(0xFF000000), surfaceTint = Color(0xFF2EC4CB),
 )
 
 private val Claro = lightColorScheme(
-    primary = Color(0xFF00727A), onPrimary = Color(0xFFFFFFFF), primaryContainer = Color(0xFF9EF0F6), onPrimaryContainer = Color(0xFF002022),
-    secondary = Color(0xFF4A5A8A), onSecondary = Color(0xFFFFFFFF), secondaryContainer = Color(0xFFDCE2FF), onSecondaryContainer = Color(0xFF0E1B44),
+    primary = Color(0xFF00727A), onPrimary = Color(0xFFFFFFFF), primaryContainer = Color(0xFFD3F3F4), onPrimaryContainer = Color(0xFF002022),
+    secondary = Color(0xFF667781), onSecondary = Color(0xFFFFFFFF), secondaryContainer = Color(0xFFE9EDEF), onSecondaryContainer = Color(0xFF111B21),
     tertiary = Color(0xFF8A5100), onTertiary = Color(0xFFFFFFFF), tertiaryContainer = Color(0xFFFFDCBA), onTertiaryContainer = Color(0xFF2C1700),
     error = Color(0xFFBA1A1A), onError = Color(0xFFFFFFFF), errorContainer = Color(0xFFFFDAD6), onErrorContainer = Color(0xFF410002),
-    background = Color(0xFFF6F8FF), onBackground = Color(0xFF151A38), surface = Color(0xFFFBFCFF), onSurface = Color(0xFF151A38),
-    surfaceVariant = Color(0xFFE3E7F7), onSurfaceVariant = Color(0xFF454B6E), outline = Color(0xFF757B9F), outlineVariant = Color(0xFFC5CAE3),
-    surfaceContainerLowest = Color(0xFFFFFFFF), surfaceContainerLow = Color(0xFFF1F4FD), surfaceContainer = Color(0xFFEBEFFA),
-    surfaceContainerHigh = Color(0xFFE5E9F5), surfaceContainerHighest = Color(0xFFDFE3F0),
-    inverseSurface = Color(0xFF2B3050), inverseOnSurface = Color(0xFFEDF0FF), inversePrimary = Color(0xFF2EC4CB),
+    background = Color(0xFFFFFFFF), onBackground = Color(0xFF111B21), surface = Color(0xFFFFFFFF), onSurface = Color(0xFF111B21),
+    surfaceVariant = Color(0xFFF0F2F5), onSurfaceVariant = Color(0xFF667781), outline = Color(0xFF8696A0), outlineVariant = Color(0xFFE9EDEF),
+    surfaceContainerLowest = Color(0xFFFFFFFF), surfaceContainerLow = Color(0xFFF7F8FA), surfaceContainer = Color(0xFFF0F2F5),
+    surfaceContainerHigh = Color(0xFFE9EDEF), surfaceContainerHighest = Color(0xFFDDE2E5),
+    inverseSurface = Color(0xFF233138), inverseOnSurface = Color(0xFFF0F2F5), inversePrimary = Color(0xFF2EC4CB),
     scrim = Color(0xFF000000), surfaceTint = Color(0xFF00727A),
 )
+
+/** Colores del chat (burbujas, fondo, palomitas, cápsulas de fecha y de sistema): no existen en Material 3. */
+@androidx.compose.runtime.Immutable
+data class ColoresChat(
+    val fondo: Color, val enviada: Color, val recibida: Color, val textoEnviada: Color, val textoRecibida: Color,
+    val horaEnviada: Color, val horaRecibida: Color, val palomita: Color, val palomitaLeida: Color, val capsula: Color, val textoCapsula: Color,
+    val seleccion: Color,
+)
+
+private val ChatOscuro = ColoresChat(
+    fondo = Color(0xFF0B141A), enviada = Color(0xFF005C4B), recibida = Color(0xFF1F2C34), textoEnviada = Color(0xFFE9EDEF), textoRecibida = Color(0xFFE9EDEF),
+    horaEnviada = Color(0xFF99BEB7), horaRecibida = Color(0xFF8696A0), palomita = Color(0xFF99BEB7), palomitaLeida = Color(0xFF53BDEB),
+    capsula = Color(0xFF182229), textoCapsula = Color(0xFF8696A0), seleccion = Color(0x3300A884),
+)
+private val ChatClaro = ColoresChat(
+    fondo = Color(0xFFEFEAE2), enviada = Color(0xFFD9FDD3), recibida = Color(0xFFFFFFFF), textoEnviada = Color(0xFF111B21), textoRecibida = Color(0xFF111B21),
+    horaEnviada = Color(0xFF667781), horaRecibida = Color(0xFF667781), palomita = Color(0xFF667781), palomitaLeida = Color(0xFF53BDEB),
+    capsula = Color(0xFFFFFFFF), textoCapsula = Color(0xFF54656F), seleccion = Color(0x3300A884),
+)
+
+val LocalColoresChat = compositionLocalOf { ChatOscuro }
 
 /** Colores que no existen en Material 3 pero la app necesita: "conectado" (turquesa) y "reconectando" (ámbar). */
 @androidx.compose.runtime.Immutable
@@ -111,8 +133,8 @@ private val Tipografia = Typography(
     displaySmall = Base.displaySmall.copy(fontWeight = FontWeight.SemiBold),
     headlineMedium = Base.headlineMedium.copy(fontWeight = FontWeight.SemiBold),
     headlineSmall = Base.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
-    titleLarge = Base.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-    titleMedium = Base.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+    titleLarge = Base.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.Medium),
+    titleMedium = Base.titleMedium.copy(fontSize = 17.sp, fontWeight = FontWeight.Normal),
     bodyLarge = Base.bodyLarge.copy(fontSize = 17.sp, lineHeight = 24.sp),
     bodyMedium = Base.bodyMedium.copy(fontSize = 15.sp, lineHeight = 21.sp),
     labelLarge = Base.labelLarge.copy(fontSize = 15.sp),
@@ -153,7 +175,7 @@ fun BotChatTema(contenido: @Composable () -> Unit) {
     val oscuro = esquema.background.luminance() < 0.5f
     val extra = if (oscuro) ColoresApp(Turquesa, Ambar, Color(0xFF4A2A00), Color(0xFF6A3F00)) else ColoresApp(Color(0xFF00727A), Color(0xFF8A5100), Color.White, Color(0xFFFFDCBA))
     val modoAnim = if (reducirSistema) ModoAnim.NINGUNA else modoAjuste
-    CompositionLocalProvider(LocalReducirMovimiento provides (modoAnim != ModoAnim.NATURAL), LocalModoAnim provides modoAnim, LocalColoresApp provides extra) {
+    CompositionLocalProvider(LocalReducirMovimiento provides (modoAnim != ModoAnim.NATURAL), LocalModoAnim provides modoAnim, LocalColoresApp provides extra, LocalColoresChat provides (if (oscuro) ChatOscuro else ChatClaro)) {
         MaterialTheme(colorScheme = esquema, typography = Tipografia, shapes = Formas, content = contenido)
     }
 }
