@@ -425,7 +425,12 @@ fun PantallaChat(
             val fase = when { msgs == null -> 0; msgs.isEmpty() -> 1; else -> 2 }
             androidx.compose.animation.Crossfade(fase, Modifier.fillMaxSize(), animationSpec = Transiciones.fundidoChat(LocalModoAnim.current), label = "chat_contenido") { f ->
             when (f) {
-                0 -> CargaDeMensajes()
+                0 -> {
+                    // El esqueleto solo se muestra si la carga tarda más de 300 ms: si llega antes, no hay destello de cajas grises.
+                    var ver by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) { kotlinx.coroutines.delay(300); ver = true }
+                    if (ver) CargaDeMensajes()
+                }
                 1 -> Box(Modifier.fillMaxSize()) { EstadoVacio(Ico.Documento, "Sin mensajes", "Todavía no hay mensajes en este chat.", Modifier.align(Alignment.Center)) }
                 else -> Box(Modifier.fillMaxSize()) {
                     // Posición inicial (primer mensaje sin leer): la lista se coloca antes de dejarse ver, así no hay desplazamiento visible.
@@ -439,8 +444,14 @@ fun PantallaChat(
                                 if (idx >= 0) estadoLista.scrollToItem(idx)
                             }
                         }
-                        colocada = true
+                        // Hasta que llega la lectura de la base la lista no se deja ver (así no se ve el salto al primer mensaje sin leer).
+                        if (vm.primeraCargaLista) colocada = true
                     }
+                    LaunchedEffect(Unit) { kotlinx.coroutines.delay(350); colocada = true }
+                    // Mientras el chat termina de armarse (separadores, tarjetas) los mensajes no se acomodan con animación:
+                    // las animaciones de colocación y de entrada solo valen para lo que cambia con el chat ya abierto.
+                    var animarCambios by remember(jid) { mutableStateOf(false) }
+                    LaunchedEffect(colocada) { if (colocada) { kotlinx.coroutines.delay(800); animarCambios = true } }
                     LazyColumn(
                         Modifier.fillMaxSize().alpha(if (colocada) 1f else 0f).testTag("lista_chat"), state = estadoLista, reverseLayout = true,
                         contentPadding = PaddingValues(horizontal = Esp.m, vertical = Esp.s), verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -451,14 +462,14 @@ fun PantallaChat(
                             contentType = { e -> when (e) { is Elem.Dia -> "dia"; is Elem.SinLeer -> "sinleer"; is Elem.Burbuja -> "b-${e.m.categoria}"; is Elem.Sistema -> "sistema"; is Elem.InicioGrupo -> "inicio" } },
                         ) { e ->
                             // Sin desvanecido al entrar: las burbujas que ya estaban no se animan (solo lo que se mueve de lugar).
-                            val anima = Modifier.animateItem(fadeInSpec = null)
+                            val anima = if (animarCambios) Modifier.animateItem(fadeInSpec = null) else Modifier
                             when (e) {
                                 is Elem.Dia -> SeparadorDia(e.ts, anima)
                                 is Elem.SinLeer -> SeparadorSinLeer(e.cuantos, anima)
                                 is Elem.Sistema -> CapsulaSistema(e.texto, anima)
                                 is Elem.InicioGrupo -> TarjetaInicioGrupo(e.texto, alAbrirInfo, anima)
                                 is Elem.Burbuja -> Burbuja(
-                                    e, vm, alAbrirVisor, alAbrirDocumento, anima.apareceDesdeAbajo(vm.esNueva(e.m.id)), alAbrirUnaVez,
+                                    e, vm, alAbrirVisor, alAbrirDocumento, anima.apareceDesdeAbajo(animarCambios && vm.esNueva(e.m.id)), alAbrirUnaVez,
                                     resaltar = resaltado == e.m.id, seleccionado = e.m.id in seleccion, enSeleccion = seleccion.isNotEmpty(),
                                     alAlternar = { seleccion = if (e.m.id in seleccion) seleccion - e.m.id else seleccion + e.m.id },
                                     alResponder = { if (escribirActivo) vm.citando = e.m },

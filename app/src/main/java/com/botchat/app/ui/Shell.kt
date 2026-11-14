@@ -172,7 +172,8 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         topBar = {
             // La lista de chats dibuja su propia barra (menú, selección); las demás pestañas usan esta con su título.
-            AnimatedVisibility(principal && rutaActual != "inicio", enter = Transiciones.fundidoEntra(modo), exit = Transiciones.fundidoSale(modo)) {
+            // Las barras se quitan al instante (sin fundido de salida): si se desvanecieran, el chat ganaría su alto al final y los mensajes se correrían de golpe.
+            AnimatedVisibility(principal && rutaActual != "inicio", enter = Transiciones.fundidoEntra(modo), exit = ExitTransition.None) {
                 BarraApp(
                     estadoVisible(estado, corriendo, !bot.vinculado), { nav.navigate("estado_bot") },
                     when (rutaActual) { "grupos" -> "Grupos"; "bot" -> "Bot"; else -> "Ajustes" },
@@ -180,7 +181,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
             }
         },
         bottomBar = {
-            AnimatedVisibility(principal, enter = Transiciones.fundidoEntra(modo), exit = Transiciones.fundidoSale(modo)) {
+            AnimatedVisibility(principal, enter = Transiciones.fundidoEntra(modo), exit = ExitTransition.None) {
                 NavigationBar {
                     destinos.forEach { d ->
                         NavigationBarItem(
