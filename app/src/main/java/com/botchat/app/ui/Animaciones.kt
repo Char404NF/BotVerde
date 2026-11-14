@@ -175,50 +175,50 @@ object Transiciones {
     const val DESLIZAR_MS = 280
     const val FUNDIDO_CORTO_MS = 100
     /** Fundido del esqueleto al contenido cuando se abre un chat. */
-    const val FUNDIDO_CHAT_MS = 100
+    const val FUNDIDO_CHAT_MS = 180
 
     /** Curvas "enfatizadas" de Material 3: arrancan rápido y frenan largo, como las transiciones del sistema. */
     private val DESACELERA = androidx.compose.animation.core.CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
     /** La misma curva, para las piezas que entran dentro de una pantalla (filas de la lista, burbujas nuevas). */
     val DESACELERA_ENFATIZADA get() = DESACELERA
     private val ACELERA = androidx.compose.animation.core.CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
-    private const val ENTRA_MS = 350
-    private const val SALE_MS = 220
+    private const val ENTRA_MS = 420
+    private const val SALE_MS = 260
 
-    // La pantalla nueva entra desde la derecha un cuarto del ancho y se aclara; la de abajo se corre un poco sin desvanecerse.
+    // "Fundido con escala" (el de Android reciente): la pantalla vieja se desvanece rápido y la nueva se aclara mientras crece de 92 % a 100 %.
+    // Nada se desliza de lado.
+    private val APARECE = androidx.compose.animation.core.LinearOutSlowInEasing
+    private val DESAPARECE = androidx.compose.animation.core.FastOutLinearInEasing
+
     fun entra(modo: ModoAnim, entreTabs: Boolean): androidx.compose.animation.EnterTransition = when (modo) {
         ModoAnim.NINGUNA -> androidx.compose.animation.EnterTransition.None
         ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeIn(tween(FUNDIDO_CORTO_MS))
         ModoAnim.NATURAL ->
-            if (entreTabs) androidx.compose.animation.fadeIn(tween(210, 90, androidx.compose.animation.core.LinearOutSlowInEasing))
-            else androidx.compose.animation.slideInHorizontally(tween(ENTRA_MS, easing = DESACELERA)) { it / 4 } +
-                androidx.compose.animation.fadeIn(tween(160, easing = androidx.compose.animation.core.LinearOutSlowInEasing))
+            if (entreTabs) androidx.compose.animation.fadeIn(tween(210, 90, APARECE))
+            else androidx.compose.animation.fadeIn(tween(260, 80, APARECE)) + androidx.compose.animation.scaleIn(tween(ENTRA_MS, easing = DESACELERA), 0.92f)
     }
 
     fun sale(modo: ModoAnim, entreTabs: Boolean): androidx.compose.animation.ExitTransition = when (modo) {
         ModoAnim.NINGUNA -> androidx.compose.animation.ExitTransition.None
         ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeOut(tween(FUNDIDO_CORTO_MS))
-        ModoAnim.NATURAL ->
-            if (entreTabs) androidx.compose.animation.fadeOut(tween(90, easing = androidx.compose.animation.core.FastOutLinearInEasing))
-            else androidx.compose.animation.slideOutHorizontally(tween(ENTRA_MS, easing = DESACELERA)) { -it / 8 }
+        ModoAnim.NATURAL -> androidx.compose.animation.fadeOut(tween(if (entreTabs) 90 else 110, easing = DESAPARECE))
     }
 
-    // Al volver, la que estaba abajo regresa a su sitio y la de encima se va hacia la derecha acelerando.
+    // Al volver: la de abajo reaparece (crece desde 96 %) y la de encima se achica y se desvanece.
     fun vuelveEntra(modo: ModoAnim, entreTabs: Boolean): androidx.compose.animation.EnterTransition = when (modo) {
         ModoAnim.NINGUNA -> androidx.compose.animation.EnterTransition.None
         ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeIn(tween(FUNDIDO_CORTO_MS))
         ModoAnim.NATURAL ->
-            if (entreTabs) androidx.compose.animation.fadeIn(tween(210, 90, androidx.compose.animation.core.LinearOutSlowInEasing))
-            else androidx.compose.animation.slideInHorizontally(tween(ENTRA_MS, easing = DESACELERA)) { -it / 8 }
+            if (entreTabs) androidx.compose.animation.fadeIn(tween(210, 90, APARECE))
+            else androidx.compose.animation.fadeIn(tween(240, 60, APARECE)) + androidx.compose.animation.scaleIn(tween(ENTRA_MS, easing = DESACELERA), 0.96f)
     }
 
     fun vuelveSale(modo: ModoAnim, entreTabs: Boolean): androidx.compose.animation.ExitTransition = when (modo) {
         ModoAnim.NINGUNA -> androidx.compose.animation.ExitTransition.None
         ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeOut(tween(FUNDIDO_CORTO_MS))
         ModoAnim.NATURAL ->
-            if (entreTabs) androidx.compose.animation.fadeOut(tween(90, easing = androidx.compose.animation.core.FastOutLinearInEasing))
-            else androidx.compose.animation.slideOutHorizontally(tween(SALE_MS, easing = ACELERA)) { it / 4 } +
-                androidx.compose.animation.fadeOut(tween(SALE_MS, easing = androidx.compose.animation.core.FastOutLinearInEasing))
+            if (entreTabs) androidx.compose.animation.fadeOut(tween(90, easing = DESAPARECE))
+            else androidx.compose.animation.fadeOut(tween(SALE_MS, easing = DESAPARECE)) + androidx.compose.animation.scaleOut(tween(SALE_MS, easing = ACELERA), 0.92f)
     }
 
     /** Fundido de una pieza que aparece/desaparece (barras, visor): Natural 220 ms, Reducidas corto, Ninguna nada. */

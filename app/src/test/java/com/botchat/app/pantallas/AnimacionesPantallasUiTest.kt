@@ -139,30 +139,27 @@ class AnimacionesPantallasUiTest {
     private fun voyA(ruta: String) { regla.runOnUiThread { nav.navigate(ruta) } }
     private fun atras() { regla.runOnUiThread { nav.popBackStack() } }
 
-    @Test fun naturalLaPantallaNuevaEntraDesdeLaDerechaUnCuartoDelAncho() {
+    @Test fun naturalLaPantallaNuevaCreceConFundidoSinDeslizarse() {
         arnes(ModoAnim.NATURAL)
         assertEquals(280, Transiciones.DESLIZAR_MS)
         voyA("b")
         regla.mainClock.advanceTimeBy(32)
         val ancho = anchoRaiz()
         val l0 = izq("pant_b")
-        assertTrue("empieza desplazada a la derecha, a lo sumo un cuarto del ancho: izq=$l0 ancho=$ancho", l0 != null && l0 > ancho * 0.1f && l0 <= ancho * 0.26f)
-        regla.mainClock.advanceTimeBy(100)
-        val l1 = izq("pant_b")!!
-        assertTrue("a mitad de camino sigue deslizando", l1 >= 0f && l1 < l0!!)
-        assertTrue("la de abajo sigue presente durante el deslizamiento", izq("pant_a") != null)
-        regla.mainClock.advanceTimeBy(400)
+        assertTrue("empieza un poco achicada, no desplazada de lado: izq=$l0 ancho=$ancho", l0 != null && l0 >= 0f && l0 <= ancho * 0.06f)
+        assertTrue("la de abajo sigue presente un momento", izq("pant_a") != null)
+        regla.mainClock.advanceTimeBy(500)
         assertEquals("termina en su lugar", 0f, izq("pant_b")!!, 0.5f)
         assertTrue("la anterior se retira al terminar", izq("pant_a") == null)
     }
 
-    @Test fun naturalAlVolverLaPantallaSaleHaciaLaDerecha() {
+    @Test fun naturalAlVolverLaPantallaSeAchicaYLaDeAbajoReaparece() {
         arnes(ModoAnim.NATURAL)
         voyA("b"); regla.mainClock.advanceTimeBy(600)
         atras()
         regla.mainClock.advanceTimeBy(100)
         val l = izq("pant_b")
-        assertTrue("al volver, la pantalla que sale se va hacia la derecha: $l", l != null && l > 0f)
+        assertTrue("al volver, la pantalla que sale no se desplaza de lado: $l", l != null && l <= anchoRaiz() * 0.06f)
         assertTrue("y la de abajo reaparece", izq("pant_a") != null)
         regla.mainClock.advanceTimeBy(600)
         assertTrue(izq("pant_b") == null)
@@ -192,8 +189,8 @@ class AnimacionesPantallasUiTest {
         assertTrue(izq("pant_b") == null); assertEquals(0f, izq("pant_a")!!, 0.5f)
     }
 
-    @Test fun elFundidoDelChatEsDe100msYInstantaneoConNinguna() {
-        assertEquals(100, Transiciones.FUNDIDO_CHAT_MS)
+    @Test fun elFundidoDelChatEsDe180msYInstantaneoConNinguna() {
+        assertEquals(180, Transiciones.FUNDIDO_CHAT_MS)
         assertTrue(Transiciones.fundidoChat(ModoAnim.NATURAL) is androidx.compose.animation.core.TweenSpec)
         assertTrue(Transiciones.fundidoChat(ModoAnim.REDUCIDAS) is androidx.compose.animation.core.TweenSpec)
         assertTrue(Transiciones.fundidoChat(ModoAnim.NINGUNA) is androidx.compose.animation.core.SnapSpec)
