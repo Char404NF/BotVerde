@@ -2,6 +2,7 @@
 
 package com.botchat.app.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -96,18 +97,19 @@ fun PantallaPerfilPersona(
     }
     var dialogo by remember { mutableStateOf<String?>(null) }
     var masOpciones by remember { mutableStateOf(false) }
+    var verFoto by remember { mutableStateOf(false) }
     val p = perfil
     val nombre = p?.nombre?.ifBlank { null } ?: p?.telefono?.ifBlank { null } ?: numeroDePersona(jid)
 
     Box(Modifier.fillMaxSize()) {
     Scaffold(
-        topBar = { TopAppBar(navigationIcon = { IconButton(alVolver, Modifier.testTag("volver_perfil")) { Icon(Ico.Atras, "Volver") } }, title = { Text("Perfil") }) },
+        topBar = { TopAppBar(navigationIcon = { IconButton(alVolver, Modifier.testTag("volver_perfil")) { Icon(Ico.Atras, "Volver") } }, title = { Text("Info del contacto") }) },
         snackbarHost = { SnackbarHost(snack) },
     ) { relleno ->
         Column(Modifier.fillMaxSize().padding(relleno).verticalScroll(rememberScrollState()).padding(Esp.l).testTag("perfil_persona"), verticalArrangement = Arrangement.spacedBy(Esp.l)) {
             // ----- cabecera -----
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
-                Avatar(nombre, p?.foto.orEmpty(), 0, jid, 120.dp, Modifier.testTag("perfil_foto"))
+                Avatar(nombre, p?.foto.orEmpty(), 0, jid, 120.dp, Modifier.clickable { verFoto = true }.testTag("perfil_foto"))
                 Text(nombre, Modifier.testTag("perfil_nombre"), style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 val numero = p?.telefono?.ifBlank { null } ?: numeroDePersona(jid)
                 if (numero.isNotBlank() && numero != nombre) Text(numero, Modifier.testTag("perfil_numero"), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -160,16 +162,12 @@ fun PantallaPerfilPersona(
                 }
             }
 
-            // ----- cuatro botones grandes -----
-            Column(verticalArrangement = Arrangement.spacedBy(Esp.m)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Esp.m)) {
-                    BotonGrandeE7(Ico.Volumen, "Silenciar", "boton_silenciar", Modifier.weight(1f)) { haptica(Toque.Suave); dialogo = "silenciar" }
-                    BotonGrandeE7(Ico.Aviso, "Advertir", "boton_advertir", Modifier.weight(1f), MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer) { haptica(Toque.Suave); dialogo = "advertir" }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(Esp.m)) {
-                    BotonGrandeE7(Ico.Seleccionar, "Marcar", "boton_marcar", Modifier.weight(1f), MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer) { haptica(Toque.Suave); dialogo = "marcar" }
-                    BotonGrandeE7(Ico.Chats, "Ver mensajes", "boton_ver_mensajes", Modifier.weight(1f), MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurface) { haptica(Toque.Suave); alVerMensajes(jid) }
-                }
+            // ----- acciones rápidas (como la fila de iconos de una app de mensajería) -----
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                AccionRedonda(Ico.Chats, "Mensajes", Modifier.testTag("boton_ver_mensajes")) { alVerMensajes(jid) }
+                AccionRedonda(Ico.Volumen, "Silenciar", Modifier.testTag("boton_silenciar")) { dialogo = "silenciar" }
+                AccionRedonda(Ico.Aviso, "Advertir", Modifier.testTag("boton_advertir")) { dialogo = "advertir" }
+                AccionRedonda(Ico.Seleccionar, "Marcar", Modifier.testTag("boton_marcar")) { dialogo = "marcar" }
             }
 
             // ----- grupos en común -----
@@ -201,6 +199,7 @@ fun PantallaPerfilPersona(
         }
     }
 
+    if (verFoto) FotoGrandeDialogo(botId, jid, nombre) { verFoto = false }
     when (dialogo) {
         "silenciar" -> DialogoSilenciarGrupos(botId, persona, nombre, alCerrar = { dialogo = null }, alListo = { version++ })
         "advertir" -> DialogoAdvertirTipo(botId, persona, nombre, p?.gruposComun ?: emptyList(), alCerrar = { dialogo = null }, alListo = { version++ })

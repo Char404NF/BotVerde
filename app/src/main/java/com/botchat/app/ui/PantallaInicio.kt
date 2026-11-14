@@ -90,8 +90,11 @@ fun PantallaInicio(
     alNuevoChat: () -> Unit = {},
     alMarcados: () -> Unit = {},
     alAjustes: () -> Unit = {},
+    alAbrirInfo: (ChatItem) -> Unit = {},
 ) {
     val vm: InicioVm = viewModel()
+    var perfilRapido by remember { mutableStateOf<ChatItem?>(null) }
+    var fotoGrande by remember { mutableStateOf<ChatItem?>(null) }
     val personales by vm.personales.collectAsState()
     val grupos by vm.grupos.collectAsState()
     val contadores by vm.contadores.collectAsState()
@@ -149,6 +152,7 @@ fun PantallaInicio(
                 seleccion = seleccion,
                 alAbrirChat = { jid -> if (seleccion.isNotEmpty()) seleccion = if (jid in seleccion) seleccion - jid else seleccion + jid else alAbrirChat(jid) },
                 alElegir = { jid -> seleccion = if (jid in seleccion) seleccion - jid else seleccion + jid },
+                alFoto = { c -> if (seleccion.isEmpty()) perfilRapido = c else seleccion = if (c.jid in seleccion) seleccion - c.jid else seleccion + c.jid },
             )
         }
         if (seleccion.isEmpty()) {
@@ -159,6 +163,14 @@ fun PantallaInicio(
             ) { Icon(Ico.NuevoChat, "Nuevo chat") }
         }
     }
+    perfilRapido?.let { c ->
+        TarjetaPerfilRapido(
+            c.nombre, c.foto, c.fotoTs, c.jid, c.esGrupo,
+            alMensaje = { perfilRapido = null; alAbrirChat(c.jid) }, alInfo = { perfilRapido = null; alAbrirInfo(c) },
+            alFoto = { fotoGrande = c; perfilRapido = null }, alCerrar = { perfilRapido = null },
+        )
+    }
+    fotoGrande?.let { c -> FotoGrandeDialogo(vm.botId, c.jid, c.nombre) { fotoGrande = null } }
     if (vaciando) {
         AlertDialog(
             onDismissRequest = { vaciando = false },
@@ -234,7 +246,7 @@ private fun BannerSinSesion(alRevincular: () -> Unit) {
 @Composable
 private fun ListaDeChats(
     lista: List<ChatItem>?, contadores: Map<String, Int>, buscando: Boolean, error: String?, etiquetas: List<com.botchat.app.datos.EtiquetaItem> = emptyList(),
-    filtrando: Boolean = false, seleccion: Set<String> = emptySet(), alAbrirChat: (String) -> Unit, alElegir: (String) -> Unit,
+    filtrando: Boolean = false, seleccion: Set<String> = emptySet(), alAbrirChat: (String) -> Unit, alElegir: (String) -> Unit, alFoto: ((ChatItem) -> Unit)? = null,
 ) {
     when {
         lista == null -> FilasDeCarga()
@@ -250,7 +262,7 @@ private fun ListaDeChats(
         else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp)) {
             item { androidx.compose.runtime.LaunchedEffect(Unit) { kotlinx.coroutines.delay(700); EntradaLista.hecha = true } }
             itemsIndexed(lista, key = { _, c -> c.jid }) { i, c ->
-                FilaChat(c, Modifier.animateItem().entradaEscalonada(i), alAbrirChat, contadores[c.jid] ?: 0, etiquetas, c.jid in seleccion) { alElegir(c.jid) }
+                FilaChat(c, Modifier.animateItem().entradaEscalonada(i), alAbrirChat, contadores[c.jid] ?: 0, etiquetas, c.jid in seleccion, { alElegir(c.jid) }, alFoto)
             }
         }
     }
@@ -261,7 +273,7 @@ private fun ListaDeChats(
 @Composable
 fun FilaChat(
     c: ChatItem, modifier: Modifier, alAbrir: (String) -> Unit, contador: Int = 0, etiquetas: List<com.botchat.app.datos.EtiquetaItem> = emptyList(),
-    seleccionado: Boolean = false, alLargo: (() -> Unit)? = null,
+    seleccionado: Boolean = false, alLargo: (() -> Unit)? = null, alFoto: ((ChatItem) -> Unit)? = null,
 ) {
     val colores = LocalColoresChat.current
     Row(
@@ -272,7 +284,7 @@ fun FilaChat(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box {
-            Avatar(c.nombre, c.foto, c.fotoTs, c.jid, 52.dp, Modifier.compartido("avatar-${c.jid}"), grupo = c.esGrupo)
+            Avatar(c.nombre, c.foto, c.fotoTs, c.jid, 52.dp, Modifier.compartido("avatar-${c.jid}").let { m -> if (alFoto != null) m.clickable { alFoto(c) } else m }.testTag("foto_${c.jid}"), grupo = c.esGrupo)
             if (seleccionado) {
                 Box(
                     Modifier.align(Alignment.BottomEnd).size(20.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary).testTag("elegida_${c.jid}"),

@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -445,14 +446,16 @@ fun PantallaChat(
                     ) {
                         items(
                             items,
-                            key = { e -> when (e) { is Elem.Dia -> "dia-${e.ts}"; is Elem.SinLeer -> "sinleer"; is Elem.Burbuja -> "m-${e.m.id}" } },
-                            contentType = { e -> when (e) { is Elem.Dia -> "dia"; is Elem.SinLeer -> "sinleer"; is Elem.Burbuja -> "b-${e.m.categoria}" } },
+                            key = { e -> when (e) { is Elem.Dia -> "dia-${e.ts}"; is Elem.SinLeer -> "sinleer"; is Elem.Burbuja -> "m-${e.m.id}"; is Elem.Sistema -> "sis-${e.ts}-${e.texto.hashCode()}"; is Elem.InicioGrupo -> "inicio-grupo" } },
+                            contentType = { e -> when (e) { is Elem.Dia -> "dia"; is Elem.SinLeer -> "sinleer"; is Elem.Burbuja -> "b-${e.m.categoria}"; is Elem.Sistema -> "sistema"; is Elem.InicioGrupo -> "inicio" } },
                         ) { e ->
                             // Sin desvanecido al entrar: las burbujas que ya estaban no se animan (solo lo que se mueve de lugar).
                             val anima = Modifier.animateItem(fadeInSpec = null)
                             when (e) {
                                 is Elem.Dia -> SeparadorDia(e.ts, anima)
                                 is Elem.SinLeer -> SeparadorSinLeer(e.cuantos, anima)
+                                is Elem.Sistema -> CapsulaSistema(e.texto, anima)
+                                is Elem.InicioGrupo -> TarjetaInicioGrupo(e.texto, alAbrirInfo, anima)
                                 is Elem.Burbuja -> Burbuja(
                                     e, vm, alAbrirVisor, alAbrirDocumento, anima.apareceDesdeAbajo(vm.esNueva(e.m.id)), alAbrirUnaVez,
                                     resaltar = resaltado == e.m.id, seleccionado = e.m.id in seleccion, enSeleccion = seleccion.isNotEmpty(),
@@ -906,15 +909,18 @@ fun FotoGrandeDialogo(botId: Long, chat: String, nombre: String, alCerrar: () ->
         }
     }
     androidx.compose.ui.window.Dialog(alCerrar, androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize().clickable(onClick = alCerrar), color = Color.Black.copy(alpha = 0.92f)) {
+        Surface(Modifier.fillMaxSize().testTag("visor_foto_perfil"), color = Color.Black) {
             Box(contentAlignment = Alignment.Center) {
                 val img = imagen
                 when {
-                    img != null -> Image(img, "Foto de perfil de $nombre", Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
+                    img != null -> Image(img, "Foto de perfil de $nombre", Modifier.fillMaxWidth().clickable(onClick = alCerrar), contentScale = ContentScale.Fit)
                     error != null -> EstadoVacio(Ico.Foto, "Sin foto", error ?: "")
                     else -> CircularProgressIndicator(color = Color.White)
                 }
-                IconButton(alCerrar, Modifier.align(Alignment.TopStart).padding(Esp.s)) { Icon(Ico.Cerrar, "Cerrar", tint = Color.White) }
+                Row(Modifier.align(Alignment.TopStart).fillMaxWidth().statusBarsPadding().padding(Esp.xs), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(alCerrar, Modifier.testTag("cerrar_foto_perfil")) { Icon(Ico.Atras, "Volver", tint = Color.White) }
+                    Text(nombre, style = MaterialTheme.typography.titleLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Normal), color = Color.White.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }

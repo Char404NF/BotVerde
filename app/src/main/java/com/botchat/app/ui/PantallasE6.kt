@@ -148,7 +148,6 @@ fun PantallaPersonas(botId: Long, alAbrir: (String) -> Unit) {
                 items(lista, key = { it.jid }) { p ->
                     val puestas = c.etiquetas.filter { it.id in (c.porId[p.jid] ?: emptyList()) }
                     FilaPersona(p, puestas, c.estados[p.jid]) { alAbrir(p.jid) }
-                    HorizontalDivider(Modifier.padding(start = 84.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 }
             }
         }
@@ -163,7 +162,6 @@ private fun FilaPersona(p: ChatItem, puestas: List<EtiquetaItem>, estado: com.bo
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(p.nombre, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (p.pais.isNotEmpty()) { Spacer(Modifier.width(6.dp)); Text(Paises.banderaDe(p.pais), style = MaterialTheme.typography.bodyMedium) }
             }
             if (p.telefono.isNotBlank() && p.telefono != p.nombre) TextoUnaLinea(p.telefono)
         }
@@ -199,7 +197,7 @@ fun PantallaGrupos(botId: Long, alAbrir: (String) -> Unit) {
                     val puestas = c.etiquetas.filter { it.id in (c.porId[g.jid] ?: emptyList()) }
                     val a = c.admin[g.jid]
                     Row(Modifier.fillMaxWidth().clickableEscala { alAbrir(g.jid) }.padding(horizontal = Esp.l, vertical = Esp.m).testTag("grupo_${g.jid}"), verticalAlignment = Alignment.CenterVertically) {
-                        Avatar(g.nombre, g.foto, g.fotoTs, g.jid, 52.dp)
+                        Avatar(g.nombre, g.foto, g.fotoTs, g.jid, 52.dp, grupo = true)
                         Spacer(Modifier.width(Esp.l))
                         Column(Modifier.weight(1f)) {
                             Text(g.nombre, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -211,7 +209,6 @@ fun PantallaGrupos(botId: Long, alAbrir: (String) -> Unit) {
                         }
                         PuntitosEtiqueta(puestas, Modifier.testTag("puntitos_${g.jid}"))
                     }
-                    HorizontalDivider(Modifier.padding(start = 84.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 }
             }
         }
@@ -222,21 +219,7 @@ fun PantallaGrupos(botId: Long, alAbrir: (String) -> Unit) {
 
 @Composable
 private fun BotonGrande(icono: ImageVector, titulo: String, texto: String, etiqueta: String, alPulsar: () -> Unit) {
-    Card(
-        onClick = alPulsar, modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp).testTag(etiqueta), shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
-        Row(Modifier.padding(Esp.l), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), Alignment.Center) {
-                Icon(icono, null, Modifier.size(26.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
-            }
-            Spacer(Modifier.width(Esp.l))
-            Column(Modifier.weight(1f)) {
-                Text(titulo, style = MaterialTheme.typography.titleMedium)
-                Text(texto, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
+    FilaAjuste(icono, titulo, texto, Modifier.testTag(etiqueta), alPulsar)
 }
 
 /** Pestaña Bot: un botón grande por cada cosa. En modo Completo se suman las herramientas avanzadas. */
@@ -248,17 +231,20 @@ fun PantallaCentroBot(
     alAsistente: () -> Unit = {},
 ) {
     val completo = LocalModoCompleto.current
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Esp.l).testTag("pantalla_centro_bot"), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag("pantalla_centro_bot")) {
+        TituloSeccion("Tu bot")
         BotonGrande(Ico.Agregar, "Crea tu bot", "Cinco pasos: dónde responde, bienvenida, menú, reglas y utilidades", "hub_asistente", alAsistente)
         BotonGrande(Ico.Bot, "Mi bot", "Encender, apagar y ver si está conectado", "hub_mi_bot", alMiBot)
-        BotonGrande(Ico.Espacio, "Almacenamiento", "Cuánto espacio ocupan tus chats y cómo liberarlo", "hub_almacenamiento", alAlmacenamiento)
-        BotonGrande(Ico.Candado, "Auditoría y privacidad", "Qué se guarda y qué pasa con lo que borran", "hub_auditoria", alAuditoria)
+        TituloSeccion("Personas y grupos")
         BotonGrande(Ico.Volumen, "Silencios", "A quién silenciaste en tus grupos", "hub_silencios", alSilencios)
         BotonGrande(Ico.Aviso, "Advertencias", "A quién has advertido y lo que anotaste", "hub_advertencias", alAdvertencias)
         BotonGrande(Ico.Seleccionar, "Etiquetas y marcados", "Ordena personas, grupos y mensajes con colores", "hub_etiquetas", alEtiquetas)
+        TituloSeccion("Datos y privacidad")
+        BotonGrande(Ico.Espacio, "Almacenamiento", "Cuánto espacio ocupan tus chats y cómo liberarlo", "hub_almacenamiento", alAlmacenamiento)
+        BotonGrande(Ico.Candado, "Auditoría y privacidad", "Qué se guarda y qué pasa con lo que borran", "hub_auditoria", alAuditoria)
         BotonGrande(Ico.Ajustes, "Ajustes", "Seguridad, descargas, aspecto y más", "hub_ajustes", alAjustes)
         if (completo) {
-            Text("Más herramientas", Modifier.padding(top = Esp.s).testTag("titulo_mas_herramientas"), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            TituloSeccion("Más herramientas", Modifier.testTag("titulo_mas_herramientas"))
             BotonGrande(Ico.Responder, "Comandos propios", "Tus comandos: !horario, !precios…", "hub_comandos", alComandos)
             BotonGrande(Ico.Agregar, "Módulos", "Extras opcionales, apagados hasta que los enciendas", "hub_modulos", alModulos)
             BotonGrande(Ico.Reloj, "Límites e iniciativa", "Lo que el bot escribe solo, topes y No molestar", "hub_limites", alLimites)

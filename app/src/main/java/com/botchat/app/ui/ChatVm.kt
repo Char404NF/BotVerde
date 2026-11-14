@@ -17,6 +17,7 @@ import com.botchat.app.datos.Msg
 import com.botchat.app.datos.Participante
 import com.botchat.app.datos.PresenciaChat
 import com.botchat.app.datos.Repo
+import com.botchat.app.datos.cambiosMiembros
 import com.botchat.app.datos.puntitosEnBruto
 import com.botchat.app.medios.AdjuntoListo
 import com.botchat.app.medios.GrabadorVoz
@@ -160,7 +161,23 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
     @Volatile private var sinLeerAbierto = -1
     @Volatile private var aperturaTs = 0L
 
-    private fun armar(ms: List<Msg>, esGrupo: Boolean) = elementos(ms, esGrupo, vistoAntes, sinLeerAbierto, aperturaTs)
+    /** Cambios de miembros del grupo (entradas, salidas…) para mostrarlos como avisos entre los mensajes. */
+    @Volatile private var cambiosGrupo: List<com.botchat.app.datos.CambioMiembro> = emptyList()
+
+    private fun cargarCambiosGrupo() {
+        viewModelScope.launch {
+            cambiosGrupo = runCatching { Repo.cambiosMiembros(botId, jid, 0, 200) }.getOrDefault(emptyList())
+            val ms = mensajes
+            if (ms != null) elementos = withContext(Dispatchers.Default) { armar(ms, chat?.esGrupo == true) }
+        }
+    }
+
+    private fun armar(ms: List<Msg>, esGrupo: Boolean): List<Elem> {
+        val base = elementos(ms, esGrupo, vistoAntes, sinLeerAbierto, aperturaTs)
+        val n = participantes.size
+        val tarjeta = (chat?.nombre.orEmpty().ifBlank { "Grupo" }) + if (n > 0) " · " + plural(n.toLong(), "miembro", "miembros") else ""
+        return mezclarSistema(base, cambiosGrupo, esGrupo, hayMas, tarjeta)
+    }
 
     /** Se completa cuando termina la animación de entrada: hasta entonces solo se carga lo que se ve. */
     private val entrada = CompletableDeferred<Unit>()
@@ -177,7 +194,7 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
     private val idsPendientes = LinkedHashSet<String>() // ids de mensajes que cambiaron (solo en el hilo principal)
 
     init {
-        if (jid.endsWith("@g.us")) cargarFotos()
+        if (jid.endsWith("@g.us")) { cargarFotos(); cargarCambiosGrupo() }
         vistoAntes = ajustes.visto(jid)
         ajustes.marcarVisto(jid)
         if (antiguo) {

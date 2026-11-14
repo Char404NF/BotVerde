@@ -3,6 +3,7 @@
 package com.botchat.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,19 +83,23 @@ fun PantallaInfoGrupo(
     Scaffold(topBar = {
         Column {
             TopAppBar(navigationIcon = { IconButton(alVolver, Modifier.testTag("volver_info_grupo")) { Icon(Ico.Atras, "Volver") } }, title = { Text("Info del grupo") })
-            Row(Modifier.fillMaxWidth().padding(horizontal = Esp.l, vertical = Esp.s), verticalAlignment = Alignment.CenterVertically) {
-                Avatar(chat?.nombre.orEmpty(), chat?.foto.orEmpty(), chat?.fotoTs ?: 0, jid, 64.dp)
-                Spacer(Modifier.width(Esp.m))
-                Column(Modifier.weight(1f)) {
-                    Text(chat?.nombre.orEmpty(), Modifier.testTag("grupo_nombre"), style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    val a = admin
-                    val detalle = buildList {
-                        if (a != null && a.miembros > 0) add(plural(a.miembros.toLong(), "miembro", "miembros"))
-                        if (a != null && a.sabido) add(if (a.soyAdmin) "Soy admin" else "No soy admin")
-                    }.joinToString(" · ")
-                    if (detalle.isNotEmpty()) Text(detalle, Modifier.testTag("grupo_detalle"), style = MaterialTheme.typography.bodyMedium, color = if (a?.soyAdmin == false && a.sabido) AMARILLO_SILENCIO else MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.fillMaxWidth().padding(horizontal = Esp.l, vertical = Esp.s), horizontalAlignment = Alignment.CenterHorizontally) {
+                Avatar(chat?.nombre.orEmpty(), chat?.foto.orEmpty(), chat?.fotoTs ?: 0, jid, 96.dp, grupo = true)
+                Spacer(Modifier.size(Esp.s))
+                Text(chat?.nombre.orEmpty(), Modifier.testTag("grupo_nombre"), style = MaterialTheme.typography.headlineSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                val a = admin
+                val detalle = buildList {
+                    add("Grupo")
+                    if (a != null && a.miembros > 0) add(plural(a.miembros.toLong(), "miembro", "miembros"))
+                    if (a != null && a.sabido) add(if (a.soyAdmin) "Soy admin" else "No soy admin")
+                }.joinToString(" · ")
+                Text(detalle, Modifier.testTag("grupo_detalle"), style = MaterialTheme.typography.bodyMedium, color = if (a?.soyAdmin == false && a.sabido) AMARILLO_SILENCIO else MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.size(Esp.m))
+                Row(horizontalArrangement = Arrangement.spacedBy(Esp.m)) {
+                    AccionRedonda(Ico.Chats, "Chat", Modifier.testTag("grupo_abrir_chat"), alAbrirChat)
+                    AccionRedonda(Ico.Ajustes, "Administrar", Modifier.testTag("grupo_administrar_rapido"), alAbrirAdministrar)
+                    AccionRedonda(Ico.Estadisticas, "Resumen", Modifier.testTag("grupo_resumen_rapido"), alAbrirResumen)
                 }
-                OutlinedButton(alAbrirChat, Modifier.testTag("grupo_abrir_chat")) { Text("Abrir chat") }
             }
             PrimaryTabRow(pestana) {
                 Tab(pestana == 0, { haptica(Toque.Suave); pestana = 0 }, text = { Text("Miembros") }, modifier = Modifier.testTag("pestana_miembros"))
@@ -172,9 +177,10 @@ fun FilaMiembroE7(m: MiembroDetalle, etiquetas: List<EtiquetaItem>, alPulsar: ()
                 Text(nombreDeMiembro(m), Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (m.silenciado) { Spacer(Modifier.width(6.dp)); Icon(Ico.Volumen, "Silenciado", Modifier.size(18.dp).testTag("icono_silenciado_${m.persona}"), tint = ROJO_SILENCIO) }
                 if (m.advertido) { Spacer(Modifier.width(4.dp)); Icon(Ico.Aviso, "Advertido", Modifier.size(18.dp).testTag("icono_advertido_${m.persona}"), tint = AMARILLO_SILENCIO) }
+                Spacer(Modifier.weight(1f))
+                if (m.esAdmin) InsigniaAdmin(m.rol == "creador")
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.xs), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                if (m.esAdmin) InsigniaAdmin(m.rol == "creador")
                 if (m.rango.isNotBlank()) InsigniaRango(m.rango, m.rangoColor, Modifier.testTag("rango_${m.persona}"))
                 etiquetas.take(3).forEach { ChipEtiqueta(it) }
                 if (etiquetas.size > 3) Text("+${etiquetas.size - 3}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -190,7 +196,7 @@ fun FilaMiembroE7(m: MiembroDetalle, etiquetas: List<EtiquetaItem>, alPulsar: ()
 @Composable
 private fun InsigniaAdmin(creador: Boolean) {
     Text(
-        if (creador) "Creó el grupo" else "Admin",
+        if (creador) "Creó el grupo" else "Admin. del grupo",
         Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(50)).background(MaterialTheme.colorScheme.primaryContainer).padding(horizontal = 8.dp, vertical = 2.dp).testTag("insignia_admin"),
         style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer,
     )
@@ -199,25 +205,11 @@ private fun InsigniaAdmin(creador: Boolean) {
 @Composable
 private fun PestanaAjustes(botId: Long, jid: String, nombre: String, alAdministrar: () -> Unit, alResumen: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = Esp.s).testTag("pestana_ajustes_contenido"), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
+        TituloSeccion("El bot en este grupo")
         TarjetaPoliticaGrupo(botId, jid, nombre)
-        Card(Modifier.fillMaxWidth().padding(horizontal = Esp.l, vertical = Esp.xs).testTag("tarjeta_administrar_grupo"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-            Row(Modifier.padding(horizontal = Esp.l, vertical = Esp.s), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Administrar el grupo", style = MaterialTheme.typography.bodyLarge)
-                    Text("Nombre, descripción, enlace, reglas, solicitudes, filtros y actividad", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                androidx.compose.material3.Button(alAdministrar, Modifier.testTag("abrir_grupo")) { Text("Abrir") }
-            }
-        }
-        Card(Modifier.fillMaxWidth().padding(horizontal = Esp.l, vertical = Esp.xs).testTag("tarjeta_resumen_grupo"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-            Row(Modifier.padding(horizontal = Esp.l, vertical = Esp.s), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Resumen, calendario y archivos", style = MaterialTheme.typography.bodyLarge)
-                    Text("Cuánto se escribe, cuándo, y las fotos y documentos del grupo", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                OutlinedButton(alResumen, Modifier.testTag("abrir_resumen_grupo")) { Text("Abrir") }
-            }
-        }
+        TituloSeccion("Administrar")
+        FilaAjuste(Ico.Ajustes, "Administrar el grupo", "Nombre, descripción, enlace, reglas, solicitudes, filtros y actividad", Modifier.testTag("abrir_grupo"), alAdministrar)
+        FilaAjuste(Ico.Estadisticas, "Resumen, calendario y archivos", "Cuánto se escribe, cuándo, y las fotos y documentos del grupo", Modifier.testTag("abrir_resumen_grupo"), alResumen)
         TarjetaMiWhatsApp(botId, jid, nombre)
     }
 }
@@ -282,5 +274,18 @@ fun PantallaCambiosMiembros(botId: Long, jid: String, alVolver: () -> Unit) {
                 if (!fin) item(key = "mas") { OutlinedButton({ cargar(false) }, Modifier.testTag("cambios_mas")) { Text("Ver más") } }
             }
         }
+    }
+}
+
+/** Botón redondo con su nombre debajo, para las acciones rápidas de la cabecera. */
+@Composable
+fun AccionRedonda(icono: androidx.compose.ui.graphics.vector.ImageVector, texto: String, modifier: Modifier = Modifier, alPulsar: () -> Unit) {
+    val haptica = rememberHaptica()
+    Column(modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp)).clickable { haptica(Toque.Suave); alPulsar() }.padding(Esp.xs), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(width = 64.dp, height = 40.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh), Alignment.Center) {
+            Icon(icono, null, tint = MaterialTheme.colorScheme.primary)
+        }
+        Spacer(Modifier.size(4.dp))
+        Text(texto, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

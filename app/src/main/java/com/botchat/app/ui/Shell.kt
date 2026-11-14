@@ -202,6 +202,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                             alNuevoChat = { nav.navigate("contactos") },
                             alMarcados = { nav.navigate("marcados") },
                             alAjustes = { irA("ajustes") },
+                            alAbrirInfo = { c -> nav.navigate(if (c.esGrupo) "grupo_info/${enc(c.jid)}" else "persona_perfil/${enc(c.jid)}") },
                         )
                     }
                 }

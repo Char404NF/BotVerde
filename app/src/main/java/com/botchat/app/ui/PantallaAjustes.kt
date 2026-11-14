@@ -45,7 +45,7 @@ fun PantallaAjustes(ajustes: Ajustes, alSeguridad: () -> Unit, alDescargas: () -
     val completo = LocalModoCompleto.current
     val ctx = LocalContext.current
     val version = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "" }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Tarjeta(Ico.Chats, "Automatizaciones", "Menús y respuestas del bot", alAutomatizaciones, "ajuste_automatizaciones")
         if (completo) Tarjeta(Ico.Responder, "Comandos propios", "Tus propios comandos: !horario, !precios…", alComandosPropios, "ajuste_comandos_propios")
         Tarjeta(Ico.Persona, "Rangos y permisos", if (pendientesSolicitudes > 0) plural(pendientesSolicitudes.toLong(), "solicitud pendiente", "solicitudes pendientes") else "Quién puede usar qué, solicitudes y grupos", alPermisos, "ajuste_permisos")
@@ -62,7 +62,7 @@ fun PantallaAjustes(ajustes: Ajustes, alSeguridad: () -> Unit, alDescargas: () -
         Tarjeta(Ico.Chats, "Estado del bot", "Encender, apagar y mantenerlo conectado", alBot, "ajuste_bot")
         Tarjeta(Ico.Info, "Avanzado", "Aspecto, registro y otras opciones técnicas", alAvanzado, "ajuste_avanzado")
         Spacer(Modifier.size(Esp.l))
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.fillMaxWidth().padding(Esp.l), horizontalAlignment = Alignment.CenterHorizontally) {
             LogoBot(Modifier.size(48.dp))
             Spacer(Modifier.size(Esp.s))
             Text("Bot Chat $version", style = MaterialTheme.typography.titleSmall)
@@ -73,19 +73,5 @@ fun PantallaAjustes(ajustes: Ajustes, alSeguridad: () -> Unit, alDescargas: () -
 
 @Composable
 private fun Tarjeta(icono: ImageVector, titulo: String, texto: String, alPulsar: () -> Unit, etiqueta: String) {
-    Card(
-        onClick = alPulsar, modifier = Modifier.fillMaxWidth().testTag(etiqueta), shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-    ) {
-        Row(Modifier.padding(Esp.l), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), Alignment.Center) {
-                Icon(icono, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
-            }
-            Spacer(Modifier.width(Esp.l))
-            Column(Modifier.weight(1f)) {
-                Text(titulo, style = MaterialTheme.typography.titleMedium)
-                Text(texto, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
+    FilaAjuste(icono, titulo, texto, Modifier.testTag(etiqueta), alPulsar)
 }
