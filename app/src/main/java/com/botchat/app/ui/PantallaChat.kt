@@ -240,27 +240,28 @@ fun PantallaChat(
                     navigationIcon = { IconButton({ limpiarSeleccion() }, Modifier.testTag("cerrar_seleccion")) { Icon(Ico.Cerrar, "Cancelar selección") } },
                     title = { Text("${seleccion.size}", Modifier.testTag("contador_seleccion")) },
                     actions = {
+
                         if (unico != null && escribirActivo) IconButton({ vm.citando = unico; limpiarSeleccion() }, Modifier.testTag("accion_responder")) { Icon(Ico.Responder, "Responder") }
-                        if (unico != null && escribirActivo && puedeEditar(unico)) IconButton({ vm.editando = unico; limpiarSeleccion() }, Modifier.testTag("accion_editar")) { Icon(Ico.Editar, "Editar") }
+                        if (unico != null) IconButton({ marcando = unico }, Modifier.testTag("accion_marcar")) { Icon(Ico.Seleccionar, "Marcar") }
+                        IconButton({ borrando = true }, Modifier.testTag("accion_borrar")) { Icon(Ico.Borrar, "Borrar") }
                         IconButton({
                             val t = elegidos.sortedBy { it.ts }.filter { it.texto.isNotBlank() && it.tipo != "contacto" && it.tipo != "ubicacion" }.joinToString("\n") { it.texto }
                             ctx.getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(android.content.ClipData.newPlainText("Mensajes", t))
                             Toast.makeText(ctx, "Copiado", Toast.LENGTH_SHORT).show()
                             limpiarSeleccion()
                         }, Modifier.testTag("accion_copiar")) { Icon(Ico.Copiar, "Copiar") }
-                        if (unico != null) IconButton({ marcando = unico }, Modifier.testTag("accion_marcar")) { Icon(Ico.Seleccionar, "Marcar") }
                         if (escribirActivo) IconButton({ reenviando = true }, Modifier.testTag("accion_reenviar")) { Icon(Ico.Compartir, "Reenviar") }
-                        IconButton({ borrando = true }, Modifier.testTag("accion_borrar")) { Icon(Ico.Borrar, "Borrar") }
                         Box {
                             var mas by remember { mutableStateOf(false) }
                             IconButton({ mas = true }, Modifier.testTag("accion_mas")) { Icon(Ico.Mas, "Más") }
                             DropdownMenu(mas, { mas = false }) {
+                                if (unico != null && escribirActivo && puedeEditar(unico)) DropdownMenuItem(text = { Text("Editar") }, onClick = { mas = false; vm.editando = unico; limpiarSeleccion() }, modifier = Modifier.testTag("accion_editar"))
                                 if (unico != null && unico.esMio) DropdownMenuItem(text = { Text("Info del mensaje") }, onClick = { mas = false; infoDe = unico; infoCargada = null; scope.launch { infoCargada = vm.info(unico) } }, modifier = Modifier.testTag("accion_info"))
                                 if (unico != null) DropdownMenuItem(text = { Text("Olvidar este mensaje") }, onClick = { mas = false; olvidando = unico; limpiarSeleccion() }, modifier = Modifier.testTag("olvidar_mensaje"))
                             }
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                 )
             } else if (busqueda.activa) {
                 BarraBuscarEnChat(busqueda)
@@ -276,10 +277,9 @@ fun PantallaChat(
                             val vivo = textoPresencia(vm.presencia)
                             if (vivo.isNotEmpty()) {
                                 Text(vivo, Modifier.testTag("presencia"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, maxLines = 1)
-                            } else if (chat != null && !chat.esGrupo) {
-                                TextoUnaLinea(banderaTelefono(chat), estilo = MaterialTheme.typography.bodySmall)
                             } else if (chat != null) {
-                                TextoUnaLinea("Grupo", estilo = MaterialTheme.typography.bodySmall)
+                                val enPausa = vm.estadoChat.botPausaHasta > System.currentTimeMillis() / 1000 || (chat.esGrupo && !vm.estadoChat.botActivo)
+                                TextoUnaLinea(if (enPausa) "Bot en pausa" else "Bot activo", Modifier.testTag("estado_bot_chat"), estilo = MaterialTheme.typography.bodySmall)
                             }
                             if (vm.estadoChat.estadoTrabajo.isNotEmpty() || vm.etiquetasLocales.isNotEmpty()) {
                                 Row(Modifier.padding(top = 2.dp).testTag("marcas_chat"), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -291,46 +291,52 @@ fun PantallaChat(
                     }
                 },
                 actions = {
-                    IconButton(alAbrirArchivos) { Icon(Ico.Carpeta, "Archivos compartidos") }
+                    var masMenu by remember { mutableStateOf(false) }
                     Box {
-                        IconButton({ menu = true }) { Icon(Ico.Mas, "Más opciones") }
-                        DropdownMenu(menu, { menu = false }) {
-                            DropdownMenuItem(text = { Text("Buscar") }, onClick = { menu = false; busqueda.abrir() }, modifier = Modifier.testTag("menu_buscar"))
-                            DropdownMenuItem(text = { Text(if (vm.estadoChat.silenciado) "Activar notificaciones" else "Silenciar notificaciones") }, onClick = { menu = false; vm.silenciar(!vm.estadoChat.silenciado) }, modifier = Modifier.testTag("menu_silenciar"))
-                            DropdownMenuItem(text = { Text(if (vm.estadoChat.fijado) "Quitar de los fijados" else "Fijar arriba") }, onClick = { menu = false; haptica(Toque.Suave); vm.fijar(!vm.estadoChat.fijado) }, modifier = Modifier.testTag("menu_fijar"))
-                            DropdownMenuItem(text = { Text("Exportar chat") }, onClick = { menu = false; exportando = true }, modifier = Modifier.testTag("menu_exportar_chat"))
-                            if (chat?.esGrupo == true) DropdownMenuItem(
-                                text = { Text(if (vm.estadoChat.botActivo) "Bot en este grupo: Activo (tocar para pausar)" else "Bot en este grupo: Pausado (tocar para activar)") },
-                                onClick = { menu = false; vm.botActivoEnChat(!vm.estadoChat.botActivo) }, modifier = Modifier.testTag("menu_bot_grupo"),
-                            )
-                            val controlTomado = vm.estadoChat.botPausaHasta > System.currentTimeMillis() / 1000
-                            DropdownMenuItem(
-                                text = { Text(if (controlTomado) "Reanudar el bot en este chat" else "Tomar el control (el bot calla aquí)") },
+                        IconButton({ masMenu = false; menu = true }) { Icon(Ico.Mas, "Más opciones") }
+                        DropdownMenu(menu, { menu = false; masMenu = false }) {
+                            if (!masMenu) {
+                                DropdownMenuItem(text = { Text(if (chat?.esGrupo == true) "Ver grupo" else "Ver contacto") }, onClick = { menu = false; alAbrirInfo() }, modifier = Modifier.testTag("menu_ver_info"))
+                                DropdownMenuItem(text = { Text("Buscar") }, onClick = { menu = false; busqueda.abrir() }, modifier = Modifier.testTag("menu_buscar"))
+                                DropdownMenuItem(text = { Text("Archivos, enlaces y docs") }, onClick = { menu = false; alAbrirArchivos() }, modifier = Modifier.testTag("menu_archivos"))
+                                                            DropdownMenuItem(text = { Text(if (vm.estadoChat.silenciado) "Activar notificaciones" else "Silenciar notificaciones") }, onClick = { menu = false; vm.silenciar(!vm.estadoChat.silenciado) }, modifier = Modifier.testTag("menu_silenciar"))
+                                                            DropdownMenuItem(text = { Text(if (vm.estadoChat.fijado) "Quitar de los fijados" else "Fijar arriba") }, onClick = { menu = false; haptica(Toque.Suave); vm.fijar(!vm.estadoChat.fijado) }, modifier = Modifier.testTag("menu_fijar"))
+                                                            val controlTomado = vm.estadoChat.botPausaHasta > System.currentTimeMillis() / 1000
+                                                            if (controlTomado) DropdownMenuItem(
+                                text = { Text("Reanudar el bot en este chat") },
                                 onClick = { menu = false; if (controlTomado) vm.reactivarBot() else vm.tomarControl() }, modifier = Modifier.testTag("menu_tomar_control"),
                             )
-                            if (!controlTomado) DropdownMenuItem(text = { Text("Pausar el bot un rato…") }, onClick = { menu = false; pausandoBot = true }, modifier = Modifier.testTag("menu_pausar_bot"))
-                            val estadoT = vm.estadoChat.estadoTrabajo
-                            DropdownMenuItem(
+                                                            if (!controlTomado) DropdownMenuItem(text = { Text("Pausar el bot…") }, onClick = { menu = false; pausandoBot = true }, modifier = Modifier.testTag("menu_pausar_bot"))
+                                DropdownMenuItem(text = { Text("Más") }, onClick = { masMenu = true }, modifier = Modifier.testTag("menu_mas"))
+                            } else {
+                                                            val estadoT = vm.estadoChat.estadoTrabajo
+                                                            DropdownMenuItem(
                                 text = { Text(if (estadoT == "pendiente") "Quitar la marca de pendiente" else "Marcar como pendiente") },
                                 onClick = { menu = false; haptica(Toque.Suave); vm.marcarEstado(if (estadoT == "pendiente") "" else "pendiente") }, modifier = Modifier.testTag("menu_pendiente"),
                             )
-                            DropdownMenuItem(
+                                                            DropdownMenuItem(
                                 text = { Text(if (estadoT == "resuelto") "Quitar la marca de resuelto" else "Marcar como resuelto") },
                                 onClick = { menu = false; haptica(Toque.Suave); vm.marcarEstado(if (estadoT == "resuelto") "" else "resuelto") }, modifier = Modifier.testTag("menu_resuelto"),
                             )
-                            DropdownMenuItem(text = { Text("Etiquetas…") }, onClick = { menu = false; etiquetando = true }, modifier = Modifier.testTag("menu_etiquetas"))
-                            DropdownMenuItem(text = { Text("Ver solo mensajes automáticos") }, onClick = { menu = false; alVerAutomaticos() }, modifier = Modifier.testTag("menu_ver_automaticos"))
-                            DropdownMenuItem(text = { Text("Borrar archivos de este chat") }, onClick = {
+                                                            DropdownMenuItem(text = { Text("Etiquetas…") }, onClick = { menu = false; etiquetando = true }, modifier = Modifier.testTag("menu_etiquetas"))
+                                                            DropdownMenuItem(text = { Text("Ver solo mensajes automáticos") }, onClick = { menu = false; alVerAutomaticos() }, modifier = Modifier.testTag("menu_ver_automaticos"))
+                                                            DropdownMenuItem(text = { Text("Exportar chat") }, onClick = { menu = false; exportando = true }, modifier = Modifier.testTag("menu_exportar_chat"))
+                                                            if (chat?.esGrupo == true) DropdownMenuItem(
+                                text = { Text(if (vm.estadoChat.botActivo) "Bot en este grupo: Activo (tocar para pausar)" else "Bot en este grupo: Pausado (tocar para activar)") },
+                                onClick = { menu = false; vm.botActivoEnChat(!vm.estadoChat.botActivo) }, modifier = Modifier.testTag("menu_bot_grupo"),
+                            )
+                                                            DropdownMenuItem(text = { Text("Borrar archivos de este chat") }, onClick = {
                                 menu = false
                                 haptica(Toque.Fuerte)
                                 vm.estimarArchivos { confirmaArchivos = it }
                             })
-                            DropdownMenuItem(text = { Text("Vaciar chat") }, onClick = { menu = false; haptica(Toque.Fuerte); confirmaVaciar = true }, modifier = Modifier.testTag("menu_vaciar_chat"))
-                            DropdownMenuItem(text = { Text("Borrar todo el chat") }, onClick = { menu = false; haptica(Toque.Fuerte); confirmaChat = true })
+                                                            DropdownMenuItem(text = { Text("Vaciar chat") }, onClick = { menu = false; haptica(Toque.Fuerte); confirmaVaciar = true }, modifier = Modifier.testTag("menu_vaciar_chat"))
+                                                            DropdownMenuItem(text = { Text("Borrar todo el chat") }, onClick = { menu = false; haptica(Toque.Fuerte); confirmaChat = true })
+                            }
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
             )
         },
         bottomBar = {
@@ -375,7 +381,7 @@ fun PantallaChat(
                 }
             }
         },
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = LocalColoresChat.current.fondo,
     ) { relleno ->
         Box(Modifier.fillMaxSize().padding(relleno)) {
             if (busqueda.activa) {
@@ -578,7 +584,7 @@ private fun CargaDeMensajes() {
 @Composable
 private fun SeparadorDia(ts: Long, modifier: Modifier) {
     Box(modifier.fillMaxWidth().padding(vertical = Esp.s), contentAlignment = Alignment.Center) {
-        Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Surface(shape = RoundedCornerShape(50), color = LocalColoresChat.current.capsula) {
             Text(etiquetaDia(ts), Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -596,17 +602,18 @@ private fun Burbuja(
 ) {
     val m = e.m
     val esquema = MaterialTheme.colorScheme
-    val fondo = if (resaltar) esquema.tertiaryContainer else if (m.esMio) esquema.primaryContainer else esquema.surfaceContainerHigh
-    val tinta = if (resaltar) esquema.onTertiaryContainer else if (m.esMio) esquema.onPrimaryContainer else esquema.onSurface
-    val g = 18.dp
-    val p = 5.dp
-    val forma = if (m.esMio) RoundedCornerShape(g, g, if (e.ultimoDelGrupo) p else g, g) else RoundedCornerShape(g, g, g, if (e.ultimoDelGrupo) p else g)
+    val colores = LocalColoresChat.current
+    val fondo = if (resaltar) esquema.tertiaryContainer else if (m.esMio) colores.enviada else colores.recibida
+    val tinta = if (resaltar) esquema.onTertiaryContainer else if (m.esMio) colores.textoEnviada else colores.textoRecibida
+    val forma = FormaBurbuja(m.esMio, conCola = e.primeroDelGrupo)
+    val sangria = 8.dp // espacio de la colita del lado de quien habla
+    val enGrupo = vm.chat?.esGrupo == true
     val haptica = rememberHaptica()
     // Deslizar a la derecha = responder.
     var desplazado by remember { mutableStateOf(0f) }
     val umbral = with(androidx.compose.ui.platform.LocalDensity.current) { 56.dp.toPx() }
     val nav = androidx.compose.animation.core.animateFloatAsState(desplazado, label = "desliza").value
-    Box(modifier.fillMaxWidth().then(if (seleccionado) Modifier.background(esquema.primary.copy(alpha = 0.18f)) else Modifier)) {
+    Box(modifier.fillMaxWidth().then(if (seleccionado) Modifier.background(colores.seleccion) else Modifier)) {
         if (nav > 8f) Icon(Ico.Responder, null, Modifier.align(Alignment.CenterStart).padding(start = 8.dp).size(22.dp), tint = esquema.primary.copy(alpha = (nav / umbral).coerceIn(0f, 1f)))
         Row(
             Modifier.fillMaxWidth().graphicsLayer { translationX = nav }
@@ -616,14 +623,22 @@ private fun Burbuja(
                         onDragCancel = { desplazado = 0f },
                     ) { _, dx -> desplazado = (desplazado + dx).coerceIn(0f, umbral * 1.4f) }
                 },
-            horizontalArrangement = if (m.esMio) Arrangement.End else Arrangement.Start,
+            horizontalArrangement = if (m.esMio) Arrangement.End else Arrangement.Start, verticalAlignment = Alignment.Bottom,
         ) {
+            if (!m.esMio && enGrupo) {
+                Box(Modifier.padding(start = 6.dp, end = 0.dp).width(32.dp)) {
+                    if (e.ultimoDelGrupo) {
+                        val foto = vm.fotos[m.remitenteId]
+                        Avatar(m.remitente.ifBlank { "?" }, foto?.first ?: "", foto?.second ?: 0L, m.remitenteId, 32.dp, Modifier.testTag("avatar_${m.id}"))
+                    }
+                }
+            }
             Column(horizontalAlignment = if (m.esMio) Alignment.End else Alignment.Start) {
                 Surface(
                     color = fondo, contentColor = tinta, shape = forma,
-                    modifier = Modifier.widthIn(max = 300.dp).clip(forma).combinedClickable(onClick = { if (enSeleccion) alAlternar() }, onLongClick = { haptica(Toque.Fuerte); alAlternar() }).testTag("burbuja_${m.id}"),
+                    modifier = Modifier.widthIn(max = 316.dp).clip(forma).combinedClickable(onClick = { if (enSeleccion) alAlternar() }, onLongClick = { haptica(Toque.Fuerte); alAlternar() }).testTag("burbuja_${m.id}"),
                 ) {
-                    Column(Modifier.padding(horizontal = 10.dp, vertical = 7.dp)) {
+                    Column(Modifier.padding(start = if (m.esMio) 10.dp else 10.dp + sangria, end = if (m.esMio) 10.dp + sangria else 10.dp, top = 6.dp, bottom = 6.dp)) {
                         if (e.mostrarRemitente && m.remitente.isNotEmpty()) {
                             Text(m.remitente, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = colorEstable(m.remitenteId, androidx.compose.foundation.isSystemInDarkTheme()).let { c -> androidx.compose.ui.graphics.lerp(c, tinta, 0.35f) }, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
@@ -639,7 +654,7 @@ private fun Burbuja(
                             }
                             if (m.delHistorial) Text("del historial  ", Modifier.testTag("del_historial_${m.id}"), style = MaterialTheme.typography.labelSmall, fontStyle = FontStyle.Italic, color = tinta.copy(alpha = 0.65f))
                             if (m.editado && !m.borrado) Text("(editado)  ", style = MaterialTheme.typography.labelSmall, color = tinta.copy(alpha = 0.65f))
-                            Text(horaDe(m.ts), style = MaterialTheme.typography.labelSmall, color = tinta.copy(alpha = 0.65f))
+                            Text(horaDe(m.ts), style = MaterialTheme.typography.labelSmall, color = if (m.esMio) colores.horaEnviada else colores.horaRecibida)
                             if (m.esMio && m.estadoEnvio.isNotEmpty()) { Spacer(Modifier.width(4.dp)); Palomitas(m.estadoEnvio, tinta) }
                         }
                     }

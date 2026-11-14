@@ -513,3 +513,36 @@ func TestNingunLogLlevaDatosPersonales(t *testing.T) {
 		}
 	}
 }
+
+// Un chat que llegó solo con el LID se une a su número cuando después se descubre (por ejemplo, desde un grupo): el chat queda con el
+// teléfono visible y no con "Número no disponible".
+func TestUnirChatLIDMuestraElNumero(t *testing.T) {
+	e := nuevoEntorno(t)
+	lid := jid("1234567890@lid")
+	pn := jid("5215512345678@s.whatsapp.net")
+	e.g.Mensaje(context.Background(), mensajeEvt(lid, lid, "L1", false, texto("hola")), false)
+	if c, _ := e.alm.ObtenerChat(1, lid.String()); c == nil || c.TelMostrado != "Número no disponible" {
+		t.Fatalf("antes de unir debía faltar el número: %+v", c)
+	}
+	e.g.UnirChatLID(context.Background(), lid, pn)
+	if c, _ := e.alm.ObtenerChat(1, lid.String()); c != nil {
+		t.Fatalf("el chat por LID debía desaparecer: %+v", c)
+	}
+	c, _ := e.alm.ObtenerChat(1, pn.String())
+	if c == nil || c.TelE164 != "+5215512345678" || c.TelMostrado != "+52 55 1234 5678" || c.PaisISO != "MX" {
+		t.Fatalf("el chat del número debía mostrar su teléfono: %+v", c)
+	}
+	l, _ := e.alm.ListarChats(1, false, "", 10, 0)
+	if len(l) != 1 || l[0].UltimoTexto != "hola" {
+		t.Fatalf("el mensaje debía pasar al chat del número: %+v", l)
+	}
+}
+
+// Si el chat por LID no existe, unir no crea nada.
+func TestUnirChatLIDSinChatNoHaceNada(t *testing.T) {
+	e := nuevoEntorno(t)
+	e.g.UnirChatLID(context.Background(), jid("999@lid"), jid("5215500000000@s.whatsapp.net"))
+	if l, _ := e.alm.ListarChats(1, false, "", 10, 0); len(l) != 0 {
+		t.Fatalf("no debía crear chats: %+v", l)
+	}
+}

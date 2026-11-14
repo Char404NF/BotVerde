@@ -159,6 +159,7 @@ func (s *estado) guardarMiembros(gi *types.GroupInfo) {
 		return
 	}
 	_, _ = a.ActualizarMiembros(s.botID, gi.JID.ToNonAD().String(), s.miembrosDe(gi), time.Now())
+	s.aprenderLIDs(gi)
 }
 
 // alUnirseAGrupo: el bot entró (o lo agregaron) a un grupo: se guardan sus miembros. Encola; no usa la red.

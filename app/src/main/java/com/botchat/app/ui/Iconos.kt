@@ -270,4 +270,10 @@ object Ico {
         trazo { moveTo(5f, 4f); lineTo(19f, 4f); curveTo(20.1f, 4f, 21f, 4.9f, 21f, 6f); lineTo(21f, 14f); curveTo(21f, 15.1f, 20.1f, 16f, 19f, 16f); lineTo(11f, 16f); lineTo(6f, 20.5f); lineTo(6f, 16f); lineTo(5f, 16f); curveTo(3.9f, 16f, 3f, 15.1f, 3f, 14f); lineTo(3f, 6f); curveTo(3f, 4.9f, 3.9f, 4f, 5f, 4f); close() }
         trazo { moveTo(12f, 7.5f); lineTo(12f, 12.5f); moveTo(9.5f, 10f); lineTo(14.5f, 10f) }
     }
+
+    /** Cámara de fotos. */
+    val Camara = icono("camara") {
+        trazo { moveTo(4f, 8f); lineTo(8f, 8f); lineTo(9.5f, 5.5f); lineTo(14.5f, 5.5f); lineTo(16f, 8f); lineTo(20f, 8f); lineTo(20f, 19f); lineTo(4f, 19f); close() }
+        trazo { moveTo(12f, 10f); curveTo(13.9f, 10f, 15.5f, 11.6f, 15.5f, 13.5f); curveTo(15.5f, 15.4f, 13.9f, 17f, 12f, 17f); curveTo(10.1f, 17f, 8.5f, 15.4f, 8.5f, 13.5f); curveTo(8.5f, 11.6f, 10.1f, 10f, 12f, 10f) }
+    }
 }

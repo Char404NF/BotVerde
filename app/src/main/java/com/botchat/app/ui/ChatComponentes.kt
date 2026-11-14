@@ -209,3 +209,33 @@ fun textoPresencia(p: com.botchat.app.datos.PresenciaChat, ahora: Long = System.
     p.ultimaVez > 0 -> "últ. vez ${etiquetaDia(p.ultimaVez).lowercase()} a las ${horaDe(p.ultimaVez)}"
     else -> ""
 }
+
+/**
+ * Forma de burbuja de mensaje: rectángulo redondeado con una colita arriba del lado de quien habla (solo en el primero de cada tanda).
+ * Deja [cola] de espacio a ese lado aunque no haya colita, para que todas las burbujas de una tanda queden alineadas.
+ */
+class FormaBurbuja(private val esMio: Boolean, private val conCola: Boolean, private val radio: androidx.compose.ui.unit.Dp = 12.dp, private val cola: androidx.compose.ui.unit.Dp = 8.dp) :
+    androidx.compose.ui.graphics.Shape {
+    override fun createOutline(size: androidx.compose.ui.geometry.Size, layoutDirection: androidx.compose.ui.unit.LayoutDirection, density: androidx.compose.ui.unit.Density): androidx.compose.ui.graphics.Outline {
+        val r = with(density) { radio.toPx() }
+        val c = with(density) { cola.toPx() }
+        val izq = if (esMio) 0f else c
+        val der = if (esMio) size.width - c else size.width
+        val esquinaCola = if (conCola) androidx.compose.ui.geometry.CornerRadius(0f, 0f) else androidx.compose.ui.geometry.CornerRadius(r, r)
+        val redondo = androidx.compose.ui.geometry.CornerRadius(r, r)
+        val cuerpo = androidx.compose.ui.geometry.RoundRect(
+            izq, 0f, der, size.height,
+            topLeftCornerRadius = if (esMio) redondo else esquinaCola, topRightCornerRadius = if (esMio) esquinaCola else redondo,
+            bottomRightCornerRadius = redondo, bottomLeftCornerRadius = redondo,
+        )
+        val camino = androidx.compose.ui.graphics.Path().apply { addRoundRect(cuerpo) }
+        if (conCola) {
+            val punta = androidx.compose.ui.graphics.Path().apply {
+                if (esMio) { moveTo(der, 0f); lineTo(size.width, 0f); lineTo(der, c * 1.3f); close() }
+                else { moveTo(izq, 0f); lineTo(0f, 0f); lineTo(izq, c * 1.3f); close() }
+            }
+            camino.addPath(punta)
+        }
+        return androidx.compose.ui.graphics.Outline.Generic(camino)
+    }
+}

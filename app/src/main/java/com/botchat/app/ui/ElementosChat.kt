@@ -6,7 +6,7 @@ import com.botchat.app.datos.Msg
 internal sealed interface Elem {
     data class Dia(val ts: Long) : Elem
     data class SinLeer(val cuantos: Int) : Elem
-    data class Burbuja(val m: Msg, val mostrarRemitente: Boolean, val ultimoDelGrupo: Boolean) : Elem
+    data class Burbuja(val m: Msg, val mostrarRemitente: Boolean, val ultimoDelGrupo: Boolean, val primeroDelGrupo: Boolean = false) : Elem
 }
 
 /**
@@ -27,7 +27,7 @@ internal fun elementos(msgs: List<Msg>, esGrupo: Boolean, vistoAntes: Long = Lon
         val menos = msgs.getOrNull(i - 1)    // el siguiente en el tiempo
         val mismoAnterior = mas != null && dias[i + 1] == dias[i] && mas.remitenteId == m.remitenteId && m.ts - mas.ts < 300
         val mismoSiguiente = menos != null && dias[i - 1] == dias[i] && menos.remitenteId == m.remitenteId && menos.ts - m.ts < 300
-        out += Elem.Burbuja(m, mostrarRemitente = esGrupo && !m.esMio && !mismoAnterior, ultimoDelGrupo = !mismoSiguiente)
+        out += Elem.Burbuja(m, mostrarRemitente = esGrupo && !m.esMio && !mismoAnterior, ultimoDelGrupo = !mismoSiguiente, primeroDelGrupo = !mismoAnterior)
         if (m.id == primerNoLeido) out += Elem.SinLeer(noLeidos)
         if (mas == null || dias[i + 1] != dias[i]) out += Elem.Dia(m.ts)
     }

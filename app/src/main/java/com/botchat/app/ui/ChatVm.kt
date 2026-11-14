@@ -49,6 +49,15 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
 
     var chat by mutableStateOf<ChatItem?>(null)
         private set
+
+    /** Fotos de las personas (por su identificador) para mostrarlas junto a cada mensaje de un grupo. */
+    val fotos = androidx.compose.runtime.mutableStateMapOf<String, Pair<String, Long>>()
+
+    private fun cargarFotos() {
+        viewModelScope.launch {
+            runCatching { Repo.chats(botId, false, "", 500) }.getOrNull()?.forEach { if (it.foto.isNotEmpty()) fotos[it.jid] = it.foto to it.fotoTs }
+        }
+    }
     var mensajes by mutableStateOf<List<Msg>?>(null) // null = cargando
         private set
     var hayMas by mutableStateOf(true)
@@ -168,6 +177,7 @@ class ChatVm(app: Application, val jid: String) : AndroidViewModel(app) {
     private val idsPendientes = LinkedHashSet<String>() // ids de mensajes que cambiaron (solo en el hilo principal)
 
     init {
+        if (jid.endsWith("@g.us")) cargarFotos()
         vistoAntes = ajustes.visto(jid)
         ajustes.marcarVisto(jid)
         if (antiguo) {

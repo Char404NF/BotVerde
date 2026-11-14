@@ -282,7 +282,7 @@ fun FilaChat(
         }
         Spacer(Modifier.width(Esp.l))
         Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     c.nombre, Modifier.weight(1f, fill = false).compartido("nombre-${c.jid}", limites = true),
                     style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,

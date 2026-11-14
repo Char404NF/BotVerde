@@ -32,6 +32,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextField
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -108,7 +110,7 @@ fun Compositor(
     val puedeEnviar = (valor.text.isNotBlank() || hayAdjuntos) && !ocupado
     val mostrarMicrofono = valor.text.isBlank() && !hayAdjuntos && editando == null
 
-    Surface(modifier.fillMaxWidth().imePadding().navigationBarsPadding(), color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(modifier.fillMaxWidth().imePadding().navigationBarsPadding(), color = androidx.compose.ui.graphics.Color.Transparent) {
         Column {
             if (candidatos.isNotEmpty()) {
                 Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh).testTag("lista_menciones")) {
@@ -149,22 +151,23 @@ fun Compositor(
                     Text("◀ Desliza para cancelar", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(horizontal = Esp.s, vertical = Esp.xs), verticalAlignment = Alignment.Bottom) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 6.dp), verticalAlignment = Alignment.Bottom) {
                 if (!grabando) {
-                    Box {
-                        IconButton({ haptica(Toque.Suave); menuAdjuntar = true }, Modifier.testTag("boton_adjuntar")) { Icon(Ico.Adjuntar, "Adjuntar") }
-                        DropdownMenu(menuAdjuntar, { menuAdjuntar = false }) {
-                            listOf(
-                                FuenteAdjunto.GALERIA to "Fotos y videos", FuenteAdjunto.CAMARA_FOTO to "Cámara (foto)", FuenteAdjunto.CAMARA_VIDEO to "Cámara (video)",
-                                FuenteAdjunto.DOCUMENTO to "Documento o archivo", FuenteAdjunto.AUDIO to "Audio",
-                            ).forEach { (f, t) -> DropdownMenuItem(text = { Text(t) }, onClick = { menuAdjuntar = false; alAdjuntar(f) }, modifier = Modifier.testTag("adjuntar_${f.name}")) }
+                    Surface(Modifier.weight(1f), shape = RoundedCornerShape(26.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            IconButton({ haptica(Toque.Suave); formato = !formato }, Modifier.testTag("boton_formato")) { Icon(Ico.Editar, "Formato del texto") }
+                            TextField(
+                                valor, alCambiar, Modifier.weight(1f).testTag("campo_mensaje"), placeholder = { Text(if (hayAdjuntos) "Añade un pie de foto" else "Mensaje") }, maxLines = 5,
+                                colors = androidx.compose.material3.TextFieldDefaults.colors(
+                                    focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent, unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                    focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent, unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                                    disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                                ),
+                            )
+                            IconButton({ haptica(Toque.Suave); menuAdjuntar = true }, Modifier.testTag("boton_adjuntar")) { Icon(Ico.Adjuntar, "Adjuntar") }
+                            if (mostrarMicrofono) IconButton({ haptica(Toque.Suave); alAdjuntar(FuenteAdjunto.CAMARA_FOTO) }, Modifier.testTag("boton_camara")) { Icon(Ico.Camara, "Cámara") }
                         }
                     }
-                    IconButton({ haptica(Toque.Suave); formato = !formato }, Modifier.testTag("boton_formato")) { Icon(Ico.Editar, "Formato del texto") }
-                    OutlinedTextField(
-                        valor, alCambiar, Modifier.weight(1f).testTag("campo_mensaje"), placeholder = { Text(if (hayAdjuntos) "Añade un pie de foto" else "Escribe un mensaje") },
-                        shape = RoundedCornerShape(24.dp), maxLines = 5,
-                    )
                     Spacer(Modifier.width(6.dp))
                 } else {
                     Spacer(Modifier.weight(1f))
@@ -206,6 +209,7 @@ fun Compositor(
                     ) { Icon(if (editando != null) Ico.Listo else Ico.Enviar, if (editando != null) "Guardar cambio" else "Enviar") }
                 }
             }
+            if (menuAdjuntar) HojaAdjuntar(alElegir = { f -> menuAdjuntar = false; alAdjuntar(f) }, alCerrar = { menuAdjuntar = false })
         }
     }
 }
@@ -250,5 +254,41 @@ private fun Banner(titulo: String, texto: String, etiqueta: String, alCerrar: ()
             Text(texto, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         IconButton(alCerrar, Modifier.testTag("cerrar_$etiqueta")) { Icon(Ico.Cerrar, "Cancelar") }
+    }
+}
+
+
+private data class OpcionAdjuntar(val fuente: FuenteAdjunto, val nombre: String, val icono: androidx.compose.ui.graphics.vector.ImageVector, val color: androidx.compose.ui.graphics.Color)
+
+/** Hoja de abajo para elegir qué adjuntar: círculos de color con su nombre debajo. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun HojaAdjuntar(alElegir: (FuenteAdjunto) -> Unit, alCerrar: () -> Unit) {
+    val opciones = listOf(
+        OpcionAdjuntar(FuenteAdjunto.GALERIA, "Galería", Ico.Foto, androidx.compose.ui.graphics.Color(0xFF3B6FD4)),
+        OpcionAdjuntar(FuenteAdjunto.CAMARA_FOTO, "Cámara", Ico.Camara, androidx.compose.ui.graphics.Color(0xFFD6336C)),
+        OpcionAdjuntar(FuenteAdjunto.CAMARA_VIDEO, "Video", Ico.Video, androidx.compose.ui.graphics.Color(0xFFE8590C)),
+        OpcionAdjuntar(FuenteAdjunto.DOCUMENTO, "Documento", Ico.Documento, androidx.compose.ui.graphics.Color(0xFF7048E8)),
+        OpcionAdjuntar(FuenteAdjunto.AUDIO, "Audio", Ico.Audio, androidx.compose.ui.graphics.Color(0xFFF08C00)),
+    )
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = alCerrar, containerColor = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.testTag("hoja_adjuntar")) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = Esp.l, vertical = Esp.s).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(Esp.l)) {
+            opciones.chunked(3).forEach { fila ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    fila.forEach { o ->
+                        Column(
+                            Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable { alElegir(o.fuente) }.padding(vertical = 6.dp).testTag("adjuntar_${o.fuente.name}"),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Box(Modifier.size(56.dp).clip(CircleShape).background(o.color), Alignment.Center) { Icon(o.icono, null, Modifier.size(26.dp), tint = androidx.compose.ui.graphics.Color.White) }
+                            Spacer(Modifier.height(6.dp))
+                            Text(o.nombre, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    repeat(3 - fila.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+            Spacer(Modifier.height(Esp.m))
+        }
     }
 }

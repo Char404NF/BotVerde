@@ -83,7 +83,7 @@ fun PantallaProvisoria(titulo: String, texto: String, alVolver: () -> Unit, etiq
 @Composable
 private fun CajaBuscar(valor: String, alCambiar: (String) -> Unit, pista: String, etiqueta: String) {
     TextField(
-        value = valor, onValueChange = alCambiar, singleLine = true, placeholder = { Text(pista) },
+        value = valor, onValueChange = alCambiar, singleLine = true, placeholder = { Text(pista, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
         leadingIcon = { Icon(Ico.Buscar, null) },
         trailingIcon = { if (valor.isNotEmpty()) IconButton({ alCambiar("") }) { Icon(Ico.Cerrar, "Borrar texto") } },
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), shape = RoundedCornerShape(28.dp),

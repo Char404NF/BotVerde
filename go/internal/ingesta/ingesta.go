@@ -619,3 +619,23 @@ func (g *Ingesta) Enviado(ctx context.Context, chat types.JID, id, texto string,
 	e.UnwrapRaw()
 	g.Mensaje(ctx, e, false)
 }
+
+// UnirChatLID: se descubrió que un LID (identificador oculto) y un número son la misma persona. El chat que estuviera guardado por LID
+// pasa al del número, y ese chat queda con su teléfono para mostrarlo (nunca "Número no disponible" si WhatsApp ya lo dio).
+func (g *Ingesta) UnirChatLID(ctx context.Context, lid, pn types.JID) {
+	l := lid.ToNonAD().String()
+	p := pn.ToNonAD().String()
+	origen, err := g.Alm.ObtenerChat(g.BotID, l)
+	if err != nil || origen == nil {
+		return
+	}
+	tel := identidad.ParseTelefono(pn.User)
+	_, _ = g.Alm.ActualizarChat(g.BotID, p, false, func(c *almacen.Chat) {
+		if c.TelE164 == "" {
+			c.TelE164 = tel.E164
+		}
+	})
+	if err := g.Alm.FusionarChat(g.BotID, l, p); err != nil {
+		g.Log(fmt.Sprintf("no se pudo unir el chat oculto con su número: %v", err))
+	}
+}

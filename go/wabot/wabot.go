@@ -390,6 +390,7 @@ func (s *estado) evento(e any) {
 		s.status("conectado")
 		go s.fotos.RevisarVencidas()
 		go s.snapshotSiToca(s.ctx, false)
+		s.reconciliarLIDsDespues()
 	case *events.Disconnected:
 		if !s.cerr {
 			s.log("Desconectado; se intentará reconectar.")
