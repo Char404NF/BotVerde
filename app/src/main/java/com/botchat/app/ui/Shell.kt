@@ -35,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -143,20 +144,25 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
         }
     }
 
-    fun entre(a: String?, b: String?) = a in RUTAS_PRINCIPALES && b in RUTAS_PRINCIPALES
+    val px30 = with(androidx.compose.ui.platform.LocalDensity.current) { 30.dp.roundToPx() }
+    fun tipo(a: String?, b: String?): TipoTransicion = when {
+        a in RUTAS_PRINCIPALES && b in RUTAS_PRINCIPALES -> TipoTransicion.PESTANA
+        (a == "inicio" && b?.startsWith("chat/") == true) || (a?.startsWith("chat/") == true && b == "inicio") -> TipoTransicion.CONTENEDOR
+        else -> TipoTransicion.EJE
+    }
     fun entra(): AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-        Transiciones.entra(modo, entre(initialState.destination.route, targetState.destination.route))
+        Transiciones.entra(modo, tipo(initialState.destination.route, targetState.destination.route), px30)
     }
     // El visor de fotos aparece con un fundido sobre el chat: el chat no se mueve de debajo.
     fun esVisor(r: String?) = r?.startsWith("visor/") == true
     fun sale(): AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-        if (esVisor(targetState.destination.route)) ExitTransition.None else Transiciones.sale(modo, entre(initialState.destination.route, targetState.destination.route))
+        if (esVisor(targetState.destination.route)) ExitTransition.None else Transiciones.sale(modo, tipo(initialState.destination.route, targetState.destination.route), px30)
     }
     fun vuelveEntra(): AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
-        if (esVisor(initialState.destination.route)) EnterTransition.None else Transiciones.vuelveEntra(modo, entre(initialState.destination.route, targetState.destination.route))
+        if (esVisor(initialState.destination.route)) EnterTransition.None else Transiciones.vuelveEntra(modo, tipo(initialState.destination.route, targetState.destination.route), px30)
     }
     fun vuelveSale(): AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
-        Transiciones.vuelveSale(modo, entre(initialState.destination.route, targetState.destination.route))
+        Transiciones.vuelveSale(modo, tipo(initialState.destination.route, targetState.destination.route), px30)
     }
     fun irA(ruta: String) {
         if (ruta == rutaActual) return
@@ -291,6 +297,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                     val jid = be.arguments?.getString("jid") ?: return@composable
                     val ir = be.arguments?.getString("ir") ?: ""
                     CompositionLocalProvider(LocalAnimScope provides this) {
+                      Box(Modifier.fillMaxSize().compartido("fila-$jid", limites = true)) {
                         PantallaChat(
                             jid, alVolver = { nav.popBackStack() },
                             alAbrirVisor = { id -> nav.navigate("visor/${enc(jid)}/${enc(id)}") },
@@ -302,6 +309,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                             alAbrirUnaVez = { id -> nav.navigate("unavez/${enc(jid)}/${enc(id)}") },
                             alAbrirEtiquetas = { nav.navigate("etiquetas") },
                         )
+                      }
                     }
                 }
                 composable("visor/{jid}/{id}", enterTransition = { Transiciones.visorEntra(modo) }, exitTransition = { ExitTransition.None },

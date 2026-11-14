@@ -22,6 +22,7 @@ import com.botchat.app.ui.LocalModoAnim
 import com.botchat.app.ui.LocalReducirMovimiento
 import com.botchat.app.ui.ModoAnim
 import com.botchat.app.ui.PantallaAvanzado
+import com.botchat.app.ui.TipoTransicion
 import com.botchat.app.ui.Transiciones
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -119,8 +120,8 @@ class AnimacionesPantallasUiTest {
                 val m = LocalModoAnim.current
                 NavHost(
                     nav, "a",
-                    enterTransition = { Transiciones.entra(m, false) }, exitTransition = { Transiciones.sale(m, false) },
-                    popEnterTransition = { Transiciones.vuelveEntra(m, false) }, popExitTransition = { Transiciones.vuelveSale(m, false) },
+                    enterTransition = { Transiciones.entra(m, TipoTransicion.EJE, 90) }, exitTransition = { Transiciones.sale(m, TipoTransicion.EJE, 90) },
+                    popEnterTransition = { Transiciones.vuelveEntra(m, TipoTransicion.EJE, 90) }, popExitTransition = { Transiciones.vuelveSale(m, TipoTransicion.EJE, 90) },
                 ) {
                     composable("a") { Box(Modifier.fillMaxSize().testTag("pant_a")) { Text("A") } }
                     composable("b") { Box(Modifier.fillMaxSize().testTag("pant_b")) { Text("B") } }
@@ -139,27 +140,26 @@ class AnimacionesPantallasUiTest {
     private fun voyA(ruta: String) { regla.runOnUiThread { nav.navigate(ruta) } }
     private fun atras() { regla.runOnUiThread { nav.popBackStack() } }
 
-    @Test fun naturalLaPantallaNuevaCreceConFundidoSinDeslizarse() {
+    @Test fun naturalLaPantallaNuevaEntraPorUnEjeCortoYConFundidoEnDosTiempos() {
         arnes(ModoAnim.NATURAL)
         assertEquals(280, Transiciones.DESLIZAR_MS)
         voyA("b")
         regla.mainClock.advanceTimeBy(32)
-        val ancho = anchoRaiz()
         val l0 = izq("pant_b")
-        assertTrue("empieza un poco achicada, no desplazada de lado: izq=$l0 ancho=$ancho", l0 != null && l0 >= 0f && l0 <= ancho * 0.06f)
+        assertTrue("entra desplazada a la derecha, a lo sumo los 90 px del eje: izq=$l0", l0 != null && l0 > 0f && l0 <= 90.5f)
         assertTrue("la de abajo sigue presente un momento", izq("pant_a") != null)
         regla.mainClock.advanceTimeBy(500)
         assertEquals("termina en su lugar", 0f, izq("pant_b")!!, 0.5f)
         assertTrue("la anterior se retira al terminar", izq("pant_a") == null)
     }
 
-    @Test fun naturalAlVolverLaPantallaSeAchicaYLaDeAbajoReaparece() {
+    @Test fun naturalAlVolverLaPantallaSaleHaciaLaDerechaPorElMismoEje() {
         arnes(ModoAnim.NATURAL)
         voyA("b"); regla.mainClock.advanceTimeBy(600)
         atras()
         regla.mainClock.advanceTimeBy(100)
         val l = izq("pant_b")
-        assertTrue("al volver, la pantalla que sale no se desplaza de lado: $l", l != null && l <= anchoRaiz() * 0.06f)
+        assertTrue("al volver, la pantalla que sale se va hacia la derecha: $l", l != null && l > 0f)
         assertTrue("y la de abajo reaparece", izq("pant_a") != null)
         regla.mainClock.advanceTimeBy(600)
         assertTrue(izq("pant_b") == null)
@@ -189,8 +189,8 @@ class AnimacionesPantallasUiTest {
         assertTrue(izq("pant_b") == null); assertEquals(0f, izq("pant_a")!!, 0.5f)
     }
 
-    @Test fun elFundidoDelChatEsDe180msYInstantaneoConNinguna() {
-        assertEquals(180, Transiciones.FUNDIDO_CHAT_MS)
+    @Test fun elFundidoDelChatEsDe100msYInstantaneoConNinguna() {
+        assertEquals(100, Transiciones.FUNDIDO_CHAT_MS)
         assertTrue(Transiciones.fundidoChat(ModoAnim.NATURAL) is androidx.compose.animation.core.TweenSpec)
         assertTrue(Transiciones.fundidoChat(ModoAnim.REDUCIDAS) is androidx.compose.animation.core.TweenSpec)
         assertTrue(Transiciones.fundidoChat(ModoAnim.NINGUNA) is androidx.compose.animation.core.SnapSpec)

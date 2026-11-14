@@ -2,7 +2,7 @@
 <resources>
     <color name="ic_launcher_background">#151A38</color>
     <style name="Theme.BotChat" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">#F6F7FB</item>
+        <item name="android:windowBackground">#FFFFFF</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>

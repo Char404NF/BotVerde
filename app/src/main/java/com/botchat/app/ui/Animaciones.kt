@@ -48,7 +48,7 @@ fun Modifier.entradaEscalonada(indice: Int): Modifier = composed {
     val reducir = LocalReducirMovimiento.current
     val animar = remember { !EntradaLista.hecha && !reducir && indice < 12 }
     val avance = remember { Animatable(if (animar) 0f else 1f) }
-    LaunchedEffect(Unit) { if (animar) { delay(indice * 28L); avance.animateTo(1f, tween(280, easing = Transiciones.DESACELERA_ENFATIZADA)) } }
+    LaunchedEffect(Unit) { if (animar) { delay(indice * 28L); avance.animateTo(1f, androidx.compose.animation.core.spring(1f, androidx.compose.animation.core.Spring.StiffnessLow)) } }
     if (!animar) this else graphicsLayer { alpha = avance.value; translationY = (1f - avance.value) * 14.dp.toPx() }
 }
 
@@ -60,7 +60,7 @@ private fun Modifier.apareceDesdeAbajoAnimado(): Modifier = composed {
     val reducir = LocalReducirMovimiento.current
     val animar = remember { activo && !reducir }
     val avance = remember { Animatable(if (animar) 0f else 1f) }
-    LaunchedEffect(Unit) { if (animar) avance.animateTo(1f, tween(240, easing = Transiciones.DESACELERA_ENFATIZADA)) }
+    LaunchedEffect(Unit) { if (animar) avance.animateTo(1f, androidx.compose.animation.core.spring(1f, androidx.compose.animation.core.Spring.StiffnessMediumLow)) }
     if (!animar) this else graphicsLayer { alpha = avance.value; translationY = (1f - avance.value) * 18.dp.toPx() }
 }
 
@@ -171,11 +171,14 @@ fun CheckAnimado(modifier: Modifier = Modifier, tam: Dp = 96.dp, color: Color = 
  *  - Reducidas: solo fundidos cortos, sin movimiento.
  *  - Ninguna: sin transiciones.
  */
+/** Cómo se relacionan dos pantallas al navegar (ver [Transiciones]). */
+enum class TipoTransicion { PESTANA, EJE, CONTENEDOR }
+
 object Transiciones {
     const val DESLIZAR_MS = 280
     const val FUNDIDO_CORTO_MS = 100
     /** Fundido del esqueleto al contenido cuando se abre un chat. */
-    const val FUNDIDO_CHAT_MS = 180
+    const val FUNDIDO_CHAT_MS = 100
 
     /** Curvas "enfatizadas" de Material 3: arrancan rápido y frenan largo, como las transiciones del sistema. */
     private val DESACELERA = androidx.compose.animation.core.CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
@@ -185,40 +188,60 @@ object Transiciones {
     private const val ENTRA_MS = 420
     private const val SALE_MS = 260
 
-    // "Fundido con escala" (el de Android reciente): la pantalla vieja se desvanece rápido y la nueva se aclara mientras crece de 92 % a 100 %.
-    // Nada se desliza de lado.
+    // Tres lenguajes, según la relación entre las pantallas (guía de movimiento de Material):
+    //  - PESTANA: entre Chats, Grupos, Bot y Tú no hay relación → "fade through": sale una y después entra la otra.
+    //  - EJE: de una pantalla a otra dentro de un flujo (menús, ajustes, detalles) → "shared axis X": 30 dp de recorrido, 300 ms, con el
+    //    fundido en dos tiempos (sale en 90 ms y entra en 210) para que nunca se vean las dos encimadas.
+    //  - CONTENEDOR: de la lista de chats al chat → la fila crece hasta ser el chat (lo hace el elemento compartido de la fila);
+    //    aquí solo se pone el fundido de fondo, sin mover ni escalar la pantalla.
     private val APARECE = androidx.compose.animation.core.LinearOutSlowInEasing
     private val DESAPARECE = androidx.compose.animation.core.FastOutLinearInEasing
+    private val EJE_EASING = androidx.compose.animation.core.FastOutSlowInEasing
+    private const val EJE_MS = 300
 
-    fun entra(modo: ModoAnim, entreTabs: Boolean): androidx.compose.animation.EnterTransition = when (modo) {
+    fun entra(modo: ModoAnim, tipo: TipoTransicion, px: Int): androidx.compose.animation.EnterTransition = when (modo) {
         ModoAnim.NINGUNA -> androidx.compose.animation.EnterTransition.None
         ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeIn(tween(FUNDIDO_CORTO_MS))
-        ModoAnim.NATURAL ->
-            if (entreTabs) androidx.compose.animation.fadeIn(tween(210, 90, APARECE))
-            else androidx.compose.animation.fadeIn(tween(260, 80, APARECE)) + androidx.compose.animation.scaleIn(tween(ENTRA_MS, easing = DESACELERA), 0.92f)
+        ModoAnim.NATURAL -> when (tipo) {
+            TipoTransicion.PESTANA -> androidx.compose.animation.fadeIn(tween(210, 90, APARECE))
+            TipoTransicion.EJE -> androidx.compose.animation.slideInHorizontally(tween(EJE_MS, easing = EJE_EASING)) { px } +
+                androidx.compose.animation.fadeIn(tween(210, 90, APARECE))
+            TipoTransicion.CONTENEDOR -> androidx.compose.animation.fadeIn(tween(180, easing = APARECE))
+        }
     }
 
-    fun sale(modo: ModoAnim, entreTabs: Boolean): androidx.compose.animation.ExitTransition = when (modo) {
+    fun sale(modo: ModoAnim, tipo: TipoTransicion, px: Int): androidx.compose.animation.ExitTransition = when (modo) {
         ModoAnim.NINGUNA -> androidx.compose.animation.ExitTransition.None
         ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeOut(tween(FUNDIDO_CORTO_MS))
-        ModoAnim.NATURAL -> androidx.compose.animation.fadeOut(tween(if (entreTabs) 90 else 110, easing = DESAPARECE))
+        ModoAnim.NATURAL -> when (tipo) {
+            TipoTransicion.PESTANA -> androidx.compose.animation.fadeOut(tween(90, easing = DESAPARECE))
+            TipoTransicion.EJE -> androidx.compose.animation.slideOutHorizontally(tween(EJE_MS, easing = EJE_EASING)) { -px } +
+                androidx.compose.animation.fadeOut(tween(90, easing = DESAPARECE))
+            TipoTransicion.CONTENEDOR -> androidx.compose.animation.fadeOut(tween(220, easing = DESAPARECE))
+        }
     }
 
-    // Al volver: la de abajo reaparece (crece desde 96 %) y la de encima se achica y se desvanece.
-    fun vuelveEntra(modo: ModoAnim, entreTabs: Boolean): androidx.compose.animation.EnterTransition = when (modo) {
+    // Al volver es el mismo movimiento al revés: la de encima se va hacia la derecha y la de abajo regresa desde la izquierda.
+    fun vuelveEntra(modo: ModoAnim, tipo: TipoTransicion, px: Int): androidx.compose.animation.EnterTransition = when (modo) {
         ModoAnim.NINGUNA -> androidx.compose.animation.EnterTransition.None
         ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeIn(tween(FUNDIDO_CORTO_MS))
-        ModoAnim.NATURAL ->
-            if (entreTabs) androidx.compose.animation.fadeIn(tween(210, 90, APARECE))
-            else androidx.compose.animation.fadeIn(tween(240, 60, APARECE)) + androidx.compose.animation.scaleIn(tween(ENTRA_MS, easing = DESACELERA), 0.96f)
+        ModoAnim.NATURAL -> when (tipo) {
+            TipoTransicion.PESTANA -> androidx.compose.animation.fadeIn(tween(210, 90, APARECE))
+            TipoTransicion.EJE -> androidx.compose.animation.slideInHorizontally(tween(EJE_MS, easing = EJE_EASING)) { -px } +
+                androidx.compose.animation.fadeIn(tween(210, 90, APARECE))
+            TipoTransicion.CONTENEDOR -> androidx.compose.animation.fadeIn(tween(220, 40, APARECE))
+        }
     }
 
-    fun vuelveSale(modo: ModoAnim, entreTabs: Boolean): androidx.compose.animation.ExitTransition = when (modo) {
+    fun vuelveSale(modo: ModoAnim, tipo: TipoTransicion, px: Int): androidx.compose.animation.ExitTransition = when (modo) {
         ModoAnim.NINGUNA -> androidx.compose.animation.ExitTransition.None
         ModoAnim.REDUCIDAS -> androidx.compose.animation.fadeOut(tween(FUNDIDO_CORTO_MS))
-        ModoAnim.NATURAL ->
-            if (entreTabs) androidx.compose.animation.fadeOut(tween(90, easing = DESAPARECE))
-            else androidx.compose.animation.fadeOut(tween(SALE_MS, easing = DESAPARECE)) + androidx.compose.animation.scaleOut(tween(SALE_MS, easing = ACELERA), 0.92f)
+        ModoAnim.NATURAL -> when (tipo) {
+            TipoTransicion.PESTANA -> androidx.compose.animation.fadeOut(tween(90, easing = DESAPARECE))
+            TipoTransicion.EJE -> androidx.compose.animation.slideOutHorizontally(tween(EJE_MS, easing = EJE_EASING)) { px } +
+                androidx.compose.animation.fadeOut(tween(90, easing = DESAPARECE))
+            TipoTransicion.CONTENEDOR -> androidx.compose.animation.fadeOut(tween(200, easing = DESAPARECE))
+        }
     }
 
     /** Fundido de una pieza que aparece/desaparece (barras, visor): Natural 220 ms, Reducidas corto, Ninguna nada. */

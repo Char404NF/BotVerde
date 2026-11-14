@@ -186,8 +186,8 @@ internal fun ExtrasRespuesta(botId: Long, p: PasoDef, cambia: (String, (PasoDef)
 internal fun AjustesDeOpcion(p: PasoDef, i: Int, o: OpcionDef, cambia: (String, (PasoDef) -> PasoDef) -> Unit) {
     var abierto by remember { mutableStateOf(o.ambito.isNotEmpty() || o.horario != null) }
     TextButton({ abierto = !abierto }, Modifier.testTag("avanzada_opcion_${p.id}_$i")) { Text(if (abierto) "Ocultar quién la ve y cuándo" else "Quién la ve y cuándo…") }
-    if (!abierto) return
     fun cambiaO(f: (OpcionDef) -> OpcionDef) = cambia(p.id) { q -> q.copy(opciones = q.opciones.mapIndexed { j, x -> if (j == i) f(x) else x }) }
+    androidx.compose.animation.AnimatedVisibility(abierto) {
     Column(Modifier.padding(start = Esp.m), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
         Text("Dónde se ofrece", style = MaterialTheme.typography.labelMedium)
         val ambitos = listOf("" to "Todos lados", "privado" to "Solo privado", "grupo" to "Solo grupos")
@@ -205,6 +205,7 @@ internal fun AjustesDeOpcion(p: PasoDef, i: Int, o: OpcionDef, cambia: (String, 
             OutlinedTextField(h.hasta, { t -> cambiaO { q -> q.copy(horario = (q.horario ?: HorarioDef()).copy(hasta = t.take(5))) } }, Modifier.weight(1f).testTag("opc_hasta_${p.id}_$i"), label = { Text("Hasta (HH:MM)") }, singleLine = true, isError = h.hasta.isNotEmpty() && !HORA_OPC.matches(h.hasta))
         }
         Text("Quién la ve según su rango se elige en Ajustes → Rangos y permisos (“Menús que ve”).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
     }
 }
 

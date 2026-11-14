@@ -248,13 +248,13 @@ private fun FilaActividad(botId: Long, x: MensajeActividad, privado: Boolean, al
                         verAntes = !verAntes
                         if (verAntes && versiones == null) scope.launch { versiones = runCatching { Repo.versionesDeMensaje(botId, m.chat, m.id) }.getOrDefault(emptyList()) }
                     }, Modifier.testTag("ver_antes_${m.id}")) { Text(if (verAntes) "Ocultar lo que decía antes" else "Ver lo que decía antes (${x.versiones})") }
-                    if (verAntes) Column(Modifier.testTag("versiones_${m.id}"), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
+                    androidx.compose.animation.AnimatedVisibility(verAntes) { Column(Modifier.testTag("versiones_${m.id}"), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
                         val vs = versiones
                         if (vs == null) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                         else vs.forEach { v ->
                             Text("Antes (${etiquetaDia(v.ts)} ${horaDe(v.ts)}): ${v.texto}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                    }
+                    } }
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.s), verticalArrangement = Arrangement.spacedBy(0.dp)) {
                     OutlinedButton(alMarcar, Modifier.testTag("marcar_${m.id}")) { Icon(Ico.Seleccionar, null, Modifier.size(18.dp)); Text(if (x.marcado) "  Marcado" else "  Marcar") }

@@ -277,7 +277,7 @@ fun FilaChat(
 ) {
     val colores = LocalColoresChat.current
     Row(
-        modifier.fillMaxWidth()
+        modifier.fillMaxWidth().compartido("fila-${c.jid}", limites = true)
             .background(if (seleccionado) colores.seleccion else Color.Transparent)
             .combinedClickable(onClick = { alAbrir(c.jid) }, onLongClick = alLargo)
             .padding(horizontal = Esp.l, vertical = 10.dp).testTag("fila_${c.jid}"),
