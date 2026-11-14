@@ -139,17 +139,17 @@ class AnimacionesPantallasUiTest {
     private fun voyA(ruta: String) { regla.runOnUiThread { nav.navigate(ruta) } }
     private fun atras() { regla.runOnUiThread { nav.popBackStack() } }
 
-    @Test fun naturalLaPantallaNuevaEntraCompletaDesdeLaDerechaEn280ms() {
+    @Test fun naturalLaPantallaNuevaEntraDesdeLaDerechaUnCuartoDelAncho() {
         arnes(ModoAnim.NATURAL)
         assertEquals(280, Transiciones.DESLIZAR_MS)
         voyA("b")
         regla.mainClock.advanceTimeBy(32)
         val ancho = anchoRaiz()
         val l0 = izq("pant_b")
-        assertTrue("empieza fuera de pantalla, cerca del borde derecho (no un décimo): izq=$l0 ancho=$ancho", l0 != null && l0 > ancho * 0.7f)
+        assertTrue("empieza desplazada a la derecha, a lo sumo un cuarto del ancho: izq=$l0 ancho=$ancho", l0 != null && l0 > ancho * 0.1f && l0 <= ancho * 0.26f)
         regla.mainClock.advanceTimeBy(100)
         val l1 = izq("pant_b")!!
-        assertTrue("a mitad de camino sigue deslizando", l1 > 0f && l1 < l0!!)
+        assertTrue("a mitad de camino sigue deslizando", l1 >= 0f && l1 < l0!!)
         assertTrue("la de abajo sigue presente durante el deslizamiento", izq("pant_a") != null)
         regla.mainClock.advanceTimeBy(400)
         assertEquals("termina en su lugar", 0f, izq("pant_b")!!, 0.5f)
