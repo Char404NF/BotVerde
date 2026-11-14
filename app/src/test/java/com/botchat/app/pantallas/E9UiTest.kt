@@ -121,6 +121,25 @@ class E9UiTest {
         assertFalse("en el resumen ya no hay Siguiente", hay("asistente_siguiente"))
     }
 
+    @Test fun elBotBaseDejaElSaludoConTresOpcionesYLaFotoDelAvatar() {
+        asistente()
+        regla.esperaTexto("¿Dónde responde tu bot?")
+        toca("asist_usar_base")
+        esperaGuardado { b -> b.menuOpciones.map { it.texto } == listOf("GitHub", "Menú", "Ayuda") && b.bienvenidaAdjuntos.any { it.nombre == "avatar_feliz.png" } }
+        assertTrue(llamo("asist_base"))
+        assertTrue(guardado().grupos)
+    }
+
+    @Test fun enLaBienvenidaSeEligeElAnimoDelAvatar() {
+        asistente()
+        regla.esperaTexto("¿Dónde responde tu bot?")
+        toca("asistente_siguiente"); regla.esperaTexto("Mensaje de bienvenida")
+        toca("animo_dormido")
+        esperaGuardado { b -> b.bienvenidaAdjuntos.any { it.nombre == "avatar_dormido.png" } }
+        toca("animo_dormido") // tocar el que está puesto lo quita
+        esperaGuardado { b -> b.bienvenidaAdjuntos.none { it.nombre.startsWith("avatar_") } }
+    }
+
     @Test fun saltarMarcaElPasoYNoCambiaNada() {
         asistente()
         regla.esperaTexto("Paso 1 de 5")

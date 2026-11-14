@@ -466,8 +466,8 @@ func TestValidacion(t *testing.T) {
 			}
 		}
 	}
-	if len(Plantillas()) != 8 { // las 3 de siempre + refacciones, soporte, citas, preguntas frecuentes y grupo (etapa C)
-		t.Fatal("ocho plantillas de arranque")
+	if len(Plantillas()) != 13 { // las 3 de siempre + refacciones, soporte, citas, preguntas frecuentes, grupo, ventas, contador, maestro, marketing y paquetes
+		t.Fatal("trece plantillas de arranque")
 	}
 }
 
