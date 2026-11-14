@@ -395,8 +395,11 @@ fun PantallaBot(vm: AppVm, conPermiso: (() -> Unit) -> Unit, alVolver: () -> Uni
             Spacer(Modifier.height(Esp.xl))
             Box(Modifier.size(190.dp), Alignment.Center) {
                 if (trabajando && !reducir) Box(Modifier.size(150.dp).scale(pulso.value).clip(CircleShape).background(color.copy(alpha = 0.18f)))
-                Box(Modifier.size(150.dp).clip(CircleShape).background(color), Alignment.Center) {
-                    Text(if (verde) "✓" else if (trabajando) "…" else "•", color = Color.White, fontSize = 64.sp, fontWeight = FontWeight.Bold)
+                Box(Modifier.size(150.dp).clip(CircleShape).background(color).padding(4.dp), Alignment.Center) {
+                    AvatarAnimo(
+                        animoDeEstado(estadoVisible(estado, corriendo, bot?.vinculado == false)), Modifier.fillMaxSize().clip(CircleShape).testTag("avatar_animo"),
+                        "El bot, " + if (verde) "conectado" else if (trabajando) "trabajando" else "detenido",
+                    )
                 }
             }
             Spacer(Modifier.height(Esp.l))

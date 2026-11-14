@@ -33,6 +33,7 @@ data class ResultadoTodos(val mencionadas: Int, val total: Int, val mensajes: In
 data class ConfigFiltroGrupo(
     val exentoAdmins: Boolean = true, val exentoRangos: List<Long> = emptyList(), val permitidos: List<String> = emptyList(),
     val palabras: List<String> = emptyList(), val max: Int = 0, val segundos: Int = 0, val silencioMin: Int = 60, val aviso: String = "",
+    val modo: String = "todos", val bloqueados: List<String> = emptyList(), val acortadores: Boolean = false,
 )
 
 data class FiltroGrupo(
@@ -40,7 +41,8 @@ data class FiltroGrupo(
 ) {
     fun json(): String = JSONObject().put("chat", chat).put("filtro", filtro).put("activo", activo).put("accion", accion)
         .put("config", JSONObject().put("exentoAdmins", config.exentoAdmins).put("exentoRangos", JSONArray(config.exentoRangos)).put("permitidos", JSONArray(config.permitidos))
-            .put("palabras", JSONArray(config.palabras)).put("max", config.max).put("segundos", config.segundos).put("silencioMin", config.silencioMin).put("aviso", config.aviso)).toString()
+            .put("palabras", JSONArray(config.palabras)).put("max", config.max).put("segundos", config.segundos).put("silencioMin", config.silencioMin).put("aviso", config.aviso)
+            .put("modo", config.modo).put("bloqueados", JSONArray(config.bloqueados)).put("acortadores", config.acortadores)).toString()
 }
 
 /** Si se puede silenciar, fijar y archivar en MI WhatsApp (hacen falta las llaves que comparte el teléfono principal). */
@@ -53,6 +55,7 @@ val ACCIONES_FILTRO = listOf(
     AccionFiltro("avisarme", "Avisarme", "Te llega una notificación en este teléfono.", false),
     AccionFiltro("avisar_grupo", "Avisar al grupo", "Respondo al mensaje con un aviso amable.", false),
     AccionFiltro("borrar", "Borrar el mensaje", "Borra el mensaje para todos.", true),
+    AccionFiltro("borrar_advertir", "Borrar y advertir", "Borra el mensaje y suma una advertencia; al llegar al tope se aplica tu regla (por ejemplo, silenciar).", false),
     AccionFiltro("advertir", "Advertir", "Pone una advertencia a la persona.", false),
     AccionFiltro("silenciar", "Ignorarla (el bot no le contesta)", "El bot deja de contestarle un rato.", false),
     AccionFiltro("expulsar", "Expulsar", "La saca del grupo.", true),
@@ -117,7 +120,8 @@ object JsonGrupos {
         return FiltroGrupo(
             o.optString("chat"), o.optString("filtro"), o.optString("nombre"), o.optString("descripcion"), o.optBoolean("activo"), o.optString("accion", "avisarme"),
             ConfigFiltroGrupo(c.optBoolean("exentoAdmins", true), longs(c.optJSONArray("exentoRangos")), strs(c.optJSONArray("permitidos")), strs(c.optJSONArray("palabras")),
-                c.optInt("max"), c.optInt("segundos"), c.optInt("silencioMin", 60), c.optString("aviso")),
+                c.optInt("max"), c.optInt("segundos"), c.optInt("silencioMin", 60), c.optString("aviso"),
+                c.optString("modo", "todos"), strs(c.optJSONArray("bloqueados")), c.optBoolean("acortadores")),
         )
     }
     fun filtros(json: String) = lista(json) { filtro(it) }

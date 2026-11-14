@@ -158,6 +158,17 @@ class MotorFalso : Motor {
         return "{\"borrador\":$b,\"problemas\":$asistProblemas,\"visto\":$asistVisto,\"aplicado\":$asistAplicado,\"numeroPrueba\":\"$asistOtroNumero\",\"numeroPruebaDe\":\"asistente\"}"
     }
     override fun asistenteGuardar(bot: Long, borradorJson: String) { asistGuardado = borradorJson; llamadas += "asist_guardar" }
+    override fun asistenteBase(bot: Long): String {
+        llamadas += "asist_base"
+        asistGuardado = com.botchat.app.datos.BorradorAsistente(
+            grupos = true, bienvenidaTexto = "¡Hola {nombre}! 👋 Soy tu bot. Toca una opción para empezar.", menuTitulo = "¿Qué quieres hacer?",
+            menuOpciones = listOf(
+                com.botchat.app.datos.OpcionAsistente("GitHub", "https://github.com/x"), com.botchat.app.datos.OpcionAsistente("Menú", "m"),
+                com.botchat.app.datos.OpcionAsistente("Ayuda", "a"),
+            ),
+        ).json()
+        return asistenteEstado(bot)
+    }
     override fun asistenteVisto(bot: Long) { asistVisto = true; llamadas += "asist_visto" }
     override fun asistenteAplicar(bot: Long): String { llamadas += "asist_aplicar"; asistAplicado = true; return "{\"menu\":7,\"autos\":[3],\"avisos\":[]}" }
     override fun asistenteDeshacer(bot: Long) { llamadas += "asist_deshacer"; asistAplicado = false }

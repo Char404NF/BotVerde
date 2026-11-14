@@ -53,3 +53,9 @@ func TestEnlacesModoAdultos(t *testing.T) {
 		t.Error("DominioAcortador no distingue bien")
 	}
 }
+
+func TestAccionBorrarAdvertirEsValida(t *testing.T) {
+	if !EsAccionFiltro(AccBorrarAdv) || textoAccion(AccBorrarAdv) == AccBorrarAdv {
+		t.Error("la acción borrar_advertir no está registrada")
+	}
+}

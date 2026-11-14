@@ -107,6 +107,7 @@ private suspend fun <T> io(f: () -> T): T = withContext(Dispatchers.IO) { f() }
 
 suspend fun Repo.asistenteEstado(bot: Long) = io { JsonE9.estado(motor.asistenteEstado(bot)) }
 suspend fun Repo.asistenteGuardar(bot: Long, b: BorradorAsistente) = io { motor.asistenteGuardar(bot, b.json()) }
+suspend fun Repo.asistenteBase(bot: Long) = io { JsonE9.estado(motor.asistenteBase(bot)) }
 suspend fun Repo.asistenteVisto(bot: Long) = io { motor.asistenteVisto(bot) }
 suspend fun Repo.asistenteAplicar(bot: Long) = io { JsonE9.resultado(motor.asistenteAplicar(bot)) }
 suspend fun Repo.asistenteDeshacer(bot: Long) = io { motor.asistenteDeshacer(bot) }

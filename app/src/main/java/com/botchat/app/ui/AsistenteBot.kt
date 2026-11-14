@@ -3,18 +3,27 @@
 package com.botchat.app.ui
 
 import androidx.activity.compose.BackHandler
+import android.content.Context
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.botchat.app.datos.AdjuntoSubido
 import com.botchat.app.datos.BorradorAsistente
 import com.botchat.app.datos.EstadoAsistente
 import com.botchat.app.datos.GrupoAdmin
@@ -22,13 +31,16 @@ import com.botchat.app.datos.OpcionAsistente
 import com.botchat.app.datos.Repo
 import com.botchat.app.datos.ResultadoAsistente
 import com.botchat.app.datos.asistenteAplicar
+import com.botchat.app.datos.asistenteBase
 import com.botchat.app.datos.asistenteDeshacer
 import com.botchat.app.datos.asistenteEstado
 import com.botchat.app.datos.asistenteGuardar
 import com.botchat.app.datos.asistenteProbar
 import com.botchat.app.datos.asistenteVisto
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // Asistente «Crea tu bot» (0.6.0, E9): cinco pasos, uno por pantalla, con botones grandes (Siguiente / Saltar) y un resumen final.
 // El borrador se guarda solo (cifrado, en Go) y se puede dejar a medias y retomar. Aplicar crea todo de golpe y se puede deshacer.
@@ -195,6 +207,7 @@ private fun TarjetaInterruptor(titulo: String, frase: String, activo: Boolean, e
 
 @Composable
 private fun PasoDonde(botId: Long, b: BorradorAsistente, alCambiar: (BorradorAsistente) -> Unit) {
+    TarjetaBotBase(botId, alCambiar)
     Titulo("¿Dónde responde tu bot?", "Elige los lugares donde quieres que conteste. Siempre contesta él, nunca escribe primero.")
     TarjetaInterruptor(
         "Chats privados", "Contesta a quien te escribe en privado: bienvenida, menú y respuestas.", b.privados, "asist_privados",
@@ -244,6 +257,7 @@ private fun PasoBienvenida(botId: Long, b: BorradorAsistente, alCambiar: (Borrad
         label = { Text("Tu mensaje") }, minLines = 3,
     )
     SelectorAdjuntos(botId, b.bienvenidaAdjuntos, "asist", { alCambiar(b.copy(bienvenidaAdjuntos = it)) })
+    SelectorAnimo(botId, b.bienvenidaAdjuntos) { alCambiar(b.copy(bienvenidaAdjuntos = it)) }
     Text("¿Cuándo la mando?", style = MaterialTheme.typography.titleSmall)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.s), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
         FilterChip(b.bienvenidaCuando == "primera", { alCambiar(b.copy(bienvenidaCuando = "primera")) }, { Text("La primera vez que escribe") }, Modifier.heightIn(min = 48.dp).testTag("asist_cuando_primera"))
@@ -436,4 +450,81 @@ fun AvisoAsistenteBot(alEmpezar: () -> Unit, alDespues: () -> Unit) {
         confirmButton = { TextButton(alEmpezar, Modifier.testTag("aviso_asistente_empezar")) { Text("Empezar") } },
         dismissButton = { TextButton(alDespues, Modifier.testTag("aviso_asistente_despues")) { Text("Ahora no") } },
     )
+}
+
+
+// ---------- Bot base y ánimos del avatar ----------
+
+private const val PREFIJO_AVATAR = "avatar_"
+
+/** Copia la imagen del ánimo a la caché y la guarda como adjunto del bot (cifrada, como cualquier otro archivo). */
+private suspend fun subirAnimo(ctx: Context, botId: Long, animo: String): AdjuntoSubido? = runCatching {
+    val f = java.io.File(ctx.cacheDir, "$PREFIJO_AVATAR$animo.png")
+    withContext(Dispatchers.IO) { ctx.assets.open("animos/$animo.png").use { i -> f.outputStream().use { o -> i.copyTo(o) } } }
+    Repo.subirAdjunto(botId, f.path, "imagen", "image/png", f.name)
+}.getOrNull()
+
+/** Un toque: deja el bot listo con saludo, foto del avatar y tres opciones (GitHub, Menú y Ayuda). Todo se puede cambiar después. */
+@Composable
+private fun TarjetaBotBase(botId: Long, alCambiar: (BorradorAsistente) -> Unit) {
+    val scope = rememberCoroutineScope()
+    val ctx = LocalContext.current
+    var ocupado by remember { mutableStateOf(false) }
+    var listo by remember { mutableStateOf(false) }
+    Card(Modifier.fillMaxWidth().testTag("asist_bot_base"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+        Column(Modifier.padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Esp.m)) {
+                AvatarAnimo("contento", Modifier.size(64.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Bot base, listo para usar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Un saludo con foto y tres opciones: GitHub, Menú y Ayuda. Después cambias lo que quieras.", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            Button(
+                {
+                    ocupado = true
+                    scope.launch {
+                        val e = runCatching { Repo.asistenteBase(botId) }.getOrNull()
+                        if (e != null) {
+                            val foto = subirAnimo(ctx, botId, "feliz")
+                            alCambiar(if (foto != null) e.borrador.copy(bienvenidaAdjuntos = listOf(foto)) else e.borrador)
+                            listo = true
+                        }
+                        ocupado = false
+                    }
+                },
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("asist_usar_base"), enabled = !ocupado && !listo,
+            ) { Text(if (listo) "Listo: revisa los pasos y cambia lo que quieras" else "Usar el bot base") }
+        }
+    }
+}
+
+/** Elige con qué cara sale el avatar en el saludo (feliz, pensando, guiño…). Tocar la que está puesta la quita. */
+@Composable
+private fun SelectorAnimo(botId: Long, adjuntos: List<AdjuntoSubido>, alCambiar: (List<AdjuntoSubido>) -> Unit) {
+    val scope = rememberCoroutineScope()
+    val ctx = LocalContext.current
+    val actual = adjuntos.firstOrNull { it.nombre.startsWith(PREFIJO_AVATAR) }?.nombre?.removePrefix(PREFIJO_AVATAR)?.removeSuffix(".png")
+    Text("Foto del avatar en el saludo", style = MaterialTheme.typography.titleSmall)
+    Text("Elige con qué cara saluda tu bot.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
+        ANIMOS.forEach { a ->
+            val marcado = a == actual
+            Column(
+                Modifier.width(72.dp).clip(RoundedCornerShape(12.dp)).clickable {
+                    scope.launch {
+                        adjuntos.filter { it.nombre.startsWith(PREFIJO_AVATAR) }.forEach { runCatching { Repo.borrarAdjunto(botId, it.id) } }
+                        val sin = adjuntos.filterNot { it.nombre.startsWith(PREFIJO_AVATAR) }
+                        alCambiar(if (marcado) sin else (subirAnimo(ctx, botId, a)?.let { listOf(it) + sin } ?: sin))
+                    }
+                }.testTag("animo_$a"),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(Modifier.size(64.dp).clip(CircleShape).border(if (marcado) 3.dp else 1.dp, if (marcado) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, CircleShape)) {
+                    AvatarAnimo(a, Modifier.fillMaxSize())
+                }
+                Text(nombreAnimo(a), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
 }

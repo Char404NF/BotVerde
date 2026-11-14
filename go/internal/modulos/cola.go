@@ -389,6 +389,9 @@ func (c *Cola) procesar(ctx context.Context, it *item, now time.Time) {
 	// 5) Enviar.
 	cx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	var err error
+	if i.Accion == nil {
+		c.parecerHumano(cx, i)
+	}
 	if i.Accion != nil {
 		err = i.Accion(cx)
 	} else if i.Medio != nil {
@@ -430,6 +433,40 @@ func (c *Cola) procesar(ctx context.Context, it *item, now time.Time) {
 	g.Log(fmt.Sprintf("Una iniciativa del módulo %s no salió.", i.Modulo))
 	if fallos >= g.Alm.AjusteIniInt(g.BotID, "ini_errores") {
 		g.ModoSeguro("errores")
+	}
+}
+
+// escribe es lo que un Enviador puede ofrecer para mostrar "escribiendo…" (es opcional).
+type escribe interface {
+	Escribiendo(ctx context.Context, chat string, si bool)
+}
+
+// tiempoDeEscribir es cuánto "teclea" un mensaje de ese largo: casi un segundo y medio fijo más 35 ms por letra, con un poco de azar
+// (hasta un tercio más) y como máximo 7 s. Un mensaje corto no tarda más de 2 o 3 s.
+func tiempoDeEscribir(letras int, azar int64) time.Duration {
+	base := 1200*time.Millisecond + time.Duration(letras)*35*time.Millisecond
+	if base > 6*time.Second {
+		base = 6 * time.Second
+	}
+	return base + time.Duration(azar)*base/(3*1000)
+}
+
+// parecerHumano muestra "escribiendo…" y espera un rato proporcional al texto antes de mandar, para que los mensajes de los módulos
+// (programados, difusión, bienvenidas) no salgan de golpe como un robot. Si el Enviador no sabe mostrarlo, solo espera. Las pruebas lo apagan.
+func (c *Cola) parecerHumano(ctx context.Context, i Iniciativa) {
+	if c.g.SinPausaArchivos {
+		return
+	}
+	letras := len([]rune(i.Texto))
+	if i.Medio != nil {
+		letras = len([]rune(i.Medio.Pie))
+	}
+	if e, ok := c.g.Enviador.(escribe); ok {
+		e.Escribiendo(ctx, i.Chat, true)
+	}
+	select {
+	case <-ctx.Done():
+	case <-time.After(tiempoDeEscribir(letras, c.g.Aleatorio(1000))):
 	}
 }
 

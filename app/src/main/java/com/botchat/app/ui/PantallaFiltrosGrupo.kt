@@ -139,8 +139,30 @@ private fun TarjetaFiltro(f: FiltroGrupo, admin: Boolean, estadoConocido: Boolea
             }
             if (!f.activo) return@Column
             when (f.filtro) {
-                "enlaces" -> ListaEditable("Dominios permitidos", "Un dominio permitido deja pasar también sus subdominios (youtube.com permite m.youtube.com). Sin lista, todos los enlaces cuentan.", c.permitidos, "permitido") { cfg(c.copy(permitidos = it)) }
-                "palabras" -> ListaEditable("Palabras o frases prohibidas", "No importan las mayúsculas ni los acentos. Cuenta la palabra completa.", c.palabras, "palabra") { cfg(c.copy(palabras = it)) }
+                "enlaces" -> {
+                    Text("Qué enlaces cuentan", style = MaterialTheme.typography.labelLarge)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
+                        FilterChip(c.modo == "adultos", { haptica(Toque.Suave); cfg(c.copy(modo = "adultos")) }, { Text("Solo adultos y peligrosos") }, modifier = Modifier.testTag("modo_adultos"))
+                        FilterChip(c.modo != "adultos", { haptica(Toque.Suave); cfg(c.copy(modo = "todos")) }, { Text("Todos los enlaces") }, modifier = Modifier.testTag("modo_todos"))
+                    }
+                    Text(
+                        if (c.modo == "adultos") "Detecto páginas de contenido adulto y las que tú agregues abajo. Los demás enlaces pasan."
+                        else "Todos los enlaces cuentan, menos los dominios permitidos.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (c.modo == "adultos") {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Bloquear acortadores", style = MaterialTheme.typography.bodyMedium)
+                                Text("bit.ly, tinyurl… esconden a dónde lleva el enlace.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(c.acortadores, { haptica(Toque.Suave); cfg(c.copy(acortadores = it)) }, Modifier.testTag("sw_acortadores"))
+                        }
+                        ListaEditable("Dominios bloqueados", "Páginas que nunca quieres, además de las de contenido adulto.", c.bloqueados, "bloqueado") { cfg(c.copy(bloqueados = it)) }
+                    }
+                    ListaEditable("Dominios permitidos", "Un dominio permitido deja pasar también sus subdominios (youtube.com permite m.youtube.com).", c.permitidos, "permitido") { cfg(c.copy(permitidos = it)) }
+                }
+                "palabras" -> ListaEditable("Palabras o frases prohibidas", "Entiendo mayúsculas, acentos y trucos como p3nd3j0, p.u.t.o o letras repetidas. Cuenta la palabra completa.", c.palabras, "palabra") { cfg(c.copy(palabras = it)) }
                 "repetidos" -> {
                     Paso("Veces seguidas", c.max, 2, 50, 1, "rep_max") { cfg(c.copy(max = it)) }
                     Paso("En cuántos segundos", c.segundos, 10, 3600, 10, "rep_seg") { cfg(c.copy(segundos = it)) }

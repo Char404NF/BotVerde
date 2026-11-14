@@ -273,3 +273,17 @@ func TestSaltarUnaSeccionNoCreaNiCambiaNada(t *testing.T) {
 		t.Fatalf("saltado no debe tocar nada: %+v", c)
 	}
 }
+
+func TestNuevoBaseTieneTresOpcionesYSePuedeAplicar(t *testing.T) {
+	b := NuevoBase()
+	if len(b.Menu.Opciones) != 3 || b.Menu.Opciones[0].Texto != "GitHub" || b.Menu.Opciones[1].Texto != "Menú" || b.Menu.Opciones[2].Texto != "Ayuda" {
+		t.Fatalf("%+v", b.Menu.Opciones)
+	}
+	if !strings.Contains(b.Menu.Opciones[0].Respuesta, RepoBotBase) {
+		t.Fatal("el botón GitHub no lleva al repositorio")
+	}
+	b.Normalizar()
+	if p := b.Problemas(); len(p) > 0 {
+		t.Fatalf("el bot base debe estar listo para usar: %v", p)
+	}
+}

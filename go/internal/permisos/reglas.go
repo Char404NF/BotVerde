@@ -187,6 +187,20 @@ func colorValido(c string) bool {
 	return true
 }
 
+// RolAdmin es el rango «Admin» de fábrica: modera los grupos (silenciar, advertir, expulsar, borrar mensajes, cerrar el grupo, filtros) y
+// atiende chats. No puede actuar sobre el Dueño ni sobre otros Admin (la jerarquía solo deja actuar hacia abajo). No da ni quita rangos.
+func RolAdmin() almacen.Rol {
+	m := map[string]almacen.Alcance{}
+	for _, id := range []string{
+		"personas.silenciar", "personas.advertir", "personas.notas", "personas.ficha", "chat.pausar", "chat.tomar_control", "chat.estado", "chat.etiquetas",
+		"grupos.info", "grupos.admins", "grupos.mencionar_todos", "grupos.ranking", "grupos.inactivos", "grupos.cerrar", "grupos.expulsar",
+		"grupos.borrar_mensaje", "grupos.solicitudes", "silencio.silenciar", "silencio.ver", "grupos.filtros", "util.notas", "util.pendientes", "rangos.ver",
+	} {
+		m[id] = almacen.Alcance{}
+	}
+	return almacen.Rol{Nombre: "Admin", Color: "#E0A100", Plantilla: "admin", LimiteMin: 30, MenusModo: "todos", Casillas: m}
+}
+
 // Plantillas son los rangos de ejemplo que se crean la primera vez (se pueden editar o borrar).
 func Plantillas() []almacen.Rol {
 	solo := func(ids ...string) map[string]almacen.Alcance {
@@ -197,6 +211,7 @@ func Plantillas() []almacen.Rol {
 		return m
 	}
 	return []almacen.Rol{
+		RolAdmin(),
 		{
 			Nombre: "Ayudante", Color: "#2EC4CB", Plantilla: "ayudante", LimiteMin: 20, MenusModo: "todos",
 			Casillas: solo("personas.silenciar", "personas.advertir", "personas.notas", "personas.ficha", "chat.pausar", "chat.tomar_control", "chat.estado",

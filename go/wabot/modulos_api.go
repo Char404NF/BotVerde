@@ -52,6 +52,11 @@ func (e enviadorModulos) Medio(ctx context.Context, chat string, a envio.Adjunto
 	return nil
 }
 
+// Escribiendo muestra (o quita) "escribiendo…" antes de un envío de módulo (difusión, programados): así el mensaje no aparece de golpe.
+func (e enviadorModulos) Escribiendo(ctx context.Context, chat string, si bool) {
+	_ = e.s.envio.Escribiendo(ctx, chat, si)
+}
+
 func (e enviadorModulos) Conectado() bool { return e.s.cli.IsConnected() && e.s.cli.IsLoggedIn() }
 
 // accionesModulos son las acciones de grupo que usan los módulos H1 y H4, hechas con el servicio de grupos del bot.

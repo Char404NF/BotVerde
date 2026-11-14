@@ -120,6 +120,24 @@ func Nuevo() *Borrador {
 	return b
 }
 
+// RepoBotBase es el proyecto del bot (código abierto). El botón «GitHub» del saludo lleva aquí.
+const RepoBotBase = "https://github.com/Char404NF/BotVerde"
+
+// NuevoBase es el borrador del «bot base»: listo para usar, con un saludo y tres opciones (GitHub, Menú y Ayuda). Todo se puede cambiar
+// en los pasos del asistente, como cualquier otro borrador.
+func NuevoBase() *Borrador {
+	b := Nuevo()
+	b.Grupos = true
+	b.Bienvenida.Texto = "¡Hola {nombre}! 👋 Soy tu bot. Toca una opción para empezar."
+	b.Menu.Titulo = "¿Qué quieres hacer?"
+	b.Menu.Opciones = []Opcion{
+		{"GitHub", "Este proyecto es de código abierto 💚\n" + RepoBotBase},
+		{"Menú", "Esto puedes hacer:\n• !ayuda — te explico cada comando\n• !reglas — las reglas del grupo\n• !grupo — datos del grupo\n\nLos administradores y el dueño tienen más comandos: escribe !ayuda para ver los tuyos."},
+		{"Ayuda", "Escribe *!ayuda* para ver lo que puedes hacer, o *!ayuda* y el nombre de un comando (por ejemplo *!ayuda silenciar*) y te lo explico con un ejemplo. Si te pierdes, escribe *menu*."},
+	}
+	return b
+}
+
 // Leer carga el borrador guardado (o uno nuevo si no hay).
 func Leer(a *almacen.Almacen, botID int64) *Borrador {
 	if raw := a.LeerBorradorAsistente(botID); len(raw) > 0 {

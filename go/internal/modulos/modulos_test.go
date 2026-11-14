@@ -1124,3 +1124,18 @@ func TestTrabajadorRealEnvia(t *testing.T) {
 		t.Fatal("el trabajador no envió")
 	}
 }
+
+func TestTiempoDeEscribirSeAcomodaAlTexto(t *testing.T) {
+	corto := tiempoDeEscribir(5, 0)
+	largo := tiempoDeEscribir(100, 0)
+	enorme := tiempoDeEscribir(5000, 1000)
+	if corto < time.Second || corto > 3*time.Second {
+		t.Errorf("un mensaje corto debe tardar de 1 a 3 s, tardó %v", corto)
+	}
+	if largo <= corto {
+		t.Errorf("un mensaje largo debe tardar más: %v vs %v", largo, corto)
+	}
+	if enorme > 9*time.Second {
+		t.Errorf("tiene tope: %v", enorme)
+	}
+}

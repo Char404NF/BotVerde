@@ -198,6 +198,34 @@ func (s *Servicio) GuardarRol(r almacen.Rol) (int64, error) {
 	return r.ID, s.Alm.GuardarRol(s.BotID, r)
 }
 
+// AsegurarAdmin deja creado el rango «Admin» de fábrica (justo debajo del Dueño) si el bot todavía no lo tiene. Devuelve su id. Si ya hay
+// uno, no toca nada: lo que la persona editó se respeta.
+func (s *Servicio) AsegurarAdmin() (int64, error) {
+	roles, err := s.Alm.ListarRoles(s.BotID)
+	if err != nil {
+		return 0, err
+	}
+	for _, r := range roles {
+		if r.Plantilla == "admin" {
+			return r.ID, nil
+		}
+	}
+	id, err := s.GuardarRol(RolAdmin())
+	if err != nil {
+		return 0, err
+	}
+	orden := []int64{id}
+	for _, r := range roles {
+		if !r.EsDueno {
+			orden = append(orden, r.ID)
+		}
+	}
+	if err := s.Alm.ReordenarRoles(s.BotID, orden); err != nil {
+		return id, err
+	}
+	return id, nil
+}
+
 // ---------- desconocidos y grupos ----------
 
 // Políticas para desconocidos.

@@ -1,6 +1,7 @@
 package wabot
 
 import (
+	"botchat/internal/permisos"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -52,6 +53,27 @@ func AsistenteEstado(botID int64) (string, error) {
 		e.NumeroPrb, e.NumeroOrig = a.AjusteBot(botID, "lab_prueba_chat"), "laboratorio"
 	}
 	return js(e, nil)
+}
+
+// AsistenteBase deja guardado el borrador del «bot base» (listo para usar) y devuelve el estado como AsistenteEstado. Lo ya aplicado se conserva.
+func AsistenteBase(botID int64) (string, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return "", err
+	}
+	b := asistente.NuevoBase()
+	if viejo := asistente.Leer(a, botID); viejo.Creado != nil {
+		b.Creado = viejo.Creado
+	}
+	b.DesdeAjustes(a, botID)
+	if err := asistente.Guardar(a, botID, b); err != nil {
+		return "", err
+	}
+	// El rango Admin de fábrica (si el bot todavía no lo tiene), para que el bot base ya traiga sus tres niveles: Dueño, Admin y todos los demás.
+	if p, err := permisos.Nuevo(a, botID); err == nil {
+		_, _ = p.AsegurarAdmin()
+	}
+	return AsistenteEstado(botID)
 }
 
 // AsistenteGuardar guarda el borrador (JSON) con el paso en que va.

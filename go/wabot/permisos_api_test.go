@@ -47,7 +47,7 @@ func TestApiRangosDeExtremoAExtremo(t *testing.T) {
 		t.Fatal("catálogo")
 	}
 	roles := decodifica[[]almacen.Rol](t, func() (string, error) { return ListarRangos(1) })
-	if len(roles) != 3 || !roles[0].EsDueno || roles[1].Nombre != "Ayudante" || roles[2].Nombre != "Cliente VIP" {
+	if len(roles) != 4 || !roles[0].EsDueno || roles[1].Nombre != "Admin" || roles[2].Nombre != "Ayudante" || roles[3].Nombre != "Cliente VIP" {
 		t.Fatalf("%+v", roles)
 	}
 	// Crear con alcance por casilla, menús visibles y límite.
@@ -71,7 +71,7 @@ func TestApiRangosDeExtremoAExtremo(t *testing.T) {
 		t.Fatal("editar el Dueño")
 	}
 	// Reordenar.
-	if err := ReordenarRangos(1, `[`+itoa(id)+`,`+itoa(roles[1].ID)+`,`+itoa(roles[2].ID)+`]`); err != nil {
+	if err := ReordenarRangos(1, `[`+itoa(id)+`,`+itoa(roles[1].ID)+`,`+itoa(roles[2].ID)+`,`+itoa(roles[3].ID)+`]`); err != nil {
 		t.Fatal(err)
 	}
 	roles = decodifica[[]almacen.Rol](t, func() (string, error) { return ListarRangos(1) })

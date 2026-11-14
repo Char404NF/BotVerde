@@ -154,8 +154,8 @@ func init() {
 		Casilla{ID: "chat.reportar", Nombre: "Reportar un mensaje", Descripcion: "Avisa al dueño de un mensaje (solo le llega una notificación).", Grupo: GChat, Base: true},
 
 		// ---- Grupos sin ser admin (Bloque E) ----
-		Casilla{ID: "grupos.info", Nombre: "Información del grupo", Descripcion: "Ve datos del grupo.", Grupo: GGruposLibre, Privado: false, Grupos: true},
-		Casilla{ID: "grupos.admins", Nombre: "Lista de administradores", Descripcion: "Ve quiénes administran el grupo.", Grupo: GGruposLibre, Grupos: true},
+		Casilla{ID: "grupos.info", Nombre: "Información del grupo", Descripcion: "Ve datos del grupo.", Grupo: GGruposLibre, Privado: false, Grupos: true, Base: true},
+		Casilla{ID: "grupos.admins", Nombre: "Lista de administradores", Descripcion: "Ve quiénes administran el grupo.", Grupo: GGruposLibre, Grupos: true, Base: true},
 		Casilla{ID: "grupos.mencionar_todos", Nombre: "Mencionar a todos", Descripcion: "Menciona a todo el grupo de una vez.", Grupo: GGruposLibre, Riesgo: RiesgoAlto, Grupos: true},
 		Casilla{ID: "grupos.ranking", Nombre: "Ranking de actividad", Descripcion: "Ve quién escribe más en el grupo.", Grupo: GGruposLibre, Grupos: true},
 		Casilla{ID: "grupos.inactivos", Nombre: "Ver inactivos", Descripcion: "Ve quiénes no escriben hace tiempo.", Grupo: GGruposLibre, Grupos: true},

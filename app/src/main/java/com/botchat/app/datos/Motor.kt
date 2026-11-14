@@ -78,6 +78,7 @@ interface Motor {
     /** Asistente «Crea tu bot» (E9). */
     fun asistenteEstado(bot: Long): String
     fun asistenteGuardar(bot: Long, borradorJson: String)
+    fun asistenteBase(bot: Long): String
     fun asistenteVisto(bot: Long)
     fun asistenteAplicar(bot: Long): String
     fun asistenteDeshacer(bot: Long)
@@ -420,6 +421,7 @@ object MotorGo : Motor {
     override fun fijarConservarPortada(bot: Long, si: Boolean) = Wabot.fijarConservarPortada(bot, si)
     override fun asistenteEstado(bot: Long) = Wabot.asistenteEstado(bot)
     override fun asistenteGuardar(bot: Long, borradorJson: String) = Wabot.asistenteGuardar(bot, borradorJson)
+    override fun asistenteBase(bot: Long) = Wabot.asistenteBase(bot)
     override fun asistenteVisto(bot: Long) = Wabot.asistenteVisto(bot)
     override fun asistenteAplicar(bot: Long) = Wabot.asistenteAplicar(bot)
     override fun asistenteDeshacer(bot: Long) = Wabot.asistenteDeshacer(bot)

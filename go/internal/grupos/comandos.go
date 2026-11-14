@@ -228,6 +228,8 @@ func textoAccion(a string) string {
 		return "borrar el mensaje"
 	case AccAdvertir:
 		return "advertir"
+	case AccBorrarAdv:
+		return "borrar el mensaje y advertir"
 	case AccSilenciar:
 		return "ignorar al bot para esa persona (que no le conteste)"
 	case AccExpulsar:

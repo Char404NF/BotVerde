@@ -34,12 +34,13 @@ const (
 	AccAvisarGrupo = "avisar_grupo" // respondo en el grupo al mensaje (aviso amable)
 	AccBorrar      = "borrar"       // borro el mensaje (solo siendo administrador)
 	AccAdvertir    = "advertir"     // pongo una advertencia (al tope se aplica la regla de advertencias)
+	AccBorrarAdv   = "borrar_advertir" // borro el mensaje (si soy administrador) y pongo una advertencia: la escalera completa
 	AccSilenciar   = "silenciar"    // el bot deja de contestarle a esa persona por un rato
 	AccExpulsar    = "expulsar"     // la saco del grupo (solo siendo administrador)
 )
 
 // Acciones válidas, en el orden de la pantalla.
-var Acciones = []string{AccAvisarme, AccAvisarGrupo, AccBorrar, AccAdvertir, AccSilenciar, AccExpulsar}
+var Acciones = []string{AccAvisarme, AccAvisarGrupo, AccBorrar, AccBorrarAdv, AccAdvertir, AccSilenciar, AccExpulsar}
 
 // EsAccionFiltro dice si es una acción válida.
 func EsAccionFiltro(a string) bool {
@@ -630,6 +631,22 @@ func (s *Servicio) Aplicar(ctx context.Context, inf *Infraccion) {
 				reg("ok", "")
 			}
 		}
+	case AccBorrarAdv:
+		// primero borra (solo siendo administrador; si no, sigue con la advertencia), luego advierte: al tope se aplica la regla
+		if admin, err := s.EsAdmin(ctx, inf.Chat); err == nil && admin {
+			if err := s.BorrarMensajeAjeno(ctx, inf.Chat, inf.MensajeID, inf.Persona); err != nil {
+				reg("no_hecho", ",borrar="+Explicar(err).Error())
+			}
+		}
+		if s.Advertir == nil {
+			soloAlerta("las advertencias no están disponibles")
+			return
+		}
+		if err := s.Advertir(ctx, inf.Persona, inf.Chat, inf.MensajeID, "filtro "+strings.ToLower(f.Nombre)); err != nil {
+			soloAlerta("no se pudo advertir")
+			return
+		}
+		reg("ok", "")
 	case AccAdvertir:
 		if s.Advertir == nil {
 			soloAlerta("las advertencias no están disponibles")
