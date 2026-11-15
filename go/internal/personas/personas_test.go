@@ -545,9 +545,10 @@ func TestReportarSoloAvisaYNoGuardaElTextoDelMensaje(t *testing.T) {
 	_, _ = e.alm.GuardarMensaje(&almacen.Mensaje{ID: "BAD", ChatJID: grupo, BotID: 1, RemitenteJID: pnLuis, Tipo: almacen.TipoTexto, Texto: "texto ofensivo que no debe copiarse", TS: e.hora.Unix()})
 	// Cualquiera (sin rango) puede reportar: responde al mensaje.
 	r := e.enGrupo(pnRosa, "!reportar me insultó", pnLuis, "BAD")
-	if r.Texto != "" {
-		t.Fatalf("el bot NO responde en el chat: %q", r.Texto)
+	if r.Texto != "Gracias, ya avisé." {
+		t.Fatalf("por defecto confirma a quien reporta: %q", r.Texto)
 	}
+	_ = e.alm.FijarAjusteBot(1, "reportar_gracias", "0")
 	av, _ := e.alm.AvisosRecientes(1, 5)
 	if len(av) != 1 {
 		t.Fatalf("avisos: %+v", av)
@@ -567,7 +568,10 @@ func TestReportarSoloAvisaYNoGuardaElTextoDelMensaje(t *testing.T) {
 	if r := e.enGrupo(pnRosa, "!reportar", "", ""); !strings.Contains(r.Texto, "esponde al mensaje") {
 		t.Fatalf("%q", r.Texto)
 	}
-	// "Gracias, ya avisé": opcional, apagado por defecto.
+	// Apagado: no contesta nada, solo avisa al dueño.
+	if r := e.enGrupo(pnRosa, "!reportar", pnLuis, "BAD"); r.Texto != "" {
+		t.Fatalf("apagado no responde: %q", r.Texto)
+	}
 	_ = e.alm.FijarAjusteBot(1, "reportar_gracias", "1")
 	if r := e.enGrupo(pnRosa, "!reportar", pnLuis, "BAD"); r.Texto != "Gracias, ya avisé." {
 		t.Fatalf("%q", r.Texto)
@@ -575,6 +579,25 @@ func TestReportarSoloAvisaYNoGuardaElTextoDelMensaje(t *testing.T) {
 	_ = e.alm.FijarAjusteBot(1, "reportar_texto", "Listo, el dueño lo verá")
 	if r := e.enGrupo(pnRosa, "!reportar", pnLuis, "BAD"); r.Texto != "Listo, el dueño lo verá" {
 		t.Fatalf("%q", r.Texto)
+	}
+}
+
+func TestNoSePuedeReportarUnMensajePropioNiDelBot(t *testing.T) {
+	e := nuevoEntorno(t)
+	avisos := func() int { a, _ := e.alm.AvisosRecientes(1, 20); return len(a) }
+	// un mensaje propio
+	r := e.enGrupo(pnRosa, "!reportar", pnRosa, "MIO")
+	if !strings.Contains(r.Texto, "mensaje tuyo") || avisos() != 0 {
+		t.Fatalf("propio: %q avisos=%d", r.Texto, avisos())
+	}
+	// un mensaje del bot (la cuenta del dueño: «propio» en las pruebas)
+	r = e.enGrupo(pnRosa, "!reportar", propio, "BOT")
+	if !strings.Contains(r.Texto, "mensaje del bot") || avisos() != 0 {
+		t.Fatalf("bot: %q avisos=%d", r.Texto, avisos())
+	}
+	// el de otra persona sí
+	if r := e.enGrupo(pnRosa, "!reportar", pnLuis, "BAD"); r.Texto == "" || avisos() != 1 {
+		t.Fatalf("otra persona: %q avisos=%d", r.Texto, avisos())
 	}
 }
 
