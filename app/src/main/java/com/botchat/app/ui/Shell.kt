@@ -168,18 +168,16 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
         nav.navigate(ruta) { popUpTo("inicio") { saveState = true }; launchSingleTop = true; restoreState = true }
     }
 
+    // Las pestañas dibujan su barra dentro de su propia pantalla: barra y contenido entran y salen juntos, igual que al abrir un chat.
+    val conBarra: @Composable (String, @Composable () -> Unit) -> Unit = { titulo, contenido ->
+        androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
+            BarraApp(estadoVisible(estado, corriendo, !bot.vinculado), { nav.navigate("estado_bot") }, titulo)
+            Box(Modifier.weight(1f).fillMaxSize()) { contenido() }
+        }
+    }
+
     Scaffold(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
-        topBar = {
-            // La lista de chats dibuja su propia barra (menú, selección); las demás pestañas usan esta con su título.
-            // Las barras se quitan al instante (sin fundido de salida): si se desvanecieran, el chat ganaría su alto al final y los mensajes se correrían de golpe.
-            AnimatedVisibility(principal && rutaActual != "inicio", enter = Transiciones.fundidoEntra(modo), exit = ExitTransition.None) {
-                BarraApp(
-                    estadoVisible(estado, corriendo, !bot.vinculado), { nav.navigate("estado_bot") },
-                    when (rutaActual) { "grupos" -> "Grupos"; "bot" -> "Bot"; else -> "Ajustes" },
-                )
-            }
-        },
         bottomBar = {
             AnimatedVisibility(principal, enter = Transiciones.fundidoEntra(modo), exit = ExitTransition.None) {
                 NavigationBar {
@@ -218,8 +216,9 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         PantallaPersonas(bot.id, alAbrir = { nav.navigate("chat/${enc(it)}") { popUpTo("contactos") { inclusive = true } } })
                     }
                 }
-                composable("grupos") { PantallaGrupos(bot.id, alAbrir = { nav.navigate("grupo_info/${enc(it)}") }) }
+                composable("grupos") { conBarra("Grupos") { PantallaGrupos(bot.id, alAbrir = { nav.navigate("grupo_info/${enc(it)}") }) } }
                 composable("bot") {
+                    conBarra("Bot") {
                     PantallaCentroBot(
                         alMiBot = { nav.navigate("estado_bot") }, alAlmacenamiento = { nav.navigate("espacio") }, alAuditoria = { nav.navigate("auditoria") },
                         alSilencios = { nav.navigate("silencios") }, alAdvertencias = { nav.navigate("advertencias") }, alEtiquetas = { nav.navigate("etiquetas") },
@@ -227,6 +226,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         alLimites = { nav.navigate("iniciativa") }, alLaboratorio = { nav.navigate("laboratorio") }, alActividad = { nav.navigate("actividad") },
                         alAsistente = { nav.navigate("asistente_bot") },
                     )
+                    }
                 }
                 // E9: asistente «Crea tu bot» (5 pasos). Reutiliza el editor completo de menús y los mensajes automáticos para seguir editando.
                 composable("asistente_bot") {
@@ -383,7 +383,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         cuenta = runCatching { Repo.contarSolicitudes(bot.id) }.getOrDefault(0)
                         Repo.cambios.collect { evs -> if ("solicitudes" in evs) cuenta = runCatching { Repo.contarSolicitudes(bot.id) }.getOrDefault(0) }
                     }
-                    Box(Modifier.fillMaxSize()) {
+                    conBarra("Ajustes") {
                     PantallaAjustes(ajustes, alPermisos = { nav.navigate("permisos") }, pendientesSolicitudes = cuenta, alSeguridad = { nav.navigate("seguridad") }, alDescargas = { nav.navigate("descargas") }, alBot = { nav.navigate("estado_bot") }, alAvanzado = { nav.navigate("avanzado") }, alEstadisticas = { nav.navigate("estadisticas") }, alPrivacidad = { nav.navigate("privacidad") }, alAutomatizaciones = { nav.navigate("automatizaciones") }, alModulos = { nav.navigate("modulos") }, alIniciativa = { nav.navigate("iniciativa") },
                         alAvisos = { nav.navigate("avisos") }, alComandosPropios = { nav.navigate("comandos_propios") }, alEtiquetas = { nav.navigate("etiquetas") }, alAdvertencias = { nav.navigate("advertencias") }, alUtilidades = { nav.navigate("utilidades") })
                     }

@@ -119,8 +119,7 @@ fun Asistente(vm: AppVm, conPermiso: (() -> Unit) -> Unit) {
         transitionSpec = {
             val adelante = targetState.ordinal >= initialState.ordinal
             if (reducir) fadeIn(tween(0)) togetherWith fadeOut(tween(0))
-            else (slideInHorizontally(tween(Mov.LARGA)) { if (adelante) it / 5 else -it / 5 } + fadeIn(tween(Mov.NORMAL))) togetherWith
-                (slideOutHorizontally(tween(Mov.LARGA)) { if (adelante) -it / 5 else it / 5 } + fadeOut(tween(Mov.CORTA)))
+            else fadeIn(tween(220, 80, androidx.compose.animation.core.LinearOutSlowInEasing)) togetherWith fadeOut(tween(100))
         },
         label = "asistente",
     ) { p ->

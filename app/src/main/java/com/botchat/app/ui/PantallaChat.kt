@@ -483,13 +483,13 @@ fun PantallaChat(
                     val diaArriba by remember { derivedStateOf { estadoLista.layoutInfo.visibleItemsInfo.lastOrNull()?.index?.let { i -> items.getOrNull(i)?.let { e -> if (e is Elem.Dia) e.ts else (e as? Elem.Burbuja)?.m?.ts } } } }
                     AnimatedVisibility(
                         visible = estadoLista.isScrollInProgress && diaArriba != null, modifier = Modifier.align(Alignment.TopCenter).padding(top = Esp.s),
-                        enter = fadeIn() + slideInVertically { -it / 2 }, exit = fadeOut(),
+                        enter = fadeIn(tween(220)), exit = fadeOut(tween(100)),
                     ) {
                         Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.95f), shadowElevation = 2.dp) {
                             Text(etiquetaDia(diaArriba ?: 0), Modifier.padding(horizontal = 14.dp, vertical = 6.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
                         }
                     }
-                    AnimatedVisibility(lejosDelFinal, Modifier.align(Alignment.BottomEnd).padding(Esp.l), enter = fadeIn(tween(160)) + androidx.compose.animation.scaleIn(tween(220, easing = Transiciones.DESACELERA_ENFATIZADA), 0.7f), exit = fadeOut(tween(100)) + androidx.compose.animation.scaleOut(tween(120), 0.7f)) {
+                    AnimatedVisibility(lejosDelFinal, Modifier.align(Alignment.BottomEnd).padding(Esp.l), enter = fadeIn(tween(220)), exit = fadeOut(tween(100)) + androidx.compose.animation.scaleOut(tween(120), 0.7f)) {
                         SmallFloatingActionButton({ haptica(Toque.Suave); scope.launch { estadoLista.animateScrollToItem(0) } }, Modifier.testTag("bajar_al_final")) { Icon(Ico.Abajo, "Ir al último mensaje") }
                     }
                 }
