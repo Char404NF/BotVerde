@@ -200,3 +200,25 @@ func TestMencionDeLIDMuestraNombreONumeroNoElAvisoDeNoDisponible(t *testing.T) {
 		t.Fatalf("nombreParaMostrar: %q", got)
 	}
 }
+
+// Si el alias no se aprendió pero la lista de miembros del grupo sí sabe quién es ese LID, se usa eso.
+func TestMencionDeLIDSeResuelvePorLaListaDeMiembros(t *testing.T) {
+	a := nuevo(t)
+	g := "120363000000000002@g.us"
+	chatBasico(t, a, g, "", "Grupo", true)
+	const lid, pn = "171373624348814@lid", "5215500000002@s.whatsapp.net"
+	_, _ = a.ActualizarMiembros(1, g, []MiembroGrupo{{Persona: pn, JID: lid, Rol: RolGrupoMiembro}}, time.Now())
+	m := msg(g, "1", time.Now().Unix(), "hola")
+	m.Menciones = []string{lid}
+	if got := a.vista(m, nil).Menciones[0].Nombre; got != "+5215500000002" {
+		t.Fatalf("debía ser su número: %q", got)
+	}
+	// y si escribió con su número y nombre (clave canónica), se muestra el nombre
+	o := msg(g, "2", time.Now().Unix(), "yo")
+	o.RemitenteJID, o.RemitenteNombre = pn, "Bot VPS"
+	_, _ = a.GuardarMensaje(o)
+	a.nombres.limpiar()
+	if got := a.vista(m, nil).Menciones[0].Nombre; got != "Bot VPS" {
+		t.Fatalf("debía ser su nombre: %q", got)
+	}
+}

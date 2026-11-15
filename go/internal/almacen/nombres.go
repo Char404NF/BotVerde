@@ -246,6 +246,16 @@ func (a *Almacen) nombrePorAlias(bot int64, chat, j string) string {
 			otros = append(otros, x)
 		}
 	}
+	// La lista de miembros del grupo sabe quién es cada LID (guarda el JID del grupo junto a la persona).
+	var p string
+	if a.db.QueryRow(`SELECT persona FROM grupo_miembros WHERE bot_id=? AND jid=? AND persona<>'' LIMIT 1`, bot, j).Scan(&p) == nil && p != "" && p != j {
+		otros = append(otros, p)
+		for _, x := range a.AliasDe(bot, p) {
+			if x != j && x != p {
+				otros = append(otros, x)
+			}
+		}
+	}
 	if len(otros) == 0 {
 		return ""
 	}
@@ -275,7 +285,12 @@ func nombreReal(n string) bool {
 
 // telefonoDe devuelve «+número» de una persona si alguna de sus formas es un número (@s.whatsapp.net).
 func (a *Almacen) telefonoDe(bot int64, j string) string {
-	for _, x := range a.AliasDe(bot, j) {
+	formas := a.AliasDe(bot, j)
+	var p string
+	if a.db.QueryRow(`SELECT persona FROM grupo_miembros WHERE bot_id=? AND jid=? AND persona<>'' LIMIT 1`, bot, j).Scan(&p) == nil && p != "" {
+		formas = append(formas, p)
+	}
+	for _, x := range formas {
 		if esPN(x) {
 			if d := strings.TrimSuffix(x, "@s.whatsapp.net"); d != "" && strings.Trim(d, "0123456789") == "" {
 				return "+" + d
