@@ -166,6 +166,7 @@ func init() {
 		Casilla{ID: "grupos.expulsar", Nombre: "Expulsar", Descripcion: "Saca a una persona del grupo.", Grupo: GGruposAdmin, Riesgo: RiesgoAlto, Confirma: true, Grupos: true},
 		Casilla{ID: "grupos.banear", Nombre: "Banear", Descripcion: "Saca a una persona y no la deja volver a entrar a ese grupo (!ban, !unban, !baneados).", Grupo: GGruposAdmin, Riesgo: RiesgoAlto, Confirma: true, Grupos: true},
 		Casilla{ID: "grupos.horario", Nombre: "Horario de cierre", Descripcion: "El grupo se cierra y se abre solo a las horas que digas (!horariogrupo).", Grupo: GGruposAdmin, Riesgo: RiesgoMedio, Grupos: true},
+		Casilla{ID: "grupos.encuesta", Nombre: "Encuestas y mensajes fijados", Descripcion: "Manda una encuesta al grupo y fija o suelta mensajes (!encuesta, !fijar, !desfijar).", Grupo: GGruposAdmin, Riesgo: RiesgoMedio, Grupos: true},
 		Casilla{ID: "grupos.ascender", Nombre: "Dar y quitar administrador", Descripcion: "Convierte a alguien en administrador o se lo quita.", Grupo: GGruposAdmin, Riesgo: RiesgoAlto, Grupos: true},
 		Casilla{ID: "grupos.solicitudes", Nombre: "Aprobar solicitudes de ingreso", Descripcion: "Acepta o rechaza a quien pide entrar.", Grupo: GGruposAdmin, Riesgo: RiesgoMedio, Grupos: true},
 		Casilla{ID: "grupos.renombrar", Nombre: "Cambiar nombre y descripción", Descripcion: "Edita el nombre y la descripción del grupo.", Grupo: GGruposAdmin, Riesgo: RiesgoMedio, Grupos: true},

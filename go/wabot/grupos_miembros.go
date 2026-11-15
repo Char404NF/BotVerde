@@ -195,6 +195,9 @@ func (s *estado) alUnirseAGrupo(v *events.JoinedGroup) {
 			}
 		}()
 		s.guardarMiembros(&gi)
+		if s.gru != nil {
+			s.gru.AlGrupoNuevo(gi.JID.ToNonAD().String())
+		}
 	})
 }
 

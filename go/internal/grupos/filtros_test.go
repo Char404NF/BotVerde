@@ -339,7 +339,7 @@ func TestLasAlertasNoSeRepitenPorCadaMensaje(t *testing.T) {
 func TestGuardarFiltroValidaYSePersiste(t *testing.T) {
 	e := nuevo(t, true)
 	fs := e.s.FiltrosDe(grupoJID)
-	if len(fs) != 4 || fs[0].Filtro != FiltroEnlaces || fs[0].Activo || !fs[0].Config.ExentoAdmins || fs[3].Config.Max != 6 || fs[2].Config.Max != 3 {
+	if len(fs) != 7 || fs[0].Filtro != FiltroEnlaces || fs[0].Activo || !fs[0].Config.ExentoAdmins || fs[3].Config.Max != 6 || fs[2].Config.Max != 3 {
 		t.Fatalf("valores de fábrica: %+v", fs)
 	}
 	malos := []Filtro{

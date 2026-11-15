@@ -23,10 +23,14 @@ const (
 	FiltroPalabras  = "palabras"
 	FiltroRepetidos = "repetidos"
 	FiltroFlood     = "flood"
+	// Anti-spam de contenido: cuentan stickers, audios (con notas de voz) o reenviados en una ventana de tiempo.
+	FiltroStickers   = "stickers"
+	FiltroAudios     = "audios"
+	FiltroReenviados = "reenviados"
 )
 
 // Filtros en el orden en que se muestran y evalúan.
-var Filtros = []string{FiltroEnlaces, FiltroPalabras, FiltroRepetidos, FiltroFlood}
+var Filtros = []string{FiltroEnlaces, FiltroPalabras, FiltroRepetidos, FiltroFlood, FiltroStickers, FiltroAudios, FiltroReenviados}
 
 // Acciones de un filtro.
 const (
@@ -98,6 +102,12 @@ func nombreFiltro(f string) (nombre, desc string) {
 		return "Mensajes repetidos", "Detecta a quien manda lo mismo varias veces."
 	case FiltroFlood:
 		return "Flood", "Detecta a quien manda muchos mensajes en poco tiempo."
+	case FiltroStickers:
+		return "Stickers", "Detecta a quien manda muchos stickers seguidos."
+	case FiltroAudios:
+		return "Audios y notas de voz", "Detecta a quien manda muchos audios o notas de voz seguidos."
+	case FiltroReenviados:
+		return "Reenviados", "Detecta mensajes reenviados (cadenas). Con «Máximo» más alto se permiten algunos."
 	}
 	return f, ""
 }
@@ -115,6 +125,12 @@ func filtroDefecto(chat, f string) Filtro {
 		x.Config.Max, x.Config.Segundos = 3, 120
 	case FiltroFlood:
 		x.Config.Max, x.Config.Segundos = 6, 10
+	case FiltroStickers:
+		x.Config.Max, x.Config.Segundos = 5, 60
+	case FiltroAudios:
+		x.Config.Max, x.Config.Segundos = 4, 120
+	case FiltroReenviados:
+		x.Config.Max, x.Config.Segundos = 1, 600
 	}
 	return x
 }
@@ -359,6 +375,8 @@ type Entrada struct {
 	PersonaWA     string // su JID tal como lo manda WhatsApp (para mencionarla)
 	Nombre        string
 	Texto         string
+	Tipo          string // "texto", "sticker", "audio", "imagen"… ("" = texto)
+	Reenviado     bool
 	EsMio         bool
 	Sincronizando bool
 }
@@ -378,6 +396,7 @@ type marcaTexto struct {
 type historial struct {
 	textos  []marcaTexto
 	tiempos []time.Time
+	por     map[string][]time.Time // anti-spam de contenido: marcas por clase (sticker, audio, reenviado)
 }
 
 func (s *Servicio) historialDe(chat, persona string) *historial {
@@ -396,7 +415,7 @@ func (s *Servicio) historialDe(chat, persona string) *historial {
 // Evaluar revisa un mensaje con los filtros encendidos del grupo y devuelve el primero que rompe (o nil). Es rápido y no usa la red:
 // va en el trabajador. No mira lo que escribo yo ni el historial que llega al sincronizar.
 func (s *Servicio) Evaluar(e Entrada) *Infraccion {
-	if e.EsMio || e.Sincronizando || e.Persona == "" || !strings.HasSuffix(e.Chat, "@g.us") || strings.TrimSpace(e.Texto) == "" {
+	if e.EsMio || e.Sincronizando || e.Persona == "" || !strings.HasSuffix(e.Chat, "@g.us") || (strings.TrimSpace(e.Texto) == "" && e.Tipo != "sticker" && e.Tipo != "audio" && !e.Reenviado) {
 		return nil
 	}
 	fs := s.filtrosActivos(e.Chat)
@@ -433,6 +452,18 @@ func (s *Servicio) Evaluar(e Entrada) *Infraccion {
 			motivo = s.cuentaRepetido(e, f, ahora)
 		case FiltroFlood:
 			motivo = s.cuentaFlood(e, f, ahora)
+		case FiltroStickers:
+			if e.Tipo == "sticker" {
+				motivo = s.cuentaClase(e, f, ahora, "sticker")
+			}
+		case FiltroAudios:
+			if e.Tipo == "audio" {
+				motivo = s.cuentaClase(e, f, ahora, "audio")
+			}
+		case FiltroReenviados:
+			if e.Reenviado {
+				motivo = s.cuentaClase(e, f, ahora, "reenviado")
+			}
 		}
 		if motivo != "" && primera == nil {
 			primera = &Infraccion{Entrada: e, Filtro: f, Motivo: motivo}
@@ -484,6 +515,34 @@ func (s *Servicio) cuentaFlood(e Entrada, f Filtro, ahora time.Time) string {
 	if len(h.tiempos) >= f.Config.Max {
 		h.tiempos = nil
 		return "flood"
+	}
+	return ""
+}
+
+// cuentaClase cuenta mensajes de una clase (sticker, audio, reenviado) de esa persona en la ventana del filtro: al llegar al máximo salta.
+func (s *Servicio) cuentaClase(e Entrada, f Filtro, ahora time.Time, clase string) string {
+	ventana := time.Duration(f.Config.Segundos) * time.Second
+	max := f.Config.Max
+	if max < 1 {
+		max = 1
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	h := s.historialDe(e.Chat, e.Persona)
+	if h.por == nil {
+		h.por = map[string][]time.Time{}
+	}
+	nuevos := h.por[clase][:0]
+	for _, t := range h.por[clase] {
+		if ahora.Sub(t) <= ventana {
+			nuevos = append(nuevos, t)
+		}
+	}
+	nuevos = append(nuevos, ahora)
+	h.por[clase] = nuevos
+	if len(nuevos) >= max {
+		h.por[clase] = nil
+		return clase
 	}
 	return ""
 }
@@ -541,6 +600,12 @@ func avisoDefecto(filtro string) string {
 		return "Por favor no repitas el mismo mensaje."
 	case FiltroFlood:
 		return "Vas muy rápido: escribe con calma, por favor."
+	case FiltroStickers:
+		return "Por favor no mandes tantos stickers seguidos."
+	case FiltroAudios:
+		return "Por favor no mandes tantos audios seguidos."
+	case FiltroReenviados:
+		return "Aquí no se permiten mensajes reenviados."
 	}
 	return "Ese mensaje no cumple las reglas del grupo."
 }

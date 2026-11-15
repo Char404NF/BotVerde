@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"botchat/internal/almacen"
+	"botchat/internal/envio"
 	"botchat/internal/grupos"
 )
 
@@ -32,6 +34,13 @@ func (s *estado) armarGrupos() {
 			return errNoEnviado
 		}
 		return nil
+	}
+	g.Encuesta = func(ctx context.Context, chat, titulo string, ops []string, multiple bool) error {
+		_, err := s.envio.EnviarEncuesta(ctx, chat, titulo, ops, multiple)
+		return espanolEnvio(err)
+	}
+	g.Fijar = func(ctx context.Context, chat, id string, seg int, fijar bool) error {
+		return espanolEnvio(s.envio.FijarMensaje(ctx, chat, id, seg, fijar))
 	}
 	g.Advertir = func(ctx context.Context, objetivo, chat, msgID, motivo string) error {
 		if s.pers == nil {
@@ -327,4 +336,14 @@ func GrupoRestaurarFiltro(botID int64, chat, filtro string) error {
 		return err
 	}
 	return g.RestaurarFiltro(dueno(), chat, filtro)
+}
+
+// espanolEnvio deja los errores propios del envío (que ya están en español) como errores claros de grupos.
+func espanolEnvio(err error) error {
+	for _, e := range []error{envio.ErrEncuesta, envio.ErrNoExiste, envio.ErrSinConexion, envio.ErrDemasiados} {
+		if errors.Is(err, e) {
+			return &grupos.Fallo{Msg: strings.TrimSuffix(e.Error(), "."), Causa: err}
+		}
+	}
+	return err
 }

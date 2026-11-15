@@ -742,3 +742,15 @@ func abrirTextoCol(clave []byte, col string, b []byte) (string, error) {
 	t, err := cifrado.AbrirTexto(clave, col, b)
 	return string(t), err
 }
+
+// BorrarCifrado borra un archivo cifrado (no es error que ya no exista).
+func (a *Almacen) BorrarCifrado(rel string) error {
+	abs, err := a.Abs(rel)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(abs); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}

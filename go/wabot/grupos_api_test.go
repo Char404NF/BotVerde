@@ -30,7 +30,7 @@ func TestApiGruposSinElBotEncendido(t *testing.T) {
 	}
 	// Filtros: valores de fábrica, guardar y leer.
 	fs := decodifica[[]grupos.Filtro](t, func() (string, error) { return GrupoFiltros(1, grpJID) })
-	if len(fs) != 4 || fs[0].Activo || fs[0].Accion != "avisarme" {
+	if len(fs) != 7 || fs[0].Activo || fs[0].Accion != "avisarme" {
 		t.Fatalf("%+v", fs)
 	}
 	fs[0].Activo, fs[0].Accion = true, "borrar"

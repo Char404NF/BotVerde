@@ -2,10 +2,12 @@ package grupos
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"botchat/internal/almacen"
 	"botchat/internal/comandos"
@@ -112,6 +114,70 @@ func (s *Servicio) TextoPerfil(chat, persona, nombre string) string {
 	return b.String()
 }
 
+// Encuestar manda una encuesta al grupo.
+func (s *Servicio) Encuestar(ctx context.Context, actor, chat, titulo string, opciones []string, multiple bool) error {
+	if _, err := parseaGrupo(chat); err != nil {
+		return err
+	}
+	if s.Encuesta == nil {
+		return ErrNoDisponible
+	}
+	var limpias []string
+	for _, o := range opciones {
+		if o = strings.TrimSpace(o); o != "" {
+			limpias = append(limpias, o)
+		}
+	}
+	if strings.TrimSpace(titulo) == "" || len(limpias) < 2 || len(limpias) > 12 || utf8.RuneCountInString(titulo) > 200 {
+		return fallo("una encuesta lleva una pregunta y de 2 a 12 opciones", nil)
+	}
+	err := s.Encuesta(ctx, chat, strings.TrimSpace(titulo), limpias, multiple)
+	res := "ok"
+	if err != nil {
+		res = "error"
+	}
+	s.registra(actor, "grupo.encuesta", "", chat, res, fmt.Sprintf("opciones=%d", len(limpias)))
+	return Explicar(err)
+}
+
+// FijarMensaje fija (o suelta) un mensaje del grupo. dias: 1, 7 o 30.
+func (s *Servicio) FijarMensaje(ctx context.Context, actor, chat, msgID string, dias int, fijar bool) error {
+	if _, err := parseaGrupo(chat); err != nil {
+		return err
+	}
+	if s.Fijar == nil {
+		return ErrNoDisponible
+	}
+	if msgID == "" {
+		return ErrSinMensaje
+	}
+	err := s.Fijar(ctx, chat, msgID, dias*86400, fijar)
+	res, acc := "ok", "grupo.fijar"
+	if !fijar {
+		acc = "grupo.desfijar"
+	}
+	if err != nil {
+		res = "error"
+	}
+	s.registra(actor, acc, "", chat, res, "")
+	return Explicar(err)
+}
+
+// partesEncuesta separa «pregunta | op1 | op2» (con «multiple» al principio para elegir varias).
+func partesEncuesta(resto string) (titulo string, ops []string, multiple bool) {
+	resto = strings.TrimSpace(resto)
+	if p := strings.Fields(resto); len(p) > 0 && strings.EqualFold(p[0], "multiple") {
+		multiple = true
+		resto = strings.TrimSpace(resto[len(p[0]):])
+	}
+	partes := strings.Split(resto, "|")
+	titulo = strings.TrimSpace(partes[0])
+	for _, o := range partes[1:] {
+		ops = append(ops, o)
+	}
+	return
+}
+
 func (s *Servicio) registrarAdmin(reg func(comandos.Comando), validaObjetivo func(*comandos.Contexto) error) {
 	reg(comandos.Comando{Nombre: "ban", Alias: []string{"banear"}, Resumen: "Sacar a una persona y no dejarla volver", Uso: "ban <persona> [motivo]", Casilla: "grupos.banear", Ambito: comandos.Grupo, Confirma: true, Validar: validaObjetivo,
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -129,6 +195,73 @@ func (s *Servicio) registrarAdmin(reg func(comandos.Comando), validaObjetivo fun
 				return "", err
 			}
 			return s.r("grupo.baneada"), nil
+		}})
+	reg(comandos.Comando{Nombre: "encuesta", Resumen: "Mandar una encuesta al grupo", Uso: "encuesta [multiple] ¿Pregunta? | opción 1 | opción 2 | …", Casilla: "grupos.encuesta", Ambito: comandos.Grupo,
+		Ejecutar: func(cx *comandos.Contexto) (string, error) {
+			chat, _, err := s.grupoDe(cx)
+			if err != nil {
+				return "", err
+			}
+			titulo, ops, multi := partesEncuesta(cx.Resto)
+			ctx, cancel := ctxCmd()
+			defer cancel()
+			if err := s.Encuestar(ctx, cx.Persona, chat, titulo, ops, multi); err != nil {
+				return "", err
+			}
+			return s.r("grupo.encuesta_enviada"), nil
+		}})
+	reg(comandos.Comando{Nombre: "fijar", Resumen: "Fijar el mensaje que citas (1, 7 o 30 días)", Uso: "fijar [1|7|30]  (respondiendo al mensaje)", Casilla: "grupos.encuesta", Ambito: comandos.Grupo,
+		Validar: func(cx *comandos.Contexto) error {
+			if _, _, err := s.grupoDe(cx); err != nil {
+				return err
+			}
+			if cx.CitaID == "" {
+				return errors.New("responde al mensaje que quieres fijar y escribe el comando")
+			}
+			return nil
+		},
+		Ejecutar: func(cx *comandos.Contexto) (string, error) {
+			chat, _, err := s.grupoDe(cx)
+			if err != nil {
+				return "", err
+			}
+			dias := 7
+			if len(cx.Args) > 0 {
+				switch cx.Args[0] {
+				case "1", "7", "30":
+					dias, _ = strconv.Atoi(cx.Args[0])
+				default:
+					return "", errors.New("los días pueden ser 1, 7 o 30")
+				}
+			}
+			ctx, cancel := ctxCmd()
+			defer cancel()
+			if err := s.FijarMensaje(ctx, cx.Persona, chat, cx.CitaID, dias, true); err != nil {
+				return "", err
+			}
+			return s.r("grupo.mensaje_fijado"), nil
+		}})
+	reg(comandos.Comando{Nombre: "desfijar", Resumen: "Soltar el mensaje fijado que citas", Uso: "desfijar  (respondiendo al mensaje)", Casilla: "grupos.encuesta", Ambito: comandos.Grupo,
+		Validar: func(cx *comandos.Contexto) error {
+			if _, _, err := s.grupoDe(cx); err != nil {
+				return err
+			}
+			if cx.CitaID == "" {
+				return errors.New("responde al mensaje fijado y escribe el comando")
+			}
+			return nil
+		},
+		Ejecutar: func(cx *comandos.Contexto) (string, error) {
+			chat, _, err := s.grupoDe(cx)
+			if err != nil {
+				return "", err
+			}
+			ctx, cancel := ctxCmd()
+			defer cancel()
+			if err := s.FijarMensaje(ctx, cx.Persona, chat, cx.CitaID, 0, false); err != nil {
+				return "", err
+			}
+			return s.r("grupo.mensaje_desfijado"), nil
 		}})
 	reg(comandos.Comando{Nombre: "unban", Alias: []string{"desbanear"}, Resumen: "Dejar que una persona baneada vuelva", Uso: "unban <persona>", Casilla: "grupos.banear", Ambito: comandos.Grupo, Validar: validaObjetivo,
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {

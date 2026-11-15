@@ -66,6 +66,7 @@ var (
 	ErrDemasiados    = errors.New("Demasiados mensajes seguidos. Espera un momento e inténtalo de nuevo.")
 	ErrMensajeVacio  = errors.New("Escribe algo antes de enviar.")
 	ErrNoExiste      = errors.New("Ese mensaje ya no está en este teléfono.")
+	ErrEncuesta      = errors.New("Una encuesta lleva una pregunta y de 2 a 12 opciones.")
 	ErrSoloPropios   = errors.New("Solo se pueden editar los mensajes que escribiste tú.")
 	ErrSoloTexto     = errors.New("Solo se pueden editar mensajes de texto.")
 	ErrMuchosChats   = errors.New("Puedes reenviar a 5 chats como máximo cada vez.")

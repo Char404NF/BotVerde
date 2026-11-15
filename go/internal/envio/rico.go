@@ -2,6 +2,7 @@ package envio
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"go.mau.fi/whatsmeow"
 	waBinary "go.mau.fi/whatsmeow/binary"
+	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"google.golang.org/protobuf/proto"
@@ -170,4 +172,85 @@ func (s *Servicio) enviarEspecialID(ctx context.Context, chat, tipo, texto, cita
 	s.Log("Mensaje enviado (automático) al chat …" + sufijo(chat) + ".")
 	res.Estado = "enviado"
 	return res, nil
+}
+
+// ---------- encuestas y mensajes fijados ----------
+
+// EnviarEncuesta manda una encuesta al chat como mensaje automático. `multiple` deja elegir varias opciones. En el chat se guarda como
+// texto (la pregunta y sus opciones numeradas).
+func (s *Servicio) EnviarEncuesta(ctx context.Context, chat, titulo string, opciones []string, multiple bool) (Resultado, error) {
+	titulo = strings.TrimSpace(titulo)
+	if titulo == "" || len(opciones) < 2 || len(opciones) > 12 {
+		return Resultado{}, ErrEncuesta
+	}
+	var b strings.Builder
+	b.WriteString("📊 " + titulo)
+	for i, o := range opciones {
+		fmt.Fprintf(&b, "\n%d. %s", i+1, o)
+	}
+	n := 1
+	if multiple {
+		n = len(opciones)
+	}
+	return s.EnviarInteractivo(ctx, chat, b.String(), "", "", func(_ string, _ *waE2E.ContextInfo) *waE2E.Message {
+		return construirEncuesta(titulo, opciones, n)
+	}, nil)
+}
+
+// construirEncuesta arma el mensaje de encuesta (lo mismo que hace whatsmeow, sin necesitar el cliente).
+func construirEncuesta(titulo string, opciones []string, seleccionables int) *waE2E.Message {
+	ops := make([]*waE2E.PollCreationMessage_Option, len(opciones))
+	for i, o := range opciones {
+		ops[i] = &waE2E.PollCreationMessage_Option{OptionName: proto.String(o)}
+	}
+	secreto := make([]byte, 32)
+	_, _ = rand.Read(secreto)
+	return &waE2E.Message{
+		PollCreationMessage: &waE2E.PollCreationMessage{Name: proto.String(titulo), Options: ops, SelectableOptionsCount: proto.Uint32(uint32(seleccionables))},
+		MessageContextInfo:  &waE2E.MessageContextInfo{MessageSecret: secreto},
+	}
+}
+
+// FijarMensaje fija (o suelta) un mensaje del chat para todos durante `segundos` (1 día, 7 días o 30 días). Solo si el bot administra
+// el grupo o el grupo deja fijar a todos: si no, WhatsApp lo rechaza.
+func (s *Servicio) FijarMensaje(ctx context.Context, chat, id string, segundos int, fijar bool) error {
+	j, err := parsea(chat)
+	if err != nil {
+		return err
+	}
+	m, err := s.Alm.ObtenerMensaje(s.BotID, chat, id)
+	if err != nil {
+		return err
+	}
+	if m == nil {
+		return ErrNoExiste
+	}
+	if !s.Cli.Conectado() {
+		return ErrSinConexion
+	}
+	if !s.tomarFicha() {
+		return ErrDemasiados
+	}
+	autor := s.autorEnWhatsApp(ctx, j, m)
+	clave := &waCommon.MessageKey{RemoteJID: proto.String(j.String()), FromMe: proto.Bool(m.EsMio), ID: proto.String(id)}
+	if !m.EsMio && autor.User != "" && s.esGrupo(j) {
+		clave.Participant = proto.String(autor.String())
+	}
+	tipo := waE2E.PinInChatMessage_PIN_FOR_ALL
+	msg := &waE2E.Message{PinInChatMessage: &waE2E.PinInChatMessage{Key: clave, Type: tipo.Enum(), SenderTimestampMS: proto.Int64(s.ahora().UnixMilli())}}
+	if fijar {
+		if segundos != 86400 && segundos != 604800 && segundos != 2592000 {
+			segundos = 604800
+		}
+		msg.MessageContextInfo = &waE2E.MessageContextInfo{MessageAddOnDurationInSecs: proto.Uint32(uint32(segundos))}
+	} else {
+		msg.PinInChatMessage.Type = waE2E.PinInChatMessage_UNPIN_FOR_ALL.Enum()
+	}
+	resp, err := s.Cli.SendMessage(ctx, j, msg)
+	if err != nil {
+		return err
+	}
+	s.RegistrarEnvio(resp.ID)
+	s.pausarBot(chat)
+	return nil
 }

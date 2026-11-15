@@ -193,7 +193,7 @@ func RolAdmin() almacen.Rol {
 	m := map[string]almacen.Alcance{}
 	for _, id := range []string{
 		"personas.silenciar", "personas.advertir", "personas.notas", "personas.ficha", "chat.pausar", "chat.tomar_control", "chat.estado", "chat.etiquetas",
-		"grupos.info", "grupos.admins", "grupos.mencionar_todos", "grupos.ranking", "grupos.inactivos", "grupos.cerrar", "grupos.expulsar", "grupos.banear", "grupos.horario",
+		"grupos.info", "grupos.admins", "grupos.mencionar_todos", "grupos.ranking", "grupos.inactivos", "grupos.cerrar", "grupos.expulsar", "grupos.banear", "grupos.horario", "grupos.encuesta",
 		"grupos.borrar_mensaje", "grupos.solicitudes", "silencio.silenciar", "silencio.ver", "grupos.filtros", "util.notas", "util.pendientes", "rangos.ver",
 	} {
 		m[id] = almacen.Alcance{}

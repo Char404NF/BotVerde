@@ -344,3 +344,80 @@ func GrupoGuardarEntrada(botID int64, grupo, entradaJSON string) error {
 	e.Grupo = grupo
 	return a.GuardarEntrada(botID, e)
 }
+
+// ---------- configuración base ----------
+
+// GrupoBaseInfo devuelve (JSON) si hay configuración base, de qué grupo salió y qué trae.
+func GrupoBaseInfo(botID int64) (string, error) {
+	g, err := servicioGrupos(botID)
+	if err != nil {
+		return "", err
+	}
+	return js(g.InfoBase(), nil)
+}
+
+// GrupoBaseGuardar copia la configuración de ese grupo como base para los demás.
+func GrupoBaseGuardar(botID int64, chat string) error {
+	g, err := servicioGrupos(botID)
+	if err != nil {
+		return err
+	}
+	return g.GuardarBase(dueno(), chat)
+}
+
+// GrupoBaseQuitar borra la configuración base.
+func GrupoBaseQuitar(botID int64) error {
+	g, err := servicioGrupos(botID)
+	if err != nil {
+		return err
+	}
+	return g.QuitarBase(dueno())
+}
+
+// GrupoBaseAuto enciende o apaga ponerle la base a cada grupo nuevo.
+func GrupoBaseAuto(botID int64, si bool) error {
+	g, err := servicioGrupos(botID)
+	if err != nil {
+		return err
+	}
+	return g.FijarBaseAuto(dueno(), si)
+}
+
+// GrupoBaseAplicar pone la base en los grupos de la lista (JSON: ["…@g.us", …]) y devuelve a cuántos se la puso.
+func GrupoBaseAplicar(botID int64, gruposJSON string) (int, error) {
+	g, err := servicioGrupos(botID)
+	if err != nil {
+		return 0, err
+	}
+	var lista []string
+	if json.Unmarshal([]byte(gruposJSON), &lista) != nil || len(lista) == 0 {
+		return 0, errors.New("elige al menos un grupo")
+	}
+	return g.AplicarBase(dueno(), lista)
+}
+
+// GrupoEncuesta manda una encuesta al grupo. opcionesJSON es una lista de textos.
+func GrupoEncuesta(botID int64, chat, titulo, opcionesJSON string, multiple bool) error {
+	g, err := servicioGrupos(botID)
+	if err != nil {
+		return err
+	}
+	var ops []string
+	if json.Unmarshal([]byte(opcionesJSON), &ops) != nil {
+		return errors.New("las opciones no son válidas")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	return g.Encuestar(ctx, dueno(), chat, titulo, ops, multiple)
+}
+
+// GrupoFijar fija (dias = 1, 7 o 30) o suelta (fijar = false) un mensaje del grupo.
+func GrupoFijar(botID int64, chat, msgID string, dias int, fijar bool) error {
+	g, err := servicioGrupos(botID)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	return g.FijarMensaje(ctx, dueno(), chat, msgID, dias, fijar)
+}

@@ -161,8 +161,8 @@ func (s *estado) alMotor(v *events.Message, sincronizando bool) {
 		}
 	}
 	m.CitaID = c.CitaID
-	if m.EsGrupo && !m.EsMio && !sincronizando && m.Texto != "" {
-		s.filtrarGrupo(grupos.Entrada{Chat: m.Chat, MensajeID: m.ID, Persona: m.Remitente, PersonaWA: m.RemitenteWA, Nombre: m.Nombre, Texto: m.Texto})
+	if m.EsGrupo && !m.EsMio && !sincronizando && (m.Texto != "" || c.Tipo == "sticker" || c.Tipo == "audio" || c.Reenviado) {
+		s.filtrarGrupo(grupos.Entrada{Chat: m.Chat, MensajeID: m.ID, Persona: m.Remitente, PersonaWA: m.RemitenteWA, Nombre: m.Nombre, Texto: m.Texto, Tipo: c.Tipo, Reenviado: c.Reenviado})
 	}
 	if !sincronizando && s.avs != nil {
 		s.avs.AlMensaje(avisos.Mensaje{Chat: m.Chat, Persona: m.Remitente, Nombre: m.Nombre, Texto: m.Texto, EsGrupo: m.EsGrupo, EsMio: m.EsMio, Edicion: m.EsEdicion})

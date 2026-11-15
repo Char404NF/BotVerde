@@ -36,6 +36,10 @@ type Servicio struct {
 	Borrar func(ctx context.Context, chat, id string) error
 	// Enviar manda un texto a un chat citando un mensaje y mencionando a esas personas (respuesta a un comando o aviso de un filtro).
 	Enviar func(ctx context.Context, chat, texto, citaID string, menciones []string) error
+	// Encuesta manda una encuesta al grupo. nil = no disponible.
+	Encuesta func(ctx context.Context, chat, titulo string, opciones []string, multiple bool) error
+	// Fijar fija o suelta un mensaje del grupo para todos (segundos: 1, 7 o 30 días). nil = no disponible.
+	Fijar func(ctx context.Context, chat, msgID string, segundos int, fijar bool) error
 	// Advertir pone una advertencia a una persona (con la regla del tope de la etapa B). nil = el filtro "advertir" solo alerta.
 	Advertir func(ctx context.Context, objetivo, chat, msgID, motivo string) error
 	Ahora    func() time.Time
