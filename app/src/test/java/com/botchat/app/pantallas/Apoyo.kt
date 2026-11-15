@@ -834,6 +834,9 @@ class MotorFalso : Motor {
     override fun grupoDesbanear(bot: Long, grupo: String, persona: String) { llamadas += "grupoDesbanear:$persona"; gFalla(); baneadosJson = "[]" }
     override fun grupoHorario(bot: Long, grupo: String) = horarioJson
     override fun grupoGuardarHorario(bot: Long, grupo: String, horarioJson: String) { llamadas += "guardarHorario:$horarioJson"; this.horarioJson = JSONObject(horarioJson).put("grupo", grupo).put("ultimo", "").toString() }
+    var entradaJson = """{"grupo":"g@g.us","raidActivo":false,"raidMax":8,"raidMinutos":2,"prefijos":[]}"""
+    override fun grupoEntrada(bot: Long, grupo: String) = entradaJson
+    override fun grupoGuardarEntrada(bot: Long, grupo: String, entradaJson: String) { llamadas += "guardarEntrada:$entradaJson"; this.entradaJson = entradaJson }
     var resumenAdminJson = ""
     override fun grupoResumenAdmin(bot: Long, grupo: String): String {
         defectosAdmin()

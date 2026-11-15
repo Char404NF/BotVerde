@@ -30,6 +30,9 @@ func TestConteosMiembrosPorTipo(t *testing.T) {
 	mio := msg(g, "10", ahora, "del bot")
 	mio.EsMio, mio.RemitenteJID = true, ana
 	_, _ = a.GuardarMensaje(mio)
+	mio2 := msg(g, "11", ahora-5, "mío")
+	mio2.EsMio, mio2.Tipo = true, TipoImagen
+	_, _ = a.GuardarMensaje(mio2)
 
 	c := a.ConteosMiembros(1, g)
 	x := c[a.ResolverPersona(1, ana)]
@@ -42,10 +45,14 @@ func TestConteosMiembrosPorTipo(t *testing.T) {
 	if b := c[a.ResolverPersona(1, beto)]; b == nil || b.Mensajes != 1 {
 		t.Fatalf("beto: %+v", b)
 	}
+	// lo enviado desde la cuenta del bot cuenta como del dueño y no se suma a quien aparezca como remitente
+	if d := c[PersonaDueno]; d == nil || d.Mensajes != 2 || d.Imagenes != 1 || a.ConteoPersona(1, g, PersonaDueno).Mensajes != 2 {
+		t.Fatalf("dueño: %+v", d)
+	}
 	if y := a.ConteoPersona(1, g, ana); y.Mensajes != 8 || y.NotasVoz != 1 {
 		t.Fatalf("persona: %+v", y)
 	}
-	if ks := OrdenarConteos(c); len(ks) != 2 || ks[0] != a.ResolverPersona(1, ana) {
+	if ks := OrdenarConteos(c); len(ks) != 3 || ks[0] != a.ResolverPersona(1, ana) {
 		t.Fatalf("orden: %v", ks)
 	}
 }

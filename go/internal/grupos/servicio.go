@@ -51,6 +51,9 @@ type Servicio struct {
 	filt    map[string]cacheFiltros
 	hist    map[string]*historial
 	alertas map[string]time.Time
+	// protección de entrada: entradas recientes por grupo y cuándo se dio la última alarma de raid
+	entradas    map[string][]time.Time
+	raidAvisado map[string]time.Time
 }
 
 type cacheGrupo struct {

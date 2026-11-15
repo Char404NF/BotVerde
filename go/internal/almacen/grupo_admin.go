@@ -56,23 +56,27 @@ func (c *ConteoMiembro) suma(tipo string, notaVoz bool, n, borrados, editados in
 	}
 }
 
-// ConteosMiembros cuenta, por persona canónica, lo que cada uno envió a un grupo (los mensajes del propio bot no cuentan).
+// ConteosMiembros cuenta, por persona canónica, lo que cada uno envió a un grupo. Lo que se envía desde la cuenta del bot (el
+// teléfono del dueño y las respuestas del bot) cuenta a nombre de PersonaDueno.
 func (a *Almacen) ConteosMiembros(botID int64, grupo string) map[string]*ConteoMiembro {
 	out := map[string]*ConteoMiembro{}
-	filas, err := a.db.Query(`SELECT remitente_jid, tipo, nota_voz, COUNT(*), SUM(borrado), SUM(editado), MIN(ts), MAX(ts)
-		FROM messages WHERE bot_id=? AND chat_jid=? AND es_mio=0 AND remitente_jid<>'' GROUP BY remitente_jid, tipo, nota_voz`, botID, grupo)
+	filas, err := a.db.Query(`SELECT es_mio, remitente_jid, tipo, nota_voz, COUNT(*), SUM(borrado), SUM(editado), MIN(ts), MAX(ts)
+		FROM messages WHERE bot_id=? AND chat_jid=? AND (es_mio=1 OR remitente_jid<>'') GROUP BY es_mio, remitente_jid, tipo, nota_voz`, botID, grupo)
 	if err != nil {
 		return out
 	}
 	defer filas.Close()
 	for filas.Next() {
+		var mio, nota, n, bor, edi int
 		var jid, tipo string
-		var nota, n, bor, edi int
 		var p, u int64
-		if filas.Scan(&jid, &tipo, &nota, &n, &bor, &edi, &p, &u) != nil {
+		if filas.Scan(&mio, &jid, &tipo, &nota, &n, &bor, &edi, &p, &u) != nil {
 			continue
 		}
-		c := a.ResolverPersona(botID, jid)
+		c := PersonaDueno
+		if mio == 0 {
+			c = a.ResolverPersona(botID, jid)
+		}
 		x := out[c]
 		if x == nil {
 			x = &ConteoMiembro{}
@@ -83,9 +87,15 @@ func (a *Almacen) ConteosMiembros(botID int64, grupo string) map[string]*ConteoM
 	return out
 }
 
-// ConteoDe da lo mismo para una sola persona (todas sus formas: número y LID).
+// ConteoPersona da lo mismo para una sola persona (todas sus formas: número y LID).
 func (a *Almacen) ConteoPersona(botID int64, grupo, persona string) ConteoMiembro {
 	var c ConteoMiembro
+	if persona == PersonaDueno {
+		if x := a.ConteosMiembros(botID, grupo)[PersonaDueno]; x != nil {
+			return *x
+		}
+		return c
+	}
 	fs := a.formas(botID, persona)
 	if len(fs) == 0 {
 		return c
@@ -515,4 +525,92 @@ func (a *Almacen) MensajesDesde(botID int64, grupo string, desdeTS int64) int {
 	var n int
 	_ = a.db.QueryRow(`SELECT COUNT(*) FROM messages WHERE bot_id=? AND chat_jid=? AND es_mio=0 AND ts>=?`, botID, grupo, desdeTS).Scan(&n)
 	return n
+}
+
+// ---------- protección de entrada ----------
+
+// ProteccionEntrada son las defensas de un grupo contra gente que entra de golpe o de países que no quieres.
+type ProteccionEntrada struct {
+	Grupo       string   `json:"grupo"`
+	RaidActivo  bool     `json:"raidActivo"`
+	RaidMax     int      `json:"raidMax"`     // cuántas cuentas nuevas…
+	RaidMinutos int      `json:"raidMinutos"` // …en cuántos minutos disparan la alarma
+	Prefijos    []string `json:"prefijos"`    // prefijos de país (solo dígitos, p. ej. "212") cuyos números se sacan al entrar
+}
+
+// LimpiaPrefijo deja solo los dígitos de un prefijo («+212» → «212»). Vacío si no queda nada o es demasiado largo.
+func LimpiaPrefijo(p string) string {
+	var b strings.Builder
+	for _, r := range p {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	if b.Len() == 0 || b.Len() > 4 {
+		return ""
+	}
+	return b.String()
+}
+
+// GuardarEntrada guarda la protección de entrada de un grupo (limites razonables).
+func (a *Almacen) GuardarEntrada(botID int64, e ProteccionEntrada) error {
+	if e.RaidMax < 2 {
+		e.RaidMax = 2
+	}
+	if e.RaidMax > 100 {
+		e.RaidMax = 100
+	}
+	if e.RaidMinutos < 1 {
+		e.RaidMinutos = 1
+	}
+	if e.RaidMinutos > 60 {
+		e.RaidMinutos = 60
+	}
+	vistos := map[string]bool{}
+	var ps []string
+	for _, p := range e.Prefijos {
+		if c := LimpiaPrefijo(p); c != "" && !vistos[c] {
+			vistos[c] = true
+			ps = append(ps, c)
+		}
+	}
+	act := 0
+	if e.RaidActivo {
+		act = 1
+	}
+	_, err := a.db.Exec(`INSERT INTO grupo_entrada(bot_id,grupo,raid_activo,raid_max,raid_minutos,prefijos) VALUES(?,?,?,?,?,?)
+		ON CONFLICT(bot_id,grupo) DO UPDATE SET raid_activo=excluded.raid_activo, raid_max=excluded.raid_max, raid_minutos=excluded.raid_minutos, prefijos=excluded.prefijos`,
+		botID, e.Grupo, act, e.RaidMax, e.RaidMinutos, strings.Join(ps, ","))
+	if err == nil {
+		a.avisa("grupo:" + e.Grupo)
+	}
+	return err
+}
+
+// EntradaDe devuelve la protección de entrada del grupo (apagada y sin prefijos si nunca se tocó).
+func (a *Almacen) EntradaDe(botID int64, grupo string) ProteccionEntrada {
+	e := ProteccionEntrada{Grupo: grupo, RaidMax: 8, RaidMinutos: 2, Prefijos: []string{}}
+	var act int
+	var ps string
+	if a.db.QueryRow(`SELECT raid_activo,raid_max,raid_minutos,prefijos FROM grupo_entrada WHERE bot_id=? AND grupo=?`, botID, grupo).Scan(&act, &e.RaidMax, &e.RaidMinutos, &ps) == nil {
+		e.RaidActivo = act == 1
+		if ps != "" {
+			e.Prefijos = strings.Split(ps, ",")
+		}
+	}
+	return e
+}
+
+// PrefijoBloqueado dice si el número (clave de persona «34600…@s.whatsapp.net» o «+34600…») empieza con alguno de los prefijos.
+func (e ProteccionEntrada) PrefijoBloqueado(persona string) bool {
+	n := strings.TrimPrefix(strings.SplitN(persona, "@", 2)[0], "+")
+	if strings.HasSuffix(persona, "@lid") || n == "" {
+		return false // un LID no es un número: no se puede saber el país
+	}
+	for _, p := range e.Prefijos {
+		if p != "" && strings.HasPrefix(n, p) {
+			return true
+		}
+	}
+	return false
 }

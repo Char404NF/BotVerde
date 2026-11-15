@@ -74,6 +74,7 @@ fun PantallaPerfilMiembro(botId: Long, jid: String, persona: String, alVolver: (
     val perfil by produceState<PerfilMiembroAdmin?>(null, jid, persona, version) { value = runCatching { Repo.perfilMiembro(botId, jid, persona) }.getOrNull() ?: value }
     val estado by produceState<EstadoGrupo?>(null, jid) { value = runCatching { Repo.estadoGrupo(botId, jid) }.getOrNull() }
     val p = perfil
+    var dialogo by remember { mutableStateOf<String?>(null) }
     Scaffold(
         topBar = {
             Column {
@@ -87,7 +88,7 @@ fun PantallaPerfilMiembro(botId: Long, jid: String, persona: String, alVolver: (
                 }
             }
         },
-        bottomBar = { if (p != null) BarraAccionesMiembro(botId, jid, p, estado?.soyAdmin == true) { version++ } },
+        bottomBar = { if (p != null) BarraAccionesMiembro(botId, jid, p, estado?.soyAdmin == true, { dialogo = it }) { version++ } },
     ) { relleno ->
         Box(Modifier.fillMaxSize().padding(relleno)) {
             if (p == null) FilasDeCarga(4) else when (pestana) {
@@ -96,6 +97,8 @@ fun PantallaPerfilMiembro(botId: Long, jid: String, persona: String, alVolver: (
                 2 -> PestanaAuditoriaPerfil(p) { alAuditar(p.miembro.titulo) }
                 else -> PestanaHistorialPerfil(p)
             }
+            // Los cuadros de confirmar van aquí (no en la barra de abajo): son hojas que ocupan toda la pantalla.
+            if (p != null) DialogosMiembro(botId, jid, p, dialogo, { dialogo = null }) { version++ }
         }
     }
 }
@@ -242,12 +245,11 @@ private fun PestanaHistorialPerfil(p: PerfilMiembroAdmin) {
 // ---------- acciones ----------
 
 @Composable
-private fun BarraAccionesMiembro(botId: Long, jid: String, p: PerfilMiembroAdmin, soyAdmin: Boolean, refrescar: () -> Unit) {
+private fun BarraAccionesMiembro(botId: Long, jid: String, p: PerfilMiembroAdmin, soyAdmin: Boolean, pedir: (String) -> Unit, refrescar: () -> Unit) {
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
     val haptica = rememberHaptica()
     val m = p.miembro
-    var dialogo by remember { mutableStateOf<String?>(null) }
     var menuSilencio by remember { mutableStateOf(false) }
     fun hacer(ok: String, f: suspend () -> Unit) = scope.launch {
         runCatching { f() }.onSuccess { avisaToast(ctx, ok, false) }.onFailure { avisaToast(ctx, textoError(it), true) }
@@ -255,9 +257,9 @@ private fun BarraAccionesMiembro(botId: Long, jid: String, p: PerfilMiembroAdmin
     }
     Surface(tonalElevation = 3.dp, modifier = Modifier.testTag("barra_acciones_miembro")) {
         Row(Modifier.horizontalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = Esp.s, vertical = Esp.s), horizontalArrangement = Arrangement.spacedBy(Esp.s), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton({ haptica(Toque.Suave); dialogo = "advertir" }, Modifier.testTag("accion_advertir")) { Icon(Ico.Aviso, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Advertir") }
+            OutlinedButton({ haptica(Toque.Suave); pedir("advertir") }, Modifier.testTag("accion_advertir")) { Icon(Ico.Aviso, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Advertir") }
             Box {
-                OutlinedButton({ haptica(Toque.Suave); if (p.silenciado) dialogo = "quitar_silencio" else menuSilencio = true }, Modifier.testTag("accion_silenciar")) {
+                OutlinedButton({ haptica(Toque.Suave); if (p.silenciado) pedir("quitar_silencio") else menuSilencio = true }, Modifier.testTag("accion_silenciar")) {
                     Icon(Ico.Volumen, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text(if (p.silenciado) "Quitar silencio" else "Silenciar")
                 }
                 DropdownMenu(menuSilencio, { menuSilencio = false }) {
@@ -269,49 +271,61 @@ private fun BarraAccionesMiembro(botId: Long, jid: String, p: PerfilMiembroAdmin
                     }
                 }
             }
-            OutlinedButton({ haptica(Toque.Suave); dialogo = if (m.esAdmin) "quitar_admin" else "hacer_admin" }, Modifier.testTag("accion_admin"), enabled = soyAdmin && !m.esCreador) {
+            OutlinedButton({ haptica(Toque.Suave); pedir(if (m.esAdmin) "quitar_admin" else "hacer_admin") }, Modifier.testTag("accion_admin"), enabled = soyAdmin && !m.esCreador) {
                 Icon(Ico.Candado, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text(if (m.esAdmin) "Quitar admin" else "Hacer admin")
             }
-            OutlinedButton({ haptica(Toque.Fuerte); dialogo = "expulsar" }, Modifier.testTag("accion_expulsar"), enabled = soyAdmin && !m.esCreador) { Text("Expulsar", color = MaterialTheme.colorScheme.error) }
-            OutlinedButton({ haptica(Toque.Fuerte); dialogo = if (m.baneado) "desbanear" else "banear" }, Modifier.testTag("accion_banear"), enabled = soyAdmin || m.baneado) {
+            OutlinedButton({ haptica(Toque.Fuerte); pedir("expulsar") }, Modifier.testTag("accion_expulsar"), enabled = soyAdmin && !m.esCreador) { Text("Expulsar", color = MaterialTheme.colorScheme.error) }
+            OutlinedButton({ haptica(Toque.Fuerte); pedir(if (m.baneado) "desbanear" else "banear") }, Modifier.testTag("accion_banear"), enabled = soyAdmin || m.baneado) {
                 Text(if (m.baneado) "Quitar baneo" else "Banear", color = if (m.baneado) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error)
             }
         }
     }
-    when (dialogo) {
+}
+
+@Composable
+private fun DialogosMiembro(botId: Long, jid: String, p: PerfilMiembroAdmin, dialogo: String?, cerrar: () -> Unit, refrescar: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val ctx = LocalContext.current
+    val m = p.miembro
+    fun hacer(ok: String, f: suspend () -> Unit) = scope.launch {
+        runCatching { f() }.onSuccess { avisaToast(ctx, ok, false) }.onFailure { avisaToast(ctx, textoError(it), true) }
+        refrescar()
+    }
+    val dialogoActual = dialogo
+    when (dialogoActual) {
         "advertir" -> HojaTexto(
-            "Advertir a ${m.titulo}", "", "motivo_advertir", { dialogo = null },
-            { t -> dialogo = null; hacer("Advertencia puesta") { Repo.advertir(botId, m.persona, t, jid) } },
+            "Advertir a ${m.titulo}", "", "motivo_advertir", { cerrar() },
+            { t -> cerrar(); hacer("Advertencia puesta") { Repo.advertir(botId, m.persona, t, jid) } },
             ayuda = "Se anota en su ficha. Si llega al tope, el bot hace lo que tengas configurado (por ejemplo silenciar).", permiteVacio = true, maximo = 200, lineas = 2,
         )
         "quitar_silencio" -> AlertDialog(
-            onDismissRequest = { dialogo = null }, title = { Text("¿Quitar el silencio?") }, text = { Text("El bot dejará de borrar lo que escriba ${m.titulo}.") },
-            confirmButton = { TextButton({ dialogo = null; hacer("Listo: ya puede escribir") { Repo.quitarSilencioGrupos(botId, m.persona) } }, Modifier.testTag("confirmar_quitar_silencio")) { Text("Quitar silencio") } },
-            dismissButton = { TextButton({ dialogo = null }) { Text("Cancelar") } },
+            onDismissRequest = { cerrar() }, title = { Text("¿Quitar el silencio?") }, text = { Text("El bot dejará de borrar lo que escriba ${m.titulo}.") },
+            confirmButton = { TextButton({ cerrar(); hacer("Listo: ya puede escribir") { Repo.quitarSilencioGrupos(botId, m.persona) } }, Modifier.testTag("confirmar_quitar_silencio")) { Text("Quitar silencio") } },
+            dismissButton = { TextButton({ cerrar() }) { Text("Cancelar") } },
         )
         "hacer_admin" -> AlertDialog(
-            onDismissRequest = { dialogo = null }, title = { Text("¿Hacer admin a ${m.titulo}?") }, text = { Text("Podrá cambiar ajustes, agregar y sacar personas en WhatsApp.") },
-            confirmButton = { TextButton({ dialogo = null; hacer("Listo: ahora es administradora") { Repo.ascenderEnGrupo(botId, jid, m.persona, true) } }, Modifier.testTag("confirmar_admin")) { Text("Hacer admin") } },
-            dismissButton = { TextButton({ dialogo = null }) { Text("Cancelar") } },
+            onDismissRequest = { cerrar() }, title = { Text("¿Hacer admin a ${m.titulo}?") }, text = { Text("Podrá cambiar ajustes, agregar y sacar personas en WhatsApp.") },
+            confirmButton = { TextButton({ cerrar(); hacer("Listo: ahora es administradora") { Repo.ascenderEnGrupo(botId, jid, m.persona, true) } }, Modifier.testTag("confirmar_admin")) { Text("Hacer admin") } },
+            dismissButton = { TextButton({ cerrar() }) { Text("Cancelar") } },
         )
         "quitar_admin" -> AlertDialog(
-            onDismissRequest = { dialogo = null }, title = { Text("¿Quitar el cargo de admin?") }, text = { Text("${m.titulo} ya no podrá administrar el grupo.") },
-            confirmButton = { TextButton({ dialogo = null; hacer("Listo: ya no es administradora") { Repo.ascenderEnGrupo(botId, jid, m.persona, false) } }, Modifier.testTag("confirmar_quitar_admin")) { Text("Quitar admin") } },
-            dismissButton = { TextButton({ dialogo = null }) { Text("Cancelar") } },
+            onDismissRequest = { cerrar() }, title = { Text("¿Quitar el cargo de admin?") }, text = { Text("${m.titulo} ya no podrá administrar el grupo.") },
+            confirmButton = { TextButton({ cerrar(); hacer("Listo: ya no es administradora") { Repo.ascenderEnGrupo(botId, jid, m.persona, false) } }, Modifier.testTag("confirmar_quitar_admin")) { Text("Quitar admin") } },
+            dismissButton = { TextButton({ cerrar() }) { Text("Cancelar") } },
         )
         "expulsar" -> ConfirmarSinDeshacer(
             "¿Expulsar a ${m.titulo}?", "Sale del grupo ahora. Podría volver si tiene el enlace; para impedirlo, mejor banéala.", "Expulsar", "confirmar_expulsar",
-            { dialogo = null }, { dialogo = null; hacer("Listo: salió del grupo") { Repo.expulsarDeGrupo(botId, jid, m.persona) } },
+            { cerrar() }, { cerrar(); hacer("Listo: salió del grupo") { Repo.expulsarDeGrupo(botId, jid, m.persona) } },
         )
         "banear" -> HojaTexto(
-            "Banear a ${m.titulo}", "", "motivo_banear", { dialogo = null },
-            { t -> dialogo = null; hacer("Listo: baneada") { Repo.banear(botId, jid, m.persona, t) } },
+            "Banear a ${m.titulo}", "", "motivo_banear", { cerrar() },
+            { t -> cerrar(); hacer("Listo: baneada") { Repo.banear(botId, jid, m.persona, t) } },
             ayuda = "Sale del grupo y, si vuelve a entrar, la saco otra vez. El motivo es solo para ti (opcional).", permiteVacio = true, maximo = 200, lineas = 2,
         )
         "desbanear" -> AlertDialog(
-            onDismissRequest = { dialogo = null }, title = { Text("¿Dejar volver a ${m.titulo}?") }, text = { Text("Podrá entrar otra vez al grupo.") },
-            confirmButton = { TextButton({ dialogo = null; hacer("Listo: ya puede volver") { Repo.desbanear(botId, jid, m.persona) } }, Modifier.testTag("confirmar_desbanear_perfil")) { Text("Quitar baneo") } },
-            dismissButton = { TextButton({ dialogo = null }) { Text("Cancelar") } },
+            onDismissRequest = { cerrar() }, title = { Text("¿Dejar volver a ${m.titulo}?") }, text = { Text("Podrá entrar otra vez al grupo.") },
+            confirmButton = { TextButton({ cerrar(); hacer("Listo: ya puede volver") { Repo.desbanear(botId, jid, m.persona) } }, Modifier.testTag("confirmar_desbanear_perfil")) { Text("Quitar baneo") } },
+            dismissButton = { TextButton({ cerrar() }) { Text("Cancelar") } },
         )
     }
 }

@@ -3,6 +3,7 @@ package grupos
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -57,9 +58,15 @@ func (s *Servicio) AlEntrar(ctx context.Context, chat, persona string) bool {
 // AplicarHorarios abre o cierra los grupos que tienen horario. Se llama cada minuto; solo actúa cuando el estado deseado cambió.
 func (s *Servicio) AplicarHorarios(ctx context.Context, ahora time.Time) int {
 	n := 0
+	ahora = ahora.In(s.Alm.Zona()) // las horas del horario son las del teléfono, no las de UTC
 	for _, h := range s.Alm.HorariosActivos(s.BotID) {
 		quiero := h.EstadoDeseado(ahora)
 		if quiero == "" || quiero == h.Ultimo {
+			continue
+		}
+		if quiero == "abierto" && h.Ultimo == "" {
+			// recién encendido (o primera vez): el grupo nunca lo cerró el horario, así que no hay nada que abrir ni avisar
+			s.Alm.MarcarHorario(s.BotID, h.Grupo, quiero)
 			continue
 		}
 		if !s.conectado() {
@@ -197,6 +204,35 @@ func (s *Servicio) registrarAdmin(reg func(comandos.Comando), validaObjetivo fun
 			}
 			return "Escribe: !horariogrupo 22:00 07:00  (o !horariogrupo off).", nil
 		}})
+	reg(comandos.Comando{Nombre: "limpiarinactivos", Resumen: "Sacar a quienes llevan tiempo sin escribir (no toca a los administradores)", Uso: "limpiarinactivos [30|60|90]", Casilla: "grupos.expulsar", Ambito: comandos.Grupo, Confirma: true,
+		Validar: func(cx *comandos.Contexto) error { _, _, err := s.grupoDe(cx); return err },
+		Ejecutar: func(cx *comandos.Contexto) (string, error) {
+			chat, resto, err := s.grupoDe(cx)
+			if err != nil {
+				return "", err
+			}
+			dias := 30
+			if len(resto) > 0 {
+				if n, e := strconv.Atoi(resto[0]); e == nil {
+					dias = n
+				}
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute) // son varias sacadas con pausa
+
+			defer cancel()
+			n, fallos, err := s.LimpiarInactivos(ctx, cx.Persona, chat, dias)
+			if err != nil {
+				return "", err
+			}
+			if n == 0 && fallos == 0 {
+				return "No hay nadie inactivo que sacar.", nil
+			}
+			t := fmt.Sprintf("Listo: saqué a %d personas que llevaban más de %d días sin escribir.", n, s.NormalizaDias(dias))
+			if fallos > 0 {
+				t += fmt.Sprintf(" A %d no pude sacarlas.", fallos)
+			}
+			return t, nil
+		}})
 	reg(comandos.Comando{Nombre: "perfil", Resumen: "Ver cuánto ha enviado una persona al grupo", Uso: "perfil <persona>", Casilla: "grupos.ranking", Ambito: comandos.Grupo, Validar: validaObjetivo,
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
 			chat, _, err := s.grupoDe(cx)
@@ -209,4 +245,105 @@ func (s *Servicio) registrarAdmin(reg func(comandos.Comando), validaObjetivo fun
 			}
 			return s.TextoPerfil(chat, p, s.Alm.NombreDePersona(s.BotID, p)), nil
 		}})
+}
+
+// LimpiarInactivos saca (de a una, con una pausa) a los miembros que no escriben desde hace `dias` días. No toca a los administradores
+// ni a quien no se puede sacar. Como mucho 50 por vez. Devuelve cuántas salieron y a cuántas no se pudo.
+func (s *Servicio) LimpiarInactivos(ctx context.Context, actor, chat string, dias int) (sacadas, fallos int, err error) {
+	l, _, err := s.Inactivos(ctx, chat, dias)
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, x := range l {
+		if x.EsAdmin {
+			continue
+		}
+		if sacadas+fallos >= 50 {
+			break
+		}
+		if e := s.ExpulsarComo(ctx, actor, chat, x.Persona); e != nil {
+			fallos++
+		} else {
+			sacadas++
+		}
+		s.pausa(ctx, 800*time.Millisecond)
+	}
+	return sacadas, fallos, nil
+}
+
+// AlEntrarRevisa aplica las defensas de entrada: baneados, prefijos de país bloqueados y el modo raid. Devuelve qué hizo
+// ("baneado", "prefijo", "raid" o "" si no hizo nada). Se llama desde una goroutine (usa la red).
+func (s *Servicio) AlEntrarRevisa(ctx context.Context, chat, persona string) string {
+	if persona == "" {
+		return ""
+	}
+	if s.AlEntrar(ctx, chat, persona) {
+		return "baneado"
+	}
+	e := s.Alm.EntradaDe(s.BotID, chat)
+	if e.PrefijoBloqueado(persona) {
+		if err := s.ExpulsarComo(ctx, almacen.PersonaDueno, chat, persona); err != nil {
+			s.log("Grupo: no pude sacar a alguien de un país bloqueado (" + err.Error() + ").")
+		} else {
+			s.registra(almacen.PersonaDueno, "grupo.prefijo_bloqueado", persona, chat, "ok", "")
+		}
+		return "prefijo"
+	}
+	if e.RaidActivo && s.contarEntrada(chat, e.RaidMinutos) >= e.RaidMax {
+		s.alarmaRaid(ctx, chat, e)
+		return "raid"
+	}
+	return ""
+}
+
+// contarEntrada anota una entrada y dice cuántas hubo en los últimos `minutos` minutos en ese grupo.
+func (s *Servicio) contarEntrada(chat string, minutos int) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.entradas == nil {
+		s.entradas = map[string][]time.Time{}
+	}
+	ahora := s.ahora()
+	corte := ahora.Add(-time.Duration(minutos) * time.Minute)
+	var vivas []time.Time
+	for _, t := range s.entradas[chat] {
+		if t.After(corte) {
+			vivas = append(vivas, t)
+		}
+	}
+	vivas = append(vivas, ahora)
+	s.entradas[chat] = vivas
+	return len(vivas)
+}
+
+// alarmaRaid cierra el grupo, avisa en él y deja una notificación local. Solo salta una vez por ráfaga.
+func (s *Servicio) alarmaRaid(ctx context.Context, chat string, e almacen.ProteccionEntrada) {
+	s.mu.Lock()
+	if t, ok := s.raidAvisado[chat]; ok && s.ahora().Sub(t) < 10*time.Minute {
+		s.mu.Unlock()
+		return
+	}
+	if s.raidAvisado == nil {
+		s.raidAvisado = map[string]time.Time{}
+	}
+	s.raidAvisado[chat] = s.ahora()
+	s.entradas[chat] = nil
+	s.mu.Unlock()
+	cerrado := false
+	if err := s.Cerrar(ctx, almacen.PersonaDueno, chat, true); err == nil {
+		cerrado = true
+		s.registra(almacen.PersonaDueno, "grupo.raid", "", chat, "ok", "")
+		if s.Enviar != nil {
+			_ = s.Enviar(ctx, chat, "🚨 Entraron muchas cuentas en muy poco tiempo. Por seguridad cerré el grupo: solo los administradores pueden escribir hasta que lo abran.", "", nil)
+		}
+	} else {
+		s.registra(almacen.PersonaDueno, "grupo.raid", "", chat, "error", "")
+	}
+	cuerpo := fmt.Sprintf("Entraron %d cuentas en menos de %d minutos a %s.", e.RaidMax, e.RaidMinutos, s.nombreGrupo(chat))
+	if cerrado {
+		cuerpo += " Cerré el grupo."
+	} else {
+		cuerpo += " No pude cerrar el grupo (¿soy administrador?)."
+	}
+	_, _ = s.Alm.CrearAvisoDe(s.BotID, "filtros", chat, "", "Posible ataque al grupo", cuerpo)
 }

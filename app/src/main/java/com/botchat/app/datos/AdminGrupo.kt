@@ -24,7 +24,7 @@ data class MiembroAdmin(
     val esCreador: Boolean get() = rol == "creador"
 
     /** El nombre que se muestra: el guardado, o el teléfono si WhatsApp no dio ninguno. */
-    val titulo: String get() = nombre.takeIf { it.isNotBlank() && it != "Participante" } ?: telefono.ifBlank { persona.substringBefore('@') }
+    val titulo: String get() = nombre.takeIf { it.isNotBlank() && it != "Participante" && !it.startsWith("Número no disponible") } ?: telefono.ifBlank { persona.substringBefore('@') }
 }
 
 data class ListaMiembrosAdmin(val desde: Long, val miembros: List<MiembroAdmin>)
@@ -51,6 +51,11 @@ data class BaneadoGrupo(val persona: String, val nombre: String, val telefono: S
 /** Cierra el grupo a `cierra` y lo abre a `abre` (HH:MM) los días marcados (bit 0 = lunes … bit 6 = domingo). */
 data class HorarioGrupo(val activo: Boolean = false, val cierra: String = "22:00", val abre: String = "07:00", val dias: Int = 127, val ultimo: String = "") {
     fun json(): String = JSONObject().put("activo", activo).put("cierra", cierra).put("abre", abre).put("dias", dias).toString()
+}
+
+/** Defensas contra gente que entra de golpe (modo raid) o de países que no quieres (`prefijos`, solo dígitos). */
+data class ProteccionEntrada(val raidActivo: Boolean = false, val raidMax: Int = 8, val raidMinutos: Int = 2, val prefijos: List<String> = emptyList()) {
+    fun json(): String = JSONObject().put("raidActivo", raidActivo).put("raidMax", raidMax).put("raidMinutos", raidMinutos).put("prefijos", JSONArray(prefijos)).toString()
 }
 
 data class ResumenAdmin(
@@ -105,6 +110,12 @@ object JsonAdminGrupo {
 
     fun horario(json: String): HorarioGrupo = horario(JSONObject(json.ifBlank { "{}" }))
 
+    fun entrada(json: String): ProteccionEntrada {
+        val o = JSONObject(json.ifBlank { "{}" })
+        val ps = o.optJSONArray("prefijos")
+        return ProteccionEntrada(o.optBoolean("raidActivo"), o.optInt("raidMax", 8), o.optInt("raidMinutos", 2), List(ps?.length() ?: 0) { ps!!.getString(it) })
+    }
+
     fun resumen(json: String): ResumenAdmin {
         val o = JSONObject(json)
         return ResumenAdmin(
@@ -129,3 +140,5 @@ suspend fun Repo.desbanear(bot: Long, grupo: String, persona: String) = io { mot
 suspend fun Repo.horarioGrupo(bot: Long, grupo: String) = io { JsonAdminGrupo.horario(motor.grupoHorario(bot, grupo)) }
 suspend fun Repo.guardarHorarioGrupo(bot: Long, grupo: String, h: HorarioGrupo) = io { motor.grupoGuardarHorario(bot, grupo, h.json()) }
 suspend fun Repo.resumenAdmin(bot: Long, grupo: String) = io { JsonAdminGrupo.resumen(motor.grupoResumenAdmin(bot, grupo)) }
+suspend fun Repo.entradaGrupo(bot: Long, grupo: String) = io { JsonAdminGrupo.entrada(motor.grupoEntrada(bot, grupo)) }
+suspend fun Repo.guardarEntradaGrupo(bot: Long, grupo: String, e: ProteccionEntrada) = io { motor.grupoGuardarEntrada(bot, grupo, e.json()) }

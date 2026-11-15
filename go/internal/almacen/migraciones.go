@@ -947,6 +947,16 @@ var migraciones = [][]string{
 			ultimo TEXT NOT NULL DEFAULT '',
 			PRIMARY KEY (bot_id, grupo)
 		) WITHOUT ROWID`,
+		// protección de entrada: modo raid (muchas cuentas en poco tiempo → cerrar y avisar) y prefijos de país bloqueados
+		`CREATE TABLE grupo_entrada (
+			bot_id INTEGER NOT NULL,
+			grupo TEXT NOT NULL,
+			raid_activo INTEGER NOT NULL DEFAULT 0,
+			raid_max INTEGER NOT NULL DEFAULT 8,
+			raid_minutos INTEGER NOT NULL DEFAULT 2,
+			prefijos TEXT NOT NULL DEFAULT '',
+			PRIMARY KEY (bot_id, grupo)
+		) WITHOUT ROWID`,
 	},
 }
 

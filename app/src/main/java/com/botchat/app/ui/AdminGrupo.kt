@@ -72,7 +72,10 @@ import com.botchat.app.datos.EventoGrupo
 import com.botchat.app.datos.HorarioGrupo
 import com.botchat.app.datos.InfoGrupo
 import com.botchat.app.datos.Repo
+import com.botchat.app.datos.ProteccionEntrada
 import com.botchat.app.datos.ResumenAdmin
+import com.botchat.app.datos.entradaGrupo
+import com.botchat.app.datos.guardarEntradaGrupo
 import com.botchat.app.datos.baneadosGrupo
 import com.botchat.app.datos.desbanear
 import com.botchat.app.datos.guardarHorarioGrupo
@@ -332,11 +335,15 @@ private fun PestanaAjustesAdmin(botId: Long, jid: String, estado: EstadoGrupo?, 
     var version by remember { mutableIntStateOf(0) }
     val horario by produceState<HorarioGrupo?>(null, jid, version) { value = runCatching { Repo.horarioGrupo(botId, jid) }.getOrNull() }
     val baneados by produceState<List<BaneadoGrupo>?>(null, jid, version) { value = runCatching { Repo.baneadosGrupo(botId, jid) }.getOrNull() }
+    val entrada by produceState<ProteccionEntrada?>(null, jid, version) { value = runCatching { Repo.entradaGrupo(botId, jid) }.getOrNull() }
     var enlace by remember { mutableStateOf<String?>(null) }
+    var eligiendoOrigen by remember { mutableStateOf(false) }
+    var origenPlantilla by remember { mutableStateOf<ChatItem?>(null) }
     fun hacer(ok: String, f: suspend () -> Unit) = scope.launch {
         runCatching { f() }.onSuccess { avisaToast(ctx, ok, false) }.onFailure { avisaToast(ctx, textoError(it), true) }
         refrescar(); version++
     }
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = Esp.s).testTag("pestana_ajustes_admin"), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
         TituloSeccion("Quién puede qué")
         FilaAjuste(Ico.Candado, "Solo administradores escriben", "Cierra el grupo: nadie más puede mandar mensajes.", Modifier.testTag("fila_cerrado"), derecha = {
@@ -350,6 +357,12 @@ private fun PestanaAjustesAdmin(botId: Long, jid: String, estado: EstadoGrupo?, 
         TituloSeccion("Horario de cierre")
         val h = horario
         if (h == null) FilasDeCarga(2) else TarjetaHorario(h, soyAdmin, { nuevo -> hacer(if (nuevo.activo) "Horario guardado" else "Horario apagado") { Repo.guardarHorarioGrupo(botId, jid, nuevo) } })
+
+        TituloSeccion("Protección de entrada")
+        entrada?.let { e -> TarjetaEntrada(e, soyAdmin) { nuevo -> hacer("Protección guardada") { Repo.guardarEntradaGrupo(botId, jid, nuevo) } } }
+
+        TituloSeccion("Plantillas")
+        SeccionPlantillasGrupo(botId, jid, origenPlantilla, { eligiendoOrigen = true }, { origenPlantilla = null }) { version++ }
 
         TituloSeccion("Gente")
         FilaIr(Ico.Agregar, "Solicitudes de ingreso", "Aceptar o rechazar a quien pide entrar.", "ir_solicitudes") { salidas.alAbrirSolicitudes() }
@@ -368,6 +381,9 @@ private fun PestanaAjustesAdmin(botId: Long, jid: String, estado: EstadoGrupo?, 
         TituloSeccion("Más")
         FilaIr(Ico.Ajustes, "Nombre, descripción y más ajustes", "Cambiar el nombre y la descripción, y crear un enlace nuevo.", "ir_ajustes_avanzados") { salidas.alAbrirAjustesAvanzados() }
     }
+    // La hoja ocupa toda la pantalla, así que va aquí (fuera de la columna que se desplaza).
+    if (eligiendoOrigen) HojaElegirChat(botId, true, "Copiar de…", "elegir_origen", { eligiendoOrigen = false }) { eligiendoOrigen = false; origenPlantilla = it }
+    }
 }
 
 /** El horario con el que el grupo se cierra y se abre solo: interruptor, dos horas y los días. */
@@ -382,11 +398,11 @@ private fun TarjetaHorario(h: HorarioGrupo, soyAdmin: Boolean, alGuardar: (Horar
                     Text("Cerrar y abrir solo", style = MaterialTheme.typography.titleMedium)
                     Text("Así de noche nadie escribe. Se usa la hora de este teléfono.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Switch(h.activo, { haptica(Toque.Suave); alGuardar(h.copy(activo = it)) }, Modifier.testTag("sw_horario"), enabled = soyAdmin)
+                Switch(h.activo, { haptica(Toque.Suave); alGuardar(h.copy(activo = it)) }, Modifier.testTag("sw_horario"))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
-                OutlinedButton({ hora = "cierra" }, Modifier.weight(1f).testTag("hora_cierra"), enabled = soyAdmin) { Text("Cierra ${h.cierra}") }
-                OutlinedButton({ hora = "abre" }, Modifier.weight(1f).testTag("hora_abre"), enabled = soyAdmin) { Text("Abre ${h.abre}") }
+                OutlinedButton({ hora = "cierra" }, Modifier.weight(1f).testTag("hora_cierra")) { Text("Cierra ${h.cierra}") }
+                OutlinedButton({ hora = "abre" }, Modifier.weight(1f).testTag("hora_abre")) { Text("Abre ${h.abre}") }
             }
             Text("Días en que cierra", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.xs)) {
@@ -394,11 +410,11 @@ private fun TarjetaHorario(h: HorarioGrupo, soyAdmin: Boolean, alGuardar: (Horar
                     FilterChip((h.dias and (1 shl i)) != 0, {
                         val nuevo = h.dias xor (1 shl i)
                         if (nuevo != 0) { haptica(Toque.Suave); alGuardar(h.copy(dias = nuevo)) }
-                    }, { Text(d) }, modifier = Modifier.testTag("dia_$i"), enabled = soyAdmin)
+                    }, { Text(d) }, modifier = Modifier.testTag("dia_$i"))
                 }
             }
             if (h.activo && h.ultimo.isNotBlank()) Text("Ahora está ${if (h.ultimo == "cerrado") "cerrado por el horario" else "abierto"}.", Modifier.testTag("horario_estado"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (!soyAdmin) Text("Para que funcione, el bot debe ser administrador del grupo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (!soyAdmin) Text("Se guarda aquí; para que funcione, el bot debe ser administrador del grupo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
     hora?.let { cual ->
@@ -418,12 +434,62 @@ private fun TarjetaHorario(h: HorarioGrupo, soyAdmin: Boolean, alGuardar: (Horar
     }
 }
 
+/** Modo raid (muchas cuentas nuevas de golpe → cierra el grupo y te avisa) y países cuyos números no entran. */
+@Composable
+private fun TarjetaEntrada(e: ProteccionEntrada, soyAdmin: Boolean, alGuardar: (ProteccionEntrada) -> Unit) {
+    val haptica = rememberHaptica()
+    var nuevo by remember { mutableStateOf("") }
+    Card(Modifier.fillMaxWidth().padding(horizontal = Esp.l).testTag("tarjeta_entrada"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+        Column(Modifier.padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Modo raid", style = MaterialTheme.typography.titleMedium)
+                    Text("Si entran muchas cuentas en poco tiempo, cierro el grupo, aviso y te llega una notificación.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(e.raidActivo, { haptica(Toque.Suave); alGuardar(e.copy(raidActivo = it)) }, Modifier.testTag("sw_raid"))
+            }
+            if (e.raidActivo) {
+                PasoNumero("Cuentas nuevas", e.raidMax, 2, 50, "raid_max") { alGuardar(e.copy(raidMax = it)) }
+                PasoNumero("En cuántos minutos", e.raidMinutos, 1, 30, "raid_min") { alGuardar(e.copy(raidMinutos = it)) }
+            }
+            HorizontalDivider()
+            Text("Países bloqueados", style = MaterialTheme.typography.titleMedium)
+            Text("Quien entre con un número que empiece con estos prefijos sale solo. Escribe el prefijo del país (por ejemplo 212 o +91).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (e.prefijos.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.xs), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
+                e.prefijos.forEach { p ->
+                    androidx.compose.material3.InputChip(false, { alGuardar(e.copy(prefijos = e.prefijos - p)) }, { Text("+$p") }, modifier = Modifier.testTag("prefijo_$p"),
+                        trailingIcon = { Icon(Ico.Cerrar, "Quitar +$p", Modifier.size(16.dp)) })
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(nuevo, { nuevo = it.filter { c -> c.isDigit() || c == '+' }.take(5) }, Modifier.weight(1f).testTag("prefijo_campo"), singleLine = true, label = { Text("Prefijo") })
+                Spacer(Modifier.width(Esp.s))
+                Button({
+                    val d = nuevo.filter { it.isDigit() }
+                    if (d.isNotEmpty() && d !in e.prefijos) { alGuardar(e.copy(prefijos = e.prefijos + d)); nuevo = "" }
+                }, Modifier.testTag("prefijo_agregar"), enabled = nuevo.any { it.isDigit() }) { Text("Agregar") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PasoNumero(titulo: String, valor: Int, minimo: Int, maximo: Int, etiqueta: String, alCambiar: (Int) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(titulo, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        OutlinedButton({ alCambiar((valor - 1).coerceAtLeast(minimo)) }, Modifier.testTag("${etiqueta}_menos"), enabled = valor > minimo) { Text("−") }
+        Text("$valor", Modifier.padding(horizontal = Esp.m).testTag("${etiqueta}_valor"), style = MaterialTheme.typography.titleMedium)
+        OutlinedButton({ alCambiar((valor + 1).coerceAtMost(maximo)) }, Modifier.testTag("${etiqueta}_mas"), enabled = valor < maximo) { Text("+") }
+    }
+}
+
 // ---------- Historial ----------
 
 private fun nombreOYo(nombre: String, persona: String) = when {
     nombre == "Yo" -> "Tú"
     nombre.isNotBlank() -> nombre
-    else -> persona.substringBefore('@').let { if (it.isBlank()) "" else "+$it" }
+    persona.contains('@') && persona.first().isDigit() -> "+" + persona.substringBefore('@')
+    else -> ""
 }
 
 /** La frase de una línea del historial, lista para leer. */
@@ -437,12 +503,22 @@ internal fun textoEvento(e: EventoGrupo): String {
             else -> "$persona ${e.texto}".trim()
         }
         else -> buildString {
-            append(actor.ifBlank { "El bot" }).append(' ').append(e.texto)
+            val tu = actor == "Tú"
+            var t = if (persona.isBlank()) e.texto.removeSuffix(" de") else e.texto
+            if (tu) t = t.substringBefore(' ').let { v -> (VERBOS_TU[v] ?: v) + t.removePrefix(v) }
+            append(actor.ifBlank { "El bot" }).append(' ').append(t)
             if (persona.isNotBlank()) append(' ').append(persona)
             if (e.fallo) append(" (no se pudo)")
         }
     }
 }
+
+/** Para que «Tú» no lleve el verbo en tercera persona: «Tú cerraste el grupo». */
+private val VERBOS_TU = mapOf(
+    "abrió" to "abriste", "cerró" to "cerraste", "borró" to "borraste", "cambió" to "cambiaste", "expulsó" to "expulsaste", "baneó" to "baneaste", "hizo" to "hiciste",
+    "quitó" to "quitaste", "aprobó" to "aprobaste", "rechazó" to "rechazaste", "mencionó" to "mencionaste", "bloqueó" to "bloqueaste", "liberó" to "liberaste",
+    "agregó" to "agregaste", "pidió" to "pediste", "sacó" to "sacaste",
+)
 
 private fun colorEvento(e: EventoGrupo) = when {
     e.fallo -> AMARILLO_SILENCIO

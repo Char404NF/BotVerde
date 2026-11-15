@@ -89,15 +89,15 @@ func (s *estado) registrarCambiosGrupo(c cambioGrupoEv) {
 			tipo = almacen.CambioAgregado
 		}
 		_ = a.RegistrarCambio(s.botID, c.grupo, tipo, p, jid, porSiNoEs(por, tipo), c.razon, c.ts)
-		// Baneada: si vuelve a entrar, se la saca (la acción corre aparte; la red no va en el trabajador).
-		if s.gru != nil && !propio(j) && a.EstaBaneado(s.botID, c.grupo, p) {
+		// Defensas de entrada (baneada, país bloqueado, modo raid): la acción corre aparte; la red no va en el trabajador.
+		if s.gru != nil && !propio(j) {
 			grupo, quien := c.grupo, p
 			s.wg.Add(1)
 			go func() {
 				defer s.wg.Done()
 				ctx, cancel := context.WithTimeout(s.ctx, 45*time.Second)
 				defer cancel()
-				s.gru.AlEntrar(ctx, grupo, quien)
+				s.gru.AlEntrarRevisa(ctx, grupo, quien)
 			}()
 		}
 	}

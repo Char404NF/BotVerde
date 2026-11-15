@@ -233,8 +233,9 @@ fun FilaPersonaAdmin(m: MiembroAdmin, elegida: Boolean, seleccionando: Boolean, 
                 Spacer(Modifier.weight(1f))
                 InsigniaCargo(m, Modifier.testTag("cargo_${m.persona}"))
             }
-            Text(
-                listOf(m.telefono, textoEnLinea(m)).filter { it.isNotBlank() }.joinToString(" · "),
+            val linea = listOf(m.telefono.takeIf { it != m.titulo }.orEmpty(), textoEnLinea(m)).filter { it.isNotBlank() }.joinToString(" · ")
+            if (linea.isNotBlank()) Text(
+                linea,
                 style = MaterialTheme.typography.bodySmall, color = if (m.enLinea) VERDE_EN_LINEA else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.testTag("telefono_${m.persona}"),
             )

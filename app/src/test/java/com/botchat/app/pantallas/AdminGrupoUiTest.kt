@@ -222,7 +222,7 @@ class AdminGrupoUiTest {
         regla.espera { abiertos.contains("auditar:Ana") }
         toca("perfil_pestana_3")
         regla.esperaEtiqueta("perfil_historial")
-        regla.esperaTexto("Tú baneó a Rosa")
+        regla.esperaTexto("Tú baneaste a Rosa")
     }
 
     @Test fun advertirSilenciarYHacerAdminLlamanALaAPI() {
@@ -347,7 +347,7 @@ class AdminGrupoUiTest {
 
     @Test fun elHistorialMuestraCambiosYAcciones() {
         admin(5)
-        regla.esperaTexto("Tú baneó a Rosa")
+        regla.esperaTexto("Tú baneaste a Rosa")
         regla.esperaTexto("Luis entró por el enlace")
         toca("filtro_historial_cambio")
         regla.espera { !hay("evento_${motor.ahoraS - 60}") && hay("evento_${motor.ahoraS - 7200}") }
@@ -359,5 +359,54 @@ class AdminGrupoUiTest {
         motor.historialJson = "[]"
         admin(5)
         regla.esperaEtiqueta("historial_vacio")
+    }
+
+    // ---------- Plantillas y copiar ----------
+
+    @Test fun unaPlantillaCambiaQueFiltrosEstanEncendidosYSuAccion() {
+        admin(4)
+        toca("plantilla_estricto")
+        regla.esperaEtiqueta("confirmar_plantilla")
+        assertFalse(llamo("grupoFiltro"))
+        nodo("confirmar_plantilla").performClick()
+        regla.espera { motor.llamadas.count { it.startsWith("grupoFiltro:") } == 4 }
+        val a = org.json.JSONArray(motor.filtrosGrupoJson)
+        for (i in 0 until a.length()) {
+            assertTrue(a.getJSONObject(i).getBoolean("activo"))
+            assertEquals("borrar_advertir", a.getJSONObject(i).getString("accion"))
+        }
+        toca("plantilla_familia")
+        nodo("confirmar_plantilla").performClick()
+        regla.espera { org.json.JSONArray(motor.filtrosGrupoJson).let { b -> (0 until b.length()).none { b.getJSONObject(it).getBoolean("activo") } } }
+    }
+
+    @Test fun copiarDeOtroGrupoTraeFiltrosReglasYHorario() {
+        motor.chatsGrupos = org.json.JSONArray().put(Apoyo.chatJson("otro@g.us", "Ventas", grupo = true)).toString()
+        motor.reglasGrupo = "No spam"
+        admin(4)
+        toca("copiar_de_otro")
+        regla.esperaEtiqueta("elegir_origen_otro@g.us")
+        nodo("elegir_origen_otro@g.us").performClick()
+        regla.esperaEtiqueta("confirmar_copiar")
+        nodo("confirmar_copiar").performClick()
+        regla.espera { llamo("guardarHorario:") && llamo("grupoReglas:No spam") && llamo("grupoFiltro:") }
+    }
+
+    // ---------- Protección de entrada ----------
+
+    @Test fun elModoRaidYLosPrefijosSeGuardan() {
+        admin(4)
+        regla.esperaEtiqueta("sw_raid")
+        nodo("sw_raid").performScrollTo().performClick()
+        regla.espera { llamo("guardarEntrada:") && motor.entradaJson.contains("\"raidActivo\":true") }
+        regla.esperaEtiqueta("raid_max_mas")
+        nodo("raid_max_mas").performScrollTo().performClick()
+        regla.espera { JSONObject(motor.entradaJson).optInt("raidMax") == 9 }
+        nodo("prefijo_campo").performScrollTo().performTextInput("+212")
+        nodo("prefijo_agregar").performClick()
+        regla.espera { JSONObject(motor.entradaJson).getJSONArray("prefijos").toString() == "[\"212\"]" }
+        regla.esperaEtiqueta("prefijo_212")
+        nodo("prefijo_212").performClick() // tocar el chip lo quita
+        regla.espera { JSONObject(motor.entradaJson).getJSONArray("prefijos").length() == 0 }
     }
 }

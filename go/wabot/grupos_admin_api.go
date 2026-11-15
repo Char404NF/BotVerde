@@ -278,7 +278,7 @@ func GrupoResumenAdmin(botID int64, grupo string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	ahora := time.Now()
+	ahora := time.Now().In(a.Zona())
 	ms, _, err := miembrosAdmin(a, botID, grupo, ahora)
 	if err != nil {
 		return "", err
@@ -320,4 +320,27 @@ func GrupoResumenAdmin(botID int64, grupo string) (string, error) {
 		r.Top = append(r.Top, m)
 	}
 	return js(r, nil)
+}
+
+// GrupoEntrada devuelve (JSON) la protección de entrada del grupo: modo raid y prefijos de país bloqueados.
+func GrupoEntrada(botID int64, grupo string) (string, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return "", err
+	}
+	return js(a.EntradaDe(botID, grupo), nil)
+}
+
+// GrupoGuardarEntrada guarda la protección de entrada ({raidActivo, raidMax, raidMinutos, prefijos}).
+func GrupoGuardarEntrada(botID int64, grupo, entradaJSON string) error {
+	a, err := almacenAbierto()
+	if err != nil {
+		return err
+	}
+	var e almacen.ProteccionEntrada
+	if err := json.Unmarshal([]byte(entradaJSON), &e); err != nil {
+		return errors.New("la configuración no es válida")
+	}
+	e.Grupo = grupo
+	return a.GuardarEntrada(botID, e)
 }
