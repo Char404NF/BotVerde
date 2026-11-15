@@ -835,6 +835,23 @@ class MotorFalso : Motor {
         for (i in 0 until f.length()) if (f.getJSONObject(i).getString("id") == id) f.getJSONObject(i).put("propio", texto)
         respuestasJson = o.toString()
     }
+    // ---- configuración base, encuestas, fijar, avisos y copia ----
+    var baseJson = """{"existe":false,"desde":"","fecha":0,"filtros":0,"reglas":false,"horario":false,"entrada":false,"auto":false}"""
+    var avisosJson = """{"wa":false,"tipos":["reporte","grupos","conexion","resumen"],"desconexion":10,"resumen":false}"""
+    var resumenTexto = "Resumen de la semana\n• Mensajes: 90"
+    var copiaFalla: String? = null
+    override fun grupoBaseInfo(bot: Long) = baseJson
+    override fun grupoBaseGuardar(bot: Long, chat: String) { llamadas += "baseGuardar:$chat"; baseJson = JSONObject(baseJson).put("existe", true).put("desde", "Familia").put("fecha", 1763000000).put("filtros", 2).put("reglas", true).toString() }
+    override fun grupoBaseQuitar(bot: Long) { llamadas += "baseQuitar"; baseJson = JSONObject(baseJson).put("existe", false).put("auto", false).toString() }
+    override fun grupoBaseAuto(bot: Long, si: Boolean) { llamadas += "baseAuto:$si"; baseJson = JSONObject(baseJson).put("auto", si).toString() }
+    override fun grupoBaseAplicar(bot: Long, gruposJson: String): Long { llamadas += "baseAplicar:$gruposJson"; return JSONArray(gruposJson).length().toLong() }
+    override fun grupoEncuesta(bot: Long, chat: String, titulo: String, opcionesJson: String, multiple: Boolean) { llamadas += "encuesta:$titulo:$opcionesJson:$multiple"; gFalla() }
+    override fun grupoFijar(bot: Long, chat: String, msgId: String, dias: Long, fijar: Boolean) { llamadas += "fijar:$msgId:$dias:$fijar"; gFalla() }
+    override fun alertasLeer(bot: Long) = avisosJson
+    override fun alertasGuardar(bot: Long, ajustesJson: String) { llamadas += "alertas:$ajustesJson"; avisosJson = ajustesJson }
+    override fun resumenSemanalAhora(bot: Long): String { llamadas += "resumenSemanal"; return resumenTexto }
+    override fun respaldoConfigExportar(bot: Long, contrasena: String): ByteArray { llamadas += "exportar:${contrasena.length}"; copiaFalla?.let { throw IllegalStateException(it) }; return "copia".toByteArray() }
+    override fun respaldoConfigRestaurar(bot: Long, contrasena: String, datos: ByteArray): String { llamadas += "restaurar:${contrasena.length}:${datos.size}"; copiaFalla?.let { throw IllegalStateException(it) }; return """{"ajustes":4,"grupos":2,"filtros":5,"baneados":1,"base":true}""" }
     override fun respuestasRestaurar(bot: Long): Long { llamadas += "respuestas_restaurar"; val o = JSONObject(respuestasJson); val f = o.getJSONArray("filas"); for (i in 0 until f.length()) f.getJSONObject(i).put("propio", ""); respuestasJson = o.put("reemplazos", JSONArray()).toString(); return 1 }
     override fun reemplazosFijar(bot: Long, listaJson: String) { llamadas += "reemplazos:$listaJson"; respuestasJson = JSONObject(respuestasJson).put("reemplazos", JSONArray(listaJson)).toString() }
     var perfilBaneado = false

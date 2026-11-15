@@ -38,6 +38,9 @@ type InfoBase struct {
 	Auto    bool   `json:"auto"`    // se aplica sola a los grupos nuevos
 }
 
+// RutaBase es dónde se guarda la configuración base (cifrada).
+func (s *Servicio) RutaBase() string { return s.rutaBase() }
+
 func (s *Servicio) rutaBase() string { return fmt.Sprintf("config/grupo_base_%d.json", s.BotID) }
 
 func (s *Servicio) leerBase() (*Base, error) {

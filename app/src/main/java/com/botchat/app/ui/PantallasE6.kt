@@ -228,7 +228,7 @@ fun PantallaCentroBot(
     alMiBot: () -> Unit, alAlmacenamiento: () -> Unit, alAuditoria: () -> Unit, alSilencios: () -> Unit, alAdvertencias: () -> Unit,
     alEtiquetas: () -> Unit, alAjustes: () -> Unit,
     alComandos: () -> Unit = {}, alModulos: () -> Unit = {}, alLimites: () -> Unit = {}, alLaboratorio: () -> Unit = {}, alActividad: () -> Unit = {},
-    alAsistente: () -> Unit = {}, alRespuestas: () -> Unit = {},
+    alAsistente: () -> Unit = {}, alRespuestas: () -> Unit = {}, alAvisos: () -> Unit = {},
 ) {
     val completo = LocalModoCompleto.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag("pantalla_centro_bot")) {
@@ -240,6 +240,7 @@ fun PantallaCentroBot(
         BotonGrande(Ico.Volumen, "Silencios", "A quién silenciaste en tus grupos", "hub_silencios", alSilencios)
         BotonGrande(Ico.Aviso, "Advertencias", "A quién has advertido y lo que anotaste", "hub_advertencias", alAdvertencias)
         BotonGrande(Ico.Seleccionar, "Etiquetas y marcados", "Ordena personas, grupos y mensajes con colores", "hub_etiquetas", alEtiquetas)
+        BotonGrande(Ico.Campana, "Avisos y copia de seguridad", "Avisos por WhatsApp, si se cae la conexión, resumen semanal y copia cifrada", "hub_avisos", alAvisos)
         TituloSeccion("Datos y privacidad")
         BotonGrande(Ico.Espacio, "Almacenamiento", "Cuánto espacio ocupan tus chats y cómo liberarlo", "hub_almacenamiento", alAlmacenamiento)
         BotonGrande(Ico.Candado, "Auditoría y privacidad", "Qué se guarda y qué pasa con lo que borran", "hub_auditoria", alAuditoria)

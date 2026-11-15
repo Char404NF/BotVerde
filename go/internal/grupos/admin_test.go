@@ -411,3 +411,25 @@ func TestEncuestaYFijarPorComando(t *testing.T) {
 		t.Fatalf("sin conexión al envío: %v", err)
 	}
 }
+
+func TestResumenSemanalToca(t *testing.T) {
+	e := nuevo(t, true)
+	z := e.alm.Zona()
+	domingo := time.Date(2026, 11, 15, 21, 0, 0, 0, z)
+	if e.s.ResumenSemanalToca(domingo) {
+		t.Fatal("apagado no toca")
+	}
+	_ = e.alm.FijarAjusteBot(1, "resumen_semanal", "1")
+	if e.s.ResumenSemanalToca(time.Date(2026, 11, 15, 12, 0, 0, 0, z)) {
+		t.Fatal("antes de las 8 de la noche no toca")
+	}
+	if e.s.ResumenSemanalToca(time.Date(2026, 11, 14, 21, 0, 0, 0, z)) {
+		t.Fatal("un sábado no toca")
+	}
+	if !e.s.ResumenSemanalToca(domingo) {
+		t.Fatal("domingo en la noche toca")
+	}
+	if e.s.ResumenSemanalToca(domingo.Add(time.Hour)) {
+		t.Fatal("solo una vez por día")
+	}
+}

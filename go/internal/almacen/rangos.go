@@ -229,9 +229,14 @@ var ajustesBotDefecto = map[string]string{
 	"sil_avisar_fin":         "1",         // avisarle a la persona (y a mí) cuando termina su silencio
 	"sil_aviso_noadmin":      "1",         // avisarme (máx. 1 por día y grupo) cuando no soy admin donde alguien está silenciado
 	// Advertencias con sanciones (v0.6.0, etapa E5)
-	"adv_caducidad_dias":  "30", // días que vale una advertencia nueva (0 = no caduca); las que ya existían no caducan
-	"grupo_base_auto":     "0",  // 1 = al entrar a un grupo nuevo se le aplica la configuración base
-	"adv_tipos_sembrados": "0",  // 1 = ya se crearon los tipos de fábrica (Spam, Insultos, Enlaces, Otro)
+	"adv_caducidad_dias":  "30",                              // días que vale una advertencia nueva (0 = no caduca); las que ya existían no caducan
+	"alerta_wa":           "0",                               // 1 = los avisos importantes también me llegan a mi chat de WhatsApp («Mensajes guardados»)
+	"alerta_wa_tipos":     "reporte,grupos,conexion,resumen", // qué avisos se repiten por WhatsApp
+	"aviso_desconexion":   "10",                              // minutos sin conexión antes de avisarme (0 = no avisar)
+	"resumen_sem_ultimo":  "",
+	"resumen_semanal":     "0", // 1 = cada domingo en la noche me llega el resumen de la semana
+	"grupo_base_auto":     "0", // 1 = al entrar a un grupo nuevo se le aplica la configuración base
+	"adv_tipos_sembrados": "0", // 1 = ya se crearon los tipos de fábrica (Spam, Insultos, Enlaces, Otro)
 }
 
 // AjusteBot devuelve un ajuste del bot (su valor por defecto si nunca se fijó).

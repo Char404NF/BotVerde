@@ -489,25 +489,32 @@ private fun CampoAjuste(titulo: String, clave: String, ajustes: Map<String, Stri
     }
 }
 
-/** Registro de acciones: quién, qué, cuándo y con qué resultado. No guarda textos de mensajes. */
+/** Registro de acciones: quién, qué, cuándo y con qué resultado. No guarda textos de mensajes. Se puede ver solo lo que cambió la configuración. */
 @Composable
 fun PantallaRegistroAcciones(botId: Long, alVolver: () -> Unit) {
     var version by remember { mutableIntStateOf(0) }
+    var soloConfig by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { Repo.cambios.collect { evs -> if ("acciones" in evs) version++ } }
-    val lista by produceState<List<com.botchat.app.datos.AccionItem>?>(null, version) { value = runCatching { Repo.acciones(botId, 200) }.getOrDefault(emptyList()) }
+    val lista by produceState<List<com.botchat.app.datos.AccionItem>?>(null, version) { value = runCatching { Repo.acciones(botId, 300) }.getOrDefault(emptyList()) }
     Scaffold(topBar = { TopAppBar(navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text("Registro de acciones") }) }) { relleno ->
-        val datos = lista
-        when {
-            datos == null -> Box(Modifier.fillMaxSize().padding(relleno), Alignment.Center) { CircularProgressIndicator() }
-            datos.isEmpty() -> EstadoVacio(Ico.Estadisticas, "Sin acciones todavía", "Aquí verás quién usó un comando o cambió un rango.", Modifier.padding(relleno).padding(top = 60.dp))
-            else -> LazyColumn(Modifier.fillMaxSize().padding(relleno).testTag("lista_acciones"), contentPadding = androidx.compose.foundation.layout.PaddingValues(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
-                items(datos, key = { it.id }) { x ->
-                    Column(Modifier.fillMaxWidth().testTag("accion_${x.id}")) {
-                        Row { Text(x.accion, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium); Text(x.resultado, color = if (x.resultado == "ok") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error) }
-                        Text(
-                            (if (x.quien == "yo") "Tú" else if (x.quien == "sistema") "Sistema" else numeroDePersona(x.quien)) + (if (x.objetivo.isNotEmpty()) " → " + numeroDePersona(x.objetivo) else "") + " · " + etiquetaDia(x.ts) + " " + horaDe(x.ts),
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+        val datos = lista?.let { l -> if (soloConfig) l.filter { esCambioConfig(it.accion) } else l }
+        Column(Modifier.fillMaxSize().padding(relleno)) {
+            Row(Modifier.padding(horizontal = Esp.l, vertical = Esp.s), horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
+                FilterChip(!soloConfig, { soloConfig = false }, { Text("Todo") }, modifier = Modifier.testTag("registro_todo"))
+                FilterChip(soloConfig, { soloConfig = true }, { Text("Cambios de configuración") }, modifier = Modifier.testTag("registro_config"))
+            }
+            when {
+                datos == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+                datos.isEmpty() -> EstadoVacio(Ico.Estadisticas, if (soloConfig) "Sin cambios todavía" else "Sin acciones todavía", if (soloConfig) "Aquí verás quién cambió reglas, filtros, respuestas, rangos o ajustes." else "Aquí verás quién usó un comando o cambió un rango.", Modifier.padding(top = 60.dp))
+                else -> LazyColumn(Modifier.fillMaxSize().testTag("lista_acciones"), contentPadding = androidx.compose.foundation.layout.PaddingValues(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
+                    items(datos, key = { it.id }) { x ->
+                        Column(Modifier.fillMaxWidth().testTag("accion_${x.id}")) {
+                            Row { Text(nombreAccion(x.accion), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium); Text(x.resultado, color = if (x.resultado == "ok") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error) }
+                            Text(
+                                (if (x.quien == "yo") "Tú" else if (x.quien == "sistema") "Sistema" else numeroDePersona(x.quien)) + (if (x.objetivo.isNotEmpty()) " → " + numeroDePersona(x.objetivo) else "") + " · " + etiquetaDia(x.ts) + " " + horaDe(x.ts),
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }

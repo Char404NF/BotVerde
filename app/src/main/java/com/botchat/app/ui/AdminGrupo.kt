@@ -317,6 +317,8 @@ private fun PestanaMensajesAdmin(botId: Long, jid: String, estado: EstadoGrupo?,
             }, Modifier.testTag("anuncio_enviar"), enabled = anuncio.isNotBlank() && !enviando && estado?.conectado == true) { Text("Enviar al grupo") }
             if (estado?.conectado == false) Text("El bot no está conectado: enciéndelo para enviar.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        TituloSeccion("Encuesta")
+        TarjetaEncuesta(botId, jid, estado?.conectado == true)
         TituloSeccion("Automáticos")
         FilaIr(Ico.Chats, "Bienvenida y despedida", "El mensaje que sale cuando alguien entra o se va, con su nombre.", "ir_bienvenida") { salidas.alAbrirBienvenida() }
         FilaIr(Ico.Calendario, "Mensajes programados y difusiones", "Avisos que salen solos a cierta hora (módulos Programados y Difusión).", "ir_programados") { salidas.alAbrirModulos() }
@@ -363,6 +365,9 @@ private fun PestanaAjustesAdmin(botId: Long, jid: String, estado: EstadoGrupo?, 
 
         TituloSeccion("Plantillas")
         SeccionPlantillasGrupo(botId, jid, origenPlantilla, { eligiendoOrigen = true }, { origenPlantilla = null }) { version++ }
+
+        TituloSeccion("Configuración base")
+        SeccionBaseGrupos(botId, jid, version) { version++ }
 
         TituloSeccion("Gente")
         FilaIr(Ico.Agregar, "Solicitudes de ingreso", "Aceptar o rechazar a quien pide entrar.", "ir_solicitudes") { salidas.alAbrirSolicitudes() }

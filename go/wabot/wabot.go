@@ -153,7 +153,16 @@ func Start(raiz string, botID int64, clave []byte, l Listener) error {
 	go func() {
 		defer s.wg.Done()
 		(&vigilante{vinculado: func() bool { return cli.Store.ID != nil }, conectado: cli.IsConnected, log: s.log,
-			conectar: func() { _ = cli.Connect() }}).correr(s.ctx)
+			conectar: func() { _ = cli.Connect() },
+			avisoTras: func() time.Duration {
+				return time.Duration(alm.AjusteBotInt(s.botID, "aviso_desconexion")) * time.Minute
+			},
+			alLargo: func(min int) {
+				_, _ = alm.CrearAviso(s.botID, "conexion", "", "El bot perdió la conexión", fmt.Sprintf("Lleva %d minutos sin conexión a WhatsApp. Revisa el internet del teléfono; si sigue igual, abre la app.", min))
+			},
+			alVolver: func(min int) {
+				_, _ = alm.CrearAviso(s.botID, "conexion", "", "El bot volvió a conectarse", fmt.Sprintf("Estuvo %d minutos sin conexión y ya está de nuevo en línea.", min))
+			}}).correr(s.ctx)
 	}()
 	if dev.ID == nil {
 		s.log("Sesión nueva: falta vincular.")
@@ -191,6 +200,7 @@ func (s *estado) armar() {
 	s.armarGrupos()
 	s.armarSilencio()
 	s.armarPersonas()
+	s.armarAlertas()
 	s.eapp = estadoapp.Nuevo(alm, s.botID, estadoapp.Real{Client: s.cli}, s.log)
 	s.armarModulos()
 	s.armarAuto()

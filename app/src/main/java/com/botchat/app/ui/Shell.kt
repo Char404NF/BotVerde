@@ -224,7 +224,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         alSilencios = { nav.navigate("silencios") }, alAdvertencias = { nav.navigate("advertencias") }, alEtiquetas = { nav.navigate("etiquetas") },
                         alAjustes = { nav.navigate("ajustes") }, alComandos = { nav.navigate("comandos_propios") }, alModulos = { nav.navigate("modulos") },
                         alLimites = { nav.navigate("iniciativa") }, alLaboratorio = { nav.navigate("laboratorio") }, alActividad = { nav.navigate("actividad") },
-                        alAsistente = { nav.navigate("asistente_bot") }, alRespuestas = { nav.navigate("respuestas_bot") },
+                        alAsistente = { nav.navigate("asistente_bot") }, alRespuestas = { nav.navigate("respuestas_bot") }, alAvisos = { nav.navigate("avisos_copia") },
                     )
                     }
                 }
@@ -339,6 +339,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         alAbrirGrupo = { nav.navigate("admin_grupo/${enc(jid)}") },
                     )
                 }
+                composable("avisos_copia") { PantallaAvisosCopia(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("respuestas_bot") { PantallaRespuestasBot(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("admin_grupo/{jid}") { be ->
                     val jid = be.arguments?.getString("jid") ?: return@composable

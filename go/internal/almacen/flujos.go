@@ -627,6 +627,9 @@ func (a *Almacen) CrearAvisoDe(botID int64, tipo, chat, persona, titulo, detalle
 	}
 	id, _ := r.LastInsertId()
 	a.avisa(fmt.Sprintf("aviso:%d", id))
+	if f := a.AlAviso; f != nil {
+		go f(botID, tipo, chat, titulo, detalle)
+	}
 	return id, nil
 }
 

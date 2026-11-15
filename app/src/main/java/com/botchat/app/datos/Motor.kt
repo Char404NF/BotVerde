@@ -380,6 +380,18 @@ interface Motor {
     fun videoActualizar(bot: Long): String = ""
     fun videoQuitarMotor(bot: Long) {}
     fun videoRepetir(bot: Long, id: Long): String = ""
+    fun grupoBaseInfo(bot: Long): String = "{}"
+    fun grupoBaseGuardar(bot: Long, chat: String) {}
+    fun grupoBaseQuitar(bot: Long) {}
+    fun grupoBaseAuto(bot: Long, si: Boolean) {}
+    fun grupoBaseAplicar(bot: Long, gruposJson: String): Long = 0
+    fun grupoEncuesta(bot: Long, chat: String, titulo: String, opcionesJson: String, multiple: Boolean) {}
+    fun grupoFijar(bot: Long, chat: String, msgId: String, dias: Long, fijar: Boolean) {}
+    fun alertasLeer(bot: Long): String = "{}"
+    fun alertasGuardar(bot: Long, ajustesJson: String) {}
+    fun resumenSemanalAhora(bot: Long): String = ""
+    fun respaldoConfigExportar(bot: Long, contrasena: String): ByteArray = ByteArray(0)
+    fun respaldoConfigRestaurar(bot: Long, contrasena: String, datos: ByteArray): String = "{}"
 }
 
 /** El módulo Go de verdad (whatsmeow + almacén cifrado). */
@@ -728,4 +740,16 @@ object MotorGo : Motor {
     override fun videoActualizar(bot: Long) = Wabot.videoActualizar(bot)
     override fun videoQuitarMotor(bot: Long) = Wabot.videoQuitarMotor(bot)
     override fun videoRepetir(bot: Long, id: Long) = Wabot.videoRepetir(bot, id)
+    override fun grupoBaseInfo(bot: Long) = Wabot.grupoBaseInfo(bot)
+    override fun grupoBaseGuardar(bot: Long, chat: String) = Wabot.grupoBaseGuardar(bot, chat)
+    override fun grupoBaseQuitar(bot: Long) = Wabot.grupoBaseQuitar(bot)
+    override fun grupoBaseAuto(bot: Long, si: Boolean) = Wabot.grupoBaseAuto(bot, si)
+    override fun grupoBaseAplicar(bot: Long, gruposJson: String) = Wabot.grupoBaseAplicar(bot, gruposJson).toLong()
+    override fun grupoEncuesta(bot: Long, chat: String, titulo: String, opcionesJson: String, multiple: Boolean) = Wabot.grupoEncuesta(bot, chat, titulo, opcionesJson, multiple)
+    override fun grupoFijar(bot: Long, chat: String, msgId: String, dias: Long, fijar: Boolean) = Wabot.grupoFijar(bot, chat, msgId, dias, fijar)
+    override fun alertasLeer(bot: Long) = Wabot.alertasLeer(bot)
+    override fun alertasGuardar(bot: Long, ajustesJson: String) = Wabot.alertasGuardar(bot, ajustesJson)
+    override fun resumenSemanalAhora(bot: Long) = Wabot.resumenSemanalAhora(bot)
+    override fun respaldoConfigExportar(bot: Long, contrasena: String): ByteArray = Wabot.respaldoConfigExportar(bot, contrasena)
+    override fun respaldoConfigRestaurar(bot: Long, contrasena: String, datos: ByteArray) = Wabot.respaldoConfigRestaurar(bot, contrasena, datos)
 }

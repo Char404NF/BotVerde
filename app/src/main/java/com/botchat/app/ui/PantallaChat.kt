@@ -96,6 +96,7 @@ import androidx.media3.common.util.UnstableApi
 import com.botchat.app.Paises
 import com.botchat.app.datos.Msg
 import com.botchat.app.datos.Repo
+import com.botchat.app.datos.fijarMensaje
 import com.botchat.app.medios.CacheImagenes
 import com.botchat.app.medios.PortadaVideo
 import com.botchat.app.medios.TipoArchivo
@@ -135,6 +136,7 @@ fun PantallaChat(
     var etiquetando by remember { mutableStateOf(false) }
     var verFoto by remember { mutableStateOf(false) }
     var olvidando by remember { mutableStateOf<Msg?>(null) }
+    var fijando by remember { mutableStateOf<Msg?>(null) }
     var marcando by remember { mutableStateOf<Msg?>(null) }
     var seleccion by remember { mutableStateOf(setOf<String>()) }
     var borrando by remember { mutableStateOf(false) }
@@ -259,6 +261,7 @@ fun PantallaChat(
                             DropdownMenu(mas, { mas = false }) {
                                 if (unico != null && escribirActivo && puedeEditar(unico)) DropdownMenuItem(text = { Text("Editar") }, onClick = { mas = false; vm.editando = unico; limpiarSeleccion() }, modifier = Modifier.testTag("accion_editar"))
                                 if (unico != null && unico.esMio) DropdownMenuItem(text = { Text("Info del mensaje") }, onClick = { mas = false; infoDe = unico; infoCargada = null; scope.launch { infoCargada = vm.info(unico) } }, modifier = Modifier.testTag("accion_info"))
+                                if (unico != null && chat?.esGrupo == true && escribirActivo) DropdownMenuItem(text = { Text("Fijar o soltar mensaje") }, onClick = { mas = false; fijando = unico }, modifier = Modifier.testTag("accion_fijar"))
                                 if (unico != null) DropdownMenuItem(text = { Text("Olvidar este mensaje") }, onClick = { mas = false; olvidando = unico; limpiarSeleccion() }, modifier = Modifier.testTag("olvidar_mensaje"))
                             }
                         }
@@ -514,6 +517,7 @@ fun PantallaChat(
             limpiarSeleccion()
         }, alCerrar = { reenviando = false })
     }
+    fijando?.let { m -> DialogoFijarMensaje(vm.botId, jid, m.id, alCerrar = { fijando = null; limpiarSeleccion() }) }
     marcando?.let { m -> DialogoMarcarRapido(vm.botId, jid, m.id, alCerrar = { marcando = null; limpiarSeleccion() }) }
     if (infoDe != null) DialogoInfoMensaje(infoCargada, alCerrar = { infoDe = null; limpiarSeleccion() })
 
@@ -968,4 +972,28 @@ private fun TarjetaVerUnaVez(m: Msg, alAbrir: (String) -> Unit) {
         Icon(Ico.Candado, null, Modifier.size(24.dp)); Spacer(Modifier.width(10.dp))
         Column { Text(titulo, fontWeight = FontWeight.SemiBold); Text(detalle, style = MaterialTheme.typography.bodySmall, color = LocalContentColorSuave()) }
     }
+}
+
+/** Fija un mensaje del grupo para todos durante 24 horas, 7 o 30 días, o lo suelta. */
+@Composable
+private fun DialogoFijarMensaje(botId: Long, jid: String, msgId: String, alCerrar: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val ctx = LocalContext.current
+    fun hacer(dias: Int, fijar: Boolean) = scope.launch {
+        runCatching { Repo.fijarMensaje(botId, jid, msgId, dias, fijar) }
+            .onSuccess { avisaToast(ctx, if (fijar) "Mensaje fijado" else "Mensaje soltado", false) }.onFailure { avisaToast(ctx, textoError(it), true) }
+        alCerrar()
+    }
+    AlertDialog(
+        onDismissRequest = alCerrar, title = { Text("Mensaje fijado") },
+        text = { Text("Se fija para todos en el grupo. Hace falta que el bot sea administrador o que el grupo deje fijar a todos.") },
+        confirmButton = {
+            Row {
+                TextButton({ hacer(1, true) }, Modifier.testTag("fijar_1")) { Text("24 h") }
+                TextButton({ hacer(7, true) }, Modifier.testTag("fijar_7")) { Text("7 días") }
+                TextButton({ hacer(30, true) }, Modifier.testTag("fijar_30")) { Text("30 días") }
+            }
+        },
+        dismissButton = { TextButton({ hacer(0, false) }, Modifier.testTag("fijar_soltar")) { Text("Soltar") } },
+    )
 }

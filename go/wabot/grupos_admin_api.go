@@ -253,7 +253,11 @@ func GrupoGuardarHorario(botID int64, grupo, horarioJSON string) error {
 		return errors.New("el horario no es válido")
 	}
 	h.Grupo = grupo
-	return a.GuardarHorario(botID, h)
+	if err := a.GuardarHorario(botID, h); err != nil {
+		return err
+	}
+	a.RegistrarAccion(botID, almacen.PersonaDueno, "grupo.horario", "", grupo, "ok", "")
+	return nil
 }
 
 // ResumenGrupoAdmin son los números de la portada de Administrar.
@@ -342,7 +346,11 @@ func GrupoGuardarEntrada(botID int64, grupo, entradaJSON string) error {
 		return errors.New("la configuración no es válida")
 	}
 	e.Grupo = grupo
-	return a.GuardarEntrada(botID, e)
+	if err := a.GuardarEntrada(botID, e); err != nil {
+		return err
+	}
+	a.RegistrarAccion(botID, almacen.PersonaDueno, "grupo.entrada", "", grupo, "ok", "")
+	return nil
 }
 
 // ---------- configuración base ----------

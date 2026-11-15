@@ -97,11 +97,11 @@ class NavegacionUiTest {
         // pestañas de abajo (0.6.0): Chats, Personas, Grupos y Bot; Almacenamiento y Ajustes se abren desde Bot
         regla.onNodeWithTag("nav_bot").performClick()
         regla.esperaEtiqueta("hub_almacenamiento")
-        regla.onNodeWithTag("hub_almacenamiento").performClick()
+        regla.onNodeWithTag("hub_almacenamiento").performScrollTo().performClick()
         regla.esperaTexto("Lo que guardo de tus chats") // E8: el medidor contra el tope va primero
         atras()
         regla.esperaEtiqueta("hub_ajustes")
-        regla.onNodeWithTag("hub_ajustes").performClick()
+        regla.onNodeWithTag("hub_ajustes").performScrollTo().performClick()
         regla.esperaTexto("Seguridad")
         regla.onNodeWithTag("ajuste_seguridad").performScrollTo().performClick()
         regla.esperaTexto("Proteger la app")

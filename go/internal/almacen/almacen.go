@@ -66,6 +66,8 @@ type Almacen struct {
 	// Cambio, si no es nil, se llama cuando algo cambia (sin bloquear la operación). Los eventos son:
 	// "chats", "chat:<jid>", "msg:<jid>:<id>", "archivo:<jid>:<id>" y "espacio".
 	Cambio func(evento string)
+	// AlAviso, si no es nil, se llama (en otra goroutine) cada vez que se crea un aviso local: así se puede repetir por WhatsApp al dueño.
+	AlAviso func(botID int64, tipo, chat, titulo, detalle string)
 	// Reloj, si no es nil, da la hora «de ahora» para lo que caduca (advertencias vencidas). Solo lo cambian las pruebas.
 	Reloj func() time.Time
 }

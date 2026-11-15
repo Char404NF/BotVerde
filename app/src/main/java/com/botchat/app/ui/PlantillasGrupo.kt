@@ -39,19 +39,19 @@ data class PlantillaGrupo(val id: String, val nombre: String, val resumen: Strin
 val PLANTILLAS_GRUPO = listOf(
     PlantillaGrupo(
         "familia", "Familia", "Sin filtros: nadie se queda sin escribir. Solo te aviso si algo se pasa.",
-        mapOf("enlaces" to AjusteFiltro(false, "avisarme"), "palabras" to AjusteFiltro(false, "avisarme"), "repetidos" to AjusteFiltro(false, "avisarme"), "flood" to AjusteFiltro(false, "avisarme")),
+        mapOf("enlaces" to AjusteFiltro(false, "avisarme"), "palabras" to AjusteFiltro(false, "avisarme"), "repetidos" to AjusteFiltro(false, "avisarme"), "flood" to AjusteFiltro(false, "avisarme"), "stickers" to AjusteFiltro(false, "avisarme"), "audios" to AjusteFiltro(false, "avisarme"), "reenviados" to AjusteFiltro(false, "avisarme")),
     ),
     PlantillaGrupo(
-        "comunidad", "Comunidad", "Cuida el ritmo: avisa con amabilidad a quien repite lo mismo o manda muchos mensajes seguidos.",
-        mapOf("enlaces" to AjusteFiltro(false, "avisarme"), "palabras" to AjusteFiltro(false, "avisarme"), "repetidos" to AjusteFiltro(true, "avisar_grupo"), "flood" to AjusteFiltro(true, "avisar_grupo")),
+        "comunidad", "Comunidad", "Cuida el ritmo: avisa con amabilidad a quien repite lo mismo, manda muchos mensajes o llena el grupo de stickers.",
+        mapOf("enlaces" to AjusteFiltro(false, "avisarme"), "palabras" to AjusteFiltro(false, "avisarme"), "repetidos" to AjusteFiltro(true, "avisar_grupo"), "flood" to AjusteFiltro(true, "avisar_grupo"), "stickers" to AjusteFiltro(true, "avisar_grupo"), "audios" to AjusteFiltro(false, "avisarme"), "reenviados" to AjusteFiltro(false, "avisarme")),
     ),
     PlantillaGrupo(
-        "ventas", "Ventas", "Sin repetidos ni ráfagas: borra el mensaje y suma una advertencia. Los enlaces se dejan pasar.",
-        mapOf("enlaces" to AjusteFiltro(false, "avisarme"), "palabras" to AjusteFiltro(false, "avisarme"), "repetidos" to AjusteFiltro(true, "borrar_advertir"), "flood" to AjusteFiltro(true, "borrar_advertir")),
+        "ventas", "Ventas", "Sin repetidos, ráfagas, stickers en cadena ni reenviados: borra el mensaje y suma una advertencia. Los enlaces se dejan pasar.",
+        mapOf("enlaces" to AjusteFiltro(false, "avisarme"), "palabras" to AjusteFiltro(false, "avisarme"), "repetidos" to AjusteFiltro(true, "borrar_advertir"), "flood" to AjusteFiltro(true, "borrar_advertir"), "stickers" to AjusteFiltro(true, "borrar_advertir"), "audios" to AjusteFiltro(false, "avisarme"), "reenviados" to AjusteFiltro(true, "borrar_advertir")),
     ),
     PlantillaGrupo(
-        "estricto", "Estricto", "Todo vigilado: enlaces, palabras prohibidas, repetidos y ráfagas. Borra y advierte.",
-        mapOf("enlaces" to AjusteFiltro(true, "borrar_advertir"), "palabras" to AjusteFiltro(true, "borrar_advertir"), "repetidos" to AjusteFiltro(true, "borrar_advertir"), "flood" to AjusteFiltro(true, "borrar_advertir")),
+        "estricto", "Estricto", "Todo vigilado: enlaces, palabras, repetidos, ráfagas, stickers, audios y reenviados. Borra y advierte.",
+        mapOf("enlaces" to AjusteFiltro(true, "borrar_advertir"), "palabras" to AjusteFiltro(true, "borrar_advertir"), "repetidos" to AjusteFiltro(true, "borrar_advertir"), "flood" to AjusteFiltro(true, "borrar_advertir"), "stickers" to AjusteFiltro(true, "borrar_advertir"), "audios" to AjusteFiltro(true, "avisar_grupo"), "reenviados" to AjusteFiltro(true, "borrar_advertir")),
     ),
 )
 

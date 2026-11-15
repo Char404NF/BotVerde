@@ -171,6 +171,12 @@ private fun TarjetaFiltro(f: FiltroGrupo, admin: Boolean, estadoConocido: Boolea
                     Paso("Mensajes", c.max, 2, 100, 1, "flood_max") { cfg(c.copy(max = it)) }
                     Paso("En cuántos segundos", c.segundos, 1, 3600, 1, "flood_seg") { cfg(c.copy(segundos = it)) }
                 }
+                "stickers", "audios", "reenviados" -> {
+                    val que = when (f.filtro) { "stickers" -> "Stickers"; "audios" -> "Audios"; else -> "Reenviados" }
+                    Paso(que, c.max, 1, 100, 1, "${f.filtro}_max") { cfg(c.copy(max = it)) }
+                    Paso("En cuántos segundos", c.segundos, 10, 86400, 10, "${f.filtro}_seg") { cfg(c.copy(segundos = it)) }
+                    if (f.filtro == "reenviados") Text("Con 1, cualquier mensaje reenviado salta. Súbelo para dejar pasar algunos.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
             Text("Qué hago", style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {

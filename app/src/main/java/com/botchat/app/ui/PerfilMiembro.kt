@@ -153,7 +153,7 @@ private fun PestanaResumenPerfil(botId: Long, jid: String, p: PerfilMiembroAdmin
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = Esp.s).testTag("perfil_resumen"), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
         Column(Modifier.padding(horizontal = Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
             Text(textoUltimoMensaje(c), Modifier.testTag("perfil_ultimo"), style = MaterialTheme.typography.bodyLarge)
-            if (p.puesto > 0) Text("Puesto ${p.puesto} de ${p.activos} que han escrito", Modifier.testTag("perfil_puesto"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (p.puesto > 0 && p.puesto <= p.activos) Text("Puesto ${p.puesto} de ${p.activos} que han escrito", Modifier.testTag("perfil_puesto"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (p.miembro.desdeTs > 0) Text("En el grupo desde ${fechaLarga(p.miembro.desdeTs)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
                 Dato(Ico.Chats, c.mensajes, "mensajes", Modifier.weight(1f).testTag("dato_mensajes"))
