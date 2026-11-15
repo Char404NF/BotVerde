@@ -13,6 +13,8 @@ class BotApp : Application() {
         BotState.iniciar(File(filesDir, "registro.txt"))
         com.botchat.app.datos.Repo.abrir(this) // abre los mensajes guardados (con o sin bot conectado)
         com.botchat.app.medios.Temporales.barrer(this) // borra restos de copias temporales de la vez anterior
+        com.botchat.app.descargas.ConvertirAudio.contexto = applicationContext
+        wabot.Wabot.registrarMotorVideo(com.botchat.app.descargas.MotorVideoAndroid(this)) // descargas de video (módulo opcional): no arranca nada hasta que se use
     }
 }
 

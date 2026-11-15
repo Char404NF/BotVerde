@@ -160,7 +160,7 @@ fun CheckAnimado(modifier: Modifier = Modifier, tam: Dp = 96.dp, color: Color = 
 
 /**
  * Transiciones entre pantallas según "Animaciones de pantallas" (Avanzado):
- *  - Natural: la pantalla nueva entra deslizando completa desde la derecha (~280 ms) y la de abajo se corre un poco; al volver, al revés.
+ *  - Natural: un solo fundido (sale la pantalla anterior y se aclara la nueva) entre cualquier par de pantallas.
  *    Entre las pestañas principales (Chats, Espacio, Ajustes) solo hay un fundido.
  *  - Reducidas: solo fundidos cortos, sin movimiento.
  *  - Ninguna: sin transiciones.

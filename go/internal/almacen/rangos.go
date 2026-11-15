@@ -176,21 +176,26 @@ var ajustesBotDefecto = map[string]string{
 	"todos_espera_seg": "300", // espera mínima entre dos "!todos" en el mismo grupo
 	"grupo_dias":       "30",  // periodo por defecto del ranking y de los inactivos
 	// Laboratorio (bloque G). Todo apagado: el menú sigue en texto numerado mientras no se active y se acepte el riesgo.
-	"lab_activo":       "0",     // interruptor del Laboratorio
-	"lab_aviso_ts":     "0",     // cuándo se aceptó el aviso de riesgo (0 = nunca)
-	"lab_modo_menu":    "texto", // texto | encuesta | botones (experimental)
-	"lab_grupos":       "0",     // permitir encuestas y botones en grupos (todos ven los votos)
-	"lab_enc_max_opc":  "12",    // opciones máximas de una encuesta; más que eso el menú sale en texto
-	"lab_expira_min":   "120",   // una encuesta o botón sin respuesta deja de valer a los N minutos
-	"lab_respaldo_enc": "0",     // mandar también el texto numerado debajo de la encuesta
-	"lab_respaldo_bot": "1",     // mandar también el texto numerado debajo de los botones
-	"lab_botones_tipo": "auto",  // auto | botones | lista | interactivo
-	"lab_prueba_chat":  "",      // mi otro número o grupo de prueba (clave del chat)
-	"lab_prueba_hora":  "4",     // pruebas por hora
-	"lab_prueba_dia":   "12",    // pruebas por día
-	"lab_biz_activo":   "0",     // interruptor propio de la prueba experimental "Interactivo + biz" (apagado)
-	"lab_biz_ack":      "0",     // casilla "Entiendo que puede bloquear mi número" de esa prueba
-	"lab_version_wa":   "",      // versión de WhatsApp del teléfono que recibe las pruebas
+	"lab_activo":    "0",     // interruptor del Laboratorio
+	"lab_aviso_ts":  "0",     // cuándo se aceptó el aviso de riesgo (0 = nunca)
+	"lab_modo_menu": "texto", // texto | encuesta | botones (experimental)
+	// Descargas de video: versión de yt-dlp en uso, la última publicada y cuándo se revisó (la app no los muestra como ajustes).
+	"video_ytdlp_ver":    "",
+	"video_ytdlp_ultima": "",
+	"video_ytdlp_rev_ts": "0",
+	"video_upd_dia":      "",
+	"lab_grupos":         "0",    // permitir encuestas y botones en grupos (todos ven los votos)
+	"lab_enc_max_opc":    "12",   // opciones máximas de una encuesta; más que eso el menú sale en texto
+	"lab_expira_min":     "120",  // una encuesta o botón sin respuesta deja de valer a los N minutos
+	"lab_respaldo_enc":   "0",    // mandar también el texto numerado debajo de la encuesta
+	"lab_respaldo_bot":   "1",    // mandar también el texto numerado debajo de los botones
+	"lab_botones_tipo":   "auto", // auto | botones | lista | interactivo
+	"lab_prueba_chat":    "",     // mi otro número o grupo de prueba (clave del chat)
+	"lab_prueba_hora":    "4",    // pruebas por hora
+	"lab_prueba_dia":     "12",   // pruebas por día
+	"lab_biz_activo":     "0",    // interruptor propio de la prueba experimental "Interactivo + biz" (apagado)
+	"lab_biz_ack":        "0",    // casilla "Entiendo que puede bloquear mi número" de esa prueba
+	"lab_version_wa":     "",     // versión de WhatsApp del teléfono que recibe las pruebas
 	// Auditoría (v0.6.0, etapa E1)
 	"audit_defecto":       "1",  // guardar el texto de los mensajes (interruptor global; cada chat puede tener el suyo)
 	"audit_ret_dias":      "90", // días que se conserva el texto (30, 90 o 0 = siempre); instalación nueva = 90

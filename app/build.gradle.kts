@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.chaquo.python")
 }
 
 android {
@@ -45,6 +46,19 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+// Descargas de video (módulo opcional): Python embebido con yt-dlp. Solo arranca cuando alguien usa un comando de descarga.
+chaquopy {
+    defaultConfig {
+        version = "3.12"
+        buildPython("/usr/bin/python3.12")
+        pip {
+            install("yt-dlp")
+            install("yt-dlp-ejs")
+            install("certifi")
+        }
     }
 }
 

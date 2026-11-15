@@ -60,6 +60,9 @@ func (s *estado) alLab(v *events.Message, sincronizando bool) bool {
 		return true // un voto que llegó mientras el teléfono estaba sin conexión no navega el menú
 	}
 	chat := e.Sesion.Chat
+	if s.mods != nil && s.mods.VideoResponder(chat, e.Votante, e.Num) {
+		return true // era la respuesta a las opciones de una descarga de video
+	}
 	m := motor.Mensaje{
 		Chat: chat, ID: string(v.Info.ID), Texto: strconv.Itoa(e.Num), EsTexto: true, EsGrupo: esGrupoChat(chat),
 		TS: v.Info.Timestamp, RemitenteWA: v.Info.Sender.ToNonAD().String(), Remitente: e.Votante, Nombre: v.Info.PushName,

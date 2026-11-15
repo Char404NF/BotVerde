@@ -280,11 +280,16 @@ func (a *Almacen) EstimarLista(botID int64, items []Item) (bytes int64, n int, e
 
 // BorrarLista borra archivos concretos (selección múltiple).
 func (a *Almacen) BorrarLista(botID int64, items []Item) (bytes int64, n int, err error) {
+	return a.BorrarListaMotivo(botID, items, "manual")
+}
+
+// BorrarListaMotivo borra archivos concretos y anota por qué ("manual", "descarga"…).
+func (a *Almacen) BorrarListaMotivo(botID int64, items []Item, motivo string) (bytes int64, n int, err error) {
 	filas, err := a.filasDeItems(botID, items)
 	if err != nil {
 		return 0, 0, err
 	}
-	return a.borrarFilas(botID, filas, "manual")
+	return a.borrarFilas(botID, filas, motivo)
 }
 
 func (a *Almacen) filasDeItems(botID int64, items []Item) ([]filaArchivo, error) {

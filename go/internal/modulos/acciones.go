@@ -32,6 +32,8 @@ type Acciones interface {
 	Agregar(ctx context.Context, chat, persona string) (string, error)
 	// RechazarLlamada rechaza una llamada entrante (whatsmeow: Client.RejectCall). HACER llamadas no existe en la librería.
 	RechazarLlamada(ctx context.Context, de, id string) error
+	// EnviarMenu manda opciones como botones o encuesta (si el Laboratorio está encendido) o, si no, el texto numerado.
+	EnviarMenu(ctx context.Context, chat, persona, titulo, textoNumerado string, opciones []string, citaID string) error
 }
 
 // ---------- ayudas comunes de los módulos H ----------

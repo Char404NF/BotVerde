@@ -133,7 +133,7 @@ fun PantallaAvanzado(
                     }
                     Text(
                         when (animModo) {
-                            ModoAnim.NATURAL -> "Las pantallas se deslizan como en WhatsApp."
+                            ModoAnim.NATURAL -> "Un solo fundido suave al cambiar de pantalla."
                             ModoAnim.REDUCIDAS -> "Solo fundidos cortos, sin movimiento."
                             ModoAnim.NINGUNA -> "Todo cambia al instante."
                         },

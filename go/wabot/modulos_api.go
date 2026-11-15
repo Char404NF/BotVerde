@@ -135,6 +135,7 @@ func (s *estado) armarModulos() {
 	g := modulos.NuevoGestor(alm, s.botID, s.cmd)
 	g.Enviador = enviadorModulos{s}
 	g.Acc = accionesModulos{s}
+	g.Video = motorVideoActual()
 	g.Log = s.log
 	g.Cambio = s.avisaCambio
 	g.Zona = alm.Zona
@@ -225,6 +226,7 @@ func gestorDe(botID int64) (*modulos.Gestor, error) {
 		return g, nil
 	}
 	g := modulos.NuevoGestor(a, botID, nil)
+	g.Video = motorVideoActual()
 	g.Zona = a.Zona
 	g.Cambio = func(ev string) {
 		if x := agrup; x != nil {

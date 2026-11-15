@@ -429,8 +429,9 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 }
                 composable("modulo_config/{id}") { be ->
                     val id = be.arguments?.getString("id") ?: return@composable
-                    PantallaConfigModulo(bot.id, id, alVolver = { nav.popBackStack() })
+                    PantallaConfigModulo(bot.id, id, alVolver = { nav.popBackStack() }, alAbrirHistorial = { nav.navigate("descargas_video") })
                 }
+                composable("descargas_video") { PantallaDescargasVideo(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("modulo_aviso/{id}") { be ->
                     val id = be.arguments?.getString("id") ?: return@composable
                     PantallaAvisoRiesgo(bot.id, id, alVolver = { nav.popBackStack() })

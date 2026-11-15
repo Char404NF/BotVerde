@@ -14,6 +14,7 @@ import (
 // ---------- apoyo común de las pruebas H ----------
 
 type accFalsa struct {
+	menus       []string
 	mu          sync.Mutex
 	admin       bool
 	expulsados  []string
@@ -35,6 +36,10 @@ func (a *accFalsa) Expulsar(_ context.Context, chat, p string) error {
 		return a.errExpulsar
 	}
 	a.expulsados = append(a.expulsados, chat+"|"+p)
+	return nil
+}
+func (a *accFalsa) EnviarMenu(_ context.Context, chat, persona, titulo, texto string, ops []string, citaID string) error {
+	a.menus = append(a.menus, texto)
 	return nil
 }
 func (a *accFalsa) RechazarLlamada(_ context.Context, de, id string) error {

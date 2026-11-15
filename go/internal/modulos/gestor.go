@@ -38,6 +38,9 @@ type Gestor struct {
 	Acc Acciones
 	// Descarga hace las peticiones HTTP de los módulos H5 (nil = el cliente normal con sus protecciones).
 	Descarga Descargador
+	// Video es el motor de descargas de video (Python con yt-dlp, lo pone la app; nil = no disponible).
+	Video MotorVideo
+	video *estadoVideo
 	// SinPausaArchivos quita la pausa de 1 a 3 s entre archivos de un mismo mensaje (las pruebas).
 	SinPausaArchivos bool
 

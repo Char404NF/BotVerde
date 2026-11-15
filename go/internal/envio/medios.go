@@ -29,6 +29,10 @@ type Adjunto struct {
 	NotaVoz   bool
 	Miniatura []byte // JPEG pequeño
 	Onda      []byte // forma de onda de una nota de voz (hasta 64 valores de 0 a 100)
+	// TopeBytes (opcional) sube el máximo de peso de este archivo (0 = el de siempre, 100 MB). Lo usan las descargas de video.
+	TopeBytes int64
+	// SinCopia: al terminar de enviarlo se borra también la copia cifrada que se guarda para el chat (el mensaje queda sin archivo).
+	SinCopia bool
 }
 
 const (
@@ -92,6 +96,8 @@ func (s *Servicio) enviarMedio(ctx context.Context, chat string, a Adjunto, cita
 	tope := int64(maxOtros)
 	if a.Tipo == almacen.TipoImagen || a.Tipo == almacen.TipoSticker {
 		tope = maxImagen
+	} else if a.TopeBytes > tope {
+		tope = a.TopeBytes
 	}
 	if st.Size() > tope {
 		return Resultado{}, fmt.Errorf("El archivo pesa %d MB; el máximo es %d MB.", st.Size()>>20, tope>>20)
@@ -128,7 +134,12 @@ func (s *Servicio) enviarMedio(ctx context.Context, chat string, a Adjunto, cita
 		s.pausarBot(chat)
 		s.Alm.RegistrarActividad(s.BotID, almacen.ActManual, "", chat, a.Tipo)
 	}
-	return s.transmitirMedio(ctx, j, m, a.Onda)
+	r, err := s.transmitirMedio(ctx, j, m, a.Onda)
+	if a.SinCopia {
+		// el archivo ya salió (o falló): la copia cifrada del chat no se queda ocupando espacio
+		_, _, _ = s.Alm.BorrarListaMotivo(s.BotID, []almacen.Item{{Chat: chat, ID: m.ID}}, "descarga")
+	}
+	return r, err
 }
 
 func (s *Servicio) ponerCita(m *almacen.Mensaje, citaID string) {

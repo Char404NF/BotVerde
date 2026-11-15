@@ -243,7 +243,7 @@ private fun TarjetaPaso(
                 Text("${i + 1}. ${o.texto} → " + (d.paso(o.destino)?.let { resumenPaso(it).take(28) } ?: "sin destino"), style = MaterialTheme.typography.bodySmall,
                     color = if (d.paso(o.destino) == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            androidx.compose.animation.AnimatedVisibility(abierto) { EditorDePaso(botId, d, p, cambia, borra, agrega, alHacerInicial) }
+            if (abierto) EditorDePaso(botId, d, p, cambia, borra, agrega, alHacerInicial)
         }
     }
 }

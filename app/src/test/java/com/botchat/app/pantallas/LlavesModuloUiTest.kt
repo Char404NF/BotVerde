@@ -65,7 +65,7 @@ class LlavesModuloUiTest {
     private fun hay(tag: String) = regla.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
     @Test fun laLlaveVaAlKeystoreYAGoPeroNuncaALaConfiguracion() {
-        regla.setContent { BotChatTema { PantallaConfigModulo(bot, "ia") {} } }
+        regla.setContent { BotChatTema { PantallaConfigModulo(bot, "ia", alVolver = {}) } }
         regla.esperaEtiqueta("config_generica")
         assertTrue(hay("llave_estado_llave"))
         regla.onNodeWithTag("in_llave", useUnmergedTree = true).performScrollTo().performTextInput("sk-SECRETA-999")

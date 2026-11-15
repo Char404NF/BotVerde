@@ -214,6 +214,13 @@ object Repo {
     suspend fun acciones(bot: Long, limite: Int = 100, antesId: Long = 0) = io { JsonPerm.acciones(motor.listarAcciones(bot, limite.toLong(), antesId)) }
 
     // Módulos e iniciativa propia
+    // Descargas de video (módulo opcional)
+    suspend fun videoEstado(bot: Long) = io { JsonVideo.estado(motor.videoEstado(bot)) }
+    suspend fun videoLista(bot: Long, antes: Long = 0) = io { JsonVideo.lista(motor.videoLista(bot, 40, antes)) }
+    suspend fun videoMiniatura(bot: Long, id: Long) = io { motor.videoMiniatura(bot, id) }
+    suspend fun videoBorrar(bot: Long, id: Long) = io { motor.videoBorrar(bot, id) }
+    suspend fun videoActualizar(bot: Long) = io { motor.videoActualizar(bot) }
+    suspend fun videoRepetir(bot: Long, id: Long) = io { motor.videoRepetir(bot, id) }
     suspend fun modulos(bot: Long) = io { JsonMod.modulos(motor.listarModulos(bot)) }
     suspend fun modulo(bot: Long, id: String) = io { JsonMod.moduloOpt(motor.infoModulo(bot, id)) }
     suspend fun activarModulo(bot: Long, id: String) = io { motor.activarModulo(bot, id) }

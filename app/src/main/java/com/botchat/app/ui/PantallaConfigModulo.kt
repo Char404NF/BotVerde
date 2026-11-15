@@ -66,7 +66,7 @@ object PantallasModulo {
 
 /** Ventana de configuración de un módulo: la suya si la registró, o el contenedor genérico que dibuja su esquema de campos. */
 @Composable
-fun PantallaConfigModulo(botId: Long, id: String, alVolver: () -> Unit) {
+fun PantallaConfigModulo(botId: Long, id: String, alVolver: () -> Unit, alAbrirHistorial: () -> Unit = {}) {
     val info by produceState<ModuloInfo?>(null, id) { value = runCatching { Repo.modulo(botId, id) }.getOrNull() }
     val m = info
     Scaffold(topBar = { TopAppBar(navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text(m?.nombre ?: "Módulo") }) }) { relleno ->
@@ -77,6 +77,7 @@ fun PantallaConfigModulo(botId: Long, id: String, alVolver: () -> Unit) {
                 Text(m.estado.ifBlank { if (m.activo) "Encendido" else "Apagado" }, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("config_estado"))
             }
             Text(m.descripcion, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (id == "descargas_video") TarjetaMotorVideo(botId, alAbrirHistorial = alAbrirHistorial)
             val propia = PantallasModulo.de(id)
             if (propia != null) Box(Modifier.fillMaxWidth().testTag("config_propia")) { propia(botId, m) }
             else if (m.esquema.isNotEmpty()) ConfiguracionGenerica(botId, m)

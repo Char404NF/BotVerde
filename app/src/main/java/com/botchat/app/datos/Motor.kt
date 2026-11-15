@@ -352,6 +352,14 @@ interface Motor {
     fun appStateFijar(bot: Long, chat: String, fijar: Boolean)
     fun appStateArchivar(bot: Long, chat: String, archivar: Boolean)
     fun appStateSincronizar(bot: Long)
+
+    // Descargas de video (módulo opcional). Evento: "descargas_video".
+    fun videoEstado(bot: Long): String = "{}"
+    fun videoLista(bot: Long, limite: Long, antes: Long): String = "[]"
+    fun videoMiniatura(bot: Long, id: Long): ByteArray? = null
+    fun videoBorrar(bot: Long, id: Long) {}
+    fun videoActualizar(bot: Long): String = ""
+    fun videoRepetir(bot: Long, id: Long): String = ""
 }
 
 /** El módulo Go de verdad (whatsmeow + almacén cifrado). */
@@ -675,4 +683,10 @@ object MotorGo : Motor {
     override fun appStateFijar(bot: Long, chat: String, fijar: Boolean) = Wabot.appStateFijar(bot, chat, fijar)
     override fun appStateArchivar(bot: Long, chat: String, archivar: Boolean) = Wabot.appStateArchivar(bot, chat, archivar)
     override fun appStateSincronizar(bot: Long) = Wabot.appStateSincronizar(bot)
+    override fun videoEstado(bot: Long) = Wabot.videoEstado(bot)
+    override fun videoLista(bot: Long, limite: Long, antes: Long) = Wabot.videoLista(bot, limite, antes)
+    override fun videoMiniatura(bot: Long, id: Long): ByteArray? = Wabot.videoMiniatura(bot, id)
+    override fun videoBorrar(bot: Long, id: Long) = Wabot.videoBorrar(bot, id)
+    override fun videoActualizar(bot: Long) = Wabot.videoActualizar(bot)
+    override fun videoRepetir(bot: Long, id: Long) = Wabot.videoRepetir(bot, id)
 }

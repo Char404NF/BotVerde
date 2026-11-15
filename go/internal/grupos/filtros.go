@@ -30,13 +30,13 @@ var Filtros = []string{FiltroEnlaces, FiltroPalabras, FiltroRepetidos, FiltroFlo
 
 // Acciones de un filtro.
 const (
-	AccAvisarme    = "avisarme"     // solo una notificación en mi teléfono
-	AccAvisarGrupo = "avisar_grupo" // respondo en el grupo al mensaje (aviso amable)
-	AccBorrar      = "borrar"       // borro el mensaje (solo siendo administrador)
-	AccAdvertir    = "advertir"     // pongo una advertencia (al tope se aplica la regla de advertencias)
+	AccAvisarme    = "avisarme"        // solo una notificación en mi teléfono
+	AccAvisarGrupo = "avisar_grupo"    // respondo en el grupo al mensaje (aviso amable)
+	AccBorrar      = "borrar"          // borro el mensaje (solo siendo administrador)
+	AccAdvertir    = "advertir"        // pongo una advertencia (al tope se aplica la regla de advertencias)
 	AccBorrarAdv   = "borrar_advertir" // borro el mensaje (si soy administrador) y pongo una advertencia: la escalera completa
-	AccSilenciar   = "silenciar"    // el bot deja de contestarle a esa persona por un rato
-	AccExpulsar    = "expulsar"     // la saco del grupo (solo siendo administrador)
+	AccSilenciar   = "silenciar"       // el bot deja de contestarle a esa persona por un rato
+	AccExpulsar    = "expulsar"        // la saco del grupo (solo siendo administrador)
 )
 
 // Acciones válidas, en el orden de la pantalla.

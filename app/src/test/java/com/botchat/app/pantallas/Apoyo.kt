@@ -157,6 +157,14 @@ class MotorFalso : Motor {
         val b = asistGuardado ?: com.botchat.app.datos.JsonE9.borradorPorDefecto()
         return "{\"borrador\":$b,\"problemas\":$asistProblemas,\"visto\":$asistVisto,\"aplicado\":$asistAplicado,\"numeroPrueba\":\"$asistOtroNumero\",\"numeroPruebaDe\":\"asistente\"}"
     }
+    // Descargas de video
+    var videoFilas = "[]"
+    var videoEstadoJson = "{\"activo\":true,\"motor\":true,\"version\":\"2026.10.26\",\"ultima\":\"2026.11.01\",\"hayNueva\":true,\"revisionTs\":1,\"enCurso\":0,\"esperando\":0,\"hoy\":2}"
+    override fun videoEstado(bot: Long) = videoEstadoJson
+    override fun videoLista(bot: Long, limite: Long, antes: Long) = videoFilas
+    override fun videoBorrar(bot: Long, id: Long) { llamadas += "video_borrar:$id" }
+    override fun videoActualizar(bot: Long): String { llamadas += "video_actualizar"; return "yt-dlp actualizado a la versión 2026.11.01." }
+    override fun videoRepetir(bot: Long, id: Long): String { llamadas += "video_repetir:$id"; return "Volviendo a descargar…" }
     override fun asistenteGuardar(bot: Long, borradorJson: String) { asistGuardado = borradorJson; llamadas += "asist_guardar" }
     override fun asistenteBase(bot: Long): String {
         llamadas += "asist_base"

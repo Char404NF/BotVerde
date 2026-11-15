@@ -42,7 +42,7 @@ class PanelesModuloUiTest {
         motor.filasPaneles["difusion_h:listas"] = JSONArray().put(JSONObject().put("id", "suscritos").put("titulo", "suscritos").put("detalle", "3 personas")).toString()
     }
 
-    private fun abre(id: String) = regla.setContent { BotChatTema { PantallaConfigModulo(bot, id) {} } }
+    private fun abre(id: String) = regla.setContent { BotChatTema { PantallaConfigModulo(bot, id, alVolver = {}) } }
     private fun llamada(p: String) = motor.llamadas.toList().firstOrNull { it.startsWith(p) }
     private fun hay(tag: String) = regla.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 

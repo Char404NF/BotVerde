@@ -899,6 +899,33 @@ var migraciones = [][]string{
 		)`,
 		`CREATE INDEX idx_regla_items ON grupo_regla_items(bot_id, grupo, pos)`,
 	},
+	// Descargas de video (módulo opcional): el historial de lo que se pidió. Enlace, título, quién lo pidió y miniatura van cifrados.
+	{
+		`CREATE TABLE descargas_video (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			ts INTEGER NOT NULL,
+			persona TEXT NOT NULL DEFAULT '',
+			chat TEXT NOT NULL DEFAULT '',
+			es_grupo INTEGER NOT NULL DEFAULT 0,
+			nombre_cifrado BLOB,
+			url_cifrado BLOB,
+			titulo_cifrado BLOB,
+			subidor_cifrado BLOB,
+			mini_cifrada BLOB,
+			extractor TEXT NOT NULL DEFAULT '',
+			duracion INTEGER NOT NULL DEFAULT 0,
+			peso INTEGER NOT NULL DEFAULT 0,
+			formato TEXT NOT NULL DEFAULT '',
+			calidad TEXT NOT NULL DEFAULT '',
+			partes INTEGER NOT NULL DEFAULT 1,
+			entrega TEXT NOT NULL DEFAULT '',
+			estado TEXT NOT NULL DEFAULT 'en_curso',
+			error TEXT NOT NULL DEFAULT ''
+		)`,
+		`CREATE INDEX idx_descargas_video ON descargas_video(bot_id, ts DESC)`,
+		`CREATE INDEX idx_descargas_video_persona ON descargas_video(bot_id, persona, ts)`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

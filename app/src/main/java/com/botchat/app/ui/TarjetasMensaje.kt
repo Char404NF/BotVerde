@@ -183,7 +183,7 @@ fun TarjetaVideoEliminado(m: Msg) {
     LaunchedEffect(m.portada) {
         portada = if (m.portada.isEmpty()) null else runCatching { com.botchat.app.medios.CacheImagenes.cargar(ctx, Repo.archivo(m.portada), 360)?.asImageBitmap() }.getOrNull()
     }
-    val motivo = when (m.borradoMotivo) { "tope" -> "para dejar espacio"; "limpieza", "manual" -> "al limpiar"; "retencion", "retención" -> "por la retención"; else -> "" }
+    val motivo = when (m.borradoMotivo) { "tope" -> "para dejar espacio"; "limpieza", "manual" -> "al limpiar"; "descarga" -> "al enviarse"; "retencion", "retención" -> "por la retención"; else -> "" }
     Column(Modifier.widthIn(min = 220.dp, max = 280.dp).testTag("tarjeta_video_eliminado"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Box(Modifier.fillMaxWidth().aspectRatio(if (m.ancho > 0 && m.alto > 0) (m.ancho.toFloat() / m.alto).coerceIn(0.6f, 1.8f) else 1.33f).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest), Alignment.Center) {
             portada?.let { androidx.compose.foundation.Image(it, null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop) }
