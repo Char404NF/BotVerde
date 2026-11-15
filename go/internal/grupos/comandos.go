@@ -366,7 +366,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 	simple("desbloquearinfo", "Que todos puedan cambiar nombre y foto", "grupos.bloquear_info",
 		func(ctx context.Context, a, c string) error { return s.BloquearInfo(ctx, a, c, false) }, "Listo: todos pueden cambiar la información del grupo.")
 
-	reg(comandos.Comando{Nombre: "expulsar", Resumen: "Sacar a una persona del grupo", Uso: "expulsar <persona>", Casilla: "grupos.expulsar", Ambito: comandos.Grupo, Confirma: true, Validar: validaObjetivo,
+	reg(comandos.Comando{Nombre: "expulsar", Alias: []string{"kick", "sacar"}, Resumen: "Sacar a una persona del grupo", Uso: "expulsar <persona>", Casilla: "grupos.expulsar", Ambito: comandos.Grupo, Confirma: true, Validar: validaObjetivo,
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
 			chat, _, err := s.grupoDe(cx)
 			if err != nil {
@@ -404,6 +404,8 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 	}
 	admin("ascender", "Hacer administradora a una persona", s.Ascender, "Listo: ahora es administradora del grupo.")
 	admin("bajar", "Quitar el cargo de administradora", s.Bajar, "Listo: ya no es administradora del grupo.")
+
+	s.registrarAdmin(reg, validaObjetivo)
 
 	reg(comandos.Comando{Nombre: "solicitudes", Resumen: "Ver quién pide entrar al grupo", Uso: "solicitudes", Casilla: "grupos.solicitudes", Ambito: comandos.Grupo,
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {

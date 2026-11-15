@@ -926,6 +926,28 @@ var migraciones = [][]string{
 		`CREATE INDEX idx_descargas_video ON descargas_video(bot_id, ts DESC)`,
 		`CREATE INDEX idx_descargas_video_persona ON descargas_video(bot_id, persona, ts)`,
 	},
+	// Administrar grupos: baneados (no pueden volver; si entran, el bot los saca) y horario de cierre automático por grupo.
+	{
+		`CREATE TABLE grupo_baneados (
+			bot_id INTEGER NOT NULL,
+			grupo TEXT NOT NULL,
+			persona TEXT NOT NULL,
+			ts INTEGER NOT NULL,
+			por TEXT NOT NULL DEFAULT '',
+			motivo TEXT NOT NULL DEFAULT '',
+			PRIMARY KEY (bot_id, grupo, persona)
+		) WITHOUT ROWID`,
+		`CREATE TABLE grupo_horario (
+			bot_id INTEGER NOT NULL,
+			grupo TEXT NOT NULL,
+			activo INTEGER NOT NULL DEFAULT 0,
+			cierra TEXT NOT NULL DEFAULT '22:00',
+			abre TEXT NOT NULL DEFAULT '07:00',
+			dias INTEGER NOT NULL DEFAULT 127,
+			ultimo TEXT NOT NULL DEFAULT '',
+			PRIMARY KEY (bot_id, grupo)
+		) WITHOUT ROWID`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

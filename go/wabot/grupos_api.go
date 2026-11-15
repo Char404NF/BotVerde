@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -41,6 +42,32 @@ func (s *estado) armarGrupos() {
 	}
 	g.RegistrarComandos(s.cmd)
 	s.gru = g
+	s.iniciarHorarios()
+}
+
+// iniciarHorarios abre y cierra los grupos con horario: revisa cada minuto (y una vez al arrancar).
+func (s *estado) iniciarHorarios() {
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				s.log(fmt.Sprintf("error interno en el horario de los grupos: %v", r))
+			}
+		}()
+		t := time.NewTicker(time.Minute)
+		defer t.Stop()
+		for {
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-t.C:
+				ctx, cancel := context.WithTimeout(s.ctx, 50*time.Second)
+				s.gru.AplicarHorarios(ctx, time.Now())
+				cancel()
+			}
+		}
+	}()
 }
 
 // alCambiarGrupo: WhatsApp avisó de un cambio en un grupo (administradores, ajustes, miembros): lo recordado deja de valer.

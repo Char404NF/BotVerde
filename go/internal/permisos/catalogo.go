@@ -164,6 +164,8 @@ func init() {
 		Casilla{ID: "grupos.cerrar", Nombre: "Cerrar y abrir el grupo", Descripcion: "Solo administradores pueden escribir, o todos.", Grupo: GGruposAdmin, Riesgo: RiesgoMedio, Grupos: true},
 		Casilla{ID: "grupos.bloquear_info", Nombre: "Bloquear la información", Descripcion: "Solo administradores cambian nombre, foto y descripción.", Grupo: GGruposAdmin, Riesgo: RiesgoMedio, Grupos: true},
 		Casilla{ID: "grupos.expulsar", Nombre: "Expulsar", Descripcion: "Saca a una persona del grupo.", Grupo: GGruposAdmin, Riesgo: RiesgoAlto, Confirma: true, Grupos: true},
+		Casilla{ID: "grupos.banear", Nombre: "Banear", Descripcion: "Saca a una persona y no la deja volver a entrar a ese grupo (!ban, !unban, !baneados).", Grupo: GGruposAdmin, Riesgo: RiesgoAlto, Confirma: true, Grupos: true},
+		Casilla{ID: "grupos.horario", Nombre: "Horario de cierre", Descripcion: "El grupo se cierra y se abre solo a las horas que digas (!horariogrupo).", Grupo: GGruposAdmin, Riesgo: RiesgoMedio, Grupos: true},
 		Casilla{ID: "grupos.ascender", Nombre: "Dar y quitar administrador", Descripcion: "Convierte a alguien en administrador o se lo quita.", Grupo: GGruposAdmin, Riesgo: RiesgoAlto, Grupos: true},
 		Casilla{ID: "grupos.solicitudes", Nombre: "Aprobar solicitudes de ingreso", Descripcion: "Acepta o rechaza a quien pide entrar.", Grupo: GGruposAdmin, Riesgo: RiesgoMedio, Grupos: true},
 		Casilla{ID: "grupos.renombrar", Nombre: "Cambiar nombre y descripción", Descripcion: "Edita el nombre y la descripción del grupo.", Grupo: GGruposAdmin, Riesgo: RiesgoMedio, Grupos: true},
@@ -177,7 +179,7 @@ func init() {
 		Casilla{ID: "util.notas", Nombre: "Notas", Descripcion: "Guarda y lee notas por comando.", Grupo: GUtilidades},
 		Casilla{ID: "util.pendientes", Nombre: "Pendientes", Descripcion: "Lleva una lista de pendientes por comando.", Grupo: GUtilidades},
 		Casilla{ID: "util.sticker", Nombre: "Convertir imagen en sticker", Descripcion: "Convierte una imagen en sticker.", Grupo: GUtilidades},
-		Casilla{ID: "comandos.propios", Nombre: "Comandos propios", Descripcion: "Usa los comandos que creó el dueño (!horario, !precios…).", Grupo: GUtilidades, Base: true},
+		Casilla{ID: "comandos.propios", Nombre: "Comandos propios", Descripcion: "Usa los comandos que creó el dueño (!horariogrupo, !precios…).", Grupo: GUtilidades, Base: true},
 
 		// ---- Menús (Bloque C) ----
 		Casilla{ID: "menus.usar", Nombre: "Usar los menús", Descripcion: "El bot le muestra y le atiende los menús.", Grupo: GMenus, Base: true},

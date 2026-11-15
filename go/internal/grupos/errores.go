@@ -13,6 +13,8 @@ var (
 	ErrSinConexion  = errors.New("no hay conexión con WhatsApp: revisa que el bot esté encendido")
 	ErrNoEsGrupo    = errors.New("eso solo funciona en un grupo")
 	ErrNoMiembro    = errors.New("esa persona no está en el grupo")
+	ErrYaBaneado    = errors.New("esa persona ya está baneada de este grupo")
+	ErrNoBaneado    = errors.New("esa persona no está baneada")
 	ErrSinPersona   = errors.New("dime a quién: menciónalo, responde a su mensaje o escribe su número")
 	ErrYoMismo      = errors.New("no puedo hacer eso conmigo mismo")
 	ErrCreador      = errors.New("no se puede hacer eso con quien creó el grupo")
@@ -48,7 +50,7 @@ func Explicar(err error) error {
 	if errors.As(err, &f) {
 		return err
 	}
-	for _, propio := range []error{ErrNoAdmin, ErrSinConexion, ErrNoEsGrupo, ErrNoMiembro, ErrSinPersona, ErrYoMismo, ErrCreador, ErrYaAdmin, ErrNoEsAdmin,
+	for _, propio := range []error{ErrNoAdmin, ErrSinConexion, ErrNoEsGrupo, ErrNoMiembro, ErrYaBaneado, ErrNoBaneado, ErrSinPersona, ErrYoMismo, ErrCreador, ErrYaAdmin, ErrNoEsAdmin,
 		ErrTextoVacio, ErrTextoLargo, ErrSinMensaje, ErrNoHaySolic, ErrFiltroNoHay, ErrAccionNoHay, ErrSinMenciones, ErrNoDisponible} {
 		if errors.Is(err, propio) {
 			return err
