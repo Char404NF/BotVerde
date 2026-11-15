@@ -15,6 +15,7 @@ class BotApp : Application() {
         com.botchat.app.medios.Temporales.barrer(this) // borra restos de copias temporales de la vez anterior
         com.botchat.app.descargas.ConvertirAudio.contexto = applicationContext
         wabot.Wabot.registrarMotorVideo(com.botchat.app.descargas.MotorVideoAndroid(this)) // descargas de video (módulo opcional): no arranca nada hasta que se use
+        com.botchat.app.ui.PantallasModulo.registrar("ia") { b, info -> com.botchat.app.ui.PantallaConfigIA(b, info) } // IA: elegir servicio con logo, modelo, llave y probar
     }
 }
 

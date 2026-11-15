@@ -215,6 +215,8 @@ object Repo {
 
     // Módulos e iniciativa propia
     // Descargas de video (módulo opcional)
+    suspend fun iaProveedores() = io { JsonIA.proveedores(motor.iaProveedores()) }
+    suspend fun iaProbar(bot: Long) = io { motor.iaProbar(bot) }
     suspend fun videoEstado(bot: Long) = io { JsonVideo.estado(motor.videoEstado(bot)) }
     suspend fun videoLista(bot: Long, antes: Long = 0) = io { JsonVideo.lista(motor.videoLista(bot, 40, antes)) }
     suspend fun videoMiniatura(bot: Long, id: Long) = io { motor.videoMiniatura(bot, id) }

@@ -60,7 +60,7 @@ func TestIAComandoUsaLlaveEtiquetaYNoGuardaLlave(t *testing.T) {
 		Mensajes []MensajeIA `json:"messages"`
 	}
 	_ = json.Unmarshal(p.Cuerpo, &cu)
-	if cu.Modelo != "gpt-4o-mini" || len(cu.Mensajes) != 2 || cu.Mensajes[1].Texto != "¿qué hora es?" || !strings.Contains(cu.Mensajes[0].Texto, "Nunca digas") {
+	if cu.Modelo != "gpt-6-luna" || len(cu.Mensajes) != 2 || cu.Mensajes[1].Texto != "¿qué hora es?" || !strings.Contains(cu.Mensajes[0].Texto, "Nunca digas") {
 		t.Fatalf("cuerpo: %+v", cu)
 	}
 	cj, _ := e.g.ConfigJSON(IDIA)
@@ -223,5 +223,66 @@ func TestIAEnMenusConTextoIA(t *testing.T) {
 	d.resp = func(PeticionHTTP) (*RespuestaHTTP, error) { return nil, ErrDominio }
 	if e.g.TextoIA("hola", pnLuis, pnLuis) != "" {
 		t.Fatal("si falla, vacío sin romper")
+	}
+}
+
+func TestIAClaudeUsaSuFormato(t *testing.T) {
+	e, d := iaLista(t)
+	d.resp = func(p PeticionHTTP) (*RespuestaHTTP, error) {
+		return cuerpo("application/json", "", `{"content":[{"type":"text","text":"Hola desde Claude"}]}`), nil
+	}
+	e.config(IDIA, map[string]any{"acepto_privacidad": true, "proveedor": "anthropic", "url": "https://api.anthropic.com", "modelo": "claude-haiku-5-5"})
+	r, err := cmdIA(t, e).Ejecutar(&comandos.Contexto{Chat: pnAna, Persona: pnAna, Resto: "hola"})
+	if err != nil || !strings.HasSuffix(r, "Hola desde Claude") {
+		t.Fatalf("%q %v", r, err)
+	}
+	p := d.reqs[len(d.reqs)-1]
+	if p.URL != "https://api.anthropic.com/v1/messages" || p.Cabeceras["x-api-key"] != "sk-SECRETO-999" || p.Cabeceras["anthropic-version"] == "" || p.Cabeceras["Authorization"] != "" {
+		t.Fatalf("petición: %s %v", p.URL, p.Cabeceras)
+	}
+	var cu struct {
+		Modelo    string      `json:"model"`
+		MaxTokens int         `json:"max_tokens"`
+		Sistema   string      `json:"system"`
+		Mensajes  []MensajeIA `json:"messages"`
+		Temp      *float64    `json:"temperature"`
+	}
+	_ = json.Unmarshal(p.Cuerpo, &cu)
+	if cu.Modelo != "claude-haiku-5-5" || cu.MaxTokens <= 0 || !strings.Contains(cu.Sistema, "Nunca digas") || len(cu.Mensajes) != 1 || cu.Mensajes[0].Rol != "user" || cu.Temp != nil {
+		t.Fatalf("cuerpo: %+v", cu)
+	}
+}
+
+func TestIAOpenAIUsaMaxCompletionTokensYOtrosMaxTokens(t *testing.T) {
+	e, d := iaLista(t)
+	e.config(IDIA, map[string]any{"acepto_privacidad": true, "proveedor": "openai"})
+	_, _ = cmdIA(t, e).Ejecutar(&comandos.Contexto{Chat: pnAna, Persona: pnAna, Resto: "hola"})
+	if c := string(d.reqs[len(d.reqs)-1].Cuerpo); !strings.Contains(c, "max_completion_tokens") || strings.Contains(c, "temperature") {
+		t.Fatalf("openai: %s", c)
+	}
+	e.config(IDIA, map[string]any{"acepto_privacidad": true, "proveedor": "groq", "url": "https://api.groq.com/openai/v1", "modelo": "llama-3.1-8b-instant"})
+	_, _ = cmdIA(t, e).Ejecutar(&comandos.Contexto{Chat: pnAna, Persona: pnAna, Resto: "hola"})
+	if c := string(d.reqs[len(d.reqs)-1].Cuerpo); !strings.Contains(c, `"max_tokens"`) || strings.Contains(c, "max_completion_tokens") {
+		t.Fatalf("groq: %s", c)
+	}
+}
+
+func TestIAProbarYCatalogo(t *testing.T) {
+	e, _ := iaLista(t)
+	r, err := e.g.ProbarIA()
+	if err != nil || r == "" {
+		t.Fatalf("probar: %q %v", r, err)
+	}
+	FijarLlave(1, IDIA, "llave", "")
+	_, err = e.g.ProbarIA()
+	esperaErr(t, err, "llave")
+	var l []ProveedorIA
+	if json.Unmarshal([]byte(ProveedoresIA()), &l) != nil || len(l) < 10 {
+		t.Fatalf("catálogo: %d", len(l))
+	}
+	for _, p := range l {
+		if p.ID != "otro" && (p.URL == "" || p.Defecto == "" || len(p.Modelos) == 0) {
+			t.Fatalf("proveedor incompleto: %+v", p)
+		}
 	}
 }

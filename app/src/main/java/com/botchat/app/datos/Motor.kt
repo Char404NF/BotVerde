@@ -355,6 +355,9 @@ interface Motor {
 
     // Descargas de video (módulo opcional). Evento: "descargas_video".
     fun videoEstado(bot: Long): String = "{}"
+    // IA opcional: catálogo de servicios y prueba de conexión.
+    fun iaProveedores(): String = "[]"
+    fun iaProbar(bot: Long): String = ""
     fun videoLista(bot: Long, limite: Long, antes: Long): String = "[]"
     fun videoMiniatura(bot: Long, id: Long): ByteArray? = null
     fun videoBorrar(bot: Long, id: Long) {}
@@ -684,6 +687,8 @@ object MotorGo : Motor {
     override fun appStateArchivar(bot: Long, chat: String, archivar: Boolean) = Wabot.appStateArchivar(bot, chat, archivar)
     override fun appStateSincronizar(bot: Long) = Wabot.appStateSincronizar(bot)
     override fun videoEstado(bot: Long) = Wabot.videoEstado(bot)
+    override fun iaProveedores() = Wabot.iaProveedores()
+    override fun iaProbar(bot: Long) = Wabot.iaProbar(bot)
     override fun videoLista(bot: Long, limite: Long, antes: Long) = Wabot.videoLista(bot, limite, antes)
     override fun videoMiniatura(bot: Long, id: Long): ByteArray? = Wabot.videoMiniatura(bot, id)
     override fun videoBorrar(bot: Long, id: Long) = Wabot.videoBorrar(bot, id)

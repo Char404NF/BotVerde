@@ -18,10 +18,12 @@ import (
 
 // destinoJSON es a dónde y cómo se hace la llamada.
 type destinoJSON struct {
-	URL      string
-	Llave    string
-	Tiempo   time.Duration
-	RedLocal bool
+	URL       string
+	Llave     string
+	Tiempo    time.Duration
+	RedLocal  bool
+	Formato   string // "" u "openai" (Bearer, /chat/completions) o "anthropic" (x-api-key, /v1/messages)
+	Proveedor string
 }
 
 func (g *Gestor) postJSON(ctx context.Context, d destinoJSON, cuerpo any, salida any) error {
@@ -32,7 +34,14 @@ func (g *Gestor) postJSON(ctx context.Context, d destinoJSON, cuerpo any, salida
 	b, _ := json.Marshal(cuerpo)
 	cab := map[string]string{"Content-Type": "application/json", "Accept": "application/json"}
 	if d.Llave != "" {
-		cab["Authorization"] = "Bearer " + d.Llave
+		if d.Formato == formatoAnthropic {
+			cab["x-api-key"] = d.Llave
+		} else {
+			cab["Authorization"] = "Bearer " + d.Llave
+		}
+	}
+	if d.Formato == formatoAnthropic {
+		cab["anthropic-version"] = versionAnthropic
 	}
 	host := strings.ToLower(u.Hostname())
 	resp, err := g.descargador().Hacer(ctx, PeticionHTTP{Metodo: "POST", URL: u.String(), Cabeceras: cab, Cuerpo: b, Timeout: d.Tiempo, Max: 1 << 20,
@@ -84,16 +93,30 @@ type MensajeIA struct {
 	Texto string `json:"content"`
 }
 
-// chatIA pide una respuesta a un endpoint compatible con OpenAI (/chat/completions).
+const (
+	formatoOpenAI    = "openai"
+	formatoAnthropic = "anthropic"
+	versionAnthropic = "2023-06-01"
+)
+
+// chatIA pide una respuesta al servicio elegido: compatible con OpenAI (/chat/completions) o Claude (/v1/messages).
 func (g *Gestor) chatIA(ctx context.Context, d destinoJSON, modelo string, maxTokens int, msgs []MensajeIA) (string, error) {
+	if d.Formato == formatoAnthropic {
+		return g.chatAnthropic(ctx, d, modelo, maxTokens, msgs)
+	}
 	base := strings.TrimRight(strings.TrimSpace(d.URL), "/")
 	if !strings.HasSuffix(base, "/chat/completions") {
 		base += "/chat/completions"
 	}
 	d.URL = base
-	req := map[string]any{"model": modelo, "messages": msgs, "temperature": 0.7}
+	req := map[string]any{"model": modelo, "messages": msgs}
 	if maxTokens > 0 {
-		req["max_tokens"] = maxTokens
+		// OpenAI renombró el parámetro (los modelos nuevos rechazan max_tokens); el resto de servicios siguen con el nombre de siempre.
+		if d.Proveedor == "openai" {
+			req["max_completion_tokens"] = maxTokens
+		} else {
+			req["max_tokens"] = maxTokens
+		}
 	}
 	var out struct {
 		Choices []struct {
@@ -109,4 +132,52 @@ func (g *Gestor) chatIA(ctx context.Context, d destinoJSON, modelo string, maxTo
 		return "", errors.New("el modelo no devolvió respuesta")
 	}
 	return strings.TrimSpace(out.Choices[0].Message.Content), nil
+}
+
+// chatAnthropic usa la API de Mensajes de Claude: la instrucción va aparte ("system"), max_tokens es obligatorio y la respuesta viene en
+// bloques de texto.
+func (g *Gestor) chatAnthropic(ctx context.Context, d destinoJSON, modelo string, maxTokens int, msgs []MensajeIA) (string, error) {
+	base := strings.TrimRight(strings.TrimSpace(d.URL), "/")
+	if !strings.HasSuffix(base, "/messages") {
+		if !strings.HasSuffix(base, "/v1") {
+			base += "/v1"
+		}
+		base += "/messages"
+	}
+	d.URL = base
+	if maxTokens <= 0 {
+		maxTokens = 1024
+	}
+	var sis []string
+	var conv []MensajeIA
+	for _, m := range msgs {
+		if m.Rol == "system" {
+			sis = append(sis, m.Texto)
+			continue
+		}
+		conv = append(conv, m)
+	}
+	req := map[string]any{"model": modelo, "max_tokens": maxTokens, "messages": conv}
+	if len(sis) > 0 {
+		req["system"] = strings.Join(sis, "\n")
+	}
+	var out struct {
+		Contenido []struct {
+			Tipo  string `json:"type"`
+			Texto string `json:"text"`
+		} `json:"content"`
+	}
+	if err := g.postJSON(ctx, d, req, &out); err != nil {
+		return "", err
+	}
+	var sb strings.Builder
+	for _, c := range out.Contenido {
+		if c.Tipo == "text" {
+			sb.WriteString(c.Texto)
+		}
+	}
+	if strings.TrimSpace(sb.String()) == "" {
+		return "", errors.New("el modelo no devolvió respuesta")
+	}
+	return strings.TrimSpace(sb.String()), nil
 }

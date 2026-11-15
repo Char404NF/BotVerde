@@ -32,14 +32,15 @@ type turnoIA struct {
 func ia() Modulo {
 	return Nuevo(Def{
 		ID: IDIA, Nombre: "IA opcional", Icono: "ia", Riesgo: RiesgoMedio, Iniciativa: true,
-		Descripcion: "Responde con un modelo de IA (cualquier servicio compatible con OpenAI) cuando lo pidan con «!ia», lo mencionen en un grupo o escriban en chats que tú permitas. Aviso de privacidad: " + avisoPrivacidadIA + " Las respuestas siempre dicen que son automáticas. «!ia» responde siempre; mención y chats permitidos necesitan «Iniciativa propia» encendida.",
+		Descripcion: "Responde con un modelo de IA (OpenAI, Claude, Gemini, DeepSeek, Groq, Mistral, Grok, Ollama y cualquier servicio compatible con OpenAI) cuando lo pidan con «!ia», lo mencionen en un grupo o escriban en chats que tú permitas. Aviso de privacidad: " + avisoPrivacidadIA + " Las respuestas siempre dicen que son automáticas. «!ia» responde siempre; mención y chats permitidos necesitan «Iniciativa propia» encendida.",
 		Casillas: []permisos.Casilla{
 			{ID: "ia.usar", Nombre: "Usar la IA («!ia»)", Descripcion: "Puede hacerle preguntas a la IA. Lo que escriba sale del teléfono hacia el proveedor de IA.", Grupo: "IA", Riesgo: permisos.RiesgoMedio},
 		},
 		Esquema: []Campo{
 			{Clave: "acepto_privacidad", Titulo: "Entiendo que el contenido sale del teléfono", Ayuda: avisoPrivacidadIA + " Hace falta marcarlo para que responda.", Tipo: CampoInterruptor, Defecto: false},
+			{Clave: "proveedor", Titulo: "Servicio de IA", Ayuda: "Elige uno de la lista y se llenan solos la dirección y el modelo. «otro» sirve para cualquier servicio compatible con OpenAI.", Tipo: CampoTexto, Largo: 30, Defecto: "openai"},
 			{Clave: "url", Titulo: "Dirección del servicio", Ayuda: "Por ejemplo https://api.openai.com/v1 (se agrega /chat/completions).", Tipo: CampoTexto, Largo: 300, Defecto: "https://api.openai.com/v1"},
-			{Clave: "modelo", Titulo: "Modelo", Tipo: CampoTexto, Largo: 80, Defecto: "gpt-4o-mini", Obligatorio: true},
+			{Clave: "modelo", Titulo: "Modelo", Tipo: CampoTexto, Largo: 80, Defecto: "gpt-6-luna", Obligatorio: true},
 			{Clave: "llave", Titulo: "Llave del servicio", Ayuda: "Se guarda cifrada en el Keystore de Android. Nunca en la base, el repositorio ni los registros.", Tipo: CampoSecreto},
 			{Clave: "personalidad", Titulo: "Personalidad (instrucciones)", Ayuda: "Lo que la IA debe ser y hacer. Cada chat puede tener la suya en la lista de abajo.", Tipo: CampoTexto, Varias: true, Largo: 1200,
 				Defecto: "Eres un asistente amable y breve. Respondes en español."},
@@ -77,10 +78,14 @@ func ia() Modulo {
 			switch {
 			case !cfg.Bool("acepto_privacidad"):
 				return "Encendido, falta aceptar el aviso de privacidad"
-			case !TieneLlave(g.BotID, IDIA, "llave") && !cfg.Bool("red_local"):
+			case !TieneLlave(g.BotID, IDIA, "llave") && !cfg.Bool("red_local") && !sinLlaveIA(cfg):
 				return "Encendido, falta la llave del servicio"
 			}
-			return fmt.Sprintf("Encendido · %d consultas hoy", g.consultasHoy())
+			nombre := cfg.Texto("modelo")
+			if p, ok := proveedorIA(cfg.Texto("proveedor")); ok {
+				nombre = p.Nombre + " · " + nombre
+			}
+			return fmt.Sprintf("Encendido · %s · %d consultas hoy", nombre, g.consultasHoy())
 		},
 		Paneles:  panelesIA,
 		AlFilas:  filasIA,
@@ -214,7 +219,7 @@ func (g *Gestor) ConsultarIA(ctx context.Context, chat, persona, pregunta string
 	}
 	msgs = append(msgs, MensajeIA{"user", pregunta})
 	g.Alm.RegistrarModulo(g.BotID, IDIA, "consulta", ResEnviado, "", g.ahora())
-	d := destinoJSON{URL: cfg.Texto("url"), Llave: g.Llave(IDIA, "llave"), Tiempo: time.Duration(cfg.Int("tiempo_s")) * time.Second, RedLocal: cfg.Bool("red_local")}
+	d := g.destinoIA(cfg)
 	maxR := cfg.Int("max_respuesta")
 	r, err := g.chatIA(ctx, d, cfg.Texto("modelo"), maxR/2+50, msgs)
 	if err != nil {
@@ -324,4 +329,10 @@ func eventoIA(g *Gestor, e Evento) {
 		_, _ = g.Enviar(Iniciativa{Modulo: IDIA, Que: "respuesta", Chat: e.Chat, Personas: []string{persona}, Texto: r, CitaID: e.MensajeID, Menciones: menc,
 			Noche: NocheDescartar, RetrasoMin: 2 * time.Second, RetrasoMax: 6 * time.Second})
 	}()
+}
+
+// sinLlaveIA dice si el servicio elegido no pide llave (Ollama).
+func sinLlaveIA(cfg Config) bool {
+	p, ok := proveedorIA(cfg.Texto("proveedor"))
+	return ok && p.SinLlave
 }
