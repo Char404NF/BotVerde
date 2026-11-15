@@ -118,8 +118,9 @@ func TestReportarPorElMotorNoContestaEnElChat(t *testing.T) {
 		return len(av) == 1
 	})
 	e.quieto()
-	if len(e.env.lista()) != 0 {
-		t.Fatalf("el bot NO responde en el chat: %+v", e.env.lista())
+	// por defecto le confirma a quien reportó (con su texto de fábrica); el aviso al dueño sigue siendo solo local
+	if l := e.env.lista(); len(l) != 1 || !strings.Contains(l[0].texto, "Gracias por tu reporte, lo analizaremos. Gracias.") || l[0].chat != grupoJID {
+		t.Fatalf("debía confirmar a quien reportó: %+v", l)
 	}
 	av, _ := e.alm.AvisosRecientes(1, 5)
 	if av[0].Tipo != "reporte" || av[0].Chat != grupoJID || !strings.Contains(av[0].Detalle, "insulta") {

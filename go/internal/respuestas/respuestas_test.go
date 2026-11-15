@@ -109,7 +109,7 @@ func TestCambiarCualquierFraseFunciona(t *testing.T) {
 	if Aplicar(a, 1, "No tienes permiso para usar ese comando.") != "No tienes permiso para usar ese comando." {
 		t.Fatal("sin cambios no toca nada")
 	}
-	if err := FijarReemplazos(a, 1, []Reemplazo{{"No tienes permiso", "Eso solo lo hacen los admins"}, {"", "x"}, {"No tienes permiso", "repetido"}, {"hola", "buenas"}}); err != nil {
+	if err := FijarReemplazos(a, 1, []Reemplazo{{De: "No tienes permiso", A: "Eso solo lo hacen los admins"}, {De: "", A: "x"}, {De: "No tienes permiso", A: "repetido"}, {De: "hola", A: "buenas"}}); err != nil {
 		t.Fatal(err)
 	}
 	if got := Aplicar(a, 1, "No tienes permiso para usar ese comando. hola"); got != "Eso solo lo hacen los admins para usar ese comando. buenas" {
@@ -121,7 +121,7 @@ func TestCambiarCualquierFraseFunciona(t *testing.T) {
 	if err := FijarReemplazos(a, 1, nil); err != nil || len(Reemplazos(a, 1)) != 0 {
 		t.Fatal("vaciar")
 	}
-	if err := FijarReemplazos(a, 1, []Reemplazo{{strings.Repeat("a", 201), "x"}}); err == nil {
+	if err := FijarReemplazos(a, 1, []Reemplazo{{De: strings.Repeat("a", 201), A: "x"}}); err == nil {
 		t.Fatal("frase muy larga")
 	}
 }

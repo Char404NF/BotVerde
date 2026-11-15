@@ -422,7 +422,7 @@ func TestLasRespuestasSePuedenPersonalizar(t *testing.T) {
 	if r := e.d.Ejecutar(Entrada{Persona: pnAna, Chat: pnAna, Texto: "!noexiste", Dueno: true}); r.Texto != "Ese comando no existe. Prueba !ayuda" {
 		t.Fatalf("%q", r.Texto)
 	}
-	_ = respuestas.FijarReemplazos(e.alm, 1, []respuestas.Reemplazo{{"Ese comando no existe", "No lo conozco"}})
+	_ = respuestas.FijarReemplazos(e.alm, 1, []respuestas.Reemplazo{{De: "Ese comando no existe", A: "No lo conozco"}})
 	if r := e.d.Ejecutar(Entrada{Persona: pnAna, Chat: pnAna, Texto: "!noexiste", Dueno: true}); r.Texto != "No lo conozco. Prueba !ayuda" {
 		t.Fatalf("%q", r.Texto)
 	}
