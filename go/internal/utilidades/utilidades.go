@@ -6,6 +6,7 @@
 package utilidades
 
 import (
+	"botchat/internal/respuestas"
 	"errors"
 	"fmt"
 	"strconv"
@@ -80,9 +81,9 @@ func (s *Servicio) Texto(persona, tipo string) string {
 	l := s.Alm.ListarItemsUtil(s.BotID, persona, tipo, true)
 	if len(l) == 0 {
 		if tipo == almacen.UtilNota {
-			return "No tienes notas. Guarda una con !anotar y el texto."
+			return s.r("util.sin_notas")
 		}
-		return "No tienes pendientes. Agrega uno con !tarea y el texto."
+		return s.r("util.sin_pendientes")
 	}
 	var b strings.Builder
 	if tipo == almacen.UtilNota {
@@ -208,8 +209,12 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 				return "", err
 			}
 			if n == 0 {
-				return "No había pendientes hechos.", nil
+				return s.r("util.sin_hechos"), nil
 			}
-			return fmt.Sprintf("Listo: borré %d pendientes hechos.", n), nil
+			return s.r("util.hechos_borrados", "n", fmt.Sprint(n)), nil
 		}})
+}
+
+func (s *Servicio) r(id string, vars ...string) string {
+	return respuestas.Texto(s.Alm, s.BotID, id, vars...)
 }

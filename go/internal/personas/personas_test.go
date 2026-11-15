@@ -545,7 +545,7 @@ func TestReportarSoloAvisaYNoGuardaElTextoDelMensaje(t *testing.T) {
 	_, _ = e.alm.GuardarMensaje(&almacen.Mensaje{ID: "BAD", ChatJID: grupo, BotID: 1, RemitenteJID: pnLuis, Tipo: almacen.TipoTexto, Texto: "texto ofensivo que no debe copiarse", TS: e.hora.Unix()})
 	// Cualquiera (sin rango) puede reportar: responde al mensaje.
 	r := e.enGrupo(pnRosa, "!reportar me insultó", pnLuis, "BAD")
-	if r.Texto != "Gracias, ya avisé." {
+	if r.Texto != "Gracias por tu reporte, lo analizaremos. Gracias." {
 		t.Fatalf("por defecto confirma a quien reporta: %q", r.Texto)
 	}
 	_ = e.alm.FijarAjusteBot(1, "reportar_gracias", "0")
@@ -573,7 +573,7 @@ func TestReportarSoloAvisaYNoGuardaElTextoDelMensaje(t *testing.T) {
 		t.Fatalf("apagado no responde: %q", r.Texto)
 	}
 	_ = e.alm.FijarAjusteBot(1, "reportar_gracias", "1")
-	if r := e.enGrupo(pnRosa, "!reportar", pnLuis, "BAD"); r.Texto != "Gracias, ya avisé." {
+	if r := e.enGrupo(pnRosa, "!reportar", pnLuis, "BAD"); r.Texto != "Gracias por tu reporte, lo analizaremos. Gracias." {
 		t.Fatalf("%q", r.Texto)
 	}
 	_ = e.alm.FijarAjusteBot(1, "reportar_texto", "Listo, el dueño lo verá")

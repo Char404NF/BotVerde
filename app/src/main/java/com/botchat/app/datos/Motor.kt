@@ -369,6 +369,10 @@ interface Motor {
     fun grupoGuardarHorario(bot: Long, grupo: String, horarioJson: String) {}
     fun grupoResumenAdmin(bot: Long, grupo: String): String = "{}"
     fun grupoEntrada(bot: Long, grupo: String): String = "{}"
+    fun respuestasLista(bot: Long): String = "{}"
+    fun respuestaFijar(bot: Long, id: String, texto: String) {}
+    fun respuestasRestaurar(bot: Long): Long = 0
+    fun reemplazosFijar(bot: Long, listaJson: String) {}
     fun grupoGuardarEntrada(bot: Long, grupo: String, entradaJson: String) {}
     fun videoLista(bot: Long, limite: Long, antes: Long): String = "[]"
     fun videoMiniatura(bot: Long, id: Long): ByteArray? = null
@@ -713,6 +717,10 @@ object MotorGo : Motor {
     override fun grupoGuardarHorario(bot: Long, grupo: String, horarioJson: String) = Wabot.grupoGuardarHorario(bot, grupo, horarioJson)
     override fun grupoResumenAdmin(bot: Long, grupo: String) = Wabot.grupoResumenAdmin(bot, grupo)
     override fun grupoEntrada(bot: Long, grupo: String) = Wabot.grupoEntrada(bot, grupo)
+    override fun respuestasLista(bot: Long) = Wabot.respuestasLista(bot)
+    override fun respuestaFijar(bot: Long, id: String, texto: String) = Wabot.respuestaFijar(bot, id, texto)
+    override fun respuestasRestaurar(bot: Long) = Wabot.respuestasRestaurar(bot).toLong()
+    override fun reemplazosFijar(bot: Long, listaJson: String) = Wabot.reemplazosFijar(bot, listaJson)
     override fun grupoGuardarEntrada(bot: Long, grupo: String, entradaJson: String) = Wabot.grupoGuardarEntrada(bot, grupo, entradaJson)
     override fun videoLista(bot: Long, limite: Long, antes: Long) = Wabot.videoLista(bot, limite, antes)
     override fun videoMiniatura(bot: Long, id: Long): ByteArray? = Wabot.videoMiniatura(bot, id)

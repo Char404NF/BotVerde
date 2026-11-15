@@ -129,7 +129,7 @@ var ajustesBotDefecto = map[string]string{
 	"adv_accion":       "avisar", // avisar | silenciar | borrar | expulsar
 	"adv_silencio_min": "1440",   // cuánto dura el silencio de la regla "silenciar"
 	"reportar_gracias": "1",      // contestar "Gracias, ya avisé" a !reportar (encendido: quien reporta debe saber que llegó)
-	"reportar_texto":   "Gracias, ya avisé.",
+	"reportar_texto":   "Gracias por tu reporte, lo analizaremos. Gracias.",
 	"alertas_activas":  "1",     // alertas por palabra clave
 	"alerta_fragmento": "0",     // incluir un fragmento del mensaje en la alerta (apagado)
 	"resumen_activo":   "0",     // resumen diario

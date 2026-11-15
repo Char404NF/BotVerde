@@ -1,6 +1,7 @@
 package comandos
 
 import (
+	"botchat/internal/respuestas"
 	"errors"
 	"strings"
 	"testing"
@@ -408,5 +409,21 @@ func TestRegistrarRechazaRepetidosYPermiteModulos(t *testing.T) {
 	}
 	if r := e.priv(pnAna, "!revienta"); !r.Manejado {
 		t.Fatal("el pánico se atrapa")
+	}
+}
+
+// Lo que el dueño personaliza se aplica a lo que contesta un comando: una respuesta del catálogo y una frase cualquiera.
+func TestLasRespuestasSePuedenPersonalizar(t *testing.T) {
+	e := nuevoEntorno(t)
+	if r := e.d.Ejecutar(Entrada{Persona: pnAna, Chat: pnAna, Texto: "!noexiste", Dueno: true}); !strings.Contains(r.Texto, "No conozco ese comando") {
+		t.Fatalf("%q", r.Texto)
+	}
+	_ = e.alm.FijarRespuesta(1, "cmd.desconocido", "Ese comando no existe. Prueba {prefijo}ayuda")
+	if r := e.d.Ejecutar(Entrada{Persona: pnAna, Chat: pnAna, Texto: "!noexiste", Dueno: true}); r.Texto != "Ese comando no existe. Prueba !ayuda" {
+		t.Fatalf("%q", r.Texto)
+	}
+	_ = respuestas.FijarReemplazos(e.alm, 1, []respuestas.Reemplazo{{"Ese comando no existe", "No lo conozco"}})
+	if r := e.d.Ejecutar(Entrada{Persona: pnAna, Chat: pnAna, Texto: "!noexiste", Dueno: true}); r.Texto != "No lo conozco. Prueba !ayuda" {
+		t.Fatalf("%q", r.Texto)
 	}
 }

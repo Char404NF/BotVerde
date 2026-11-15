@@ -561,22 +561,16 @@ func (s *Servicio) Etiquetar(actor, chat, nombre string, si, crear bool) (*almac
 	return e, nil
 }
 
-// ErrReportarPropio y ErrReportarBot: no se puede reportar un mensaje propio ni del bot.
-var (
-	ErrReportarPropio = errors.New("no puedes reportar un mensaje tuyo: responde al mensaje de otra persona")
-	ErrReportarBot    = errors.New("no puedes reportar un mensaje del bot: responde al mensaje de una persona")
-)
-
 // Reportar avisa al dueño con una notificación local. NO guarda ni copia el texto del mensaje: solo el chat, quién reporta, de quién
 // es el mensaje y el motivo que escribió quien reporta. El registro de acciones no lleva el motivo.
 func (s *Servicio) Reportar(quien, autor, chat, motivo string) error {
 	// No se puede reportar un mensaje propio ni uno del bot (todo lo que sale de esta cuenta, incluidas sus respuestas automáticas).
 	if a := s.persona(autor); a != "" {
 		if a == almacen.PersonaDueno {
-			return ErrReportarBot
+			return errors.New(s.r("reportar.no_bot"))
 		}
 		if a == s.persona(quien) {
-			return ErrReportarPropio
+			return errors.New(s.r("reportar.no_propio"))
 		}
 	}
 	nChat := chat

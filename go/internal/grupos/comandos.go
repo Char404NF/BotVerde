@@ -1,6 +1,7 @@
 package grupos
 
 import (
+	"botchat/internal/respuestas"
 	"context"
 	"errors"
 	"fmt"
@@ -306,7 +307,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 				return "", err
 			}
 			if !cx.EsGrupo {
-				return fmt.Sprintf("Listo: mencioné a %d personas.", r.Mencionadas), nil
+				return s.r("grupo.todos", "n", fmt.Sprint(r.Mencionadas)), nil
 			}
 			return r.Aviso, nil
 		}})
@@ -354,17 +355,17 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 				if err := f(ctx, cx.Persona, chat); err != nil {
 					return "", err
 				}
-				return ok, nil
+				return s.r(ok), nil
 			}})
 	}
 	simple("cerrar", "Cerrar el grupo: solo administradores escriben", "grupos.cerrar",
-		func(ctx context.Context, a, c string) error { return s.Cerrar(ctx, a, c, true) }, "Listo: el grupo quedó cerrado, solo los administradores pueden escribir.")
+		func(ctx context.Context, a, c string) error { return s.Cerrar(ctx, a, c, true) }, "grupo.cerrado")
 	simple("abrir", "Abrir el grupo: todos pueden escribir", "grupos.cerrar",
-		func(ctx context.Context, a, c string) error { return s.Cerrar(ctx, a, c, false) }, "Listo: el grupo quedó abierto, todos pueden escribir.")
+		func(ctx context.Context, a, c string) error { return s.Cerrar(ctx, a, c, false) }, "grupo.abierto")
 	simple("bloquearinfo", "Que solo administradores cambien nombre y foto", "grupos.bloquear_info",
-		func(ctx context.Context, a, c string) error { return s.BloquearInfo(ctx, a, c, true) }, "Listo: solo los administradores pueden cambiar la información del grupo.")
+		func(ctx context.Context, a, c string) error { return s.BloquearInfo(ctx, a, c, true) }, "grupo.info_bloqueada")
 	simple("desbloquearinfo", "Que todos puedan cambiar nombre y foto", "grupos.bloquear_info",
-		func(ctx context.Context, a, c string) error { return s.BloquearInfo(ctx, a, c, false) }, "Listo: todos pueden cambiar la información del grupo.")
+		func(ctx context.Context, a, c string) error { return s.BloquearInfo(ctx, a, c, false) }, "grupo.info_libre")
 
 	reg(comandos.Comando{Nombre: "expulsar", Alias: []string{"kick", "sacar"}, Resumen: "Sacar a una persona del grupo", Uso: "expulsar <persona>", Casilla: "grupos.expulsar", Ambito: comandos.Grupo, Confirma: true, Validar: validaObjetivo,
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -381,7 +382,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			if err := s.ExpulsarComo(ctx, cx.Persona, chat, p); err != nil {
 				return "", err
 			}
-			return "Listo: la persona salió del grupo.", nil
+			return s.r("grupo.expulsada"), nil
 		}})
 	admin := func(nombre, resumen string, f func(ctx context.Context, a, c, p string) error, ok string) {
 		reg(comandos.Comando{Nombre: nombre, Resumen: resumen, Uso: nombre + " <persona>", Casilla: "grupos.ascender", Ambito: comandos.Grupo, Validar: validaObjetivo,
@@ -399,11 +400,11 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 				if err := f(ctx, cx.Persona, chat, p); err != nil {
 					return "", err
 				}
-				return ok, nil
+				return s.r(ok), nil
 			}})
 	}
-	admin("ascender", "Hacer administradora a una persona", s.Ascender, "Listo: ahora es administradora del grupo.")
-	admin("bajar", "Quitar el cargo de administradora", s.Bajar, "Listo: ya no es administradora del grupo.")
+	admin("ascender", "Hacer administradora a una persona", s.Ascender, "grupo.ascendida")
+	admin("bajar", "Quitar el cargo de administradora", s.Bajar, "grupo.bajada")
 
 	s.registrarAdmin(reg, validaObjetivo)
 
@@ -451,11 +452,11 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 				if err != nil {
 					return "", err
 				}
-				return fmt.Sprintf(ok, n), nil
+				return s.r(ok, "n", fmt.Sprint(n)), nil
 			}})
 	}
-	resolver("aprobar", "Aceptar solicitudes de ingreso (todas o una persona)", true, "Listo: aprobé %d solicitudes.")
-	resolver("rechazar", "Rechazar solicitudes de ingreso (todas o una persona)", false, "Listo: rechacé %d solicitudes.")
+	resolver("aprobar", "Aceptar solicitudes de ingreso (todas o una persona)", true, "grupo.aprobadas")
+	resolver("rechazar", "Rechazar solicitudes de ingreso (todas o una persona)", false, "grupo.rechazadas")
 
 	reg(comandos.Comando{Nombre: "nombre", Resumen: "Cambiar el nombre del grupo", Uso: "nombre <texto>", Casilla: "grupos.renombrar", Ambito: comandos.Grupo,
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -468,7 +469,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			if err := s.Renombrar(ctx, cx.Persona, chat, strings.Join(resto, " ")); err != nil {
 				return "", err
 			}
-			return "Listo: cambié el nombre del grupo.", nil
+			return s.r("grupo.nombre"), nil
 		}})
 	reg(comandos.Comando{Nombre: "descripcion", Alias: []string{"descripción"}, Resumen: "Cambiar la descripción del grupo", Uso: "descripcion <texto>  (sin texto la borra)", Casilla: "grupos.renombrar", Ambito: comandos.Grupo,
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -483,9 +484,9 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 				return "", err
 			}
 			if t == "" {
-				return "Listo: borré la descripción del grupo.", nil
+				return s.r("grupo.descripcion_borrada"), nil
 			}
-			return "Listo: cambié la descripción del grupo.", nil
+			return s.r("grupo.descripcion"), nil
 		}})
 	reg(comandos.Comando{Nombre: "enlace", Alias: []string{"link"}, Resumen: "Ver el enlace de invitación", Uso: "enlace", Casilla: "grupos.enlace", Ambito: comandos.Grupo,
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -540,7 +541,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			if err := s.BorrarMensaje(ctx, cx.Persona, chat, cx.CitaID); err != nil {
 				return "", err
 			}
-			return "Listo: borré ese mensaje.", nil
+			return s.r("grupo.mensaje_borrado"), nil
 		}})
 	reg(comandos.Comando{Nombre: "filtros", Resumen: "Ver y cambiar los filtros del grupo", Casilla: "grupos.filtros", Ambito: comandos.Grupo,
 		Uso: "filtros | filtros <enlaces|palabras|repetidos|flood> on|off | accion <acción> | agregar/quitar <texto> | permitir <dominio> | limite <n> <segundos>",
@@ -570,27 +571,27 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			msg := "Listo."
 			switch sub {
 			case "on", "si", "sí", "encender", "activar":
-				f.Activo, msg = true, "Listo: el filtro de "+strings.ToLower(f.Nombre)+" quedó encendido."
+				f.Activo, msg = true, s.r("filtro.encendido", "filtro", strings.ToLower(f.Nombre))
 			case "off", "no", "apagar", "desactivar":
-				f.Activo, msg = false, "Listo: el filtro de "+strings.ToLower(f.Nombre)+" quedó apagado."
+				f.Activo, msg = false, s.r("filtro.apagado", "filtro", strings.ToLower(f.Nombre))
 			case "accion", "acción":
 				a := strings.ReplaceAll(strings.ToLower(valor), " ", "_")
 				if !EsAccionFiltro(a) {
 					return "", ErrAccionNoHay
 				}
-				f.Accion, msg = a, "Listo: la acción es "+textoAccion(a)+"."
+				f.Accion, msg = a, s.r("filtro.accion", "accion", textoAccion(a))
 			case "agregar", "añadir":
 				if nombre != FiltroPalabras || valor == "" {
 					return "", errors.New("solo el filtro de palabras acepta eso: filtros palabras agregar <palabra>")
 				}
 				f.Config.Palabras = append(f.Config.Palabras, valor)
-				msg = "Listo: agregué esa palabra."
+				msg = s.r("filtro.palabra_agregada")
 			case "permitir":
 				if nombre != FiltroEnlaces || valor == "" {
 					return "", errors.New("solo el filtro de enlaces acepta eso: filtros enlaces permitir <dominio>")
 				}
 				f.Config.Permitidos = append(f.Config.Permitidos, valor)
-				msg = "Listo: ese dominio queda permitido."
+				msg = s.r("filtro.dominio_permitido")
 			case "quitar":
 				switch nombre {
 				case FiltroPalabras:
@@ -600,7 +601,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 				default:
 					return "", errors.New("ese filtro no tiene lista")
 				}
-				msg = "Listo: lo quité de la lista."
+				msg = s.r("filtro.quitado")
 			case "limite", "límite":
 				if nombre != FiltroRepetidos && nombre != FiltroFlood {
 					return "", errors.New("solo repetidos y flood tienen límite: filtros flood limite <mensajes> <segundos>")
@@ -611,7 +612,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 					return "", errors.New("escribe el límite así: filtros " + nombre + " limite 6 10 (6 mensajes en 10 segundos)")
 				}
 				f.Config.Max, f.Config.Segundos = n, seg
-				msg = fmt.Sprintf("Listo: el límite es %d en %d segundos.", n, seg)
+				msg = s.r("filtro.limite", "n", fmt.Sprint(n), "segundos", fmt.Sprint(seg))
 			default:
 				return "", errors.New("no entendí: usa on, off, accion, agregar, quitar, permitir o limite")
 			}
@@ -638,4 +639,8 @@ func sinElemento(l []string, valor string, norm func(string) string) []string {
 		}
 	}
 	return out
+}
+
+func (s *Servicio) r(id string, vars ...string) string {
+	return respuestas.Texto(s.Alm, s.BotID, id, vars...)
 }

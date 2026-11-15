@@ -228,13 +228,14 @@ fun PantallaCentroBot(
     alMiBot: () -> Unit, alAlmacenamiento: () -> Unit, alAuditoria: () -> Unit, alSilencios: () -> Unit, alAdvertencias: () -> Unit,
     alEtiquetas: () -> Unit, alAjustes: () -> Unit,
     alComandos: () -> Unit = {}, alModulos: () -> Unit = {}, alLimites: () -> Unit = {}, alLaboratorio: () -> Unit = {}, alActividad: () -> Unit = {},
-    alAsistente: () -> Unit = {},
+    alAsistente: () -> Unit = {}, alRespuestas: () -> Unit = {},
 ) {
     val completo = LocalModoCompleto.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).testTag("pantalla_centro_bot")) {
         TituloSeccion("Tu bot")
         BotonGrande(Ico.Agregar, "Crea tu bot", "Cinco pasos: dónde responde, bienvenida, menú, reglas y utilidades", "hub_asistente", alAsistente)
         BotonGrande(Ico.Bot, "Mi bot", "Encender, apagar y ver si está conectado", "hub_mi_bot", alMiBot)
+        BotonGrande(Ico.Editar, "Respuestas del bot", "Cambia lo que contesta: «Listo…», «No tienes permiso…», reportes y más", "hub_respuestas", alRespuestas)
         TituloSeccion("Personas y grupos")
         BotonGrande(Ico.Volumen, "Silencios", "A quién silenciaste en tus grupos", "hub_silencios", alSilencios)
         BotonGrande(Ico.Aviso, "Advertencias", "A quién has advertido y lo que anotaste", "hub_advertencias", alAdvertencias)

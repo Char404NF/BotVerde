@@ -192,3 +192,42 @@ func (a *Almacen) RazonNoUsuario(botID int64, persona string) string {
 	}
 	return ""
 }
+
+// ---------- respuestas propias (texto que el dueño cambió de lo que el bot contesta) ----------
+
+const prefijoRespuesta = "resp:"
+
+// Respuesta devuelve el texto propio de una respuesta ("" = usar la de fábrica).
+func (a *Almacen) Respuesta(botID int64, id string) string {
+	var v string
+	_ = a.db.QueryRow(`SELECT valor FROM bot_ajustes WHERE bot_id=? AND clave=?`, botID, prefijoRespuesta+id).Scan(&v)
+	return v
+}
+
+// FijarRespuesta guarda el texto propio de una respuesta; vacío vuelve al de fábrica.
+func (a *Almacen) FijarRespuesta(botID int64, id, texto string) error {
+	texto = strings.TrimSpace(texto)
+	var err error
+	if texto == "" {
+		_, err = a.db.Exec(`DELETE FROM bot_ajustes WHERE bot_id=? AND clave=?`, botID, prefijoRespuesta+id)
+	} else {
+		_, err = a.db.Exec(`INSERT INTO bot_ajustes(bot_id,clave,valor) VALUES(?,?,?) ON CONFLICT(bot_id,clave) DO UPDATE SET valor=excluded.valor`, botID, prefijoRespuesta+id, texto)
+	}
+	if err == nil {
+		a.avisa("respuestas")
+	}
+	return err
+}
+
+// RestaurarRespuestas vuelve todas las respuestas al texto de fábrica. Devuelve cuántas tenían texto propio.
+func (a *Almacen) RestaurarRespuestas(botID int64) int {
+	r, err := a.db.Exec(`DELETE FROM bot_ajustes WHERE bot_id=? AND clave LIKE ?`, botID, prefijoRespuesta+"%")
+	if err != nil {
+		return 0
+	}
+	n, _ := r.RowsAffected()
+	if n > 0 {
+		a.avisa("respuestas")
+	}
+	return int(n)
+}

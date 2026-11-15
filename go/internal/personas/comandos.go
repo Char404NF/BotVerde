@@ -1,6 +1,7 @@
 package personas
 
 import (
+	"botchat/internal/respuestas"
 	"context"
 	"errors"
 	"fmt"
@@ -123,7 +124,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			if err := s.Silenciar(cx.Persona, p, dur, ""); err != nil {
 				return "", err
 			}
-			return "Listo: el bot no le contestará " + map[bool]string{true: "para siempre", false: "durante " + TextoDuracion(dur)}[dur == 0] + ".", nil
+			return s.r("pers.ignorar", "cuando", map[bool]string{true: "para siempre", false: "durante " + TextoDuracion(dur)}[dur == 0]), nil
 		}})
 	reg(comandos.Comando{Nombre: "designorar", Resumen: "Que el bot vuelva a contestarle", Uso: "designorar <persona>", Casilla: "personas.silenciar",
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -138,7 +139,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			if !ok {
 				return "Esa persona no estaba ignorada. Si querías quitarle el silencio de grupos, usa " + cx.D.Prefijo() + "desilenciar.", nil
 			}
-			return "Listo: el bot vuelve a contestarle.", nil
+			return s.r("pers.designorar"), nil
 		}})
 	reg(comandos.Comando{Nombre: "bloquear", Resumen: "Que el bot ignore del todo a alguien", Uso: "bloquear <persona>", Casilla: "personas.bloquear",
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -149,7 +150,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			if err := s.Bloquear(cx.Persona, p); err != nil {
 				return "", err
 			}
-			return "Listo: el bot la ignora por completo (no es un bloqueo de WhatsApp).", nil
+			return s.r("pers.bloquear"), nil
 		}})
 	reg(comandos.Comando{Nombre: "desbloquear", Resumen: "Quitar el bloqueo del bot", Uso: "desbloquear <persona>", Casilla: "personas.bloquear",
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -164,7 +165,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			if !ok {
 				return "Esa persona no estaba bloqueada.", nil
 			}
-			return "Listo: el bot vuelve a atenderla.", nil
+			return s.r("pers.desbloquear"), nil
 		}})
 	reg(comandos.Comando{Nombre: "advertir", Alias: []string{"warn"}, Resumen: "Poner una advertencia", Uso: "advertir <persona> [tipo] [motivo]", Casilla: "personas.advertir",
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -275,7 +276,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			if !quitada {
 				return "Esa persona no tiene advertencias.", nil
 			}
-			return fmt.Sprintf("Listo: le quedan %d advertencia(s).", quedan), nil
+			return s.r("pers.adv_quitada", "n", fmt.Sprint(quedan)), nil
 		}})
 	reg(comandos.Comando{Nombre: "borraradvertencias", Resumen: "Borrar todo su historial de advertencias", Uso: "borraradvertencias <persona>", Casilla: "personas.advertir", Confirma: true,
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -287,7 +288,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			if err != nil {
 				return "", err
 			}
-			return fmt.Sprintf("Listo: borré %d advertencia(s).", n), nil
+			return s.r("pers.adv_borradas", "n", fmt.Sprint(n)), nil
 		}})
 	reg(comandos.Comando{Nombre: "nota", Resumen: "Escribir o ver notas sobre alguien", Uso: "nota <persona> [texto]", Casilla: "personas.notas",
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -340,7 +341,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			if err != nil {
 				return "", err
 			}
-			return fmt.Sprintf("Listo: olvidé a esa persona (%d mensajes borrados).", r.Mensajes), nil
+			return s.r("pers.olvidar", "n", fmt.Sprint(r.Mensajes)), nil
 		}})
 
 	// ----- chat -----
@@ -361,7 +362,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			if err := s.PausarChat(cx.Persona, chat, dur, false); err != nil {
 				return "", err
 			}
-			return "Listo: el bot calla aquí " + TextoDuracion(dur) + ". Escribe " + cx.D.Prefijo() + "reanudar para volver.", nil
+			return s.r("chat.pausar", "duracion", TextoDuracion(dur), "prefijo", cx.D.Prefijo()), nil
 		}})
 	reg(comandos.Comando{Nombre: "control", Alias: []string{"tomarcontrol"}, Resumen: "Tomar el control: el bot calla y atiendes tú", Casilla: "chat.tomar_control",
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -372,7 +373,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			if err := s.PausarChat(cx.Persona, chat, DuracionControl, true); err != nil {
 				return "", err
 			}
-			return "Listo: tomaste el control, el bot calla aquí. Escribe " + cx.D.Prefijo() + "reanudar para devolvérselo.", nil
+			return s.r("chat.control", "prefijo", cx.D.Prefijo()), nil
 		}})
 	reg(comandos.Comando{Nombre: "reanudar", Resumen: "Que el bot vuelva a contestar en este chat", Uso: "reanudar", Casilla: "chat.pausar", Siempre: true,
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -383,7 +384,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			if err := s.ReanudarChat(cx.Persona, chat); err != nil {
 				return "", err
 			}
-			return "Listo: el bot vuelve a contestar aquí.", nil
+			return s.r("chat.reanudar"), nil
 		}})
 	estado := func(nombre, est, resumen, ok string) {
 		reg(comandos.Comando{Nombre: nombre, Resumen: resumen, Casilla: "chat.estado",
@@ -395,11 +396,11 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 				if err := s.MarcarChat(cx.Persona, chat, est); err != nil {
 					return "", err
 				}
-				return ok, nil
+				return s.r(ok), nil
 			}})
 	}
-	estado("pendiente", almacen.TrabajoPendiente, "Marcar este chat como pendiente", "Listo: chat marcado como pendiente.")
-	estado("resuelto", almacen.TrabajoResuelto, "Marcar este chat como resuelto", "Listo: chat marcado como resuelto.")
+	estado("pendiente", almacen.TrabajoPendiente, "Marcar este chat como pendiente", "chat.pendiente")
+	estado("resuelto", almacen.TrabajoResuelto, "Marcar este chat como resuelto", "chat.resuelto")
 	reg(comandos.Comando{Nombre: "etiquetar", Resumen: "Poner o quitar una etiqueta al chat", Uso: "etiquetar <etiqueta> | etiquetar quitar <etiqueta>", Casilla: "chat.etiquetas",
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
 			chat, resto, err := s.chatDestino(cx)
@@ -427,9 +428,9 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 				return "", err
 			}
 			if !si {
-				return "Listo: quité la etiqueta " + e.Nombre + ".", nil
+				return s.r("chat.etiqueta_quitada", "etiqueta", e.Nombre), nil
 			}
-			return "Listo: etiqueta " + e.Nombre + " puesta.", nil
+			return s.r("chat.etiqueta_puesta", "etiqueta", e.Nombre), nil
 		}})
 	reg(comandos.Comando{Nombre: "reportar", Alias: []string{"report"}, Resumen: "Avisar al dueño de un mensaje (responde a él)", Uso: "reportar [motivo]", Casilla: "chat.reportar",
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -440,10 +441,13 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 				return "", err
 			}
 			if s.Alm.AjusteBotInt(s.BotID, "reportar_gracias") == 1 {
-				if t := strings.TrimSpace(s.Alm.AjusteBot(s.BotID, "reportar_texto")); t != "" {
-					return t, nil
+				// el texto propio de «Respuestas del bot» manda; si no hay, el que ya se tenía guardado (reportar_texto), y si no, el de fábrica
+				if s.Alm.Respuesta(s.BotID, "reportar.ok") == "" {
+					if t := strings.TrimSpace(s.Alm.AjusteBot(s.BotID, "reportar_texto")); t != "" && t != textoReporteAnterior {
+						return t, nil
+					}
 				}
-				return "Gracias, ya avisé.", nil
+				return s.r("reportar.ok"), nil
 			}
 			return "", nil
 		}})
@@ -493,3 +497,10 @@ func TextoFicha(f *FichaCompleta, loc *time.Location) string {
 	}
 	return b.String()
 }
+
+func (s *Servicio) r(id string, vars ...string) string {
+	return respuestas.Texto(s.Alm, s.BotID, id, vars...)
+}
+
+// textoReporteAnterior era el texto de fábrica de antes: si es el que quedó guardado, se usa el nuevo de fábrica.
+const textoReporteAnterior = "Gracias, ya avisé."

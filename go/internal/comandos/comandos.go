@@ -4,6 +4,7 @@
 package comandos
 
 import (
+	"botchat/internal/respuestas"
 	"errors"
 	"fmt"
 	"sort"
@@ -224,6 +225,14 @@ type Entrada struct {
 // Ejecutar interpreta el texto. Si no es un comando conocido y no viene del Dueño, devuelve Manejado=false para que siga el motor
 // de menús. Aplica ámbito, permiso, límite por minuto y confirmación; cada intento queda en el registro de acciones (sin textos).
 func (d *Despachador) Ejecutar(e Entrada) Resultado {
+	r := d.ejecutar(e)
+	if r.Texto != "" {
+		r.Texto = respuestas.Aplicar(d.Alm, d.BotID, r.Texto) // «cambiar cualquier otra frase»: lo que el dueño reemplazó
+	}
+	return r
+}
+
+func (d *Despachador) ejecutar(e Entrada) Resultado {
 	palabra, args, resto, ok := d.Parsear(e.Texto)
 	if !ok {
 		return Resultado{}
@@ -237,7 +246,7 @@ func (d *Despachador) Ejecutar(e Entrada) Resultado {
 	}
 	if cmd == nil {
 		if e.Dueno {
-			return Resultado{Manejado: true, Texto: "No conozco ese comando. Escribe " + d.Prefijo() + "ayuda para ver los que puedes usar."}
+			return Resultado{Manejado: true, Texto: d.R("cmd.desconocido", "prefijo", d.Prefijo())}
 		}
 		return Resultado{}
 	}
@@ -250,25 +259,25 @@ func (d *Despachador) Ejecutar(e Entrada) Resultado {
 	if ok, avisar := d.Perm.Limitar(persona); !ok {
 		registro("limite", "")
 		if avisar {
-			return Resultado{Manejado: true, Texto: "Vas muy rápido. Espera un momento y vuelve a intentar."}
+			return Resultado{Manejado: true, Texto: d.R("cmd.muy_rapido")}
 		}
 		return Resultado{Manejado: true}
 	}
 	if cmd.SoloDueno && !cx.Dueno {
 		registro("denegado", "solo_dueno")
-		return Resultado{Manejado: true, Texto: "Ese comando solo lo usa el dueño desde “Mensajes guardados” o desde la app."}
+		return Resultado{Manejado: true, Texto: d.R("cmd.solo_dueno")}
 	}
 	if !cx.Dueno {
 		if (e.EsGrupo && cmd.Ambito&Grupo == 0) || (!e.EsGrupo && cmd.Ambito&Privado == 0) {
 			registro("denegado", "ambito")
 			if e.EsGrupo {
-				return Resultado{Manejado: true, Texto: "Ese comando solo funciona en un chat privado conmigo."}
+				return Resultado{Manejado: true, Texto: d.R("cmd.solo_privado")}
 			}
-			return Resultado{Manejado: true, Texto: "Ese comando solo funciona dentro de un grupo."}
+			return Resultado{Manejado: true, Texto: d.R("cmd.solo_grupo")}
 		}
 		if cmd.Casilla != "" && !d.Perm.Puede(persona, cmd.Casilla, e.EsGrupo, e.Chat) {
 			registro("denegado", "permiso")
-			return Resultado{Manejado: true, Texto: "No tienes permiso para usar ese comando."}
+			return Resultado{Manejado: true, Texto: d.R("cmd.sin_permiso")}
 		}
 	}
 	if cmd.Confirma {
@@ -288,7 +297,7 @@ func (d *Despachador) Ejecutar(e Entrada) Resultado {
 		cf, err := d.Alm.CrearConfirmacion(d.BotID, persona, cmd.Nombre, args, e.Chat, e.MensajeID, d.vida(), d.ahora())
 		if err != nil {
 			registro("error", "confirmacion")
-			return Resultado{Manejado: true, Texto: "No pude preparar la confirmación. Intenta de nuevo."}
+			return Resultado{Manejado: true, Texto: d.R("cmd.confirmacion_falla")}
 		}
 		registro("confirmacion", "")
 		if d.AlCodigo != nil {
@@ -296,9 +305,9 @@ func (d *Despachador) Ejecutar(e Entrada) Resultado {
 		}
 		pref := d.Prefijo()
 		if cx.Dueno {
-			return Resultado{Manejado: true, Texto: "Esto necesita confirmación. Te llegó un código en una notificación y en la app: escribe " + pref + "confirmar y el código."}
+			return Resultado{Manejado: true, Texto: d.R("cmd.confirma_dueno", "prefijo", pref)}
 		}
-		return Resultado{Manejado: true, Texto: "Esto necesita confirmación. El dueño recibe un código en su teléfono; cuando te lo dé escribe " + pref + "confirmar y el código."}
+		return Resultado{Manejado: true, Texto: d.R("cmd.confirma_otro", "prefijo", pref)}
 	}
 	return d.correr(cmd, cx, registro)
 }
@@ -345,7 +354,11 @@ func mensajeError(err error) string {
 	if m == "" {
 		return "No se pudo."
 	}
-	return strings.ToUpper(m[:1]) + m[1:] + "."
+	m = strings.ToUpper(m[:1]) + m[1:]
+	if strings.HasSuffix(m, ".") || strings.HasSuffix(m, "!") || strings.HasSuffix(m, "?") {
+		return m
+	}
+	return m + "."
 }
 
 // Confirmar gasta un código y ejecuta la acción guardada. Si `persona` no es "", el código tiene que ser de esa persona (quien
@@ -483,4 +496,9 @@ func (c *Contexto) Objetivo() (persona string, resto []string, ok bool) {
 		return c.D.Perm.Persona(c.CitaAutor), resto, true
 	}
 	return "", resto, false
+}
+
+// R da una respuesta del catálogo (la propia del dueño o la de fábrica).
+func (d *Despachador) R(id string, vars ...string) string {
+	return respuestas.Texto(d.Alm, d.BotID, id, vars...)
 }

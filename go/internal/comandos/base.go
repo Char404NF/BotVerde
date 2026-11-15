@@ -24,11 +24,11 @@ func cmdAyuda(cx *Contexto) (string, error) {
 	cs := cx.D.Lista(cx)
 	pref := cx.D.Prefijo()
 	var b strings.Builder
-	b.WriteString("Esto puedes usar")
+	rangoTxt := ""
 	if cx.Rol != nil {
-		b.WriteString(" (rango " + cx.Rol.Nombre + ")")
+		rangoTxt = " (rango " + cx.Rol.Nombre + ")"
 	}
-	b.WriteString(":\n")
+	b.WriteString(cx.D.R("cmd.ayuda_titulo", "rango", rangoTxt) + "\n")
 	for _, c := range cs {
 		b.WriteString("• " + pref + c.Nombre)
 		if c.Resumen != "" {
@@ -60,13 +60,13 @@ func textoCaduca(as *almacen.Asignacion, ahora time.Time) string {
 
 func cmdRango(cx *Contexto) (string, error) {
 	if cx.Dueno {
-		return "Eres el Dueño: puedes todo.", nil
+		return cx.D.R("cmd.eres_dueno"), nil
 	}
 	r, as, _ := cx.D.Alm.RolDePersona(cx.D.BotID, cx.Persona, cx.D.ahora())
 	if r == nil {
-		return "No tienes un rango. Escribe " + cx.D.Prefijo() + "ayuda para ver lo que puedes usar.", nil
+		return cx.D.R("cmd.sin_rango", "prefijo", cx.D.Prefijo()), nil
 	}
-	return "Tu rango es " + r.Nombre + textoCaduca(as, cx.D.ahora()) + ".", nil
+	return cx.D.R("cmd.tu_rango", "rango", r.Nombre, "vence", textoCaduca(as, cx.D.ahora())), nil
 }
 
 // duraciones que se reconocen al final de !asignar
@@ -103,7 +103,7 @@ func cmdAsignar(cx *Contexto) (string, error) {
 	if cad > 0 {
 		fin = " por " + map[bool]string{true: "24 horas", false: "7 días"}[time.Unix(cad, 0).Sub(cx.D.ahora()) < 48*time.Hour]
 	}
-	return "Listo: ahora tiene el rango " + r.Nombre + fin + ".", nil
+	return cx.D.R("cmd.rango_dado", "rango", r.Nombre, "duracion", fin), nil
 }
 
 func cmdQuitarRango(cx *Contexto) (string, error) {
@@ -114,7 +114,7 @@ func cmdQuitarRango(cx *Contexto) (string, error) {
 	if err := cx.D.Perm.QuitarComo(cx.Persona, obj); err != nil {
 		return "", err
 	}
-	return "Listo: ya no tiene rango.", nil
+	return cx.D.R("cmd.rango_quitado"), nil
 }
 
 func cmdConfirmar(cx *Contexto) (string, error) {

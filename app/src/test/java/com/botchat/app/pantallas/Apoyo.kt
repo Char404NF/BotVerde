@@ -824,6 +824,19 @@ class MotorFalso : Motor {
             ""","serie":[""" + (0 until 30).joinToString(",") { """{"dia":"2026-10-${"%02d".format(it % 28 + 1)}","n":${it % 4}}""" } + """],"horas":[""" + (0 until 24).joinToString(",") { "${it % 5}" } +
             """],"promedioDia":4.0,"mediaGrupo":75.0,"puesto":1,"activos":2,"motivoBan":"","silencioHasta":0,"silenciado":false,"historial":""" + historialJson + ""","desde":${ahoraS - 90000}}"""
     }
+    var respuestasJson = JSONObject().put("grupos", JSONArray(listOf("Comandos en general", "Grupos")))
+        .put("filas", JSONArray().put(JSONObject().put("id", "cmd.sin_permiso").put("grupo", "Comandos en general").put("descripcion", "Usan un comando que su rango no permite.").put("defecto", "No tienes permiso para usar ese comando.").put("vars", JSONArray()).put("propio", ""))
+            .put(JSONObject().put("id", "grupo.aprobadas").put("grupo", "Grupos").put("descripcion", "Se aprueban solicitudes de ingreso.").put("defecto", "Listo: aprobé {n} solicitudes.").put("vars", JSONArray(listOf("n"))).put("propio", "")))
+        .put("reemplazos", JSONArray()).toString()
+    override fun respuestasLista(bot: Long) = respuestasJson
+    override fun respuestaFijar(bot: Long, id: String, texto: String) {
+        llamadas += "respuesta:$id:$texto"; rFalla()
+        val o = JSONObject(respuestasJson); val f = o.getJSONArray("filas")
+        for (i in 0 until f.length()) if (f.getJSONObject(i).getString("id") == id) f.getJSONObject(i).put("propio", texto)
+        respuestasJson = o.toString()
+    }
+    override fun respuestasRestaurar(bot: Long): Long { llamadas += "respuestas_restaurar"; val o = JSONObject(respuestasJson); val f = o.getJSONArray("filas"); for (i in 0 until f.length()) f.getJSONObject(i).put("propio", ""); respuestasJson = o.put("reemplazos", JSONArray()).toString(); return 1 }
+    override fun reemplazosFijar(bot: Long, listaJson: String) { llamadas += "reemplazos:$listaJson"; respuestasJson = JSONObject(respuestasJson).put("reemplazos", JSONArray(listaJson)).toString() }
     var perfilBaneado = false
     override fun grupoMiembrosAdmin(bot: Long, grupo: String): String { defectosAdmin(); llamadas += "miembrosAdmin:$grupo"; return miembrosAdminJson }
     override fun grupoSuscribirPresencias(bot: Long, grupo: String) { llamadas += "suscribirPresencias:$grupo" }

@@ -1,6 +1,7 @@
 package silencio
 
 import (
+	"botchat/internal/respuestas"
 	"errors"
 	"fmt"
 	"strings"
@@ -88,7 +89,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			if dur > 0 {
 				cuando = TextoDuracion(s.ahora().Add(dur).Unix(), s.ahora(), s.Alm.Zona())
 			}
-			return fmt.Sprintf("Listo: %s queda silenciada %s %s. Borraré lo que escriba (solo donde soy administrador).", s.nombre(p), donde, cuando), nil
+			return s.r("sil.silenciada", "nombre", s.nombre(p), "donde", donde, "cuando", cuando), nil
 		}})
 	reg(comandos.Comando{Nombre: "desilenciar", Resumen: "Quitar el silencio de grupos a alguien", Uso: "desilenciar <persona>", Casilla: "silencio.silenciar",
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -144,7 +145,7 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 				if err := s.PonerEnCero(cx.Persona, p, ""); err != nil {
 					return "", err
 				}
-				return "Listo: el contador de hoy de " + s.nombre(p) + " quedó en cero.", nil
+				return s.r("sil.contador_cero", "nombre", s.nombre(p)), nil
 			}
 			c := s.ContadorDe(p, "", s.ahora())
 			if c.Tope > 0 {
@@ -152,4 +153,8 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 			}
 			return fmt.Sprintf("%s lleva %d mensajes borrados hoy.", s.nombre(p), c.Usado), nil
 		}})
+}
+
+func (s *Servicio) r(id string, vars ...string) string {
+	return respuestas.Texto(s.Alm, s.BotID, id, vars...)
 }

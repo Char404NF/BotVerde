@@ -128,7 +128,7 @@ func (s *Servicio) registrarAdmin(reg func(comandos.Comando), validaObjetivo fun
 			if err := s.Banear(ctx, cx.Persona, chat, p, strings.Join(resto, " ")); err != nil {
 				return "", err
 			}
-			return "Listo: la persona salió y no podrá volver a este grupo.", nil
+			return s.r("grupo.baneada"), nil
 		}})
 	reg(comandos.Comando{Nombre: "unban", Alias: []string{"desbanear"}, Resumen: "Dejar que una persona baneada vuelva", Uso: "unban <persona>", Casilla: "grupos.banear", Ambito: comandos.Grupo, Validar: validaObjetivo,
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -143,7 +143,7 @@ func (s *Servicio) registrarAdmin(reg func(comandos.Comando), validaObjetivo fun
 			if err := s.Desbanear(cx.Persona, chat, p); err != nil {
 				return "", err
 			}
-			return "Listo: ya puede volver a entrar (por enlace o si la agregan).", nil
+			return s.r("grupo.desbaneada"), nil
 		}})
 	reg(comandos.Comando{Nombre: "baneados", Resumen: "Ver a quién está baneado de este grupo", Uso: "baneados", Casilla: "grupos.banear", Ambito: comandos.Grupo,
 		Ejecutar: func(cx *comandos.Contexto) (string, error) {
@@ -156,7 +156,7 @@ func (s *Servicio) registrarAdmin(reg func(comandos.Comando), validaObjetivo fun
 				return "", err
 			}
 			if len(l) == 0 {
-				return "No hay nadie baneado en este grupo.", nil
+				return s.r("grupo.sin_baneados"), nil
 			}
 			var b strings.Builder
 			fmt.Fprintf(&b, "⛔ Baneados (%d):", len(l))
@@ -194,13 +194,13 @@ func (s *Servicio) registrarAdmin(reg func(comandos.Comando), validaObjetivo fun
 				if err := s.Alm.GuardarHorario(s.BotID, h); err != nil {
 					return "", err
 				}
-				return "Listo: el grupo ya no se cierra solo.", nil
+				return s.r("grupo.horario_off"), nil
 			case len(resto) == 2:
 				h.Activo, h.Cierra, h.Abre = true, resto[0], resto[1]
 				if err := s.Alm.GuardarHorario(s.BotID, h); err != nil {
 					return "", err
 				}
-				return fmt.Sprintf("Listo: se cerrará a las %s y se abrirá a las %s (hora de este teléfono).", h.Cierra, h.Abre), nil
+				return s.r("grupo.horario_on", "cierra", h.Cierra, "abre", h.Abre), nil
 			}
 			return "Escribe: !horariogrupo 22:00 07:00  (o !horariogrupo off).", nil
 		}})
@@ -225,9 +225,9 @@ func (s *Servicio) registrarAdmin(reg func(comandos.Comando), validaObjetivo fun
 				return "", err
 			}
 			if n == 0 && fallos == 0 {
-				return "No hay nadie inactivo que sacar.", nil
+				return s.r("grupo.sin_inactivos"), nil
 			}
-			t := fmt.Sprintf("Listo: saqué a %d personas que llevaban más de %d días sin escribir.", n, s.NormalizaDias(dias))
+			t := s.r("grupo.inactivos_sacados", "n", fmt.Sprint(n), "dias", fmt.Sprint(s.NormalizaDias(dias)))
 			if fallos > 0 {
 				t += fmt.Sprintf(" A %d no pude sacarlas.", fallos)
 			}
