@@ -358,6 +358,16 @@ interface Motor {
     // IA opcional: catálogo de servicios y prueba de conexión.
     fun iaProveedores(): String = "[]"
     fun iaProbar(bot: Long): String = ""
+    fun grupoMiembrosAdmin(bot: Long, grupo: String): String = "{}"
+    fun grupoSuscribirPresencias(bot: Long, grupo: String) {}
+    fun grupoPerfilMiembro(bot: Long, grupo: String, persona: String): String = "{}"
+    fun grupoHistorial(bot: Long, grupo: String, antes: Long, limite: Long): String = "[]"
+    fun grupoBaneados(bot: Long, grupo: String): String = "[]"
+    fun grupoBanear(bot: Long, grupo: String, persona: String, motivo: String) {}
+    fun grupoDesbanear(bot: Long, grupo: String, persona: String) {}
+    fun grupoHorario(bot: Long, grupo: String): String = "{}"
+    fun grupoGuardarHorario(bot: Long, grupo: String, horarioJson: String) {}
+    fun grupoResumenAdmin(bot: Long, grupo: String): String = "{}"
     fun videoLista(bot: Long, limite: Long, antes: Long): String = "[]"
     fun videoMiniatura(bot: Long, id: Long): ByteArray? = null
     fun videoBorrar(bot: Long, id: Long) {}
@@ -689,6 +699,16 @@ object MotorGo : Motor {
     override fun videoEstado(bot: Long) = Wabot.videoEstado(bot)
     override fun iaProveedores() = Wabot.iaProveedores()
     override fun iaProbar(bot: Long) = Wabot.iaProbar(bot)
+    override fun grupoMiembrosAdmin(bot: Long, grupo: String) = Wabot.grupoMiembrosAdmin(bot, grupo)
+    override fun grupoSuscribirPresencias(bot: Long, grupo: String) = Wabot.grupoSuscribirPresencias(bot, grupo)
+    override fun grupoPerfilMiembro(bot: Long, grupo: String, persona: String) = Wabot.grupoPerfilMiembro(bot, grupo, persona)
+    override fun grupoHistorial(bot: Long, grupo: String, antes: Long, limite: Long) = Wabot.grupoHistorial(bot, grupo, antes, limite)
+    override fun grupoBaneados(bot: Long, grupo: String) = Wabot.grupoBaneados(bot, grupo)
+    override fun grupoBanear(bot: Long, grupo: String, persona: String, motivo: String) = Wabot.grupoBanear(bot, grupo, persona, motivo)
+    override fun grupoDesbanear(bot: Long, grupo: String, persona: String) = Wabot.grupoDesbanear(bot, grupo, persona)
+    override fun grupoHorario(bot: Long, grupo: String) = Wabot.grupoHorario(bot, grupo)
+    override fun grupoGuardarHorario(bot: Long, grupo: String, horarioJson: String) = Wabot.grupoGuardarHorario(bot, grupo, horarioJson)
+    override fun grupoResumenAdmin(bot: Long, grupo: String) = Wabot.grupoResumenAdmin(bot, grupo)
     override fun videoLista(bot: Long, limite: Long, antes: Long) = Wabot.videoLista(bot, limite, antes)
     override fun videoMiniatura(bot: Long, id: Long): ByteArray? = Wabot.videoMiniatura(bot, id)
     override fun videoBorrar(bot: Long, id: Long) = Wabot.videoBorrar(bot, id)

@@ -793,6 +793,55 @@ class MotorFalso : Motor {
         filtrosGrupoJson = a.toString()
     }
     override fun grupoRestaurarFiltro(bot: Long, chat: String, filtro: String) { llamadas += "grupoRestaurar:$filtro" }
+
+    // Administrar grupo: lista rica de miembros, perfil, baneados, horario, historial y resumen (mismo formato que el módulo Go).
+    private fun conteoJson(m: Int, tx: Int, im: Int, vi: Int, au: Int, nv: Int, ultimo: Long) =
+        """{"mensajes":$m,"texto":$tx,"imagenes":$im,"videos":$vi,"audios":$au,"notasVoz":$nv,"stickers":0,"documentos":0,"otros":0,"borrados":2,"editados":1,"primerTs":${ultimo - 5000},"ultimoTs":$ultimo}"""
+    private fun miembroAdminJson(persona: String, nombre: String, tel: String, rol: String, conteo: String, enLinea: Boolean = false, baneado: Boolean = false, rango: String = "") =
+        """{"persona":"$persona","jid":"$persona","nombre":"$nombre","telefono":"$tel","rol":"$rol","rango":"$rango","rangoColor":"#2EC4CB","desdeTs":1700000000,"hastaTs":0,"mensajes":0,"ultimoTs":0,"silenciado":false,"advertido":false,"etiquetas":[],"foto":"","conteo":$conteo,"enLinea":$enLinea,"ultimaVez":0,"baneado":$baneado,"advertencias":0}"""
+    var miembrosAdminJson = ""
+    var baneadosJson = ""
+    var horarioJson = """{"grupo":"g@g.us","activo":false,"cierra":"22:00","abre":"07:00","dias":127,"ultimo":""}"""
+    var historialJson = ""
+    var perfilAdminJson = ""
+    val ahoraS = System.currentTimeMillis() / 1000
+    private fun defectosAdmin() {
+        if (miembrosAdminJson.isEmpty()) miembrosAdminJson = """{"desde":${ahoraS - 90000},"miembros":[""" +
+            miembroAdminJson("5215511111111@s.whatsapp.net", "Ana", "+52 55 1111 1111", "admin", conteoJson(120, 80, 20, 5, 7, 8, ahoraS - 7200), enLinea = true, rango = "Moderadora") + "," +
+            miembroAdminJson("5215522222222@s.whatsapp.net", "Luis", "+52 55 2222 2222", "miembro", conteoJson(0, 0, 0, 0, 0, 0, 0)) + "," +
+            miembroAdminJson("5215533333333@s.whatsapp.net", "Rosa", "+52 55 3333 3333", "miembro", conteoJson(30, 25, 5, 0, 0, 0, ahoraS - 100 * 86400L), baneado = true) + "]}"
+        if (baneadosJson.isEmpty()) baneadosJson = """[{"grupo":"g@g.us","persona":"5215533333333@s.whatsapp.net","nombre":"Rosa","telefono":"+52 55 3333 3333","ts":${ahoraS - 3600},"por":"yo","porNombre":"Yo","motivo":"vendía cosas"}]"""
+        if (historialJson.isEmpty()) historialJson = """[{"ts":${ahoraS - 60},"clase":"accion","tipo":"grupo.banear","texto":"baneó a","actor":"yo","actorNombre":"Yo","persona":"5215533333333@s.whatsapp.net","personaNombre":"Rosa","resultado":"ok"},""" +
+            """{"ts":${ahoraS - 7200},"clase":"cambio","tipo":"enlace","texto":"entró por el enlace","actor":"","actorNombre":"","persona":"5215522222222@s.whatsapp.net","personaNombre":"Luis","resultado":""}]"""
+        if (perfilAdminJson.isEmpty() && JSONObject(miembrosAdminJson).getJSONArray("miembros").length() > 0) perfilAdminJson = """{"miembro":""" + JSONObject(miembrosAdminJson).getJSONArray("miembros").getJSONObject(0).toString() +
+            ""","serie":[""" + (0 until 30).joinToString(",") { """{"dia":"2026-10-${"%02d".format(it % 28 + 1)}","n":${it % 4}}""" } + """],"horas":[""" + (0 until 24).joinToString(",") { "${it % 5}" } +
+            """],"promedioDia":4.0,"mediaGrupo":75.0,"puesto":1,"activos":2,"motivoBan":"","silencioHasta":0,"silenciado":false,"historial":""" + historialJson + ""","desde":${ahoraS - 90000}}"""
+    }
+    var perfilBaneado = false
+    override fun grupoMiembrosAdmin(bot: Long, grupo: String): String { defectosAdmin(); llamadas += "miembrosAdmin:$grupo"; return miembrosAdminJson }
+    override fun grupoSuscribirPresencias(bot: Long, grupo: String) { llamadas += "suscribirPresencias:$grupo" }
+    override fun grupoPerfilMiembro(bot: Long, grupo: String, persona: String): String {
+        defectosAdmin(); llamadas += "perfilMiembro:$persona"
+        val o = JSONObject(perfilAdminJson)
+        val ms = JSONObject(miembrosAdminJson).getJSONArray("miembros")
+        for (i in 0 until ms.length()) if (ms.getJSONObject(i).getString("persona") == persona) o.put("miembro", ms.getJSONObject(i))
+        if (perfilBaneado) { o.getJSONObject("miembro").put("baneado", true); o.put("motivoBan", "vendía cosas") }
+        return o.toString()
+    }
+    override fun grupoHistorial(bot: Long, grupo: String, antes: Long, limite: Long): String { defectosAdmin(); llamadas += "historial:$antes"; return if (antes > 0) "[]" else historialJson }
+    override fun grupoBaneados(bot: Long, grupo: String): String { defectosAdmin(); return baneadosJson }
+    override fun grupoBanear(bot: Long, grupo: String, persona: String, motivo: String) { llamadas += "grupoBanear:$persona:$motivo"; gFalla() }
+    override fun grupoDesbanear(bot: Long, grupo: String, persona: String) { llamadas += "grupoDesbanear:$persona"; gFalla(); baneadosJson = "[]" }
+    override fun grupoHorario(bot: Long, grupo: String) = horarioJson
+    override fun grupoGuardarHorario(bot: Long, grupo: String, horarioJson: String) { llamadas += "guardarHorario:$horarioJson"; this.horarioJson = JSONObject(horarioJson).put("grupo", grupo).put("ultimo", "").toString() }
+    var resumenAdminJson = ""
+    override fun grupoResumenAdmin(bot: Long, grupo: String): String {
+        defectosAdmin()
+        if (resumenAdminJson.isEmpty()) resumenAdminJson = """{"miembros":3,"admins":1,"mensajesHoy":12,"mensajes7":90,"activos7":2,"inactivos30":1,"baneados":1,"silenciados":0,"advertidos":1,"serie":[""" +
+            (0 until 14).joinToString(",") { """{"dia":"2026-11-${"%02d".format(it + 2)}","n":${it * 3}}""" } + """],"horario":""" + horarioJson + ""","top":[""" +
+            JSONObject(miembrosAdminJson).getJSONArray("miembros").getJSONObject(0).toString() + "]}"
+        return JSONObject(resumenAdminJson).put("horario", JSONObject(horarioJson)).toString()
+    }
     override fun appStateDisponible(bot: Long) = JSONObject(appStateJson).getBoolean("disponible")
     override fun appStateEstado(bot: Long) = appStateJson
     override fun appStateSilenciar(bot: Long, chat: String, segundos: Long) { llamadas += "appSilenciar:$chat:$segundos"; gFalla() }

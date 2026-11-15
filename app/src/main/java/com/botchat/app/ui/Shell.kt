@@ -262,7 +262,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         bot.id, jid, alVolver = { nav.popBackStack() },
                         alAbrirMiembro = { persona, nombre -> nav.navigate("actividad_persona/${enc(persona)}/${enc(jid)}/${enc(nombre)}") },
                         alVerCambios = { nav.navigate("grupo_cambios/${enc(jid)}") },
-                        alAbrirAdministrar = { nav.navigate("grupo/${enc(jid)}") },
+                        alAbrirAdministrar = { nav.navigate("admin_grupo/${enc(jid)}") },
                         alAbrirResumen = { nav.navigate("info/${enc(jid)}") },
                         alAbrirChat = { nav.navigate("chat/${enc(jid)}") },
                     )
@@ -336,8 +336,38 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         alAbrirLista = { f -> nav.navigate("lista/${enc(jid)}/${enc(f.json())}") },
                         alAbrirPersona = { nav.navigate("persona/${enc(jid)}") },
                         alOlvidada = { nav.popBackStack("inicio", false) },
-                        alAbrirGrupo = { nav.navigate("grupo/${enc(jid)}") },
+                        alAbrirGrupo = { nav.navigate("admin_grupo/${enc(jid)}") },
                     )
+                }
+                composable("admin_grupo/{jid}") { be ->
+                    val jid = be.arguments?.getString("jid") ?: return@composable
+                    PantallaAdminGrupo(
+                        bot.id, jid,
+                        SalidasAdminGrupo(
+                            alVolver = { nav.popBackStack() },
+                            alAbrirPerfil = { persona -> nav.navigate("admin_perfil/${enc(jid)}/${enc(persona)}") },
+                            alAbrirBaneados = { nav.navigate("admin_baneados/${enc(jid)}") },
+                            alAbrirSolicitudes = { nav.navigate("grupo_miembros/${enc(jid)}/solicitudes") },
+                            alAbrirFiltros = { nav.navigate("grupo_filtros/${enc(jid)}") },
+                            alAbrirReglas = { nombre -> nav.navigate("reglas/${enc(jid)}/${enc(nombre.ifBlank { "Grupo" })}") },
+                            alAbrirAjustesAvanzados = { nav.navigate("grupo/${enc(jid)}") },
+                            alAbrirActividad = { nav.navigate("grupo_actividad/${enc(jid)}") },
+                            alAbrirAdvertencias = { nav.navigate("advertencias") },
+                            alAbrirSilencios = { nav.navigate("silencios") },
+                            alAbrirBienvenida = { nav.navigate("mensajes_auto") },
+                            alAbrirModulos = { nav.navigate("modulos") },
+                        ),
+                    )
+                }
+                composable("admin_perfil/{jid}/{persona}") { be ->
+                    val jid = be.arguments?.getString("jid") ?: return@composable
+                    val persona = be.arguments?.getString("persona") ?: return@composable
+                    PantallaPerfilMiembro(bot.id, jid, persona, alVolver = { nav.popBackStack() },
+                        alAuditar = { nombre -> nav.navigate("actividad_persona/${enc(persona)}/${enc(jid)}/${enc(nombre)}") })
+                }
+                composable("admin_baneados/{jid}") { be ->
+                    val jid = be.arguments?.getString("jid") ?: return@composable
+                    PantallaBaneadosGrupo(bot.id, jid, alVolver = { nav.popBackStack() })
                 }
                 composable("grupo/{jid}") { be ->
                     val jid = be.arguments?.getString("jid") ?: return@composable
