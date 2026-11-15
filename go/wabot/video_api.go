@@ -16,7 +16,7 @@ type MotorVideo interface {
 	Info(url string) (string, error)
 	Descargar(url, carpeta, modo string, altura, abr int) (string, error)
 	Convertir(ruta, formato string) (string, error)
-	Partir(ruta string, n int, carpeta, base string) (string, error)
+	Partir(ruta string, n int, tope int64, carpeta, base string) (string, error)
 	Zip(rutasJSON, salida string) error
 	Instalar(ruta string) (string, error)
 	Carpeta() string

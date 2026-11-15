@@ -62,12 +62,13 @@ object ArchivosVideo {
     }
 
     /**
-     * Parte un mp4 (o m4a) en `n` pedazos de duración parecida. Cada pedazo empieza en un cuadro clave, así que se reproduce solo.
+     * Parte un mp4 (o m4a) en pedazos de hasta `tope` bytes (llenando cada uno; el último queda con lo que sobre). Cada pedazo empieza en un
+     * cuadro clave, así que se reproduce solo. `n` es cuántos se esperan (mínimo).
      * Devuelve los archivos en orden (parte 1, parte 2…).
      */
-    fun partir(entrada: File, n: Int, carpeta: File, base: String): List<File> {
+    fun partir(entrada: File, n: Int, tope: Long, carpeta: File, base: String): List<File> {
         if (n <= 1) return listOf(entrada)
-        val partes = partirSinRevisar(entrada, n, carpeta, base)
+        val partes = partirSinRevisar(entrada, n, tope, carpeta, base)
         // cada parte tiene que abrirse y traer imagen o sonido con duración: si alguna no sirve, mejor avisar que mandar un archivo roto
         for (p in partes) check(sirve(p)) { "una de las partes no quedó bien" }
         return partes
@@ -87,18 +88,20 @@ object ArchivosVideo {
         } catch (_: Exception) { false } finally { e.release() }
     }
 
-    private fun partirSinRevisar(entrada: File, n: Int, carpeta: File, base: String): List<File> {
-        partirFragmentado(entrada, n, carpeta, base)?.let { return it }
+    private fun partirSinRevisar(entrada: File, n: Int, tope: Long, carpeta: File, base: String): List<File> {
+        partirFragmentado(entrada, n, tope, carpeta, base)?.let { return it }
         val total = duracionS(entrada) * 1_000_000L
         require(total > 0) { "No pude medir la duración para partirlo" }
-        val porParte = total / n
+        val porParte = if (tope > 0 && entrada.length() > 0) (total.toDouble() * tope / entrada.length()).toLong().coerceAtLeast(1L) else total / n
         val salidas = mutableListOf<File>()
         var inicio = 0L
-        for (k in 0 until n) {
+        var k = 0
+        while (k < 200) {
             val destino = File(carpeta, "%s_parte%02d.%s".format(base, k + 1, entrada.extension.ifEmpty { "mp4" }))
-            val fin = if (k == n - 1) Long.MAX_VALUE else (k + 1) * porParte
+            val fin = inicio + porParte
             val siguiente = copiarTramo(entrada, destino, inicio, fin)
             salidas += destino
+            k++
             if (siguiente < 0) break
             inicio = siguiente
         }
@@ -165,7 +168,7 @@ object ArchivosVideo {
      * Archivos "por fragmentos" (los que baja yt-dlp de muchas fuentes): una cabecera (ftyp + moov) y luego pares moof + mdat. Se parten
      * entre pares y a cada pedazo se le pone la cabecera, así cada uno se abre solo. Devuelve null si el archivo no es de ese tipo.
      */
-    private fun partirFragmentado(entrada: File, n: Int, carpeta: File, base: String): List<File>? {
+    private fun partirFragmentado(entrada: File, n: Int, tope: Long, carpeta: File, base: String): List<File>? {
         val cajas = leerCajas(entrada) ?: return null
         if (cajas.none { it.tipo == "moof" }) return null
         val cabecera = cajas.filter { it.tipo == "ftyp" || it.tipo == "moov" }
@@ -185,20 +188,23 @@ object ArchivosVideo {
         if (frag.size < n) return null
         val bytesCab = cabecera.sumOf { it.largo }
         val util = frag.sumOf { it.second }
-        val porParte = util / n
+        // cada parte se llena hasta el tope (con la cabecera incluida); sin tope se reparte parejo
+        val porParte = if (tope > bytesCab) tope - bytesCab else util / n
         val salidas = mutableListOf<File>()
         var i = 0
-        for (k in 0 until n) {
+        var k = 0
+        while (i < frag.size) {
             val destino = File(carpeta, "%s_parte%02d.%s".format(base, k + 1, entrada.extension.ifEmpty { "mp4" }))
             var acumulado = 0L
             java.io.RandomAccessFile(entrada, "r").use { r ->
                 destino.outputStream().buffered().use { o ->
                     for (c in cabecera) copiar(r, o, c.inicio, c.largo)
-                    while (i < frag.size && (acumulado < porParte || k == n - 1)) { copiar(r, o, frag[i].first, frag[i].second); acumulado += frag[i].second; i++ }
+                    // al menos un fragmento por parte; sigue mientras el siguiente quepa en el tope
+                    while (i < frag.size && (acumulado == 0L || acumulado + frag[i].second <= porParte)) { copiar(r, o, frag[i].first, frag[i].second); acumulado += frag[i].second; i++ }
                 }
             }
             salidas += destino
-            if (i >= frag.size) break
+            k++
         }
         check(bytesCab > 0)
         return salidas

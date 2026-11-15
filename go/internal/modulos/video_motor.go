@@ -148,7 +148,7 @@ func (g *Gestor) videoEjecutar(s *sesVideo) {
 			archivos = []string{z}
 		} else {
 			n := partesNecesarias(r.Tam, envioMax)
-			rawP, err := g.Video.Partir(r.Ruta, n, trabajo, base)
+			rawP, err := g.Video.Partir(r.Ruta, n, topeParte(envioMax), trabajo, base)
 			var ps []string
 			if err == nil {
 				err = json.Unmarshal([]byte(rawP), &ps)
@@ -221,7 +221,9 @@ func (g *Gestor) videoEnviar(ctx context.Context, s *sesVideo, cfg Config, id in
 			g.videoTexto(s, strings.NewReplacer("{motivo}", msg).Replace(cfg.Texto("msg_error")))
 		}
 	}
-	for i, ruta := range archivos {
+	var mandar func(i int)
+	mandar = func(i int) {
+		ruta := archivos[i]
 		e := strings.TrimPrefix(strings.ToLower(filepath.Ext(ruta)), ".")
 		a := envio.Adjunto{Ruta: ruta, Mime: mimeDe(e), Nombre: filepath.Base(ruta), TopeBytes: topeEnvio << 20, SinCopia: true, DurS: dur}
 		var pesoArch int64
@@ -268,22 +270,29 @@ func (g *Gestor) videoEnviar(ctx context.Context, s *sesVideo, cfg Config, id in
 				pendientes--
 				if pendientes == 0 {
 					cierra()
+					return
 				}
+				// las partes salen una por una y en orden: la siguiente se encola hasta que la anterior ya se mandó
+				if res != ResEnviado {
+					fallidos += pendientes
+					pendientes = 0
+					cierra()
+					return
+				}
+				go mandar(i + 1)
 			}}
 		if i > 0 {
 			ini.RetrasoMin, ini.RetrasoMax = 4*time.Second, 12*time.Second
 		}
 		if _, err := g.Enviar(ini); err != nil {
 			mu.Lock()
-			fallidos++
-			pendientes--
-			ultimo := pendientes == 0
+			fallidos += pendientes
+			pendientes = 0
 			mu.Unlock()
-			if ultimo {
-				cierra()
-			}
+			cierra()
 		}
 	}
+	mandar(0)
 }
 
 // ---------- miniatura ----------

@@ -20,9 +20,9 @@ class MotorVideoAndroid(private val ctx: Context) : wabot.MotorVideo {
 
     override fun convertir(ruta: String, formato: String): String = ConvertirAudio.convertir(File(ruta), formato).path
 
-    override fun partir(ruta: String, n: Long, carpeta: String, base: String): String {
+    override fun partir(ruta: String, n: Long, tope: Long, carpeta: String, base: String): String {
         val dir = File(carpeta).apply { mkdirs() }
-        val partes = ArchivosVideo.partir(File(ruta), n.toInt(), dir, base)
+        val partes = ArchivosVideo.partir(File(ruta), n.toInt(), tope, dir, base)
         return JSONArray(partes.map { it.path }).toString()
     }
 

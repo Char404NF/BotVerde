@@ -41,8 +41,8 @@ type MotorVideo interface {
 	Descargar(url, carpeta, modo string, altura, abr int) (string, error)
 	// Convertir pasa un audio a otro formato ("mp3") y devuelve la ruta nueva.
 	Convertir(ruta, formato string) (string, error)
-	// Partir parte un archivo en n pedazos que se reproducen solos (JSON: lista de rutas).
-	Partir(ruta string, n int, carpeta, base string) (string, error)
+	// Partir parte un archivo en pedazos que se reproducen solos, cada uno de hasta `tope` bytes (n es solo el cálculo previo). JSON: lista de rutas.
+	Partir(ruta string, n int, tope int64, carpeta, base string) (string, error)
 	// Zip mete los archivos (JSON: lista de rutas) en un zip.
 	Zip(rutasJSON, salida string) error
 	// Instalar pone en uso un yt-dlp descargado (verificado antes por el motor Go) y devuelve su versión; si falla, deja el anterior.
@@ -589,8 +589,11 @@ func (g *Gestor) videoElegirCalidad(s *sesVideo, cfg Config, o opVid) {
 		cortaVideo(s.Info.Titulo, 80), mbTxt(s.TamEst), mbTxt(envio)), textosOps(s.Opciones))
 }
 
+// topeParte es lo que mide cada parte: casi el máximo que se puede mandar (con un margen por si el corte cae en un cuadro clave lejano).
+func topeParte(maxEnvio int64) int64 { return int64(float64(maxEnvio) * 0.9) }
+
 func partesNecesarias(tam, maxEnvio int64) int {
-	util := float64(maxEnvio) * 0.85
+	util := float64(topeParte(maxEnvio))
 	return int(math.Ceil(float64(tam) / util))
 }
 

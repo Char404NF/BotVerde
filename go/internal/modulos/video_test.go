@@ -66,7 +66,7 @@ func (m *motorFalso) Convertir(ruta, formato string) (string, error) {
 	n := strings.TrimSuffix(ruta, filepath.Ext(ruta)) + "." + formato
 	return n, os.WriteFile(n, make([]byte, m.tam/2+1), 0o600)
 }
-func (m *motorFalso) Partir(ruta string, n int, carpeta, base string) (string, error) {
+func (m *motorFalso) Partir(ruta string, n int, tope int64, carpeta, base string) (string, error) {
 	if m.errPartir != nil {
 		return "", m.errPartir
 	}
