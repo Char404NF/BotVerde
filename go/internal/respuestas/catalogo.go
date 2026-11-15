@@ -14,7 +14,7 @@ func init() {
 	)
 	Registrar(
 		// ---- en general
-		Def{"cmd.desconocido", gGen, "Escriben un comando que no existe.", "No conozco ese comando. Escribe {prefijo}ayuda para ver los que puedes usar.", []string{"prefijo"}},
+		Def{"cmd.desconocido", gGen, "El dueño escribe un comando que no existe (a las demás personas no se les contesta nada, para no llenar el chat).", "No conozco ese comando. Escribe {prefijo}ayuda para ver los que puedes usar.", []string{"prefijo"}},
 		Def{"cmd.sin_permiso", gGen, "Usan un comando que su rango no permite.", "No tienes permiso para usar ese comando.", nil},
 		Def{"cmd.solo_privado", gGen, "Usan en un grupo un comando que solo funciona en privado.", "Ese comando solo funciona en un chat privado conmigo.", nil},
 		Def{"cmd.solo_grupo", gGen, "Usan en privado un comando que solo funciona en un grupo.", "Ese comando solo funciona dentro de un grupo.", nil},
