@@ -265,7 +265,7 @@ func (a *Almacen) nombreDe(botID int64, chat, jid string) string {
 	if cargaAntigua.Load() {
 		indice = " INDEXED BY idx_mensajes_chat_ts"
 	}
-	_ = a.db.QueryRow(`SELECT remitente_nombre FROM messages`+indice+` WHERE bot_id=? AND chat_jid=? AND remitente_jid=? AND remitente_nombre<>'' ORDER BY ts DESC LIMIT 1`,
+	_ = a.db.QueryRow(`SELECT remitente_nombre FROM messages`+indice+` WHERE bot_id=? AND chat_jid=? AND remitente_jid=? AND remitente_nombre<>'' AND remitente_nombre<>'Número no disponible' ORDER BY ts DESC LIMIT 1`,
 		botID, chat, jid).Scan(&n)
 	if n == "" {
 		return "Participante"

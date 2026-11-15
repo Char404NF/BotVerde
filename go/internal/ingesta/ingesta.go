@@ -228,6 +228,9 @@ func (g *Ingesta) remitente(ctx context.Context, info types.MessageInfo, chat ty
 		tel = identidad.ParseTelefono(s.User)
 	}
 	nombre = identidad.NombreMostrado(identidad.Datos{Guardado: n.guardado, Publico: firstNonEmpty(n.publico, info.PushName), Negocio: n.negocio, Telefono: tel.Mostrado})
+	if nombre == identidad.NumeroNoDisponible {
+		nombre = "" // no es un nombre: así los nombres se buscan por otro lado (otra forma de la persona, la lista de miembros)
+	}
 	return s.String(), nombre
 }
 

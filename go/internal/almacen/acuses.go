@@ -159,6 +159,6 @@ func (a *Almacen) NombreConocido(botID int64, chat, jid string) string {
 	if err := a.db.QueryRow(`SELECT nombre_mostrado FROM chats WHERE bot_id=? AND jid=?`, botID, jid).Scan(&n); err == nil && strings.TrimSpace(n) != "" {
 		return n
 	}
-	_ = a.db.QueryRow(`SELECT remitente_nombre FROM messages WHERE bot_id=? AND chat_jid=? AND remitente_jid=? AND remitente_nombre<>'' ORDER BY ts DESC LIMIT 1`, botID, chat, jid).Scan(&n)
+	_ = a.db.QueryRow(`SELECT remitente_nombre FROM messages WHERE bot_id=? AND chat_jid=? AND remitente_jid=? AND remitente_nombre<>'' AND remitente_nombre<>'Número no disponible' ORDER BY ts DESC LIMIT 1`, botID, chat, jid).Scan(&n)
 	return n
 }

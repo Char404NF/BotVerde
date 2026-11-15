@@ -222,3 +222,23 @@ func TestMencionDeLIDSeResuelvePorLaListaDeMiembros(t *testing.T) {
 		t.Fatalf("debía ser su nombre: %q", got)
 	}
 }
+
+// El aviso «Número no disponible» guardado como nombre del remitente (así lo dejaba la ingesta) no cuenta como nombre.
+func TestElAvisoGuardadoComoNombreDelRemitenteNoSeUsaEnMenciones(t *testing.T) {
+	a := nuevo(t)
+	g := "120363000000000003@g.us"
+	chatBasico(t, a, g, "", "Grupo", true)
+	const lid, pn = "171373624348814@lid", "5215500000002@s.whatsapp.net"
+	_, _ = a.ActualizarMiembros(1, g, []MiembroGrupo{{Persona: pn, JID: lid, Rol: RolGrupoMiembro}}, time.Now())
+	o := msg(g, "1", time.Now().Unix(), "yo")
+	o.RemitenteJID, o.RemitenteNombre = lid, "Número no disponible"
+	_, _ = a.GuardarMensaje(o)
+	m := msg(g, "2", time.Now().Unix(), "hola")
+	m.Menciones = []string{lid}
+	if got := a.vista(m, nil).Menciones[0].Nombre; got != "+5215500000002" {
+		t.Fatalf("no debía usar el aviso como nombre: %q", got)
+	}
+	if got := a.nombreParaMostrar(1, g, lid); got != "+5215500000002" {
+		t.Fatalf("nombreParaMostrar: %q", got)
+	}
+}
