@@ -94,6 +94,12 @@ type Validador interface {
 	ValidarConfig(cfg map[string]any) error
 }
 
+// ConBloqueo lo implementan los módulos que necesitan algo antes de poder usarse (por ejemplo, descargar su motor). Si devuelve un texto,
+// el módulo está BLOQUEADO: no se puede encender y la tarjeta muestra ese texto. "" = listo.
+type ConBloqueo interface {
+	Bloqueo(g *Gestor) string
+}
+
 // ConfigCambiada avisa al módulo que su configuración cambió (opcional).
 type ConfigCambiada interface {
 	ConfigCambiada(g *Gestor)
@@ -112,6 +118,7 @@ type Def struct {
 	AlActivar, AlDesactivar                func(g *Gestor) error
 	AlEvento                               func(g *Gestor, e Evento)
 	AlEstado                               func(g *Gestor) string
+	AlBloqueo                              func(g *Gestor) string
 	AlPausar, AlReanudar                   func(g *Gestor)
 	Validar                                func(cfg map[string]any) error
 	AlCambiarConfig                        func(g *Gestor)
@@ -162,6 +169,12 @@ func (s *simple) Evento(g *Gestor, e Evento) {
 func (s *simple) Estado(g *Gestor) string {
 	if s.d.AlEstado != nil {
 		return s.d.AlEstado(g)
+	}
+	return ""
+}
+func (s *simple) Bloqueo(g *Gestor) string {
+	if s.d.AlBloqueo != nil {
+		return s.d.AlBloqueo(g)
 	}
 	return ""
 }

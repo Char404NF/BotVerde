@@ -21,17 +21,27 @@ object MotorDescargas {
         return Python.getInstance()
     }
 
+    /** El yt-dlp descargado. La app no trae ninguno: sin este archivo no hay motor. */
+    fun archivo(ctx: Context): File = File(ctx.filesDir, "ytdlp/yt-dlp")
+
+    /** ¿Ya se descargó el motor? */
+    fun instalado(ctx: Context): Boolean = archivo(ctx).let { it.isFile && it.length() > 0 }
+
     private fun modulo(ctx: Context): PyObject {
+        check(instalado(ctx)) { "El motor de descargas todavía no está descargado" }
         val m = py(ctx).getModule("descargas_py")
-        // si hay un yt-dlp descargado (más nuevo que el de la app) se usa ese
-        val actualizado = File(ctx.filesDir, "ytdlp/yt-dlp")
-        if (actualizado.isFile) m.callAttr("usar_ytdlp", actualizado.path)
+        m.callAttr("usar_ytdlp", archivo(ctx).path)
         return m
     }
 
     /** Pone en uso el yt-dlp de `archivo` (recarga aunque ya hubiera uno). Si no arranca, lanza el error y queda el anterior. Devuelve la versión. */
-    fun usarYtdlp(ctx: Context, archivo: File?): String =
-        py(ctx).getModule("descargas_py").callAttr("usar_ytdlp", archivo?.path, true).toString()
+    fun usarYtdlp(ctx: Context, archivo: File): String =
+        py(ctx).getModule("descargas_py").callAttr("usar_ytdlp", archivo.path, true).toString()
+
+    /** Deja de usar el yt-dlp descargado (se llama justo antes de borrarlo). */
+    fun soltarYtdlp(ctx: Context) {
+        if (Python.isStarted()) runCatching { py(ctx).getModule("descargas_py").callAttr("soltar_ytdlp") }
+    }
 
     /** El intérprete de JavaScript que pide YouTube (QuickJS, viene dentro de la app). */
     fun qjs(ctx: Context): String? = File(ctx.applicationInfo.nativeLibraryDir, "libqjs.so").takeIf { it.canExecute() }?.path

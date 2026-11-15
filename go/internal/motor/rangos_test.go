@@ -295,3 +295,35 @@ func TestPoliticaDeGruposEnEntrar(t *testing.T) {
 		t.Fatal("comando de alguien fuera de la lista")
 	}
 }
+
+// Quien escribe (y pasa la compuerta) recibe el rango Usuario; un administrador de grupo no.
+func TestQuienEscribeRecibeElRangoUsuarioMenosLosAdmins(t *testing.T) {
+	e, perm, _ := conRangos(t, func(chat, persona string) bool { return persona == pnLuis })
+	_, _ = e.alm.ActualizarMiembros(1, grupoJID, []almacen.MiembroGrupo{{Persona: pnLuis, JID: pnLuis, Rol: almacen.RolGrupoAdmin}, {Persona: pnAna, JID: pnAna, Rol: almacen.RolGrupoMiembro}}, time.Now())
+	e.m.Entrar(priv(pnAna, "u1", "hola"))
+	e.m.Entrar(priv(pnLuis, "u2", "hola"))
+	e.espera(t, func() bool { return len(e.env.lista()) >= 1 })
+	e.quieto()
+	if r := perm.RolDe(pnAna); r == nil || r.Nombre != "Usuario" {
+		t.Fatalf("quien escribe debía quedar como Usuario: %+v", r)
+	}
+	if r := perm.RolDe(pnLuis); r != nil {
+		t.Fatalf("un administrador de grupo no es Usuario: %+v", r)
+	}
+}
+
+// En un grupo, quien escribe con su LID (alias de su número) y no tiene rango también recibe Usuario.
+func TestUsuarioEnGrupoConLID(t *testing.T) {
+	e, perm, _ := conRangos(t, func(chat, persona string) bool { return false })
+	const lid = "150831433277469@lid"
+	e.alm.AprenderAlias(1, pnAna, lid)
+	_, _ = e.alm.ActualizarMiembros(1, grupoJID, []almacen.MiembroGrupo{{Persona: pnAna, JID: lid, Rol: almacen.RolGrupoMiembro}}, time.Now())
+	e.m.Entrar(grupoM(grupoJID, "g1", lid, "!rango"))
+	e.espera(t, func() bool { return len(e.env.lista()) >= 1 })
+	if r := perm.RolDe(pnAna); r == nil || r.Nombre != "Usuario" {
+		t.Fatalf("debía quedar como Usuario: %+v · respuestas: %+v", r, e.env.lista())
+	}
+	if !strings.Contains(e.env.lista()[0].texto, "Usuario") {
+		t.Logf("respuesta: %q", e.env.lista()[0].texto)
+	}
+}

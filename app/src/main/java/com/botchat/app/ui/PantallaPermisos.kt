@@ -40,6 +40,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -94,6 +95,23 @@ fun PantallaPermisos(botId: Long, alVolver: () -> Unit, alRangos: () -> Unit, al
             Text("Tú decides quién puede usar qué. El bot solo responde: nunca escribe primero.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             TarjetaIr(Ico.Persona, "Rangos", if (rangos == 0) "Crea rangos como Ayudante o Cliente VIP" else plural(rangos.toLong(), "rango", "rangos") + " además del Dueño", alRangos, "permisos_rangos")
             TarjetaIr(Ico.Aviso, "Solicitudes", if (pendientes == 0) "Nadie espera tu decisión" else plural(pendientes.toLong(), "persona espera", "personas esperan") + " tu decisión", alSolicitudes, "permisos_solicitudes", insignia = pendientes)
+            Card(Modifier.fillMaxWidth().testTag("tarjeta_usuario_auto"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+                Row(Modifier.padding(Esp.l), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
+                        Text("Rango «Usuario» para todos", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Quien te escribe o está en tus grupos recibe solo el rango Usuario (puede pedir descargas), menos quienes administran un grupo y quienes ya tienen otro rango. " +
+                                "No cambia qué desconocidos esperan tu aprobación.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        (a["usuario_auto"] ?: "1") != "0",
+                        { v -> haptica(Toque.Suave); scope.launch { runCatching { Repo.fijarAjustePermisos(botId, "usuario_auto", if (v) "1" else "0") }.onFailure { avisaToast(ctx, it.message, true) }; version++ } },
+                        Modifier.testTag("sw_usuario_auto"),
+                    )
+                }
+            }
             Card(Modifier.fillMaxWidth().testTag("tarjeta_desconocidos"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
                 Column(Modifier.padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
                     Text("Si escribe alguien que no conoces", style = MaterialTheme.typography.titleMedium)

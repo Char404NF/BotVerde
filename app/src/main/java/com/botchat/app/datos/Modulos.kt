@@ -39,6 +39,8 @@ data class ModuloInfo(
     val activo: Boolean, val pausado: Boolean, val codigo: String, val estado: String, val conEsquema: Boolean,
     val topeHora: Int, val topeDia: Int, val defHora: Int, val defDia: Int, val activadoTs: Long, val esquema: List<CampoModulo> = emptyList(),
     val paneles: List<PanelModulo> = emptyList(),
+    /** Si no está vacío, el módulo está BLOQUEADO (no se puede encender) hasta que se cumpla eso; por ejemplo, descargar su motor. */
+    val bloqueo: String = "",
 ) {
     val riesgoAlto get() = riesgo == "alto"
     val pideAviso get() = riesgo == "medio" || riesgo == "alto"
@@ -86,6 +88,7 @@ object JsonMod {
             o.optInt("topeHora"), o.optInt("topeDia"), o.optInt("defHora"), o.optInt("defDia"), o.optLong("activadoTs"),
             List(esq?.length() ?: 0) { campo(esq!!.getJSONObject(it)) },
             List(pan?.length() ?: 0) { panel(pan!!.getJSONObject(it)) },
+            o.optString("bloqueo"),
         )
     }
 

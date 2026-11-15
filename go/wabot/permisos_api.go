@@ -41,6 +41,13 @@ func (s *estado) armarPermisos() {
 		}
 	}
 	s.perm = p
+	// Rango Usuario para quien ya escribió o está en grupos (en segundo plano: solo toca la base).
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		defer func() { _ = recover() }()
+		p.RepartirUsuarios("")
+	}()
 	d := comandos.Nuevo(alm, s.botID, p)
 	d.AlCodigo = func(c almacen.Confirmacion, desc string) { avisoCodigo(s.botID, c, desc, s.log) }
 	d.Responder = func(chat, cita, texto string) {
@@ -538,6 +545,15 @@ func FijarAjusteDePermisos(botID int64, clave, valor string) error {
 			return err
 		}
 		accionDueno(botID, "ajuste.desconocidos", "", "valor="+valor)
+		return nil
+	case "usuario_auto":
+		if valor != "0" && valor != "1" {
+			return errors.New("valor no válido")
+		}
+		if _, err := p.FijarUsuarioAuto(valor == "1"); err != nil {
+			return err
+		}
+		accionDueno(botID, "ajuste.usuario_auto", "", "valor="+valor)
 		return nil
 	case "desconocidos_texto":
 		if len([]rune(valor)) > 300 {

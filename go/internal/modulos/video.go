@@ -33,6 +33,10 @@ const IDVideo = "descargas_video"
 
 // MotorVideo es lo que la app (Kotlin + Python con yt-dlp) ofrece al motor. Todo viaja como texto JSON para no atar el motor a yt-dlp.
 type MotorVideo interface {
+	// Instalado dice si el motor (yt-dlp) ya está descargado en el teléfono. La app NO lo trae: se baja de GitHub desde la pantalla del módulo.
+	Instalado() bool
+	// Quitar borra el motor descargado (el módulo vuelve a quedar bloqueado hasta bajarlo otra vez).
+	Quitar() error
 	// Version es la versión de yt-dlp que está en uso.
 	Version() (string, error)
 	// Info revisa el enlace sin descargar (JSON: título, duración, miniatura, tamaños por calidad).
@@ -130,7 +134,7 @@ func descargasVideo() Modulo {
 	return Nuevo(Def{
 		ID: IDVideo, Nombre: "Descargas de video y audio", Icono: "descarga", Riesgo: RiesgoAlto, Iniciativa: true,
 		Descripcion: "«!descargar <enlace>» baja un video o su audio (YouTube, TikTok, Instagram, Facebook, X, SoundCloud y más), deja elegir formato y calidad, " +
-			"avisa si es largo o pesado y lo manda dividido si hace falta. Al encenderlo baja la última versión de yt-dlp y se mantiene al día. " + avisoRiesgoVideo,
+			"avisa si es largo o pesado y lo manda dividido si hace falta. Antes de usarlo hay que descargar su motor (yt-dlp, unos 3 MB) desde esta pantalla; después se mantiene al día. " + avisoRiesgoVideo,
 		Casillas: []permisos.Casilla{
 			{ID: "video.pedir", Nombre: "Pedir descargas de video y audio", Descripcion: "Puede pedir «!descargar» y «!audio». Usa datos, batería y el número de WhatsApp.", Grupo: "Descargas", Riesgo: permisos.RiesgoMedio, Privado: true, Grupos: true},
 			{ID: "video.admin", Nombre: "Administrar las descargas", Descripcion: "Ver el estado y actualizar yt-dlp con «!descargas» y «!actualizarytdlp».", Grupo: "Descargas", Riesgo: permisos.RiesgoMedio, Privado: true},
@@ -159,12 +163,15 @@ func descargasVideo() Modulo {
 			{Clave: "msg_error", Titulo: "Mensaje: no se pudo", Ayuda: "{motivo} se cambia por la causa.", Tipo: CampoTexto, Largo: 200, Defecto: "😕 No pude descargarlo: {motivo}"},
 		},
 		TopeHora: 40, TopeDia: 250,
+		AlBloqueo: bloqueoVideo,
 		Validar:   validarConfigVideo,
 		ComandosG: comandosVideo,
 		AlActivar: func(g *Gestor) error {
 			g.Alm.MarcarDescargasVideoHuerfanas(g.BotID)
 			g.videoLimpiarTrabajo()
-			go func() { _, _ = g.VideoActualizar(false) }()
+			if g.Video != nil && g.Video.Instalado() {
+				go func() { _, _ = g.VideoActualizar(false) }()
+			}
 			return nil
 		},
 		AlEvento: eventoVideo,
@@ -176,6 +183,9 @@ func descargasVideo() Modulo {
 			if g.Video == nil {
 				return "Encendido, el motor de descargas no está disponible aquí"
 			}
+			if !g.Video.Instalado() {
+				return "Encendido, pero falta descargar el motor"
+			}
 			ver := g.Alm.AjusteBot(g.BotID, "video_ytdlp_ver")
 			n := g.Alm.ContarDescargasVideo(g.BotID, "", g.ahora().Add(-24*time.Hour).Unix())
 			s := "Encendido"
@@ -185,6 +195,20 @@ func descargasVideo() Modulo {
 			return fmt.Sprintf("%s · %d descargas en 24 h", s, n)
 		},
 	})
+}
+
+// textoSinMotor es lo que se le dice a quien intenta usar las descargas sin que el motor esté descargado.
+const textoSinMotor = "Falta descargar el motor de descargas (yt-dlp). Abre BotChat → Bot → Módulos → Descargas y toca «Descargar motor»."
+
+// bloqueoVideo: el módulo no se puede encender hasta que el motor esté descargado.
+func bloqueoVideo(g *Gestor) string {
+	if g.Video == nil {
+		return "Las descargas no están disponibles en este momento."
+	}
+	if !g.Video.Instalado() {
+		return textoSinMotor
+	}
+	return ""
 }
 
 func validarConfigVideo(c map[string]any) error {
@@ -279,6 +303,9 @@ func (g *Gestor) videoPedir(cx *comandos.Contexto, pre string) (string, error) {
 	}
 	if g.Video == nil {
 		return "", errors.New("las descargas no están disponibles en este momento")
+	}
+	if !g.Video.Instalado() {
+		return "", errors.New(textoSinMotor)
 	}
 	enlace, err := validarURLVideo(cx.Resto, lineas(cfg.Texto("sitios")))
 	if err != nil {

@@ -17,7 +17,7 @@ def _limpiar_modulos():
 
 
 def usar_ytdlp(ruta, forzar=False):
-    """Usa el yt-dlp descargado (un archivo zip ejecutable) en lugar del que viene dentro de la app; sin ruta vuelve al de la app.
+    """Usa el yt-dlp descargado (un archivo zip ejecutable; la app no trae ninguno). Sin ruta lo suelta.
     Devuelve la versión que quedó (si no se puede importar, lanza el error y deja las cosas como estaban)."""
     previa = _ESTADO["ruta"]
     if ruta and os.path.isfile(ruta) and (forzar or previa != ruta):
@@ -49,8 +49,26 @@ def usar_ytdlp(ruta, forzar=False):
     return version()
 
 
+def soltar_ytdlp():
+    """Deja de usar el yt-dlp descargado (la app no trae uno propio): se llama antes de borrar el archivo."""
+    previa = _ESTADO["ruta"]
+    if previa and previa in sys.path:
+        sys.path.remove(previa)
+    sys.path_importer_cache.pop(previa, None)
+    try:
+        import zipimport
+        zipimport._zip_directory_cache.pop(previa, None)
+    except Exception:
+        pass
+    _ESTADO["ruta"] = None
+    _limpiar_modulos()
+
+
 def version():
-    import yt_dlp
+    try:
+        import yt_dlp
+    except ImportError:
+        raise RuntimeError("el motor de descargas todavía no está descargado")
     return yt_dlp.version.__version__
 
 

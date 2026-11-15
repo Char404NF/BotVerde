@@ -89,6 +89,9 @@ func (s *estado) registrarCambiosGrupo(c cambioGrupoEv) {
 			tipo = almacen.CambioAgregado
 		}
 		_ = a.RegistrarCambio(s.botID, c.grupo, tipo, p, jid, porSiNoEs(por, tipo), c.razon, c.ts)
+		if s.perm != nil && !propio(j) {
+			s.perm.AsegurarUsuario(p)
+		}
 		// Defensas de entrada (baneada, país bloqueado, modo raid): la acción corre aparte; la red no va en el trabajador.
 		if s.gru != nil && !propio(j) {
 			grupo, quien := c.grupo, p
@@ -115,10 +118,16 @@ func (s *estado) registrarCambiosGrupo(c cambioGrupoEv) {
 	for _, j := range c.promote {
 		p, jid := nombrePropio(j)
 		_ = a.RegistrarCambio(s.botID, c.grupo, almacen.CambioPromovido, p, jid, por, "", c.ts)
+		if s.perm != nil {
+			s.perm.QuitarUsuarioDeAdmin(p) // administra un grupo: ya no es «Usuario»
+		}
 	}
 	for _, j := range c.demote {
 		p, jid := nombrePropio(j)
 		_ = a.RegistrarCambio(s.botID, c.grupo, almacen.CambioDegradado, p, jid, por, "", c.ts)
+		if s.perm != nil {
+			s.perm.AsegurarUsuario(p) // dejó de administrar: vuelve a ser «Usuario» si no tiene otro rango
+		}
 	}
 }
 
@@ -171,6 +180,9 @@ func (s *estado) guardarMiembros(gi *types.GroupInfo) {
 	}
 	_, _ = a.ActualizarMiembros(s.botID, gi.JID.ToNonAD().String(), s.miembrosDe(gi), time.Now())
 	s.aprenderLIDs(gi)
+	if s.perm != nil {
+		s.perm.RepartirUsuarios(gi.JID.ToNonAD().String()) // rango Usuario para quien no administra
+	}
 }
 
 // alUnirseAGrupo: el bot entró (o lo agregaron) a un grupo: se guardan sus miembros. Encola; no usa la red.

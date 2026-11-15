@@ -222,6 +222,7 @@ object Repo {
     suspend fun videoMiniatura(bot: Long, id: Long) = io { motor.videoMiniatura(bot, id) }
     suspend fun videoBorrar(bot: Long, id: Long) = io { motor.videoBorrar(bot, id) }
     suspend fun videoActualizar(bot: Long) = io { motor.videoActualizar(bot) }
+    suspend fun videoQuitarMotor(bot: Long) = io { motor.videoQuitarMotor(bot) }
     suspend fun videoRepetir(bot: Long, id: Long) = io { motor.videoRepetir(bot, id) }
     suspend fun modulos(bot: Long) = io { JsonMod.modulos(motor.listarModulos(bot)) }
     suspend fun modulo(bot: Long, id: String) = io { JsonMod.moduloOpt(motor.infoModulo(bot, id)) }

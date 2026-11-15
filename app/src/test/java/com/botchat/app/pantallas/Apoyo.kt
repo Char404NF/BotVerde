@@ -159,11 +159,18 @@ class MotorFalso : Motor {
     }
     // Descargas de video
     var videoFilas = "[]"
-    var videoEstadoJson = "{\"activo\":true,\"motor\":true,\"version\":\"2026.10.26\",\"ultima\":\"2026.11.01\",\"hayNueva\":true,\"revisionTs\":1,\"enCurso\":0,\"esperando\":0,\"hoy\":2}"
+    var videoEstadoJson = "{\"activo\":true,\"motor\":true,\"version\":\"2026.10.26\",\"ultima\":\"2026.11.01\",\"hayNueva\":true,\"revisionTs\":1,\"enCurso\":0,\"esperando\":0,\"hoy\":2,\"instalado\":true}"
     override fun videoEstado(bot: Long) = videoEstadoJson
     override fun videoLista(bot: Long, limite: Long, antes: Long) = videoFilas
     override fun videoBorrar(bot: Long, id: Long) { llamadas += "video_borrar:$id" }
-    override fun videoActualizar(bot: Long): String { llamadas += "video_actualizar"; return "yt-dlp actualizado a la versión 2026.11.01." }
+    var videoActualizarFalla: String? = null
+    override fun videoActualizar(bot: Long): String {
+        llamadas += "video_actualizar"
+        videoActualizarFalla?.let { throw IllegalStateException(it) }
+        if (!JSONObject(videoEstadoJson).optBoolean("instalado")) { videoEstadoJson = JSONObject(videoEstadoJson).put("instalado", true).put("version", "2026.11.01").put("hayNueva", false).toString(); return "Listo: descargué el motor (yt-dlp 2026.11.01). Ya puedes encender el módulo." }
+        return "yt-dlp actualizado a la versión 2026.11.01."
+    }
+    override fun videoQuitarMotor(bot: Long) { llamadas += "video_quitar_motor"; videoEstadoJson = JSONObject(videoEstadoJson).put("instalado", false).put("version", "").put("activo", false).toString() }
     override fun videoRepetir(bot: Long, id: Long): String { llamadas += "video_repetir:$id"; return "Volviendo a descargar…" }
     override fun asistenteGuardar(bot: Long, borradorJson: String) { asistGuardado = borradorJson; llamadas += "asist_guardar" }
     override fun asistenteBase(bot: Long): String {

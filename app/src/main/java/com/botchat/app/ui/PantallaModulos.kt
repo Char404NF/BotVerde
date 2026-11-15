@@ -163,9 +163,14 @@ private fun TarjetaModulo(m: ModuloInfo, alInterruptor: (Boolean) -> Unit, alCon
                     Text(m.nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
                     EtiquetaRiesgo(m.riesgo)
                 }
-                Switch(m.activo, alInterruptor, Modifier.testTag("modulo_interruptor_${m.id}"))
+                Switch(m.activo, alInterruptor, Modifier.testTag("modulo_interruptor_${m.id}"), enabled = m.bloqueo.isBlank() || m.activo)
             }
             Text(m.descripcion, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (m.bloqueo.isNotBlank()) Row(verticalAlignment = Alignment.Top, modifier = Modifier.testTag("modulo_bloqueo_${m.id}")) {
+                Icon(Ico.Candado, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.tertiary)
+                Spacer(Modifier.width(Esp.s))
+                Text(m.bloqueo, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.tertiary)
+            }
             if (m.activo || m.pausado) {
                 Text(
                     m.estado, Modifier.testTag("modulo_estado_${m.id}"), style = MaterialTheme.typography.labelLarge,

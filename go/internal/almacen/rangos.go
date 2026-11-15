@@ -116,6 +116,9 @@ var ajustesBotDefecto = map[string]string{
 	"ignorada_dias":      "7",
 	"confirm_seg":        "120",
 	"limite_sin_rango":   "5",
+	"usuario_auto":       "1", // dar el rango Usuario a todos los que escriben o están en grupos (menos administradores)
+	"usuario_rol":        "0", // id del rango Usuario
+	"usuario_creado":     "0", // ya se creó una vez (si el dueño lo borra, no se vuelve a crear solo)
 	"grupo_modo_defecto": "todos",
 	"registro_dias":      "90",
 	// Multimedia (v0.6.0, E2): tope total en bytes (0 = sin límite; de fábrica 5 GB), conservar la portada de un video borrado (1/0)

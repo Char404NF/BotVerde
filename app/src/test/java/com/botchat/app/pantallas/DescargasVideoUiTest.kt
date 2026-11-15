@@ -97,4 +97,48 @@ class DescargasVideoUiTest {
         assertEquals(2, l.size); assertEquals("fallido", l[1].estado); assertEquals(3, l[0].partes)
         assertEquals("[]", "[]"); assertTrue(JsonVideo.lista("null").isEmpty())
     }
+
+    // ---------- el motor se descarga aparte: sin él, el módulo está bloqueado ----------
+
+    private fun sinMotor() { motor.videoEstadoJson = """{"activo":false,"motor":true,"version":"","ultima":"","hayNueva":false,"revisionTs":0,"enCurso":0,"esperando":0,"hoy":0,"instalado":false}""" }
+
+    @Test fun sinElMotorLaTarjetaDiceQueEstaBloqueadoYOfreceDescargarlo() {
+        sinMotor()
+        regla.setContent { BotChatTema { PantallaDescargasVideo(bot, alVolver = {}) } }
+        regla.espera { hay("descargar_motor") }
+        assertTrue(hay("motor_bloqueado") && hay("texto_sin_motor"))
+        regla.onNodeWithText("Módulo bloqueado", useUnmergedTree = true).assertIsDisplayed()
+        assertTrue(!hay("actualizar_ytdlp") && !hay("quitar_motor") && !hay("version_ytdlp"))
+    }
+
+    @Test fun descargarElMotorLoInstalaYDesbloquea() {
+        sinMotor()
+        regla.setContent { BotChatTema { PantallaDescargasVideo(bot, alVolver = {}) } }
+        toca("descargar_motor")
+        regla.espera { motor.llamadas.contains("video_actualizar") }
+        regla.espera { hay("mensaje_motor_video") }
+        regla.onNodeWithText("Listo: descargué el motor (yt-dlp 2026.11.01). Ya puedes encender el módulo.", useUnmergedTree = true).assertIsDisplayed()
+        regla.espera { hay("version_ytdlp") && hay("quitar_motor") && !hay("descargar_motor") }
+        assertTrue(!hay("motor_bloqueado"))
+    }
+
+    @Test fun siFallaLaDescargaSeMuestraElMotivoYSigueBloqueado() {
+        sinMotor()
+        motor.videoActualizarFalla = "no pude revisar las versiones nuevas (sin internet)"
+        regla.setContent { BotChatTema { PantallaDescargasVideo(bot, alVolver = {}) } }
+        toca("descargar_motor")
+        regla.espera { hay("mensaje_motor_video") }
+        regla.onNodeWithText("no pude revisar las versiones nuevas (sin internet)", useUnmergedTree = true).assertIsDisplayed()
+        assertTrue(hay("descargar_motor") && hay("motor_bloqueado"))
+    }
+
+    @Test fun quitarElMotorPideConfirmarYBloqueaOtraVez() {
+        regla.setContent { BotChatTema { PantallaDescargasVideo(bot, alVolver = {}) } }
+        toca("quitar_motor")
+        regla.espera { hay("dialogo_quitar_motor") }
+        assertTrue(motor.llamadas.none { it == "video_quitar_motor" })
+        toca("confirmar_quitar_motor")
+        regla.espera { motor.llamadas.contains("video_quitar_motor") }
+        regla.espera { hay("descargar_motor") && hay("motor_bloqueado") }
+    }
 }

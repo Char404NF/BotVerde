@@ -111,7 +111,7 @@ private fun CabeceraPerfil(p: PerfilMiembroAdmin) {
         Spacer(Modifier.width(Esp.l))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(m.titulo, Modifier.testTag("perfil_nombre"), style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (m.telefono.isNotBlank()) Text(m.telefono, Modifier.testTag("perfil_telefono"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (m.telefono.isNotBlank() && m.telefono != m.titulo) Text(m.telefono, Modifier.testTag("perfil_telefono"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             val linea = textoEnLinea(m)
             if (linea.isNotBlank()) Text(linea, Modifier.testTag("perfil_en_linea"), style = MaterialTheme.typography.bodySmall, color = if (m.enLinea) VERDE_EN_LINEA else MaterialTheme.colorScheme.onSurfaceVariant)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.xs), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {

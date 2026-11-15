@@ -507,13 +507,44 @@ func (g *Gestor) VideoActualizar(forzar bool) (string, error) {
 	st.ultimoError = ""
 	_ = g.Alm.FijarAjusteBot(g.BotID, "video_ytdlp_ver", ver)
 	g.Alm.RegistrarModulo(g.BotID, IDVideo, "actualizar", ResEnviado, "", g.ahora())
+	if actual == "" {
+		return fmt.Sprintf("Listo: descargué el motor (yt-dlp %s). Ya puedes encender el módulo.", ver), nil
+	}
 	return fmt.Sprintf("yt-dlp actualizado a la versión %s.", ver), nil
+}
+
+// VideoQuitarMotor borra el motor descargado y apaga el módulo: queda bloqueado hasta que se baje otra vez.
+func (g *Gestor) VideoQuitarMotor() error {
+	if g.Video == nil {
+		return errors.New("las descargas no están disponibles en este momento")
+	}
+	st := g.vid()
+	st.mu.Lock()
+	ocupado := st.enCurso > 0 || st.esperando > 0 || st.actualizando
+	st.mu.Unlock()
+	if ocupado {
+		return errors.New("hay descargas en curso o una actualización; espera a que terminen")
+	}
+	if g.Activo(IDVideo) {
+		if err := g.Desactivar(IDVideo); err != nil {
+			return err
+		}
+	}
+	if err := g.Video.Quitar(); err != nil {
+		return err
+	}
+	for _, k := range []string{"video_ytdlp_ver", "video_ytdlp_ultima", "video_ytdlp_rev_ts"} {
+		_ = g.Alm.FijarAjusteBot(g.BotID, k, "")
+	}
+	g.Alm.RegistrarModulo(g.BotID, IDVideo, "quitar_motor", ResEnviado, "", g.ahora())
+	g.Cambio("descargas_video")
+	return nil
 }
 
 // videoRevisionDiaria corre cada minuto (EvTick): a la hora elegida revisa una vez al día si hay yt-dlp nuevo.
 func (g *Gestor) videoRevisionDiaria(hora time.Time) {
 	cfg := g.Config(IDVideo)
-	if !cfg.Bool("actualizar_auto") || g.Video == nil {
+	if !cfg.Bool("actualizar_auto") || g.Video == nil || !g.Video.Instalado() {
 		return
 	}
 	loc := time.Local
@@ -538,6 +569,7 @@ func (g *Gestor) videoRevisionDiaria(hora time.Time) {
 type EstadoVideo struct {
 	Activo       bool   `json:"activo"`
 	Motor        bool   `json:"motor"`
+	Instalado    bool   `json:"instalado"` // el motor (yt-dlp) ya está descargado
 	Version      string `json:"version"`
 	Ultima       string `json:"ultima"`
 	Hay          bool   `json:"hayNueva"`
@@ -553,7 +585,7 @@ func (g *Gestor) VideoEstado() EstadoVideo {
 	st := g.vid()
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	e := EstadoVideo{Activo: g.Activo(IDVideo), Motor: g.Video != nil, Actualizando: st.actualizando, EnCurso: st.enCurso, Esperando: st.esperando, Error: st.ultimoError}
+	e := EstadoVideo{Activo: g.Activo(IDVideo), Motor: g.Video != nil, Instalado: g.Video != nil && g.Video.Instalado(), Actualizando: st.actualizando, EnCurso: st.enCurso, Esperando: st.esperando, Error: st.ultimoError}
 	e.Version = g.Alm.AjusteBot(g.BotID, "video_ytdlp_ver")
 	e.Ultima = g.Alm.AjusteBot(g.BotID, "video_ytdlp_ultima")
 	e.Hay = e.Ultima != "" && e.Version != "" && versionMayor(e.Ultima, e.Version)

@@ -5,11 +5,20 @@ import org.json.JSONArray
 import java.io.File
 
 /**
- * El motor de descargas que ve el módulo Go: Python con yt-dlp y las herramientas de Android para unir, partir y comprimir.
+ * El motor de descargas que ve el módulo Go: Python con el yt-dlp que el dueño descargó (la app no lo trae) y las herramientas de Android para unir, partir y comprimir.
  * Registrarlo no gasta nada: Python solo arranca cuando alguien pide una descarga.
  */
 class MotorVideoAndroid(private val ctx: Context) : wabot.MotorVideo {
     private val raiz get() = File(ctx.filesDir, "ytdlp").apply { mkdirs() }
+
+    override fun instalado(): Boolean = MotorDescargas.instalado(ctx)
+
+    override fun quitar() {
+        MotorDescargas.soltarYtdlp(ctx)
+        File(raiz, "yt-dlp").delete()
+        File(raiz, "yt-dlp.previo").delete()
+        File(raiz, "yt-dlp.nuevo").delete()
+    }
 
     override fun version(): String = MotorDescargas.version(ctx)
 
@@ -44,7 +53,7 @@ class MotorVideoAndroid(private val ctx: Context) : wabot.MotorVideo {
         } catch (e: Throwable) {
             actual.delete()
             if (habia && previo.isFile) { previo.renameTo(actual); runCatching { MotorDescargas.usarYtdlp(ctx, actual) } }
-            else runCatching { MotorDescargas.usarYtdlp(ctx, null) }
+            else MotorDescargas.soltarYtdlp(ctx)
             throw e
         }
     }

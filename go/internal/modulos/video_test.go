@@ -31,9 +31,24 @@ type motorFalso struct {
 	instalados int
 	sinMp3     bool
 	errPartir  error
+	sinMotor   bool // el motor aún no se ha descargado
 }
 
-func (m *motorFalso) Version() (string, error) { return m.versionAct, nil }
+func (m *motorFalso) Instalado() bool { m.mu.Lock(); defer m.mu.Unlock(); return !m.sinMotor }
+func (m *motorFalso) Quitar() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.sinMotor, m.versionAct = true, ""
+	return nil
+}
+func (m *motorFalso) Version() (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.sinMotor {
+		return "", fmt.Errorf("el motor no está descargado")
+	}
+	return m.versionAct, nil
+}
 func (m *motorFalso) Info(url string) (string, error) {
 	if m.errInfo != nil {
 		return "", m.errInfo
@@ -89,7 +104,7 @@ func (m *motorFalso) Instalar(ruta string) (string, error) {
 		return "", m.errInst
 	}
 	m.instalados++
-	m.versionAct = m.nuevaVer
+	m.versionAct, m.sinMotor = m.nuevaVer, false
 	return m.nuevaVer, nil
 }
 func (m *motorFalso) Carpeta() string          { return m.dir }
@@ -608,4 +623,127 @@ func TestVideoLoChicoSaleComoVideo(t *testing.T) {
 	if e.hay("[medio:documento]") {
 		t.Fatal("lo chico tiene que salir como video")
 	}
+}
+
+// ---------- el motor se descarga aparte: el módulo está bloqueado hasta entonces ----------
+
+func sinMotorLista(t *testing.T) (*ent, *motorFalso) {
+	t.Helper()
+	e, _ := entH(t)
+	m := &motorFalso{dir: t.TempDir(), info: infoCorta, tam: 1000, sinMotor: true, nuevaVer: "2026.11.01"}
+	e.g.Video = m
+	return e, m
+}
+
+func TestVideoBloqueadoHastaDescargarElMotor(t *testing.T) {
+	e, m := sinMotorLista(t)
+	inf, err := e.g.InfoDe(IDVideo)
+	if err != nil || !strings.Contains(inf.Bloqueo, "Falta descargar el motor") || inf.Estado != "Bloqueado" || inf.Activo {
+		t.Fatalf("debía verse bloqueado: %+v %v", inf, err)
+	}
+	if !strings.Contains(e.g.Lista()[indiceDe(e.g.Lista(), IDVideo)].Bloqueo, "Falta descargar") {
+		t.Fatal("la lista también debe traer el bloqueo")
+	}
+	esperaErr(t, e.g.Activar(IDVideo), "Falta descargar el motor")
+	if e.g.Activo(IDVideo) {
+		t.Fatal("no se debía encender")
+	}
+	if st := e.g.VideoEstado(); st.Instalado || !st.Motor {
+		t.Fatalf("estado sin motor: %+v", st)
+	}
+
+	// el dueño toca «Descargar motor»: baja de GitHub, verifica la firma y lo instala
+	d := &descFalso{}
+	e.g.Descarga = d
+	d.resp = releaseFalso("2026.11.01", []byte("yt-dlp-de-verdad"), false)
+	r, err := e.g.VideoActualizar(true)
+	if err != nil || !strings.Contains(r, "descargué el motor") || !strings.Contains(r, "2026.11.01") || m.instalados != 1 {
+		t.Fatalf("%q %v instalados=%d", r, err, m.instalados)
+	}
+	for _, p := range urlsDe(d) {
+		if !strings.HasPrefix(p, "https://api.github.com/") && !strings.HasPrefix(p, "https://github.com/") {
+			t.Fatalf("solo debía hablar con GitHub: %s", p)
+		}
+	}
+	inf, _ = e.g.InfoDe(IDVideo)
+	if inf.Bloqueo != "" || !e.g.VideoEstado().Instalado {
+		t.Fatalf("ya no debía estar bloqueado: %+v", inf)
+	}
+	if err := e.g.Activar(IDVideo); err != nil || !e.g.Activo(IDVideo) {
+		t.Fatalf("debía poder encenderse: %v", err)
+	}
+
+	// quitar el motor lo apaga y lo vuelve a bloquear
+	if err := e.g.VideoQuitarMotor(); err != nil {
+		t.Fatal(err)
+	}
+	inf, _ = e.g.InfoDe(IDVideo)
+	if inf.Activo || inf.Bloqueo == "" || e.g.VideoEstado().Instalado || e.g.Alm.AjusteBot(1, "video_ytdlp_ver") != "" {
+		t.Fatalf("debía quedar apagado y bloqueado: %+v", inf)
+	}
+	esperaErr(t, e.g.Activar(IDVideo), "Falta descargar el motor")
+}
+
+func TestVideoSiLaDescargaFallaSigueBloqueado(t *testing.T) {
+	e, m := sinMotorLista(t)
+	d := &descFalso{}
+	e.g.Descarga = d
+	d.resp = releaseFalso("2026.11.01", []byte("algo-raro"), true) // la firma no coincide
+	_, err := e.g.VideoActualizar(true)
+	esperaErr(t, err, "no coincide con su firma")
+	if m.instalados != 0 || !m.sinMotor {
+		t.Fatal("no debía instalarse nada")
+	}
+	esperaErr(t, e.g.Activar(IDVideo), "Falta descargar el motor")
+	// sin internet
+	d.resp = func(PeticionHTTP) (*RespuestaHTTP, error) { return nil, fmt.Errorf("sin red") }
+	_, err = e.g.VideoActualizar(true)
+	esperaErr(t, err, "no pude revisar")
+	if !e.g.Video.(*motorFalso).sinMotor {
+		t.Fatal("seguía sin motor")
+	}
+}
+
+func TestVideoSiSeBorraElMotorConElModuloEncendidoLosComandosAvisan(t *testing.T) {
+	e, _, m := videoLista(t, infoCorta, 1000)
+	_ = m.Quitar() // por ejemplo, se borraron los datos de la app
+	_, err := cmdVideo(t, e, "descargar").Ejecutar(&comandos.Contexto{Chat: pnAna, Persona: pnAna, Nombre: "Ana", MensajeID: "M1", Resto: "https://youtu.be/abc", Args: []string{"https://youtu.be/abc"}})
+	esperaErr(t, err, "Falta descargar el motor")
+	if got := e.g.info(mustModulo(IDVideo), false).Estado; !strings.Contains(got, "Bloqueado") && !strings.Contains(got, "falta descargar") {
+		t.Fatalf("la tarjeta debía avisar: %q", got)
+	}
+}
+
+func TestVideoNoSeDescargaSoloSinPermisoDelDuenoNiEnLaRevisionDiaria(t *testing.T) {
+	e, m := sinMotorLista(t)
+	d := &descFalso{}
+	e.g.Descarga = d
+	d.resp = releaseFalso("2026.11.01", []byte("nuevo"), false)
+	e.g.videoRevisionDiaria(time.Date(2026, 11, 10, 4, 0, 0, 0, time.UTC))
+	time.Sleep(50 * time.Millisecond)
+	if m.instalados != 0 || len(urlsDe(d)) != 0 {
+		t.Fatalf("sin motor, la revisión diaria no debe bajar nada (lo baja el dueño): %v", urlsDe(d))
+	}
+}
+
+func urlsDe(d *descFalso) []string {
+	var out []string
+	for _, r := range d.reqs {
+		out = append(out, r.URL)
+	}
+	return out
+}
+
+func indiceDe(l []Info, id string) int {
+	for i, x := range l {
+		if x.ID == id {
+			return i
+		}
+	}
+	return 0
+}
+
+func mustModulo(id string) Modulo {
+	m, _ := Obtener(id)
+	return m
 }

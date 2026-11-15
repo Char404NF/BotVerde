@@ -374,6 +374,7 @@ interface Motor {
     fun videoMiniatura(bot: Long, id: Long): ByteArray? = null
     fun videoBorrar(bot: Long, id: Long) {}
     fun videoActualizar(bot: Long): String = ""
+    fun videoQuitarMotor(bot: Long) {}
     fun videoRepetir(bot: Long, id: Long): String = ""
 }
 
@@ -717,5 +718,6 @@ object MotorGo : Motor {
     override fun videoMiniatura(bot: Long, id: Long): ByteArray? = Wabot.videoMiniatura(bot, id)
     override fun videoBorrar(bot: Long, id: Long) = Wabot.videoBorrar(bot, id)
     override fun videoActualizar(bot: Long) = Wabot.videoActualizar(bot)
+    override fun videoQuitarMotor(bot: Long) = Wabot.videoQuitarMotor(bot)
     override fun videoRepetir(bot: Long, id: Long) = Wabot.videoRepetir(bot, id)
 }

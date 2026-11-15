@@ -23,6 +23,8 @@ type Servicio struct {
 	mu      sync.Mutex
 	marcas  map[string][]time.Time
 	avisoLm map[string]time.Time
+	// quién ya recibió el rango Usuario hace poco (para no tocar la base en cada mensaje)
+	usuariosVistos map[string]time.Time
 }
 
 // Nuevo crea el servicio y deja listos el Dueño y las plantillas.
@@ -266,7 +268,7 @@ func (s *Servicio) EsConocido(persona, chat string) bool {
 	if persona == almacen.PersonaDueno {
 		return true
 	}
-	if r := s.RolDe(persona); r != nil {
+	if r := s.rolPropio(persona); r != nil {
 		return true
 	}
 	if sol, _ := s.Alm.ObtenerSolicitud(s.BotID, persona); sol != nil && sol.Estado == almacen.SolAprobada {
@@ -338,7 +340,7 @@ func (s *Servicio) Compuerta(e Entrada) Salida {
 	if pol == DescMenu || !EsPoliticaDesconocidos(pol) {
 		return Salida{Pasa: true}
 	}
-	if r := s.RolDe(persona); r != nil {
+	if r := s.rolPropio(persona); r != nil {
 		return Salida{Pasa: true}
 	}
 	if sol != nil && sol.Estado == almacen.SolAprobada {

@@ -12,6 +12,8 @@ import (
 
 // MotorVideo es el motor de descargas que pone la app (Kotlin + Python con yt-dlp). Todo viaja como texto JSON.
 type MotorVideo interface {
+	Instalado() bool
+	Quitar() error
 	Version() (string, error)
 	Info(url string) (string, error)
 	Descargar(url, carpeta, modo string, altura, abr int) (string, error)
@@ -121,6 +123,16 @@ func VideoActualizar(botID int64) (string, error) {
 	}
 	accionDueno(botID, "video.actualizar", "", "")
 	return g.VideoActualizar(true)
+}
+
+// VideoQuitarMotor borra el motor descargado (yt-dlp) y apaga el módulo; queda bloqueado hasta bajarlo otra vez.
+func VideoQuitarMotor(botID int64) error {
+	g, err := gestorDe(botID)
+	if err != nil {
+		return err
+	}
+	accionDueno(botID, "video.quitar_motor", "", "")
+	return g.VideoQuitarMotor()
 }
 
 // VideoRepetir vuelve a pedir una descarga del historial con las mismas opciones (el archivo ya no existe: se baja otra vez).

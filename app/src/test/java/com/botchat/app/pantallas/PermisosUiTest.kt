@@ -298,6 +298,17 @@ class PermisosUiTest {
 
     // ---------- Ajustes → Rangos y permisos ----------
 
+    @Test fun elCentroDePermisosApagaYEnciendeElRangoUsuarioAutomatico() {
+        regla.setContent { BotChatTema { PantallaPermisos(bot, {}, {}, {}, {}) } }
+        regla.esperaEtiqueta("sw_usuario_auto")
+        regla.onNodeWithTag("sw_usuario_auto", useUnmergedTree = true).assertIsOn() // viene encendido
+        regla.onNodeWithTag("sw_usuario_auto", useUnmergedTree = true).performClick()
+        regla.espera { llamo("ajustePerm:usuario_auto:0") }
+        regla.espera { runCatching { regla.onNodeWithTag("sw_usuario_auto", useUnmergedTree = true).assertIsOff() }.isSuccess }
+        regla.onNodeWithTag("sw_usuario_auto", useUnmergedTree = true).performClick()
+        regla.espera { llamo("ajustePerm:usuario_auto:1") }
+    }
+
     @Test fun elCentroDePermisosCambiaLaPoliticaDeDesconocidos() {
         motor.solicitudesPor["pendiente"] = Apoyo.arreglo(Apoyo.solicitudJson(ana, "Ana"))
         regla.setContent { BotChatTema { PantallaPermisos(bot, {}, {}, {}, {}) } }

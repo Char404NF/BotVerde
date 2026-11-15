@@ -14,13 +14,15 @@ data class DescargaVideo(
 data class EstadoVideo(
     val activo: Boolean = false, val motor: Boolean = false, val version: String = "", val ultima: String = "", val hayNueva: Boolean = false,
     val revisionTs: Long = 0, val actualizando: Boolean = false, val enCurso: Int = 0, val esperando: Int = 0, val error: String = "", val hoy: Int = 0,
+    /** El motor (yt-dlp) ya está descargado. La app NO lo trae: hay que bajarlo, y mientras no esté el módulo está bloqueado. */
+    val instalado: Boolean = false,
 )
 
 object JsonVideo {
     fun estado(json: String): EstadoVideo {
         val o = runCatching { JSONObject(json) }.getOrNull() ?: return EstadoVideo()
         return EstadoVideo(o.optBoolean("activo"), o.optBoolean("motor"), o.optString("version"), o.optString("ultima"), o.optBoolean("hayNueva"), o.optLong("revisionTs"),
-            o.optBoolean("actualizando"), o.optInt("enCurso"), o.optInt("esperando"), o.optString("error"), o.optInt("hoy"))
+            o.optBoolean("actualizando"), o.optInt("enCurso"), o.optInt("esperando"), o.optString("error"), o.optInt("hoy"), o.optBoolean("instalado"))
     }
 
     fun lista(json: String): List<DescargaVideo> {

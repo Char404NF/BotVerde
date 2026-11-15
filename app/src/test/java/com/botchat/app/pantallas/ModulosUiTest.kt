@@ -426,4 +426,22 @@ class ModulosUiTest {
 
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.esperaSinEtiqueta(tag: String) =
         espera { onAllNodes(androidx.compose.ui.test.hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
+
+    // ---------- módulos bloqueados (por ejemplo, sin su motor descargado) ----------
+
+    @Test fun unModuloBloqueadoNoDejaEncenderseYDiceQueFalta() {
+        motor.modulosLista[0].put("bloqueo", "Falta descargar el motor.")
+        lista()
+        regla.esperaEtiqueta("modulo_bloqueo_eco_prueba")
+        regla.onNodeWithText("Falta descargar el motor.", useUnmergedTree = true).assertIsDisplayed()
+        regla.onNodeWithTag("modulo_interruptor_eco_prueba", useUnmergedTree = true).assertIsNotEnabled()
+        assertFalse(llamo("activarModulo"))
+    }
+
+    @Test fun unModuloSinBloqueoSePuedeEncender() {
+        lista()
+        regla.esperaEtiqueta("modulo_eco_prueba")
+        assertFalse(hay("modulo_bloqueo_eco_prueba"))
+        regla.onNodeWithTag("modulo_interruptor_eco_prueba", useUnmergedTree = true).assertIsEnabled()
+    }
 }

@@ -66,7 +66,10 @@ fun pesoVideoTxt(b: Long): String = when {
 /** Duración "3:20" o "1 h 05 min". */
 fun duracionVideoTxt(s: Int): String = if (s >= 3600) "%d h %02d min".format(s / 3600, (s % 3600) / 60) else "%d:%02d".format(s / 60, s % 60)
 
-/** Tarjeta de arriba: versión de yt-dlp, si hay una nueva y un botón para actualizar. También sirve dentro de la ventana del módulo. */
+/**
+ * Tarjeta de arriba: el motor (yt-dlp). La app NO lo trae: hasta que se descargue, el módulo está bloqueado. Una vez descargado muestra
+ * su versión, avisa si hay una nueva y deja actualizarlo o quitarlo. También sirve dentro de la ventana del módulo.
+ */
 @Composable
 fun TarjetaMotorVideo(botId: Long, modifier: Modifier = Modifier, alAbrirHistorial: (() -> Unit)? = null) {
     val scope = rememberCoroutineScope()
@@ -75,17 +78,31 @@ fun TarjetaMotorVideo(botId: Long, modifier: Modifier = Modifier, alAbrirHistori
     val estado by produceState(EstadoVideo(), version, botId) { value = runCatching { Repo.videoEstado(botId) }.getOrDefault(EstadoVideo()) }
     var mensaje by remember { mutableStateOf<String?>(null) }
     var trabajando by remember { mutableStateOf(false) }
+    var quitando by remember { mutableStateOf(false) }
+    val ocupado = trabajando || estado.actualizando
     Card(modifier.fillMaxWidth().testTag("tarjeta_motor_video"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(Modifier.padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
             Text("Motor de descargas", style = MaterialTheme.typography.titleMedium)
-            Text(
-                if (estado.version.isBlank()) "Todavía no se ha revisado la versión de yt-dlp." else "yt-dlp ${estado.version}" + if (estado.hayNueva) " · hay una versión nueva (${estado.ultima})" else " · al día",
-                Modifier.testTag("version_ytdlp"), style = MaterialTheme.typography.bodyMedium,
-                color = if (estado.hayNueva) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (estado.revisionTs > 0) Text("Última revisión: ${haceCuanto(estado.revisionTs)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (!estado.instalado) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Ico.Candado, null, Modifier.size(20.dp).testTag("motor_bloqueado"), tint = MaterialTheme.colorScheme.tertiary)
+                    Spacer(Modifier.width(Esp.s))
+                    Text("Módulo bloqueado", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.tertiary)
+                }
+                Text(
+                    "La app no trae el motor (yt-dlp). Descárgalo una vez, de la página oficial de yt-dlp en GitHub (unos 3 MB), y el módulo se desbloquea. Después se actualiza solo.",
+                    Modifier.testTag("texto_sin_motor"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Text(
+                    if (estado.version.isBlank()) "Todavía no se ha revisado la versión de yt-dlp." else "yt-dlp ${estado.version}" + if (estado.hayNueva) " · hay una versión nueva (${estado.ultima})" else " · al día",
+                    Modifier.testTag("version_ytdlp"), style = MaterialTheme.typography.bodyMedium,
+                    color = if (estado.hayNueva) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (estado.revisionTs > 0) Text("Última revisión: ${haceCuanto(estado.revisionTs)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             if (estado.error.isNotBlank()) Text(estado.error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.s), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
+            if (estado.instalado) FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.s), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
                 SuggestionChip({}, { Text("Hoy: ${estado.hoy}") })
                 if (estado.enCurso > 0) SuggestionChip({}, { Text("Bajando: ${estado.enCurso}") })
                 if (estado.esperando > 0) SuggestionChip({}, { Text("En espera: ${estado.esperando}") })
@@ -94,16 +111,34 @@ fun TarjetaMotorVideo(botId: Long, modifier: Modifier = Modifier, alAbrirHistori
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.s), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
                 Button({
                     trabajando = true; mensaje = null
-                    scope.launch { mensaje = runCatching { Repo.videoActualizar(botId) }.getOrElse { it.message ?: "No se pudo actualizar" }; trabajando = false; version++ }
-                }, enabled = !trabajando && !estado.actualizando, modifier = Modifier.testTag("actualizar_ytdlp")) {
-                    if (trabajando || estado.actualizando) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp) else Icon(Ico.Actualizar, null, Modifier.size(18.dp))
+                    scope.launch {
+                        mensaje = runCatching { Repo.videoActualizar(botId) }.getOrElse { it.message ?: if (estado.instalado) "No se pudo actualizar" else "No se pudo descargar" }
+                        trabajando = false; version++
+                    }
+                }, enabled = !ocupado, modifier = Modifier.testTag(if (estado.instalado) "actualizar_ytdlp" else "descargar_motor")) {
+                    if (ocupado) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp) else Icon(if (estado.instalado) Ico.Actualizar else Ico.Descargar, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(Esp.s))
-                    Text(if (estado.hayNueva) "Actualizar ahora" else "Buscar actualización")
+                    Text(if (!estado.instalado) (if (ocupado) "Descargando…" else "Descargar motor") else if (estado.hayNueva) "Actualizar ahora" else "Buscar actualización")
                 }
-                if (alAbrirHistorial != null) OutlinedButton(alAbrirHistorial, Modifier.testTag("abrir_historial_video")) { Text("Ver descargas") }
+                if (estado.instalado) {
+                    if (alAbrirHistorial != null) OutlinedButton(alAbrirHistorial, Modifier.testTag("abrir_historial_video")) { Text("Ver descargas") }
+                    TextButton({ quitando = true }, enabled = !ocupado, modifier = Modifier.testTag("quitar_motor")) { Text("Quitar motor") }
+                }
             }
         }
     }
+    if (quitando) AlertDialog(
+        onDismissRequest = { quitando = false }, modifier = Modifier.testTag("dialogo_quitar_motor"),
+        title = { Text("¿Quitar el motor?") },
+        text = { Text("Se borra yt-dlp del teléfono y el módulo de descargas se apaga y queda bloqueado hasta que lo descargues otra vez.") },
+        confirmButton = {
+            TextButton({
+                quitando = false; mensaje = null
+                scope.launch { mensaje = runCatching { Repo.videoQuitarMotor(botId); "Motor quitado." }.getOrElse { it.message ?: "No se pudo quitar" }; version++ }
+            }, Modifier.testTag("confirmar_quitar_motor")) { Text("Quitar") }
+        },
+        dismissButton = { TextButton({ quitando = false }) { Text("Cancelar") } },
+    )
 }
 
 /** Historial de descargas: miniatura, título, quién la pidió y cuándo, peso, formato, y un botón para volver a bajarla. */

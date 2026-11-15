@@ -207,8 +207,10 @@ type Info struct {
 	Activo      bool   `json:"activo"`
 	Pausado     bool   `json:"pausado"`
 	// Codigo: apagado | activo | pausado_seguro | esperando_maestro.
-	Codigo     string  `json:"codigo"`
-	Estado     string  `json:"estado"` // texto en español para la tarjeta
+	Codigo string `json:"codigo"`
+	Estado string `json:"estado"` // texto en español para la tarjeta
+	// Bloqueo: si no está vacío, el módulo no se puede encender hasta que se cumpla eso (por ejemplo, descargar su motor).
+	Bloqueo    string  `json:"bloqueo,omitempty"`
 	ConEsquema bool    `json:"conEsquema"`
 	TopeHora   int     `json:"topeHora"`
 	TopeDia    int     `json:"topeDia"`
@@ -225,9 +227,13 @@ func (g *Gestor) info(m Modulo, conEsquema bool) Info {
 	th, td := g.TopesModulo(m.ID())
 	x := Info{ID: m.ID(), Nombre: m.Nombre(), Descripcion: m.Descripcion(), Icono: m.Icono(), Riesgo: m.Riesgo(), Iniciativa: m.Iniciativa(),
 		Activo: f.Activo, ConEsquema: len(m.Esquema()) > 0, TopeHora: th, TopeDia: td, DefHora: dh, DefDia: dd, ActivadoTS: f.ActivadoTS}
+	x.Bloqueo = g.bloqueoDe(m)
 	switch {
 	case !f.Activo:
 		x.Codigo, x.Estado = "apagado", "Apagado"
+		if x.Bloqueo != "" {
+			x.Estado = "Bloqueado"
+		}
 	case m.Iniciativa() && g.EnModoSeguro():
 		x.Pausado, x.Codigo, x.Estado = true, "pausado_seguro", "Pausado por modo seguro"
 	case m.Iniciativa() && !g.Maestro():
@@ -245,6 +251,20 @@ func (g *Gestor) info(m Modulo, conEsquema bool) Info {
 		x.Esquema = m.Esquema()
 	}
 	return x
+}
+
+// bloqueoDe dice por qué un módulo no se puede usar todavía ("" = listo).
+func (g *Gestor) bloqueoDe(m Modulo) (texto string) {
+	b, ok := m.(ConBloqueo)
+	if !ok {
+		return ""
+	}
+	defer func() {
+		if recover() != nil {
+			texto = ""
+		}
+	}()
+	return strings.TrimSpace(b.Bloqueo(g))
 }
 
 // Lista devuelve las tarjetas de todos los módulos registrados.
@@ -339,6 +359,9 @@ func (g *Gestor) Activar(id string) error {
 	asegurarCasillas(m)
 	if g.Activo(id) {
 		return nil
+	}
+	if b := g.bloqueoDe(m); b != "" {
+		return errors.New(b)
 	}
 	if g.estaVivo() {
 		if err := g.arrancar(m); err != nil {

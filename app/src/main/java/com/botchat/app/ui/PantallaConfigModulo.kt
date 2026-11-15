@@ -37,6 +37,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -67,7 +68,9 @@ object PantallasModulo {
 /** Ventana de configuración de un módulo: la suya si la registró, o el contenedor genérico que dibuja su esquema de campos. */
 @Composable
 fun PantallaConfigModulo(botId: Long, id: String, alVolver: () -> Unit, alAbrirHistorial: () -> Unit = {}) {
-    val info by produceState<ModuloInfo?>(null, id) { value = runCatching { Repo.modulo(botId, id) }.getOrNull() }
+    var recarga by remember { mutableIntStateOf(0) }
+    LaunchedEffect(id) { Repo.cambios.collect { evs -> if ("modulos" in evs || (id == "descargas_video" && "descargas_video" in evs)) recarga++ } }
+    val info by produceState<ModuloInfo?>(null, id, recarga) { value = runCatching { Repo.modulo(botId, id) }.getOrNull() ?: value }
     val m = info
     Scaffold(topBar = { TopAppBar(navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text(m?.nombre ?: "Módulo") }) }) { relleno ->
         if (m == null) { Box(Modifier.fillMaxSize().padding(relleno), Alignment.Center) { CircularProgressIndicator() }; return@Scaffold }

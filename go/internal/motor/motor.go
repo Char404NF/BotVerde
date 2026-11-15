@@ -516,6 +516,10 @@ func (m *Motor) Entrar(msg Mensaje) {
 			}
 			return
 		}
+		// Quien escribe (y pasó la compuerta) recibe el rango Usuario si corresponde.
+		if msg.Remitente != "" || !msg.EsGrupo {
+			m.c.Perm.AsegurarUsuario(quien)
+		}
 	}
 	// La baja se atiende aquí (ya pasó la compuerta): se le confirma UNA sola vez y el texto no sigue a los menús.
 	if esBaja {

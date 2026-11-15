@@ -49,14 +49,13 @@ android {
     }
 }
 
-// Descargas de video (módulo opcional): Python embebido con yt-dlp. Solo arranca cuando alguien usa un comando de descarga.
+// Descargas de video (módulo opcional): Python embebido. yt-dlp NO viaja en la app: el dueño lo descarga de GitHub desde la pantalla del módulo
+// (viene con su yt-dlp-ejs dentro). Python solo arranca cuando alguien usa un comando de descarga.
 chaquopy {
     defaultConfig {
         version = "3.12"
         buildPython("/usr/bin/python3.12")
         pip {
-            install("yt-dlp")
-            install("yt-dlp-ejs")
             install("certifi")
         }
     }
