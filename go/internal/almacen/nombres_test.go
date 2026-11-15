@@ -49,7 +49,7 @@ func TestNombresPorLoteIgualQueLaRutaAntigua(t *testing.T) {
 		t.Fatalf("difieren:\nantes   %+v\ndespués %+v", antes, despues)
 	}
 	for _, v := range despues {
-		if v.ID == "C1" && (v.CitaAutor != "Ana" || v.Menciones[0].Nombre != "Beto" || v.Menciones[1].Nombre != "Participante") {
+		if v.ID == "C1" && (v.CitaAutor != "Ana" || v.Menciones[0].Nombre != "Beto" || v.Menciones[1].Nombre != "+5215533") {
 			t.Fatalf("nombres de la cita/menciones: %q %+v", v.CitaAutor, v.Menciones)
 		}
 		if v.ID == "E1" && v.EliminadoPor != "Beto" {
@@ -166,5 +166,37 @@ func TestMencionPorLIDUsaElNombreDelNumero(t *testing.T) {
 	}
 	if vs[0].Menciones[0].Nombre != "Lupe" {
 		t.Fatalf("la mención debía llamarse Lupe y salió %q", vs[0].Menciones[0].Nombre)
+	}
+}
+
+// Una mención (o cita) de alguien que solo se conoce por su LID no debe mostrarse como «Número no disponible» si se sabe su nombre o su número.
+func TestMencionDeLIDMuestraNombreONumeroNoElAvisoDeNoDisponible(t *testing.T) {
+	a := nuevo(t)
+	g := "120363000000000001@g.us"
+	chatBasico(t, a, g, "", "Grupo", true)
+	const lid, pn = "171373624348814@lid", "5215500000002@s.whatsapp.net"
+	// el LID tiene un «chat» con el aviso guardado como nombre (así lo dejaba la ingesta)
+	chatBasico(t, a, lid, "", "", false) // sin nombre ni número: queda «Número no disponible»
+	if c, _ := a.ObtenerChat(1, lid); c == nil || c.Mostrado != "Número no disponible" {
+		t.Fatalf("el chat del LID debía quedar con el aviso como nombre: %+v", c)
+	}
+	m := msg(g, "1", time.Now().Unix(), "hola")
+	m.Menciones = []string{lid}
+	// 1) se conoce su número por el alias: se muestra el número
+	a.AprenderAlias(1, pn, lid)
+	v := a.vista(m, nil)
+	if got := v.Menciones[0].Nombre; got != "+5215500000002" {
+		t.Fatalf("debía ser su número: %q", got)
+	}
+	// 2) además escribió en el grupo con su nombre: se muestra el nombre
+	otro := msg(g, "2", time.Now().Unix(), "yo")
+	otro.RemitenteJID, otro.RemitenteNombre = lid, "Bot VPS"
+	_, _ = a.GuardarMensaje(otro)
+	a.nombres.limpiar()
+	if got := a.vista(m, nil).Menciones[0].Nombre; got != "Bot VPS" {
+		t.Fatalf("debía ser su nombre: %q", got)
+	}
+	if got := a.nombreParaMostrar(1, g, lid); got != "Bot VPS" {
+		t.Fatalf("nombreParaMostrar: %q", got)
 	}
 }

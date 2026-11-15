@@ -157,6 +157,9 @@ func (a *Almacen) resolverNombres(ms []*Mensaje) *nombresPagina {
 			if n := a.nombrePorAlias(g.bot, g.chat, j); n != "" {
 				return n
 			}
+			if t := a.telefonoDe(g.bot, j); t != "" {
+				return t // sin nombre guardado: al menos su número (nunca «Número no disponible» si se sabe)
+			}
 			return "Participante"
 		}
 		for _, j := range faltaMsg {
@@ -194,7 +197,7 @@ func (a *Almacen) nombresDeContactos(bot int64, jids []string) map[string]string
 		}
 		for filas.Next() {
 			var j, n string
-			if filas.Scan(&j, &n) == nil && strings.TrimSpace(n) != "" {
+			if filas.Scan(&j, &n) == nil && nombreReal(n) {
 				out[j] = n
 			}
 		}
@@ -256,6 +259,27 @@ func (a *Almacen) nombrePorAlias(bot int64, chat, j string) string {
 	for _, x := range otros {
 		if v := vistos[x]; v != "" {
 			return v
+		}
+	}
+	return ""
+}
+
+// textoSinNumero es lo que se guarda como nombre cuando solo se conoce el identificador oculto (LID): no es un nombre de verdad.
+const textoSinNumero = "Número no disponible"
+
+// nombreReal dice si lo guardado como nombre sirve para mostrarse (no vacío y no el aviso de «número no disponible»).
+func nombreReal(n string) bool {
+	n = strings.TrimSpace(n)
+	return n != "" && n != textoSinNumero
+}
+
+// telefonoDe devuelve «+número» de una persona si alguna de sus formas es un número (@s.whatsapp.net).
+func (a *Almacen) telefonoDe(bot int64, j string) string {
+	for _, x := range a.AliasDe(bot, j) {
+		if esPN(x) {
+			if d := strings.TrimSuffix(x, "@s.whatsapp.net"); d != "" && strings.Trim(d, "0123456789") == "" {
+				return "+" + d
+			}
 		}
 	}
 	return ""

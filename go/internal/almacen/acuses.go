@@ -129,10 +129,19 @@ func (a *Almacen) nombreParaMostrar(botID int64, chat, jid string) string {
 		return "Tú"
 	}
 	var n string
-	if err := a.db.QueryRow(`SELECT nombre_mostrado FROM chats WHERE bot_id=? AND jid=?`, botID, jid).Scan(&n); err == nil && strings.TrimSpace(n) != "" {
+	if err := a.db.QueryRow(`SELECT nombre_mostrado FROM chats WHERE bot_id=? AND jid=?`, botID, jid).Scan(&n); err == nil && nombreReal(n) {
 		return n
 	}
-	return a.nombreDe(botID, chat, jid)
+	if n := a.nombreDe(botID, chat, jid); n != "Participante" {
+		return n
+	}
+	if n := a.nombrePorAlias(botID, chat, jid); n != "" {
+		return n
+	}
+	if t := a.telefonoDe(botID, jid); t != "" {
+		return t
+	}
+	return "Participante"
 }
 
 // EstadoDeEnvio cambia el estado de envío de un mensaje propio (enviando, enviado, fallido).
