@@ -164,7 +164,7 @@ private fun PestanaResumenPerfil(botId: Long, jid: String, p: PerfilMiembroAdmin
                 Dato(Ico.Video, c.videos, "videos", Modifier.weight(1f).testTag("dato_videos"))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
-                Dato(Ico.Audio, c.audios, "audios", Modifier.weight(1f).testTag("dato_audios"))
+                Dato(IcoNota, c.audios, "audios", Modifier.weight(1f).testTag("dato_audios"))
                 Dato(Ico.Microfono, c.notasVoz, "notas de voz", Modifier.weight(1f).testTag("dato_notas"))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
@@ -204,7 +204,7 @@ private fun PestanaEstadisticasPerfil(p: PerfilMiembroAdmin) {
             val c = p.miembro.conteo
             val filas = listOf(
                 Triple(Ico.Chats, "Texto", c.texto), Triple(Ico.Foto, "Imágenes", c.imagenes), Triple(Ico.Video, "Videos", c.videos),
-                Triple(Ico.Audio, "Audios", c.audios), Triple(Ico.Microfono, "Notas de voz", c.notasVoz), Triple(Ico.Sticker, "Stickers", c.stickers), Triple(Ico.Documento, "Documentos", c.documentos),
+                Triple(IcoNota, "Audios", c.audios), Triple(Ico.Microfono, "Notas de voz", c.notasVoz), Triple(Ico.Sticker, "Stickers", c.stickers), Triple(Ico.Documento, "Documentos", c.documentos),
             )
             val mayor = (filas.maxOfOrNull { it.third } ?: 0).coerceAtLeast(1)
             filas.forEach { (ic, nombre, n) ->

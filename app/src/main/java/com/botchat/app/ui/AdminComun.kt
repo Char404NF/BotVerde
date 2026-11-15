@@ -25,7 +25,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import com.botchat.app.datos.ConteoMiembro
 import com.botchat.app.datos.MiembroAdmin
 
@@ -57,6 +62,17 @@ internal fun textoEnLinea(m: MiembroAdmin): String = when {
 
 internal val VERDE_EN_LINEA = VERDE_SILENCIO
 
+/** Una nota musical: los audios (música, archivos de sonido). Las notas de voz llevan el micrófono. */
+internal val IcoNota: ImageVector by lazy {
+    ImageVector.Builder("nota", 24.dp, 24.dp, 24f, 24f).apply {
+        path(fill = null, stroke = SolidColor(Color.Black), strokeLineWidth = 2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+            moveTo(9f, 18f); lineTo(9f, 5.5f); lineTo(19f, 3.5f); lineTo(19f, 16f)
+            moveTo(9f, 18f); curveTo(9f, 19.4f, 7.9f, 20.5f, 6.5f, 20.5f); curveTo(5.1f, 20.5f, 4f, 19.4f, 4f, 18f); curveTo(4f, 16.6f, 5.1f, 15.5f, 6.5f, 15.5f); curveTo(7.9f, 15.5f, 9f, 16.6f, 9f, 18f)
+            moveTo(19f, 16f); curveTo(19f, 17.4f, 17.9f, 18.5f, 16.5f, 18.5f); curveTo(15.1f, 18.5f, 14f, 17.4f, 14f, 16f); curveTo(14f, 14.6f, 15.1f, 13.5f, 16.5f, 13.5f); curveTo(17.9f, 13.5f, 19f, 14.6f, 19f, 16f)
+        }
+    }.build()
+}
+
 /** La foto de la persona con un puntito verde si está en línea. */
 @Composable
 fun AvatarEnLinea(m: MiembroAdmin, tam: Dp, modifier: Modifier = Modifier) {
@@ -87,7 +103,7 @@ fun ConteoIconos(c: ConteoMiembro, modifier: Modifier = Modifier) {
         DatoConteo(Ico.Chats, c.mensajes, "mensajes")
         DatoConteo(Ico.Foto, c.imagenes, "imágenes")
         DatoConteo(Ico.Video, c.videos, "videos")
-        DatoConteo(Ico.Audio, c.audios, "audios")
+        DatoConteo(IcoNota, c.audios, "audios")
         DatoConteo(Ico.Microfono, c.notasVoz, "notas de voz")
         if (c.stickers > 0) DatoConteo(Ico.Sticker, c.stickers, "stickers")
         if (c.documentos > 0) DatoConteo(Ico.Documento, c.documentos, "documentos")
