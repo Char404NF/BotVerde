@@ -250,6 +250,9 @@ func resumenTexto(sp *spec, textoNumerado string) string {
 func (s *Servicio) EnviarMenu(ctx context.Context, chat, persona string, menu *motor.MenuLab, textoNumerado, citaID, citaAutorWA string) (Enviado, bool, error) {
 	sp, ok := s.decidir(chat, menu)
 	if !ok {
+		if menu != nil && s.ModoDe(menu.Formato) != ModoTexto {
+			s.Log(fmt.Sprintf("Menú en texto aunque el formato es «%s» (%d opciones, grupo: %v).", s.ModoDe(menu.Formato), len(menu.Opciones), esGrupo(chat)))
+		}
 		return Enviado{}, false, nil
 	}
 	if persona == "" {

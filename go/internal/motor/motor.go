@@ -946,7 +946,7 @@ func (m *Motor) enviar(chat, texto, citaID, mencion string, ts time.Time) error 
 func (m *Motor) enviarSalida(chat string, sal Salida, citaID, citaAutor, mencion string, ts time.Time, ref *RefSesion) error {
 	p := &pedido{chat: chat, texto: sal.Texto, citaID: citaID, citaAutor: citaAutor, mencion: mencion, ts: ts, ref: ref, res: make(chan error, 1),
 		continua: sal.Continua, etiqueta: sal.Etiqueta}
-	if sal.Medio != nil || sal.Ubicacion != nil || sal.Contacto != nil || sal.Auto != nil {
+	if sal.Medio != nil || sal.Ubicacion != nil || sal.Contacto != nil || sal.Auto != nil || sal.Menu != nil {
 		p.salida = &sal
 	}
 	select {
