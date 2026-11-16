@@ -22,8 +22,6 @@ import (
 // IDIA es el id del módulo.
 const IDIA = "ia"
 
-const avisoPrivacidadIA = "Lo que le preguntes a la IA (y, con la memoria encendida, lo anterior de esa conversación) SALE de tu teléfono hacia el proveedor que elijas. No uses esto con información que no quieras compartir con él."
-
 type turnoIA struct {
 	Rol, Texto string
 	TS         time.Time
@@ -32,12 +30,11 @@ type turnoIA struct {
 func ia() Modulo {
 	return Nuevo(Def{
 		ID: IDIA, Nombre: "IA opcional", Icono: "ia", Riesgo: RiesgoMedio, Iniciativa: true,
-		Descripcion: "Responde con un modelo de IA (OpenAI, Claude, Gemini, DeepSeek, Groq, Mistral, Grok, Ollama y cualquier servicio compatible con OpenAI) cuando lo pidan con «!ia», lo mencionen en un grupo o escriban en chats que tú permitas. Aviso de privacidad: " + avisoPrivacidadIA + " Las respuestas siempre dicen que son automáticas. «!ia» responde siempre; mención y chats permitidos necesitan «Iniciativa propia» encendida.",
+		Descripcion: "Responde con un modelo de IA (OpenAI, Claude, Gemini, DeepSeek, Groq, Mistral, Grok, Ollama y cualquier servicio compatible con OpenAI) cuando lo pidan con «!ia», lo mencionen en un grupo o escriban en chats que tú permitas. Las respuestas siempre dicen que son automáticas. «!ia» responde siempre; mención y chats permitidos necesitan «Iniciativa propia» encendida.",
 		Casillas: []permisos.Casilla{
 			{ID: "ia.usar", Nombre: "Usar la IA («!ia»)", Descripcion: "Puede hacerle preguntas a la IA. Lo que escriba sale del teléfono hacia el proveedor de IA.", Grupo: "IA", Riesgo: permisos.RiesgoMedio},
 		},
 		Esquema: []Campo{
-			{Clave: "acepto_privacidad", Titulo: "Entiendo que el contenido sale del teléfono", Ayuda: avisoPrivacidadIA + " Hace falta marcarlo para que responda.", Tipo: CampoInterruptor, Defecto: false},
 			{Clave: "proveedor", Titulo: "Servicio de IA", Ayuda: "Elige uno de la lista y se llenan solos la dirección y el modelo. «otro» sirve para cualquier servicio compatible con OpenAI.", Tipo: CampoTexto, Largo: 30, Defecto: "openai"},
 			{Clave: "url", Titulo: "Dirección del servicio", Ayuda: "Por ejemplo https://api.openai.com/v1 (se agrega /chat/completions).", Tipo: CampoTexto, Largo: 300, Defecto: "https://api.openai.com/v1"},
 			{Clave: "modelo", Titulo: "Modelo", Tipo: CampoTexto, Largo: 80, Defecto: "gpt-6-luna", Obligatorio: true},
@@ -65,9 +62,6 @@ func ia() Modulo {
 			if strings.TrimSpace(cfg.Texto("etiqueta")) == "" {
 				return errors.New("la etiqueta de respuesta automática no puede quedar vacía: así se sabe que contesta una IA")
 			}
-			if (cfg.Bool("por_mencion") || cfg.Bool("chats_activos") || cfg.Bool("en_menus")) && !cfg.Bool("acepto_privacidad") {
-				return errors.New("para que responda sola marca antes «Entiendo que el contenido sale del teléfono»")
-			}
 			return nil
 		},
 		ComandosG:    comandosIA,
@@ -76,8 +70,6 @@ func ia() Modulo {
 		AlEstado: func(g *Gestor) string {
 			cfg := g.Config(IDIA)
 			switch {
-			case !cfg.Bool("acepto_privacidad"):
-				return "Encendido, falta aceptar el aviso de privacidad"
 			case !TieneLlave(g.BotID, IDIA, "llave") && !cfg.Bool("red_local") && !sinLlaveIA(cfg):
 				return "Encendido, falta la llave del servicio"
 			}
@@ -177,9 +169,6 @@ func corta(s string, n int) string {
 // consulta (nunca textos).
 func (g *Gestor) ConsultarIA(ctx context.Context, chat, persona, pregunta string) (string, error) {
 	cfg := g.Config(IDIA)
-	if !cfg.Bool("acepto_privacidad") {
-		return "", errors.New("falta aceptar el aviso de privacidad en la configuración de la IA")
-	}
 	if strings.TrimSpace(cfg.Texto("url")) == "" {
 		return "", errors.New("todavía no se configuró el servicio de IA")
 	}
@@ -284,7 +273,7 @@ func eventoIA(g *Gestor, e Evento) {
 		return
 	}
 	cfg := g.Config(IDIA)
-	if !cfg.Bool("acepto_privacidad") || strings.TrimSpace(cfg.Texto("url")) == "" {
+	if strings.TrimSpace(cfg.Texto("url")) == "" {
 		return
 	}
 	if g.Cmd != nil && g.Cmd.EsComando(e.Texto) {

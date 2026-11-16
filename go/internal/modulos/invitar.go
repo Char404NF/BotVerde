@@ -15,7 +15,7 @@ import (
 // ---------- H4 · Invitar y agregar a grupos ----------
 //
 // Método por defecto: mandar a la persona el ENLACE de invitación del grupo; ella decide si entra. «Agregar directo» es una opción
-// aparte (apagada, con aviso de riesgo, tope bajo y espera de 30 a 90 s) y solo vale para personas de la lista «Quieren entrar»
+// aparte (apagada, con tope bajo y espera de 30 a 90 s) y solo vale para personas de la lista «Quieren entrar»
 // (ellas mismas lo pidieron escribiendo la frase). Agregar a alguien a un grupo con la acción real de WhatsApp usa el token de
 // privacidad de esa persona; si su privacidad no lo permite WhatsApp falla en silencio, y entonces se cae a la invitación con enlace.
 // Solo se escribe a quien ya tiene chat en el teléfono (quien ya escribió).
@@ -35,7 +35,7 @@ const (
 func invitar() Modulo {
 	return Nuevo(Def{
 		ID: IDInvitar, Nombre: "Invitar y agregar a grupos", Icono: "grupo", Riesgo: RiesgoMedio, Iniciativa: true,
-		Descripcion: "Manda a quien te lo pidió el enlace de invitación a un grupo (ella decide si entra). Aparte, y apagado, puedes agregarla directo al grupo: es más arriesgado, tiene tope bajo y si su privacidad no lo permite se le manda la invitación.",
+		Descripcion: "Manda a quien te lo pidió el enlace de invitación a un grupo (ella decide si entra). Aparte, y apagado, puedes agregarla directo al grupo: tiene tope bajo y, si su privacidad no lo permite, se le manda la invitación.",
 		Casillas: []permisos.Casilla{
 			{ID: "invitar.usar", Nombre: "Invitar a alguien con «!invitar»", Descripcion: "Puede pedir en un grupo que le manden el enlace de invitación a una persona que ya escribió al bot.", Grupo: "Invitar y agregar", Grupos: true, Riesgo: permisos.RiesgoMedio},
 		},
@@ -46,8 +46,7 @@ func invitar() Modulo {
 			{Clave: "texto_invitacion", Titulo: "Mensaje con la invitación", Ayuda: "Variables: {nombre}, {grupo} y {enlace}.", Tipo: CampoTexto, Varias: true, Largo: 500, Defecto: "Hola {nombre}, aquí está la invitación al grupo *{grupo}*: {enlace}\nTú decides si entras.", Obligatorio: true},
 			{Clave: "espera_min", Titulo: "Invitación · espera mínima (segundos)", Tipo: CampoNumero, Defecto: 20.0, Min: 5, Max: 600},
 			{Clave: "espera_max", Titulo: "Invitación · espera máxima (segundos)", Tipo: CampoNumero, Defecto: 60.0, Min: 5, Max: 900},
-			{Clave: "directo", Titulo: "RIESGO · Permitir agregar directo", Ayuda: "Agregar a alguien a un grupo sin que lo acepte antes puede llevar a que la reporten y WhatsApp restrinja tu cuenta. Apagado por defecto.", Tipo: CampoInterruptor, Defecto: false},
-			{Clave: "directo_acepto", Titulo: "Entiendo el riesgo de agregar directo", Tipo: CampoInterruptor, Defecto: false},
+			{Clave: "directo", Titulo: "Permitir agregar directo", Ayuda: "Agrega a la persona al grupo sin esperar a que acepte una invitación. Apagado por defecto.", Tipo: CampoInterruptor, Defecto: false},
 			{Clave: "directo_tope_dia", Titulo: "Agregar directo · máximo por día", Tipo: CampoNumero, Defecto: 5.0, Min: 1, Max: 30},
 			{Clave: "directo_espera_min", Titulo: "Agregar directo · espera mínima (segundos)", Tipo: CampoNumero, Defecto: 30.0, Min: 30, Max: 900},
 			{Clave: "directo_espera_max", Titulo: "Agregar directo · espera máxima (segundos)", Tipo: CampoNumero, Defecto: 90.0, Min: 30, Max: 1800},
@@ -57,9 +56,6 @@ func invitar() Modulo {
 			cfg := Config(c)
 			if cfg.Num("espera_max") < cfg.Num("espera_min") || cfg.Num("directo_espera_max") < cfg.Num("directo_espera_min") {
 				return errors.New("la espera máxima no puede ser menor que la mínima")
-			}
-			if cfg.Bool("directo") && !cfg.Bool("directo_acepto") {
-				return errors.New("para permitir agregar directo marca antes «Entiendo el riesgo»")
 			}
 			if !strings.Contains(cfg.Texto("texto_invitacion"), "{enlace}") {
 				return errors.New("el mensaje de la invitación debe llevar {enlace}")
@@ -173,7 +169,7 @@ func (g *Gestor) agregarDirecto(grupoChat, persona string) error {
 	if !g.Activo(IDInvitar) || g.Acc == nil {
 		return errors.New("el módulo está apagado o no hay conexión con WhatsApp")
 	}
-	if !cfg.Bool("directo") || !cfg.Bool("directo_acepto") {
+	if !cfg.Bool("directo") {
 		return errors.New("agregar directo está apagado: enciéndelo en los ajustes del módulo")
 	}
 	if !strings.HasSuffix(grupoChat, "@g.us") {
@@ -247,7 +243,7 @@ func panelesInvitar(g *Gestor) []Panel {
 			},
 			Alta: "Enviar invitación",
 			Extras: []Boton{
-				{Accion: "invitar.directo", Titulo: "Agregar directo", Confirma: "Agregar a alguien a un grupo sin que lo acepte antes es arriesgado: pueden reportarte. Si su privacidad no lo permite se le manda la invitación. ¿Seguir?"},
+				{Accion: "invitar.directo", Titulo: "Agregar directo", Confirma: "¿Agregar a esta persona directo al grupo? Si su privacidad no lo permite se le manda la invitación."},
 				{Accion: "invitar.quitar", Titulo: "Quitar de la lista"},
 			},
 		},

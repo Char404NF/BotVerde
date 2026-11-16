@@ -67,7 +67,8 @@ class NavegacionUiTest {
     @Test fun actualizacionYaVinculadaSoloVeElAvisoUnaVez() {
         Apoyo.creaBot(); val a = Ajustes.get(Apoyo.ctx())
         contenido()
-        regla.onNodeWithText("Antes de empezar").assertIsDisplayed()
+        regla.onNodeWithText("Términos y condiciones").assertIsDisplayed()
+        assertEquals(1, regla.onAllNodesWithTextSafe("Tu cuenta de WhatsApp")) // los términos completos, no un resumen
         assertEquals(0, regla.onAllNodesWithTextSafe("Hola, esto es Bot Chat")) // sin la bienvenida completa
         regla.onNodeWithText("Continuar").assertIsNotEnabled()
         regla.onNodeWithTag("casilla_acepto").performClick()
@@ -83,12 +84,28 @@ class NavegacionUiTest {
         regla.onNodeWithText("Siguiente").performClick()
         regla.esperaTexto("Todo se queda en tu teléfono")
         regla.onNodeWithText("Siguiente").performClick()
-        regla.esperaTexto("Antes de empezar")
+        regla.esperaTexto("Términos y condiciones")
         regla.onNodeWithText("Empezar").assertIsNotEnabled()
         regla.onNodeWithTag("casilla_acepto").performClick()
         regla.onNodeWithText("Empezar").assertIsEnabled().performClick()
         regla.waitForIdle()
         regla.esperaTexto("¿Cómo se llamará tu bot?")
+    }
+
+    @Test fun losTerminosSeAceptanUnaVezYDespuesSoloSeConsultan() {
+        Apoyo.creaBot(); val a = Ajustes.get(Apoyo.ctx()); a.aceptarAviso()
+        contenido(); regla.esperaTexto("María López")
+        assertEquals(0, regla.onAllNodesWithTextSafe("He leído y acepto los términos y condiciones")) // no vuelve a pedirse
+        regla.onNodeWithTag("nav_bot").performClick()
+        regla.esperaEtiqueta("hub_ajustes")
+        regla.onNodeWithTag("hub_ajustes").performScrollTo().performClick()
+        regla.esperaEtiqueta("ajuste_terminos")
+        regla.onNodeWithTag("ajuste_terminos").performScrollTo().performClick()
+        regla.esperaEtiqueta("texto_terminos")
+        regla.esperaTexto("Mensajes automáticos")
+        regla.onNodeWithTag("cerrar_terminos").performClick()
+        regla.waitForIdle()
+        assertEquals(0, regla.onAllNodesWithTextSafe("Mensajes automáticos"))
     }
 
     @Test fun recorridoPorLasPantallas() {

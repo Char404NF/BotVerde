@@ -20,7 +20,7 @@ func iaLista(t *testing.T) (*ent, *descFalso) {
 	FijarLlave(1, IDIA, "llave", "sk-SECRETO-999")
 	t.Cleanup(func() { FijarLlave(1, IDIA, "llave", "") })
 	e.activa(IDIA)
-	e.config(IDIA, map[string]any{"acepto_privacidad": true})
+	e.config(IDIA, map[string]any{})
 	e.fija("tope_hora", "100")
 	e.fija("tope_dia", "100")
 	return e, d
@@ -34,15 +34,16 @@ func cmdIA(t *testing.T, e *ent) comandos.Comando {
 func TestIAApagadaPorDefectoYAvisaPrivacidad(t *testing.T) {
 	e, _ := entH(t)
 	i, _ := e.g.InfoDe(IDIA)
-	if i.Activo || !i.Iniciativa || i.Riesgo != RiesgoMedio || !strings.Contains(i.Descripcion, "SALE de tu teléfono") {
+	if i.Activo || !i.Iniciativa || i.Riesgo != RiesgoMedio {
 		t.Fatalf("info: %+v", i)
 	}
 	c := e.g.Config(IDIA)
-	if c.Bool("memoria") || c.Bool("por_mencion") || c.Bool("chats_activos") || c.Bool("en_menus") || c.Bool("acepto_privacidad") {
+	if c.Bool("memoria") || c.Bool("por_mencion") || c.Bool("chats_activos") || c.Bool("en_menus") {
 		t.Fatalf("todo debe nacer apagado: %v", c)
 	}
-	_, err := cmdIA(t, e).Ejecutar(&comandos.Contexto{Chat: pnAna, Persona: pnAna, Resto: "hola"})
-	esperaErr(t, err, "aviso de privacidad")
+	if _, ok := Obtener(IDIA); !ok {
+		t.Fatal("el módulo debe existir")
+	}
 }
 
 func TestIAComandoUsaLlaveEtiquetaYNoGuardaLlave(t *testing.T) {
@@ -81,9 +82,6 @@ func TestIAValidaciones(t *testing.T) {
 	e, _ := iaLista(t)
 	b, _ := jsonDe(map[string]any{"etiqueta": "  "})
 	esperaErr(t, e.g.GuardarConfig(IDIA, b), "vacío")
-	e.config(IDIA, map[string]any{"acepto_privacidad": false})
-	b, _ = jsonDe(map[string]any{"acepto_privacidad": false, "por_mencion": true})
-	esperaErr(t, e.g.GuardarConfig(IDIA, b), "Entiendo")
 }
 
 func TestIALimitesDiaPersonaYLargo(t *testing.T) {
@@ -231,7 +229,7 @@ func TestIAClaudeUsaSuFormato(t *testing.T) {
 	d.resp = func(p PeticionHTTP) (*RespuestaHTTP, error) {
 		return cuerpo("application/json", "", `{"content":[{"type":"text","text":"Hola desde Claude"}]}`), nil
 	}
-	e.config(IDIA, map[string]any{"acepto_privacidad": true, "proveedor": "anthropic", "url": "https://api.anthropic.com", "modelo": "claude-haiku-5-5"})
+	e.config(IDIA, map[string]any{"proveedor": "anthropic", "url": "https://api.anthropic.com", "modelo": "claude-haiku-5-5"})
 	r, err := cmdIA(t, e).Ejecutar(&comandos.Contexto{Chat: pnAna, Persona: pnAna, Resto: "hola"})
 	if err != nil || !strings.HasSuffix(r, "Hola desde Claude") {
 		t.Fatalf("%q %v", r, err)
@@ -255,12 +253,12 @@ func TestIAClaudeUsaSuFormato(t *testing.T) {
 
 func TestIAOpenAIUsaMaxCompletionTokensYOtrosMaxTokens(t *testing.T) {
 	e, d := iaLista(t)
-	e.config(IDIA, map[string]any{"acepto_privacidad": true, "proveedor": "openai"})
+	e.config(IDIA, map[string]any{"proveedor": "openai"})
 	_, _ = cmdIA(t, e).Ejecutar(&comandos.Contexto{Chat: pnAna, Persona: pnAna, Resto: "hola"})
 	if c := string(d.reqs[len(d.reqs)-1].Cuerpo); !strings.Contains(c, "max_completion_tokens") || strings.Contains(c, "temperature") {
 		t.Fatalf("openai: %s", c)
 	}
-	e.config(IDIA, map[string]any{"acepto_privacidad": true, "proveedor": "groq", "url": "https://api.groq.com/openai/v1", "modelo": "llama-3.1-8b-instant"})
+	e.config(IDIA, map[string]any{"proveedor": "groq", "url": "https://api.groq.com/openai/v1", "modelo": "llama-3.1-8b-instant"})
 	_, _ = cmdIA(t, e).Ejecutar(&comandos.Contexto{Chat: pnAna, Persona: pnAna, Resto: "hola"})
 	if c := string(d.reqs[len(d.reqs)-1].Cuerpo); !strings.Contains(c, `"max_tokens"`) || strings.Contains(c, "max_completion_tokens") {
 		t.Fatalf("groq: %s", c)

@@ -77,7 +77,7 @@ func TestAplicarCreaTodoYDeshacerLoQuita(t *testing.T) {
 	m := &modFalso{}
 	b := Nuevo()
 	b.Grupos, b.GruposElegidos = true, []string{g1}
-	b.Reglas.AlEntrar, b.Reglas.AvisoOk = true, true
+	b.Reglas.AlEntrar = true
 	b.Util.Silenciar, b.Util.Notas, b.Util.Recordatorios, b.Util.Advertencias = false, false, false, false
 	if p := b.Problemas(); len(p) != 0 {
 		t.Fatal(p)
@@ -146,7 +146,7 @@ func TestNoTocaLoDelUsuarioNiPisaUnModuloYaEncendido(t *testing.T) {
 	m := &modFalso{activo: true, cfg: `{"mensaje":"del usuario"}`}
 	b := Nuevo()
 	b.Grupos, b.GruposElegidos = true, []string{g1}
-	b.Reglas.AlEntrar, b.Reglas.AvisoOk = true, true
+	b.Reglas.AlEntrar = true
 	c, err := Aplicar(a, 1, b, m)
 	if err != nil {
 		t.Fatal(err)
@@ -182,14 +182,14 @@ func TestProblemasYAplicarNoDejaMediasCosas(t *testing.T) {
 		t.Fatal("debía fallar")
 	}
 	b = Nuevo()
-	b.Reglas.AlEntrar = true // sin aviso aceptado y sin grupo
-	if p := b.Problemas(); len(p) != 2 {
+	b.Reglas.AlEntrar = true // sin grupo elegido
+	if p := b.Problemas(); len(p) != 1 {
 		t.Fatalf("%v", p)
 	}
 	// Un fallo a la mitad deshace lo creado: el módulo no existe.
 	b = Nuevo()
 	b.Grupos, b.GruposElegidos = true, []string{g1}
-	b.Reglas.AlEntrar, b.Reglas.AvisoOk = true, true
+	b.Reglas.AlEntrar = true
 	if _, err := Aplicar(a, 1, b, &falla{}); err == nil {
 		t.Fatal("debía fallar")
 	}

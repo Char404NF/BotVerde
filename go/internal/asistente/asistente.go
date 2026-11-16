@@ -64,7 +64,6 @@ type Borrador struct {
 	// 4) Reglas (la lista vive en las reglas generales de siempre: aquí solo se elige a quién se mandan)
 	Reglas struct {
 		AlEntrar bool `json:"alEntrar"` // enciende el módulo de bienvenida a quien entra a un grupo (iniciativa)
-		AvisoOk  bool `json:"avisoOk"`  // «entiendo que el bot escribe solo al entrar alguien»
 	} `json:"reglas"`
 
 	// 5) Utilidades
@@ -256,9 +255,6 @@ func (b *Borrador) Problemas() []string {
 				p = append(p, fmt.Sprintf("La opción «%s» no tiene respuesta.", o.Texto))
 			}
 		}
-	}
-	if b.conReglas() && !b.Reglas.AvisoOk {
-		p = append(p, "Para mandar las reglas a quien entra a un grupo, marca que entiendes que el bot escribe solo en ese momento.")
 	}
 	if b.conReglas() && !(b.Grupos && len(b.GruposElegidos) > 0) {
 		p = append(p, "Para mandar las reglas a quien entra, elige al menos un grupo en el paso 1.")

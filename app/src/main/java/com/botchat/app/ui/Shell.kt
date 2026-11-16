@@ -456,7 +456,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 composable("modulos") {
                     PantallaModulos(
                         bot.id, alVolver = { nav.popBackStack() }, alConfigurar = { nav.navigate("modulo_config/${enc(it)}") },
-                        alAviso = { nav.navigate("modulo_aviso/${enc(it)}") }, alIniciativa = { nav.navigate("iniciativa") },
+                        alIniciativa = { nav.navigate("iniciativa") },
                     )
                 }
                 composable("modulo_config/{id}") { be ->
@@ -464,10 +464,6 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                     PantallaConfigModulo(bot.id, id, alVolver = { nav.popBackStack() }, alAbrirHistorial = { nav.navigate("descargas_video") })
                 }
                 composable("descargas_video") { PantallaDescargasVideo(bot.id, alVolver = { nav.popBackStack() }) }
-                composable("modulo_aviso/{id}") { be ->
-                    val id = be.arguments?.getString("id") ?: return@composable
-                    PantallaAvisoRiesgo(bot.id, id, alVolver = { nav.popBackStack() })
-                }
                 composable("iniciativa") { PantallaIniciativa(bot.id, alVolver = { nav.popBackStack() }, alRegistro = { nav.navigate("registro_iniciativas") }) }
                 composable("registro_iniciativas") { PantallaRegistroIniciativas(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("privacidad") { PantallaPrivacidad(ajustes, alVolver = { nav.popBackStack() }) }

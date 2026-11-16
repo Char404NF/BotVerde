@@ -191,10 +191,12 @@ class Ajustes private constructor(ctx: Context) {
     val topeAvisoVisto: StateFlow<Boolean> = _topeAviso
     fun topeAvisoMarcado() { p.edit().putBoolean("tope_aviso_visto", true).apply(); _topeAviso.value = true }
 
-    // ---- aviso de herramienta no oficial (se acepta una sola vez) ----
-    private val _aviso = MutableStateFlow(p.getBoolean("aviso_aceptado", false))
+    // ---- términos y condiciones (se aceptan una sola vez, al empezar) ----
+    // La clave «aviso_aceptado» es la del aviso anterior: sigue marcándose para saber que la app ya se usó. Los términos nuevos llevan
+    // su propia clave, así quien actualiza los ve y acepta una vez.
+    private val _aviso = MutableStateFlow(p.getBoolean("terminos_v1", false))
     val avisoAceptado: StateFlow<Boolean> = _aviso
-    fun aceptarAviso() { p.edit().putBoolean("aviso_aceptado", true).apply(); _aviso.value = true }
+    fun aceptarAviso() { p.edit().putBoolean("terminos_v1", true).putBoolean("aviso_aceptado", true).apply(); _aviso.value = true }
 
     // ---- "mensajes nuevos": hasta cuándo vio cada chat (solo en este teléfono; no toca la base de mensajes) ----
     private val vistos: SharedPreferences = ctx.getSharedPreferences("vistos", Context.MODE_PRIVATE)

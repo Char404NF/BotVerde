@@ -73,9 +73,7 @@ func TestInvitarAgregarDirectoPideAceptarYSoloListaYTope(t *testing.T) {
 	_, _ = e.alm.AgregarALista(1, ListaQuierenEntrar, pnAna, "palabra", e.hora)
 	_, err := e.g.AccionModulo(IDInvitar, "invitar.directo", Args{"grupo": grupo, "persona": pnAna})
 	esperaErr(t, err, "apagado")
-	b, _ := jsonDe(map[string]any{"directo": true})
-	esperaErr(t, e.g.GuardarConfig(IDInvitar, b), "Entiendo el riesgo")
-	e.config(IDInvitar, map[string]any{"directo": true, "directo_acepto": true, "directo_tope_dia": 2.0})
+	e.config(IDInvitar, map[string]any{"directo": true, "directo_tope_dia": 2.0})
 	// alguien que no la pidió
 	e.conChat(pnLuis, false, "Luis")
 	_, err = e.g.AccionModulo(IDInvitar, "invitar.directo", Args{"grupo": grupo, "persona": pnLuis})
@@ -120,7 +118,7 @@ func TestInvitarAgregarDirectoPideAceptarYSoloListaYTope(t *testing.T) {
 
 func TestInvitarAgregarDirectoCaeAInvitacionPorPrivacidad(t *testing.T) {
 	e, acc := invitarListo(t)
-	e.config(IDInvitar, map[string]any{"directo": true, "directo_acepto": true})
+	e.config(IDInvitar, map[string]any{"directo": true})
 	acc.resAgregar = AgregPrivacidad
 	_, _ = e.alm.AgregarALista(1, ListaQuierenEntrar, pnAna, "palabra", e.hora)
 	if err := e.g.agregarDirecto(grupo, pnAna); err != nil {
@@ -137,7 +135,7 @@ func TestInvitarAgregarDirectoCaeAInvitacionPorPrivacidad(t *testing.T) {
 
 func TestInvitarErrorAlAgregarNoCuentaSiYaNoEsta(t *testing.T) {
 	e, acc := invitarListo(t)
-	e.config(IDInvitar, map[string]any{"directo": true, "directo_acepto": true})
+	e.config(IDInvitar, map[string]any{"directo": true})
 	acc.errAgregar = errors.New("falló")
 	_, _ = e.alm.AgregarALista(1, ListaQuierenEntrar, pnAna, "palabra", e.hora)
 	_ = e.g.agregarDirecto(grupo, pnAna)

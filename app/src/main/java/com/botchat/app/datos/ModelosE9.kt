@@ -23,7 +23,6 @@ data class BorradorAsistente(
     val menuTitulo: String = "",
     val menuOpciones: List<OpcionAsistente> = emptyList(),
     val reglasAlEntrar: Boolean = false,
-    val reglasAvisoOk: Boolean = false,
     val silenciar: Boolean = true,
     val advertencias: Boolean = true,
     val etiquetas: Boolean = true,
@@ -39,7 +38,7 @@ data class BorradorAsistente(
             .put("adjuntos", JSONArray(bienvenidaAdjuntos.map { JSONObject().put("id", it.id).put("tipo", it.tipo).put("mime", it.mime).put("nombre", it.nombre).put("bytes", it.bytes) })))
         o.put("menu", JSONObject().put("activo", menuActivo).put("titulo", menuTitulo)
             .put("opciones", JSONArray(menuOpciones.map { JSONObject().put("texto", it.texto).put("respuesta", it.respuesta) })))
-        o.put("reglas", JSONObject().put("alEntrar", reglasAlEntrar).put("avisoOk", reglasAvisoOk))
+        o.put("reglas", JSONObject().put("alEntrar", reglasAlEntrar))
         o.put("util", JSONObject().put("silenciar", silenciar).put("advertencias", advertencias).put("etiquetas", etiquetas).put("recordatorios", recordatorios).put("notas", notas))
         o.put("otroNumero", otroNumero)
         return o.toString()
@@ -75,7 +74,7 @@ object JsonE9 {
             bienvenidaAdjuntos = List(adj?.length() ?: 0) { i -> adj!!.getJSONObject(i).let { AdjuntoSubido(it.optString("id"), it.optString("tipo"), it.optString("mime"), it.optString("nombre"), it.optLong("bytes")) } },
             menuActivo = m.optBoolean("activo", true), menuTitulo = m.optString("titulo"),
             menuOpciones = List(ops?.length() ?: 0) { i -> ops!!.getJSONObject(i).let { OpcionAsistente(it.optString("texto"), it.optString("respuesta")) } },
-            reglasAlEntrar = r.optBoolean("alEntrar"), reglasAvisoOk = r.optBoolean("avisoOk"),
+            reglasAlEntrar = r.optBoolean("alEntrar"),
             silenciar = u.optBoolean("silenciar", true), advertencias = u.optBoolean("advertencias", true), etiquetas = u.optBoolean("etiquetas", true),
             recordatorios = u.optBoolean("recordatorios", true), notas = u.optBoolean("notas", true),
             otroNumero = o.optString("otroNumero"),

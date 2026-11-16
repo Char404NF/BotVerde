@@ -14,7 +14,7 @@ func tradLista(t *testing.T) (*ent, *descFalso) {
 	d := &descFalso{}
 	e.g.Descarga = d
 	e.activa(IDTraductor)
-	e.config(IDTraductor, map[string]any{"url": "https://trad.ejemplo.com", "acepto_privacidad": true})
+	e.config(IDTraductor, map[string]any{"url": "https://trad.ejemplo.com"})
 	return e, d
 }
 
@@ -39,9 +39,6 @@ func TestTraductorNaceApagadoYBajoRiesgo(t *testing.T) {
 	i, _ := e.g.InfoDe(IDTraductor)
 	if i.Activo || i.Iniciativa || i.Riesgo != RiesgoBajo {
 		t.Fatalf("info: %+v", i)
-	}
-	if !strings.Contains(i.Descripcion, "SALE de tu teléfono") {
-		t.Fatal("falta el aviso de privacidad")
 	}
 }
 
@@ -100,13 +97,10 @@ func TestTraducirConEndpointDeIAYIdiomaPorDefecto(t *testing.T) {
 	}
 }
 
-func TestTraducirPideAvisoUrlYValida(t *testing.T) {
+func TestTraducirPideUrlYValida(t *testing.T) {
 	e, d := tradLista(t)
-	e.config(IDTraductor, map[string]any{"acepto_privacidad": false})
+	e.config(IDTraductor, map[string]any{"url": ""})
 	_, err := cmdTrad(t, e).Ejecutar(&comandos.Contexto{Chat: pnAna, Resto: "en hola"})
-	esperaErr(t, err, "aviso de privacidad")
-	e.config(IDTraductor, map[string]any{"acepto_privacidad": true, "url": ""})
-	_, err = cmdTrad(t, e).Ejecutar(&comandos.Contexto{Chat: pnAna, Resto: "en hola"})
 	esperaErr(t, err, "servidor")
 	e.config(IDTraductor, map[string]any{"url": "https://trad.ejemplo.com"})
 	_, err = cmdTrad(t, e).Ejecutar(&comandos.Contexto{Chat: pnAna, CitaID: "NO", Args: []string{"klingon"}, Resto: "klingon"})

@@ -195,18 +195,17 @@ class E9UiTest {
         regla.esperaTexto("1. Citas", substring = true)
     }
 
-    @Test fun reglasUsaLaListaEditableYElEnvioAlEntrarPideAvisoDeRiesgo() {
+    @Test fun reglasUsaLaListaEditableYElEnvioAlEntrarSeEnciendeSinAvisos() {
         asistente()
         repeat(3) { toca("asistente_siguiente") }
         regla.esperaTexto("Reglas de la casa")
         assertTrue(hay("lista_reglas")); assertTrue(hay("asist_reglas_comando"))
         toca("asist_reglas_entrar")
-        regla.espera { hay("asist_reglas_riesgo") }
-        assertTrue(hay("asist_reglas_sin_grupo"))
-        toca("asist_reglas_aviso")
-        esperaGuardado { it.reglasAlEntrar && it.reglasAvisoOk }
-        toca("asist_reglas_entrar") // al apagarlo se olvida el aviso aceptado
-        esperaGuardado { !it.reglasAlEntrar && !it.reglasAvisoOk }
+        regla.espera { hay("asist_reglas_sin_grupo") }
+        assertFalse(hay("asist_reglas_riesgo")); assertFalse(hay("asist_reglas_aviso"))
+        esperaGuardado { it.reglasAlEntrar }
+        toca("asist_reglas_entrar")
+        esperaGuardado { !it.reglasAlEntrar }
     }
 
     @Test fun utilidadesSonInterruptoresSimples() {

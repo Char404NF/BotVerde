@@ -25,7 +25,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +63,13 @@ fun PantallaAjustes(ajustes: Ajustes, alSeguridad: () -> Unit, alDescargas: () -
         Tarjeta(Ico.Descargar, "Descargas", "Qué se baja solo, con Wi-Fi o con datos", alDescargas, "ajuste_descargas")
         Tarjeta(Ico.Chats, "Estado del bot", "Encender, apagar y mantenerlo conectado", alBot, "ajuste_bot")
         Tarjeta(Ico.Info, "Avanzado", "Aspecto, registro y otras opciones técnicas", alAvanzado, "ajuste_avanzado")
+        var verTerminos by remember { mutableStateOf(false) }
+        Tarjeta(Ico.Documento, "Términos y condiciones", "Lo que aceptaste al empezar", { verTerminos = true }, "ajuste_terminos")
+        if (verTerminos) AlertDialog(
+            onDismissRequest = { verTerminos = false }, title = { Text("Términos y condiciones") },
+            text = { Column(Modifier.verticalScroll(rememberScrollState())) { TextoTerminos() } },
+            confirmButton = { androidx.compose.material3.TextButton({ verTerminos = false }, Modifier.testTag("cerrar_terminos")) { Text("Cerrar") } },
+        )
         Spacer(Modifier.size(Esp.l))
         Column(Modifier.fillMaxWidth().padding(Esp.l), horizontalAlignment = Alignment.CenterHorizontally) {
             LogoBot(Modifier.size(48.dp))

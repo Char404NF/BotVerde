@@ -9,7 +9,6 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import com.botchat.app.seguridad.LlavesModulos
 import com.botchat.app.ui.BotChatTema
-import com.botchat.app.ui.PantallaAvisoRiesgo
 import com.botchat.app.ui.PantallaConfigModulo
 import org.json.JSONArray
 import org.json.JSONObject
@@ -83,11 +82,5 @@ class LlavesModuloUiTest {
         regla.onNodeWithTag("borrar_llave_llave", useUnmergedTree = true).performScrollTo().performClick()
         regla.espera { motor.llavesEnGo["ia:llave"] == "" }
         assertFalse(LlavesModulos.existe(Apoyo.ctx(), bot, "ia", "llave"))
-    }
-
-    @Test fun elAvisoDeRiesgoDeLaIAAdviertePrivacidad() {
-        regla.setContent { BotChatTema { PantallaAvisoRiesgo(bot, "ia", {}) } }
-        regla.esperaEtiqueta("aviso_texto")
-        regla.onNodeWithTag("aviso_privacidad", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
     }
 }

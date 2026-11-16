@@ -76,7 +76,6 @@ fun PantallaConfigModulo(botId: Long, id: String, alVolver: () -> Unit, alAbrirH
         if (m == null) { Box(Modifier.fillMaxSize().padding(relleno), Alignment.Center) { CircularProgressIndicator() }; return@Scaffold }
         Column(Modifier.fillMaxSize().padding(relleno).verticalScroll(rememberScrollState()).padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
-                EtiquetaRiesgo(m.riesgo)
                 Text(m.estado.ifBlank { if (m.activo) "Encendido" else "Apagado" }, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("config_estado"))
             }
             Text(m.descripcion, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

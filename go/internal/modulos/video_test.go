@@ -120,7 +120,7 @@ func videoLista(t *testing.T, info string, tam int64) (*ent, *accFalsa, *motorFa
 	m := &motorFalso{dir: t.TempDir(), info: info, tam: tam, versionAct: "2026.10.26", nuevaVer: "2026.11.01"}
 	e.g.Video = m
 	e.activa(IDVideo)
-	e.config(IDVideo, map[string]any{"acepto_riesgos": true, "max_envio_mb": 90.0, "max_video_mb": 90.0, "max_zip_mb": 1500.0, "max_total_mb": 800.0})
+	e.config(IDVideo, map[string]any{"max_envio_mb": 90.0, "max_video_mb": 90.0, "max_zip_mb": 1500.0, "max_total_mb": 800.0})
 	return e, acc, m
 }
 
@@ -181,20 +181,13 @@ func TestVideoNaceApagadoYDeRiesgoAlto(t *testing.T) {
 	if e.g.Activo(IDVideo) {
 		t.Fatal("tiene que nacer apagado")
 	}
-	if e.g.Config(IDVideo).Bool("acepto_riesgos") {
-		t.Fatal("los riesgos no pueden venir aceptados")
-	}
 	if c := e.g.Config(IDVideo); c.Int("max_envio_mb") != 1000 || c.Int("max_video_mb") != 90 || c.Texto("audio_formato") != "mp3" || !c.Bool("actualizar_auto") {
 		t.Fatalf("valores de fábrica: %v", c)
 	}
 }
 
-func TestVideoPideAceptarRiesgosYValidaElEnlace(t *testing.T) {
+func TestVideoValidaElEnlace(t *testing.T) {
 	e, _, _ := videoLista(t, infoCorta, 1000)
-	e.config(IDVideo, map[string]any{"acepto_riesgos": false})
-	_, err := cmdVideo(t, e, "descargar").Ejecutar(&comandos.Contexto{Chat: pnAna, Persona: pnAna, Resto: "https://youtu.be/abc"})
-	esperaErr(t, err, "aceptó los riesgos")
-	e.config(IDVideo, map[string]any{"acepto_riesgos": true})
 	for enlace, quiere := range map[string]string{
 		"":                           "escribe el enlace",
 		"https://pornhub.com/view":   "no está permitido",
@@ -207,7 +200,7 @@ func TestVideoPideAceptarRiesgosYValidaElEnlace(t *testing.T) {
 		esperaErr(t, err, quiere)
 	}
 	e.config(IDVideo, map[string]any{"sitios": "tiktok.com"})
-	_, err = cmdVideo(t, e, "descargar").Ejecutar(&comandos.Contexto{Chat: pnAna, Persona: pnAna, Resto: "https://youtu.be/abc"})
+	_, err := cmdVideo(t, e, "descargar").Ejecutar(&comandos.Contexto{Chat: pnAna, Persona: pnAna, Resto: "https://youtu.be/abc"})
 	esperaErr(t, err, "no está permitido")
 }
 

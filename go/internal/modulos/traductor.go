@@ -56,17 +56,14 @@ func buscaIdioma(s string) (idioma, bool) {
 	return idioma{}, false
 }
 
-const avisoPrivacidadTrad = "El texto que traduzcas SALE de tu teléfono hacia el servidor que elijas (tu LibreTranslate o el proveedor de IA)."
-
 func traductor() Modulo {
 	return Nuevo(Def{
 		ID: IDTraductor, Nombre: "Traductor", Icono: "traductor", Riesgo: RiesgoBajo, Iniciativa: false,
-		Descripcion: "«!traducir inglés» citando un mensaje lo traduce. Usa el servidor que elijas (LibreTranslate propio o un endpoint compatible con IA). Aviso de privacidad: " + avisoPrivacidadTrad,
+		Descripcion: "«!traducir inglés» citando un mensaje lo traduce. Usa el servidor que elijas (LibreTranslate propio o un endpoint compatible con IA).",
 		Casillas: []permisos.Casilla{
 			{ID: "traductor.usar", Nombre: "Pedir «!traducir»", Descripcion: "Puede pedir traducciones. El texto sale del teléfono hacia el servidor de traducción.", Grupo: "Traductor", Riesgo: permisos.RiesgoBajo},
 		},
 		Esquema: []Campo{
-			{Clave: "acepto_privacidad", Titulo: "Entiendo que el texto sale del teléfono", Ayuda: avisoPrivacidadTrad + " Hace falta marcarlo para que traduzca.", Tipo: CampoInterruptor, Defecto: false},
 			{Clave: "servidor", Titulo: "Tipo de servidor", Tipo: CampoLista, Defecto: "libretranslate",
 				Opciones: []Opcion{{"libretranslate", "LibreTranslate"}, {"openai", "Endpoint compatible con IA (OpenAI)"}}},
 			{Clave: "url", Titulo: "Dirección del servidor", Ayuda: "LibreTranslate: https://traductor.tuservidor.com  ·  IA: https://api.openai.com/v1", Tipo: CampoTexto, Largo: 300, Defecto: ""},
@@ -89,8 +86,6 @@ func traductor() Modulo {
 		AlEstado: func(g *Gestor) string {
 			cfg := g.Config(IDTraductor)
 			switch {
-			case !cfg.Bool("acepto_privacidad"):
-				return "Encendido, falta aceptar el aviso de privacidad"
 			case strings.TrimSpace(cfg.Texto("url")) == "":
 				return "Encendido, falta la dirección del servidor"
 			}
@@ -103,9 +98,6 @@ func traductor() Modulo {
 // Traducir traduce un texto con el servidor configurado. Devuelve el texto traducido.
 func (g *Gestor) Traducir(ctx context.Context, texto string, destino idioma) (string, error) {
 	cfg := g.Config(IDTraductor)
-	if !cfg.Bool("acepto_privacidad") {
-		return "", errors.New("falta aceptar el aviso de privacidad en la configuración del Traductor")
-	}
 	if strings.TrimSpace(cfg.Texto("url")) == "" {
 		return "", errors.New("todavía no se configuró el servidor de traducción")
 	}

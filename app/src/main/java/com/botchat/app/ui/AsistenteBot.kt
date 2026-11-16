@@ -325,14 +325,9 @@ private fun PasoReglas(botId: Long, b: BorradorAsistente, alCambiar: (BorradorAs
     Text("Con !reglas, cualquiera del grupo puede verlas cuando quiera. Eso ya funciona solo.", Modifier.testTag("asist_reglas_comando"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     TarjetaInterruptor(
         "Mandarlas a quien entra a un grupo", "Cuando alguien entra, el bot le da la bienvenida en el grupo con estas reglas.", b.reglasAlEntrar, "asist_reglas_entrar",
-        { alCambiar(b.copy(reglasAlEntrar = it, reglasAvisoOk = if (it) b.reglasAvisoOk else false)) },
+        { alCambiar(b.copy(reglasAlEntrar = it)) },
     ) {
         if (b.reglasAlEntrar) {
-            Text("Ojo: aquí el bot escribe solo, sin que nadie le haya escrito, y WhatsApp puede restringir cuentas que lo hacen mucho. Solo funciona en los grupos que elegiste en el paso 1.", Modifier.testTag("asist_reglas_riesgo"), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(b.reglasAvisoOk, { alCambiar(b.copy(reglasAvisoOk = it)) }, Modifier.testTag("asist_reglas_aviso"))
-                Text("Entiendo el riesgo y quiero encenderlo", Modifier.weight(1f))
-            }
             if (!(b.grupos && b.gruposElegidos.isNotEmpty())) Text("Primero elige al menos un grupo en el paso 1.", Modifier.testTag("asist_reglas_sin_grupo"), style = MaterialTheme.typography.bodySmall)
         }
     }

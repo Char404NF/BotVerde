@@ -219,11 +219,9 @@ func TestBienvenidaExentoPorCasilla(t *testing.T) {
 	}
 }
 
-func TestBienvenidaPrivadoPideAceptarYTieneTope(t *testing.T) {
+func TestBienvenidaPrivadoTieneTope(t *testing.T) {
 	e, _ := bienvenidaLista(t)
-	b, _ := jsonDe(map[string]any{"privado": true})
-	esperaErr(t, e.g.GuardarConfig(IDBienvenida, b), "Entiendo el riesgo")
-	e.config(IDBienvenida, map[string]any{"privado": true, "privado_acepto": true, "privado_tope_dia": 2.0})
+	e.config(IDBienvenida, map[string]any{"privado": true, "privado_tope_dia": 2.0})
 	var jids []string
 	for _, n := range []string{"5215500000001", "5215500000002", "5215500000003"} {
 		jids = append(jids, n+"@s.whatsapp.net")

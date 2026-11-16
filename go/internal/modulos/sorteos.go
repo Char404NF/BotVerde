@@ -90,7 +90,7 @@ func sorteos() Modulo {
 			{Clave: "intentos_max", Titulo: "Intentos para encontrar ganador", Ayuda: "Cuántas veces se vuelve a sortear si el ganador no reclama.", Tipo: CampoNumero, Defecto: 3.0, Min: 1, Max: 20},
 			{Clave: "aviso_antes_min", Titulo: "Recordatorio antes de que se acabe (minutos)", Ayuda: "0 = sin recordatorio. Solo se manda si el plazo es de al menos el triple.", Tipo: CampoNumero, Defecto: 5.0, Min: 0, Max: 1440},
 			{Clave: "avisar_privado", Titulo: "Avisar al ganador por privado", Tipo: CampoInterruptor, Defecto: true},
-			{Clave: "privado_conocidos", Titulo: "Solo escribir por privado a quien ya me escribió antes", Ayuda: "Escribirle a alguien que nunca habló con el bot puede hacer que WhatsApp sospeche de la cuenta. Con esto encendido, a los demás se les menciona en el grupo.", Tipo: CampoInterruptor, Defecto: true},
+			{Clave: "privado_conocidos", Titulo: "Solo escribir por privado a quien ya me escribió antes", Ayuda: "Con esto encendido, a quien nunca habló con el bot se le menciona en el grupo en vez de escribirle por privado.", Tipo: CampoInterruptor, Defecto: true},
 		},
 		TopeHora: 20, TopeDia: 80,
 		AlActivar: func(g *Gestor) error {

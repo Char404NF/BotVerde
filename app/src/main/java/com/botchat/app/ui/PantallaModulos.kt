@@ -58,25 +58,6 @@ import kotlinx.coroutines.launch
 private val VerdeRiesgo = Color(0xFF2E9E5B)
 private val AmarilloRiesgo = Color(0xFFC98A00)
 
-/** Color de la etiqueta de riesgo: verde (bajo), amarillo (medio) o rojo (alto). */
-@Composable
-internal fun colorRiesgo(riesgo: String): Color = when (riesgo) {
-    "alto" -> MaterialTheme.colorScheme.error
-    "medio" -> AmarilloRiesgo
-    else -> VerdeRiesgo
-}
-
-internal fun textoRiesgo(riesgo: String) = when (riesgo) { "alto" -> "Riesgo alto"; "medio" -> "Riesgo medio"; else -> "Riesgo bajo" }
-
-@Composable
-internal fun EtiquetaRiesgo(riesgo: String, modifier: Modifier = Modifier) {
-    val c = colorRiesgo(riesgo)
-    Text(
-        textoRiesgo(riesgo), modifier.clip(MaterialTheme.shapes.small).background(c.copy(alpha = 0.16f)).padding(horizontal = 8.dp, vertical = 3.dp).testTag("riesgo_$riesgo"),
-        style = MaterialTheme.typography.labelMedium, color = c, maxLines = 1,
-    )
-}
-
 /** Icono de la tarjeta según el nombre que da el módulo; si no lo conozco, uno genérico. */
 fun iconoDeModulo(nombre: String): ImageVector = when (nombre) {
     "saludo", "bienvenida", "persona" -> Ico.Persona
@@ -96,11 +77,11 @@ fun iconoDeModulo(nombre: String): ImageVector = when (nombre) {
 
 /**
  * Módulos opcionales: tarjetas con icono, nombre, descripción simple, etiqueta de riesgo, interruptor y "Configurar". Encender uno de
- * riesgo medio o alto pasa antes por la pantalla de aviso; apagarlo es inmediato. Por defecto el bot solo responde: estos módulos son
+ * se enciende y apaga al instante. Por defecto el bot solo responde: estos módulos son
  * lo único que puede escribir por su cuenta y todos dependen de "Iniciativa propia".
  */
 @Composable
-fun PantallaModulos(botId: Long, alVolver: () -> Unit, alConfigurar: (String) -> Unit, alAviso: (String) -> Unit, alIniciativa: () -> Unit) {
+fun PantallaModulos(botId: Long, alVolver: () -> Unit, alConfigurar: (String) -> Unit, alIniciativa: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val haptica = rememberHaptica()
@@ -140,7 +121,6 @@ fun PantallaModulos(botId: Long, alVolver: () -> Unit, alConfigurar: (String) ->
                     m, alInterruptor = { encender ->
                         haptica(Toque.Suave)
                         if (!encender) scope.launch { runCatching { Repo.desactivarModulo(botId, m.id) }.onFailure { avisaToast(ctx, it.message ?: "No se pudo apagar", true) }; version++ }
-                        else if (m.pideAviso) alAviso(m.id)
                         else scope.launch { runCatching { Repo.activarModulo(botId, m.id) }.onFailure { avisaToast(ctx, it.message ?: "No se pudo encender", true) }; version++ }
                     },
                     alConfigurar = { alConfigurar(m.id) },
@@ -161,7 +141,6 @@ private fun TarjetaModulo(m: ModuloInfo, alInterruptor: (Boolean) -> Unit, alCon
                 Spacer(Modifier.width(Esp.l))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
                     Text(m.nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-                    EtiquetaRiesgo(m.riesgo)
                 }
                 Switch(m.activo, alInterruptor, Modifier.testTag("modulo_interruptor_${m.id}"), enabled = m.bloqueo.isBlank() || m.activo)
             }
@@ -178,76 +157,6 @@ private fun TarjetaModulo(m: ModuloInfo, alInterruptor: (Boolean) -> Unit, alCon
                 )
             }
             OutlinedButton(alConfigurar, Modifier.fillMaxWidth().testTag("modulo_configurar_${m.id}")) { Text("Configurar") }
-        }
-    }
-}
-
-// ---------- aviso de riesgo ----------
-
-/** Segundos de espera obligatoria antes de poder aceptar un riesgo alto. */
-const val ESPERA_RIESGO_ALTO_SEG = 5
-
-/**
- * Aviso antes de encender un módulo de riesgo medio o alto. Medio: botón “Entiendo el riesgo”. Alto: además espera de 5 segundos
- * visible y una casilla obligatoria. Cancelar no enciende nada.
- */
-@Composable
-fun PantallaAvisoRiesgo(botId: Long, id: String, alVolver: () -> Unit, alEncendido: () -> Unit = alVolver) {
-    val ctx = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val modulo by produceState<ModuloInfo?>(null, id) { value = runCatching { Repo.modulo(botId, id) }.getOrNull() }
-    val m = modulo
-    var segundos by remember { mutableIntStateOf(ESPERA_RIESGO_ALTO_SEG) }
-    var casilla by remember { mutableStateOf(false) }
-    var trabajando by remember { mutableStateOf(false) }
-    val alto = m?.riesgoAlto == true
-    LaunchedEffect(alto) {
-        if (alto) while (segundos > 0) { delay(1000); segundos-- }
-    }
-    Scaffold(topBar = { TopAppBar(navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text("Antes de encender") }) }) { relleno ->
-        if (m == null) { Box(Modifier.fillMaxSize().padding(relleno), Alignment.Center) { CircularProgressIndicator() }; return@Scaffold }
-        val puede = !trabajando && (!alto || (segundos == 0 && casilla))
-        Column(Modifier.fillMaxSize().padding(relleno).verticalScroll(rememberScrollState()).padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(56.dp).clip(CircleShape).background(colorRiesgo(m.riesgo).copy(alpha = 0.18f)), Alignment.Center) {
-                    Icon(Ico.Aviso, null, Modifier.size(30.dp), tint = colorRiesgo(m.riesgo))
-                }
-                Spacer(Modifier.width(Esp.l))
-                Column {
-                    Text(m.nombre, style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("aviso_nombre"))
-                    EtiquetaRiesgo(m.riesgo)
-                }
-            }
-            Text(m.descripcion, style = MaterialTheme.typography.bodyLarge)
-            Card(colors = CardDefaults.cardColors(containerColor = colorRiesgo(m.riesgo).copy(alpha = 0.12f)), modifier = Modifier.fillMaxWidth().testTag("aviso_texto")) {
-                Column(Modifier.padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
-                    Text(if (alto) "Esto puede hacer que WhatsApp bloquee tu número." else "Úsalo con cuidado.", style = MaterialTheme.typography.titleMedium, color = colorRiesgo(m.riesgo))
-                    Text("Este módulo escribe mensajes por su cuenta, sin que nadie le haya escrito antes.", style = MaterialTheme.typography.bodyMedium)
-                    Text("WhatsApp no permite el envío automático o masivo, y puede limitar o bloquear el número que lo hace. Conviene usar un número secundario.", style = MaterialTheme.typography.bodyMedium)
-                    if (alto) Text("Es el nivel de riesgo más alto: úsalo solo con personas que ya te escribieron o pidieron recibir mensajes, y con pocos envíos.", style = MaterialTheme.typography.bodyMedium)
-                    if (m.id == "ia") Text("Privacidad: lo que se le pregunte a la IA SALE de este teléfono hacia el proveedor que elijas. No lo uses con información que no quieras compartir con él.", Modifier.testTag("aviso_privacidad"), style = MaterialTheme.typography.bodyMedium)
-                    Text("Lo puedes apagar cuando quieras, y el interruptor general “Iniciativa propia” lo detiene de golpe.", style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-            if (alto) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag("aviso_fila_casilla")) {
-                    Checkbox(casilla, { casilla = it }, Modifier.testTag("aviso_casilla"))
-                    Text("Entiendo que mi número puede ser bloqueado por WhatsApp", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                }
-                if (segundos > 0) Text("Espera $segundos ${if (segundos == 1) "segundo" else "segundos"} para poder continuar…", Modifier.testTag("aviso_espera"), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Button(
-                {
-                    trabajando = true
-                    scope.launch {
-                        runCatching { Repo.activarModulo(botId, id) }
-                            .onSuccess { alEncendido() }
-                            .onFailure { trabajando = false; avisaToast(ctx, it.message ?: "No se pudo encender", true) }
-                    }
-                },
-                Modifier.fillMaxWidth().testTag("aviso_entiendo"), enabled = puede,
-            ) { Text("Entiendo el riesgo") }
-            OutlinedButton(alVolver, Modifier.fillMaxWidth().testTag("aviso_cancelar")) { Text("Cancelar") }
         }
     }
 }

@@ -44,11 +44,17 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
-const val TITULO_AVISO = "Antes de empezar"
-val PUNTOS_AVISO = listOf(
-    "Bot Chat es una herramienta no oficial. No tiene ninguna relación con WhatsApp ni con Meta.",
-    "WhatsApp puede bloquear la cuenta que uses con ella. Te recomendamos un número secundario.",
-    "La usas bajo tu propia responsabilidad.",
+const val TITULO_AVISO = "Términos y condiciones"
+
+/** Los términos que se aceptan una sola vez al empezar (cada uno: título y texto). Reúnen todo lo que antes avisaba cada módulo. */
+val TERMINOS = listOf(
+    "Herramienta no oficial" to "Bot Chat no tiene ninguna relación con WhatsApp ni con Meta. Se conecta a tu cuenta como un dispositivo vinculado.",
+    "Tu cuenta de WhatsApp" to "WhatsApp puede limitar o bloquear los números que automatizan mensajes, escriben sin que les hayan escrito antes, mandan muchos mensajes seguidos o agregan gente a grupos. Te recomendamos usar un número secundario. Lo que le pase a tu cuenta es tu responsabilidad.",
+    "Mensajes automáticos" to "Los módulos que escriben solos (difusiones, mensajes programados, bienvenidas por privado, invitar o agregar a grupos, sorteos, votaciones y tablón) solo funcionan con «Iniciativa propia» encendida. Úsalos con personas que ya te escribieron o que pidieron recibirlos, respeta a quien pida no recibir más y mantén los topes bajos. Puedes apagarlos cuando quieras.",
+    "Contenido y derechos de autor" to "Bajar y mandar videos o música puede violar derechos de autor y las reglas de cada sitio. Tú eres responsable de lo que se pida con tu bot y de cumplir las leyes que te apliquen.",
+    "Privacidad de tus datos" to "Tus mensajes y archivos se guardan cifrados solo en este teléfono. Lo que mandes a la IA, al traductor o a un conector sale del teléfono hacia el servicio que elijas: no incluyas información que no quieras compartir con él. Las llaves se guardan en el almacén seguro de Android.",
+    "Personas de tus grupos" to "Si el bot cuenta mensajes, modera, advierte, banea o expulsa, lo hace por reglas que tú pones. Avisa a tus grupos de las reglas y respeta la privacidad de las personas.",
+    "Sin garantías" to "La app se ofrece tal cual, sin garantías. No nos hacemos responsables de bloqueos de cuentas, pérdida de datos, mensajes que no salgan o cualquier otro daño por usarla. La usas bajo tu propia responsabilidad.",
 )
 
 /** Bienvenida de 3 pantallas para quien empieza; la última pide aceptar el aviso antes de vincular. */
@@ -116,18 +122,25 @@ fun AvisoUnico(alAceptar: () -> Unit) {
 @Composable
 private fun Aviso(acepta: Boolean, alCambiar: (Boolean) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(Esp.m)) {
-        PUNTOS_AVISO.forEach { texto ->
-            Row(verticalAlignment = Alignment.Top) {
-                Box(Modifier.padding(top = 8.dp).size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.tertiary))
-                Spacer(Modifier.width(Esp.m))
-                Text(texto, style = MaterialTheme.typography.bodyLarge)
-            }
-        }
+        TextoTerminos()
         Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth().padding(top = Esp.s)) {
             Row(Modifier.clickable(role = Role.Checkbox) { alCambiar(!acepta) }.padding(Esp.m).testTag("casilla_acepto"), verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(acepta, null)
                 Spacer(Modifier.width(Esp.m))
-                Text("Entiendo y acepto", style = MaterialTheme.typography.titleMedium)
+                Text("He leído y acepto los términos y condiciones", style = MaterialTheme.typography.titleMedium)
+            }
+        }
+    }
+}
+
+/** Los términos, un punto por apartado. Se usa al aceptar y al consultarlos después en Ajustes. */
+@Composable
+fun TextoTerminos() {
+    Column(verticalArrangement = Arrangement.spacedBy(Esp.m), modifier = Modifier.testTag("texto_terminos")) {
+        TERMINOS.forEach { (titulo, texto) ->
+            Column(verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
+                Text(titulo, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                Text(texto, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }

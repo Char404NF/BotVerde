@@ -112,7 +112,7 @@ func (g *Gestor) textoDifusion(cfg Config, c contenidoDif, nombre string) string
 func difusion() Modulo {
 	return Nuevo(Def{
 		ID: IDDifusion, Nombre: "Difusión y anuncios", Icono: "difusion", Riesgo: RiesgoAlto, Iniciativa: true,
-		Descripcion: "Manda un anuncio a una lista de personas que ya te escribieron o que se suscribieron. ATENCIÓN: WhatsApp prohíbe el envío masivo y puede restringir o bloquear tu cuenta. La ruta oficial y sin riesgo es la API de WhatsApp Business. Este módulo manda de a poquito, con esperas al azar, tope diario y calentamiento, pero el riesgo no desaparece.",
+		Descripcion: "Manda un anuncio a una lista de personas que ya te escribieron o que se suscribieron. Manda de a poquito, con esperas al azar, tope diario y calentamiento.",
 		Casillas: []permisos.Casilla{
 			{ID: "difusion.ver", Nombre: "Ver el estado de las difusiones", Descripcion: "Puede pedir con «!difusion» cuántas personas hay suscritas y cómo van los envíos.", Grupo: "Difusión y anuncios", Riesgo: permisos.RiesgoMedio},
 		},

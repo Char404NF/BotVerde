@@ -128,19 +128,16 @@ func claveVideo(chat, persona string) string { return chat + "|" + persona }
 
 // ---------- definición del módulo ----------
 
-const avisoRiesgoVideo = "Bajar y mandar videos o música puede violar derechos de autor y mandar archivos grandes a muchas personas puede hacer que WhatsApp limite o bloquee tu número. Tú eres responsable de lo que se pida con tu bot."
-
 func descargasVideo() Modulo {
 	return Nuevo(Def{
 		ID: IDVideo, Nombre: "Descargas de video y audio", Icono: "descarga", Riesgo: RiesgoAlto, Iniciativa: true,
 		Descripcion: "«!descargar <enlace>» baja un video o su audio (YouTube, TikTok, Instagram, Facebook, X, SoundCloud y más), deja elegir formato y calidad, " +
-			"avisa si es largo o pesado y lo manda dividido si hace falta. Antes de usarlo hay que descargar su motor (yt-dlp, unos 3 MB) desde esta pantalla; después se mantiene al día. " + avisoRiesgoVideo,
+			"avisa si es largo o pesado y lo manda dividido si hace falta. Antes de usarlo hay que descargar su motor (yt-dlp, unos 3 MB) desde esta pantalla; después se mantiene al día. ",
 		Casillas: []permisos.Casilla{
 			{ID: "video.pedir", Nombre: "Pedir descargas de video y audio", Descripcion: "Puede pedir «!descargar» y «!audio». Usa datos, batería y el número de WhatsApp.", Grupo: "Descargas", Riesgo: permisos.RiesgoMedio, Privado: true, Grupos: true},
 			{ID: "video.admin", Nombre: "Administrar las descargas", Descripcion: "Ver el estado y actualizar yt-dlp con «!descargas» y «!actualizarytdlp».", Grupo: "Descargas", Riesgo: permisos.RiesgoMedio, Privado: true},
 		},
 		Esquema: []Campo{
-			{Clave: "acepto_riesgos", Titulo: "Entiendo los riesgos", Ayuda: avisoRiesgoVideo + " Hace falta marcarlo para que descargue.", Tipo: CampoInterruptor, Defecto: false},
 			{Clave: "max_min", Titulo: "Duración máxima (minutos)", Ayuda: "Un video más largo se rechaza antes de bajarlo.", Tipo: CampoNumero, Defecto: 60.0, Min: 1, Max: 600},
 			{Clave: "max_total_mb", Titulo: "Peso máximo total (MB)", Ayuda: "Si aun con la calidad más baja pesa más, se rechaza antes de bajarlo.", Tipo: CampoNumero, Defecto: 1500.0, Min: 5, Max: 1900},
 			{Clave: "max_video_mb", Titulo: "Hasta qué peso se manda como video (MB)", Ayuda: "WhatsApp recomprime los videos y su ayuda oficial habla de unos 100 MB. Lo que pese más se manda como ARCHIVO (documento): llega completo y sin comprimir, hasta 2 000 MB.", Tipo: CampoNumero, Defecto: 90.0, Min: 5, Max: 100},
@@ -176,10 +173,6 @@ func descargasVideo() Modulo {
 		},
 		AlEvento: eventoVideo,
 		AlEstado: func(g *Gestor) string {
-			cfg := g.Config(IDVideo)
-			if !cfg.Bool("acepto_riesgos") {
-				return "Encendido, falta aceptar los riesgos"
-			}
 			if g.Video == nil {
 				return "Encendido, el motor de descargas no está disponible aquí"
 			}
@@ -298,9 +291,6 @@ func validarURLVideo(raw string, sitios []string) (string, error) {
 
 func (g *Gestor) videoPedir(cx *comandos.Contexto, pre string) (string, error) {
 	cfg := g.Config(IDVideo)
-	if !cfg.Bool("acepto_riesgos") {
-		return "", errors.New("el dueño todavía no aceptó los riesgos de las descargas en la configuración del módulo")
-	}
 	if g.Video == nil {
 		return "", errors.New("las descargas no están disponibles en este momento")
 	}

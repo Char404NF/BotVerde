@@ -321,14 +321,6 @@ fun PantallaConfigIA(botId: Long, m: ModuloInfo) {
             Text("Para «chats permitidos» elige los chats en la lista de más abajo.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
-        // ---------- 7. privacidad ----------
-        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f))) {
-            Column(Modifier.padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
-                Titulo("Privacidad")
-                Interruptor("acepto_privacidad")
-            }
-        }
-
         // ---------- 8. memoria y límites ----------
         Tarjeta {
             Titulo("Memoria y límites")

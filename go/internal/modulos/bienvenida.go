@@ -17,7 +17,7 @@ import (
 //
 // Cuando alguien entra a un grupo, un mensaje EN EL GRUPO con {nombre} {grupo} {reglas}. Se elige en qué grupos. Verificación opcional
 // por texto ("responde 1 para aceptar las reglas" o una suma) y, si soy administrador, expulsión de quien no verifica a tiempo.
-// Aparte y apagado: mensaje al privado del nuevo (30–120 s de espera, tope diario bajo, aviso de riesgo alto).
+// Aparte y apagado: mensaje al privado del nuevo (30–120 s de espera y tope diario bajo).
 // El evento solo anota y encola: todo lo que sale pasa por la cola de iniciativas.
 
 // IDBienvenida es el id del módulo.
@@ -51,8 +51,7 @@ func bienvenida() Modulo {
 			{Clave: "verif_tipo", Titulo: "Tipo de verificación", Tipo: CampoLista, Defecto: "reglas", Opciones: []Opcion{{"reglas", "Responder 1 para aceptar las reglas"}, {"suma", "Una suma sencilla"}}},
 			{Clave: "verif_minutos", Titulo: "Minutos para verificar", Tipo: CampoNumero, Defecto: 10.0, Min: 1, Max: 1440},
 			{Clave: "expulsar", Titulo: "Expulsar a quien no verifique", Ayuda: "Solo funciona si eres administrador del grupo; si no, te llega un aviso y no se hace nada.", Tipo: CampoInterruptor, Defecto: false},
-			{Clave: "privado", Titulo: "ALTO RIESGO · Mensaje al privado del nuevo", Ayuda: "Escribirle a alguien que no te ha escrito puede hacer que WhatsApp restrinja tu cuenta. Apagado por defecto.", Tipo: CampoInterruptor, Defecto: false},
-			{Clave: "privado_acepto", Titulo: "Entiendo el riesgo del mensaje privado", Ayuda: "Hace falta marcarlo para encender el mensaje privado.", Tipo: CampoInterruptor, Defecto: false},
+			{Clave: "privado", Titulo: "Mensaje al privado del nuevo", Ayuda: "Le escribe por privado a quien acaba de entrar al grupo. Apagado por defecto.", Tipo: CampoInterruptor, Defecto: false},
 			{Clave: "privado_texto", Titulo: "Texto del mensaje privado", Ayuda: "Variables: {nombre} y {grupo}.", Tipo: CampoTexto, Varias: true, Largo: 600, Defecto: "Hola {nombre}, bienvenido a {grupo}. Si no quieres más mensajes, escribe BAJA."},
 			{Clave: "privado_retraso_min", Titulo: "Privado · espera mínima (segundos)", Tipo: CampoNumero, Defecto: 30.0, Min: 30, Max: 600},
 			{Clave: "privado_retraso_max", Titulo: "Privado · espera máxima (segundos)", Tipo: CampoNumero, Defecto: 120.0, Min: 30, Max: 1200},
@@ -66,9 +65,6 @@ func bienvenida() Modulo {
 			}
 			if cfg.Num("privado_retraso_max") < cfg.Num("privado_retraso_min") {
 				return errors.New("en el mensaje privado la espera máxima no puede ser menor que la mínima")
-			}
-			if cfg.Bool("privado") && !cfg.Bool("privado_acepto") {
-				return errors.New("para encender el mensaje privado marca antes «Entiendo el riesgo»")
 			}
 			if cfg.Bool("expulsar") && !cfg.Bool("verificar") {
 				return errors.New("para expulsar hace falta pedir verificación")
@@ -234,7 +230,7 @@ func bienvenidaEntra(g *Gestor, cfg Config, e Evento) {
 		_, _ = g.Enviar(Iniciativa{Modulo: IDBienvenida, Que: qBienvenida, Chat: e.Chat, Personas: personas, Texto: texto, Menciones: menciones,
 			RetrasoMin: segundos(cfg.Num("retraso_min")), RetrasoMax: segundos(cfg.Num("retraso_max")), Noche: NocheDiferir})
 	}
-	if cfg.Bool("privado") && cfg.Bool("privado_acepto") {
+	if cfg.Bool("privado") {
 		bienvenidaPrivada(g, cfg, e, personas, grupo)
 	}
 }

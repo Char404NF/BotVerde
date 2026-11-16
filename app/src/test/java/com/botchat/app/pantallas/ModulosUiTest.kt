@@ -17,7 +17,6 @@ import androidx.compose.ui.test.performTextInput
 import com.botchat.app.datos.Ajustes
 import com.botchat.app.ui.BotChatTema
 import com.botchat.app.ui.PantallaAjustes
-import com.botchat.app.ui.PantallaAvisoRiesgo
 import com.botchat.app.ui.PantallaConfigModulo
 import com.botchat.app.ui.PantallaIniciativa
 import com.botchat.app.ui.PantallaModulos
@@ -48,8 +47,8 @@ class ModulosUiTest {
     private fun llamo(p: String) = motor.llamadas.toList().any { it.startsWith(p) }
     private fun hay(tag: String) = regla.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
-    private fun lista(alAviso: (String) -> Unit = {}, alConfigurar: (String) -> Unit = {}, alIniciativa: () -> Unit = {}) =
-        regla.setContent { BotChatTema { PantallaModulos(bot, {}, alConfigurar, alAviso, alIniciativa) } }
+    private fun lista(alConfigurar: (String) -> Unit = {}, alIniciativa: () -> Unit = {}) =
+        regla.setContent { BotChatTema { PantallaModulos(bot, {}, alConfigurar, alIniciativa) } }
 
     // ---------- tarjetas ----------
 
@@ -59,10 +58,8 @@ class ModulosUiTest {
         regla.onNodeWithText("Eco de prueba", useUnmergedTree = true).assertIsDisplayed()
         regla.onNodeWithText("Módulo de ejemplo: repite una frase.", useUnmergedTree = true).assertIsDisplayed()
         regla.onNodeWithText("Dados y adivina el número.", useUnmergedTree = true).assertIsDisplayed()
-        // Etiquetas de riesgo: verde (bajo), amarillo (medio) y rojo (alto), con su texto.
-        regla.onNodeWithText("Riesgo medio", useUnmergedTree = true).assertIsDisplayed()
-        regla.onNodeWithText("Riesgo alto", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
-        assertTrue(hay("riesgo_bajo") && hay("riesgo_medio") && hay("riesgo_alto"))
+        // Sin etiquetas ni avisos de riesgo: los términos se aceptan una sola vez al empezar.
+        assertFalse(hay("riesgo_bajo") || hay("riesgo_medio") || hay("riesgo_alto"))
         // Todo nace apagado, con su botón Configurar.
         for (id in listOf("eco_prueba", "juegos_demo", "difusion_demo", "propio_demo")) {
             regla.onNodeWithTag("modulo_interruptor_$id", useUnmergedTree = true).performScrollTo().assertIsOff()
@@ -96,37 +93,23 @@ class ModulosUiTest {
 
     // ---------- encender y apagar ----------
 
-    @Test fun encenderUnModuloDeRiesgoBajoEsInmediato() {
-        var aviso = ""
-        lista(alAviso = { aviso = it })
-        regla.esperaEtiqueta("modulo_interruptor_juegos_demo")
-        regla.onNodeWithTag("modulo_interruptor_juegos_demo", useUnmergedTree = true).performScrollTo().performClick()
-        regla.espera { llamo("activarModulo:juegos_demo") }
-        assertEquals("", aviso)
-        regla.onNodeWithTag("modulo_interruptor_juegos_demo", useUnmergedTree = true).assertIsOn()
-        regla.onNodeWithTag("modulo_estado_juegos_demo", useUnmergedTree = true).assertIsDisplayed()
-    }
-
-    @Test fun encenderRiesgoMedioOAltoAbreElAvisoYNoEnciendeSolo() {
-        var aviso = ""
-        lista(alAviso = { aviso = it })
-        regla.esperaEtiqueta("modulo_interruptor_eco_prueba")
-        regla.onNodeWithTag("modulo_interruptor_eco_prueba", useUnmergedTree = true).performScrollTo().performClick()
-        regla.espera { aviso == "eco_prueba" }
-        regla.onNodeWithTag("modulo_interruptor_difusion_demo", useUnmergedTree = true).performScrollTo().performClick()
-        regla.espera { aviso == "difusion_demo" }
-        assertFalse(llamo("activarModulo"))
-        regla.onNodeWithTag("modulo_interruptor_eco_prueba", useUnmergedTree = true).assertIsOff()
+    @Test fun encenderCualquierModuloEsInmediatoSinAvisos() {
+        lista()
+        for (id in listOf("juegos_demo", "eco_prueba", "difusion_demo")) {
+            regla.esperaEtiqueta("modulo_interruptor_$id")
+            regla.onNodeWithTag("modulo_interruptor_$id", useUnmergedTree = true).performScrollTo().performClick()
+            regla.espera { llamo("activarModulo:$id") }
+            regla.onNodeWithTag("modulo_interruptor_$id", useUnmergedTree = true).assertIsOn()
+        }
+        assertFalse(hay("aviso_entiendo"))
     }
 
     @Test fun apagarEsInmediatoSinAviso() {
         motor.moduloPorIdParaPruebas("eco_prueba").put("activo", true)
-        var aviso = ""
-        lista(alAviso = { aviso = it })
+        lista()
         regla.esperaEtiqueta("modulo_interruptor_eco_prueba")
         regla.onNodeWithTag("modulo_interruptor_eco_prueba", useUnmergedTree = true).performScrollTo().assertIsOn().performClick()
         regla.espera { llamo("desactivarModulo:eco_prueba") }
-        assertEquals("", aviso)
     }
 
     @Test fun unModuloEncendidoConElMaestroApagadoLoDice() {
@@ -142,74 +125,6 @@ class ModulosUiTest {
         regla.esperaTexto("Pausado por modo seguro")
         regla.onNodeWithTag("modulo_interruptor_eco_prueba", useUnmergedTree = true).performScrollTo().assertIsOn()
         regla.onNodeWithText("Modo seguro activo", substring = true, useUnmergedTree = true).assertIsDisplayed()
-    }
-
-    // ---------- aviso de riesgo ----------
-
-    @Test fun avisoDeRiesgoMedioSeAceptaDeUnToque() {
-        var encendido = false
-        regla.setContent { BotChatTema { PantallaAvisoRiesgo(bot, "eco_prueba", {}, { encendido = true }) } }
-        regla.esperaEtiqueta("aviso_entiendo")
-        regla.onNodeWithText("Riesgo medio", useUnmergedTree = true).assertIsDisplayed()
-        regla.onNodeWithTag("aviso_nombre", useUnmergedTree = true).assertIsDisplayed()
-        assertFalse(hay("aviso_casilla"))
-        assertFalse(hay("aviso_espera"))
-        regla.onNodeWithTag("aviso_entiendo").assertIsEnabled().performClick()
-        regla.espera { encendido }
-        assertTrue(llamo("activarModulo:eco_prueba"))
-    }
-
-    @Test fun avisoDeRiesgoAltoPideEsperaDe5SegundosYCasilla() {
-        var encendido = false
-        regla.mainClock.autoAdvance = false
-        regla.setContent { BotChatTema { PantallaAvisoRiesgo(bot, "difusion_demo", {}, { encendido = true }) } }
-        var vueltas = 0
-        while (!hay("aviso_entiendo") || !hay("aviso_espera")) { regla.mainClock.advanceTimeByFrame(); Thread.sleep(20); if (++vueltas > 400) error("no cargó el aviso") }
-        regla.onNodeWithText("Riesgo alto", useUnmergedTree = true).assertIsDisplayed()
-        // Al inicio: espera visible y botón apagado.
-        regla.onNodeWithTag("aviso_espera", useUnmergedTree = true).assertIsDisplayed()
-        regla.onNodeWithTag("aviso_entiendo").assertIsNotEnabled()
-        // Aun con la casilla marcada, no vale hasta que pasen los 5 segundos.
-        regla.onNodeWithTag("aviso_casilla", useUnmergedTree = true).performClick()
-        regla.mainClock.advanceTimeBy(2_000)
-        regla.onNodeWithTag("aviso_entiendo").assertIsNotEnabled()
-        // Pasado el tiempo y con la casilla marcada, se habilita.
-        regla.mainClock.advanceTimeBy(3_500)
-        regla.waitForIdle()
-        assertFalse(hay("aviso_espera"))
-        regla.onNodeWithTag("aviso_entiendo").assertIsEnabled()
-        regla.mainClock.autoAdvance = true // la cuenta ya terminó: el resto no depende del reloj
-        // Sin la casilla, otra vez bloqueado.
-        regla.onNodeWithTag("aviso_casilla", useUnmergedTree = true).performClick()
-        regla.waitForIdle()
-        regla.onNodeWithTag("aviso_entiendo").assertIsNotEnabled()
-        regla.onNodeWithTag("aviso_casilla", useUnmergedTree = true).performClick()
-        regla.waitForIdle()
-        assertFalse(llamo("activarModulo"))
-        regla.onNodeWithTag("aviso_entiendo").performClick()
-        regla.espera { encendido }
-        assertTrue(llamo("activarModulo:difusion_demo"))
-    }
-
-    @Test fun cancelarElAvisoNoEnciendeNada() {
-        var volvio = false
-        regla.setContent { BotChatTema { PantallaAvisoRiesgo(bot, "eco_prueba", { volvio = true }) } }
-        regla.esperaEtiqueta("aviso_cancelar")
-        regla.onNodeWithTag("aviso_cancelar").performClick()
-        regla.espera { volvio }
-        assertFalse(llamo("activarModulo"))
-    }
-
-    @Test fun siElMotorRechazaEncenderElAvisoSeQuedaYMuestraElError() {
-        motor.moduloFalla = "Ese comando ya existe"
-        var encendido = false
-        regla.setContent { BotChatTema { PantallaAvisoRiesgo(bot, "eco_prueba", {}, { encendido = true }) } }
-        regla.esperaEtiqueta("aviso_entiendo")
-        regla.onNodeWithTag("aviso_entiendo").performClick()
-        regla.espera { llamo("activarModulo:eco_prueba") }
-        regla.waitForIdle()
-        assertFalse(encendido)
-        regla.onNodeWithTag("aviso_entiendo").assertIsEnabled()
     }
 
     // ---------- Iniciativa propia ----------
@@ -331,8 +246,7 @@ class ModulosUiTest {
         assertTrue(hay("in_frase") && hay("in_veces") && hay("sw_gritar") && hay("op_estilo_normal") && hay("op_estilo_corto") && hay("in_hora_aviso"))
         regla.onNodeWithTag("sw_gritar", useUnmergedTree = true).assertIsOff()
         regla.onNodeWithText("Entre 1 y 5", substring = true, useUnmergedTree = true).assertIsDisplayed()
-        // Muestra el riesgo y, como escribe por iniciativa, sus límites propios.
-        regla.onNodeWithText("Riesgo medio", useUnmergedTree = true).assertIsDisplayed()
+        // Como escribe por iniciativa, muestra sus límites propios.
         assertTrue(hay("limites_modulo"))
     }
 
