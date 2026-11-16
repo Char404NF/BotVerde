@@ -179,9 +179,9 @@ var ajustesBotDefecto = map[string]string{
 	"todos_espera_seg": "300", // espera mínima entre dos "!todos" en el mismo grupo
 	"grupo_dias":       "30",  // periodo por defecto del ranking y de los inactivos
 	// Laboratorio (bloque G). Todo apagado: el menú sigue en texto numerado mientras no se active y se acepte el riesgo.
-	"lab_activo":    "0",     // interruptor del Laboratorio
-	"lab_aviso_ts":  "0",     // cuándo se aceptó el aviso de riesgo (0 = nunca)
-	"lab_modo_menu": "texto", // texto | encuesta | botones (experimental)
+	"lab_activo":    "0",       // interruptor del Laboratorio
+	"lab_aviso_ts":  "0",       // cuándo se aceptó el aviso de riesgo (0 = nunca)
+	"lab_modo_menu": "botones", // texto | encuesta | botones (botones solo en chats privados; en grupos siempre texto)
 	// Descargas de video: versión de yt-dlp en uso, la última publicada y cuándo se revisó (la app no los muestra como ajustes).
 	"video_ytdlp_ver":    "",
 	"video_ytdlp_ultima": "",

@@ -8,12 +8,53 @@ import (
 )
 
 // RolUsuario es el rango «Usuario» de fábrica: lo reciben solas todas las personas que escriben al bot o están en sus grupos
-// (menos quienes administran un grupo). Solo puede pedir descargas; se puede editar o borrar como cualquier rango.
+// (menos quienes administran un grupo). Es el rango de «todos»: descargas, stickers, IA, traducir, notas, pendientes y juegos (cada
+// módulo sigue teniendo sus topes y solo funciona si el dueño lo enciende). Se puede editar o borrar como cualquier rango.
 func RolUsuario() almacen.Rol {
 	return almacen.Rol{
 		Nombre: "Usuario", Color: "#8696A0", Plantilla: "usuario", LimiteMin: 5, MenusModo: "todos",
-		Casillas: map[string]almacen.Alcance{"video.pedir": {}},
+		Casillas: casillasUsuario(),
 	}
+}
+
+// IDsCasillasUsuario son las casillas del rango Usuario de fábrica.
+var IDsCasillasUsuario = []string{"video.pedir", "util.sticker", "util.notas", "util.pendientes", "ia.usar", "traductor.usar", "juegos.jugar"}
+
+func casillasUsuario() map[string]almacen.Alcance {
+	m := map[string]almacen.Alcance{}
+	for _, id := range IDsCasillasUsuario {
+		m[id] = almacen.Alcance{}
+	}
+	return m
+}
+
+// CompletarUsuario agrega al rango Usuario las casillas de fábrica que le falten (nunca quita ni cambia las que ya tiene). Lo usa la
+// plantilla «Bot para todos» para que un bot que ya existía también quede listo. Devuelve cuántas agregó.
+func (s *Servicio) CompletarUsuario() int {
+	id := s.RolUsuarioID()
+	if id <= 0 {
+		return 0
+	}
+	r, _ := s.Alm.RolPorID(s.BotID, id)
+	if r == nil {
+		return 0
+	}
+	if r.Casillas == nil {
+		r.Casillas = map[string]almacen.Alcance{}
+	}
+	n := 0
+	for _, c := range IDsCasillasUsuario {
+		if _, ok := r.Casillas[c]; !ok {
+			r.Casillas[c] = almacen.Alcance{}
+			n++
+		}
+	}
+	if n > 0 {
+		if err := s.Alm.GuardarRol(s.BotID, *r); err != nil {
+			return 0
+		}
+	}
+	return n
 }
 
 // UsuarioAutoActivo dice si se está dando el rango Usuario automáticamente.

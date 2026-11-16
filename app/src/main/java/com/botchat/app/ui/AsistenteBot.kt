@@ -459,7 +459,7 @@ private suspend fun subirAnimo(ctx: Context, botId: Long, animo: String): Adjunt
     Repo.subirAdjunto(botId, f.path, "imagen", "image/png", f.name)
 }.getOrNull()
 
-/** Un toque: deja el bot listo con saludo, foto del avatar y tres opciones (GitHub, Menú y Ayuda). Todo se puede cambiar después. */
+/** Un toque: deja el «Bot para todos» listo: saludo con el avatar, menú por categorías, juegos y utilidades. Todo se puede cambiar después. */
 @Composable
 private fun TarjetaBotBase(botId: Long, alCambiar: (BorradorAsistente) -> Unit) {
     val scope = rememberCoroutineScope()
@@ -471,8 +471,8 @@ private fun TarjetaBotBase(botId: Long, alCambiar: (BorradorAsistente) -> Unit) 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Esp.m)) {
                 AvatarAnimo("contento", Modifier.size(64.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Bot base, listo para usar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text("Un saludo con foto y tres opciones: GitHub, Menú y Ayuda. Después cambias lo que quieras.", style = MaterialTheme.typography.bodySmall)
+                    Text("Bot para todos, listo para usar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Stickers, descargas, IA, clima, cuentas, juegos, notas y más, en privado y en grupos. Los botones salen solo en chats privados. Después cambias lo que quieras.", style = MaterialTheme.typography.bodySmall)
                 }
             }
             Button(
@@ -481,7 +481,7 @@ private fun TarjetaBotBase(botId: Long, alCambiar: (BorradorAsistente) -> Unit) 
                     scope.launch {
                         val e = runCatching { Repo.asistenteBase(botId) }.getOrNull()
                         if (e != null) {
-                            val foto = subirAnimo(ctx, botId, "feliz")
+                            val foto = if (e.borrador.bienvenidaAdjuntos.isEmpty()) subirAnimo(ctx, botId, "feliz") else null
                             alCambiar(if (foto != null) e.borrador.copy(bienvenidaAdjuntos = listOf(foto)) else e.borrador)
                             listo = true
                         }
@@ -489,7 +489,7 @@ private fun TarjetaBotBase(botId: Long, alCambiar: (BorradorAsistente) -> Unit) 
                     }
                 },
                 Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("asist_usar_base"), enabled = !ocupado && !listo,
-            ) { Text(if (listo) "Listo: revisa los pasos y cambia lo que quieras" else "Usar el bot base") }
+            ) { Text(if (listo) "Listo: revisa los pasos y cambia lo que quieras" else "Usar el bot para todos") }
         }
     }
 }

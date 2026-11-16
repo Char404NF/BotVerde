@@ -135,8 +135,8 @@ func TestLabResultadosYTopes(t *testing.T) {
 
 func TestLabAjustesPorDefectoApagados(t *testing.T) {
 	a := nuevo(t)
-	if a.AjusteBot(1, "lab_activo") != "0" || a.AjusteBot(1, "lab_modo_menu") != "texto" || a.AjusteBot(1, "lab_grupos") != "0" {
-		t.Fatal("el Laboratorio debe nacer apagado, en texto y solo privado")
+	if a.AjusteBot(1, "lab_activo") != "0" || a.AjusteBot(1, "lab_modo_menu") != "botones" || a.AjusteBot(1, "lab_grupos") != "0" {
+		t.Fatal("el Laboratorio nace apagado, con los menús en botones (solo privado) y sin grupos")
 	}
 	if a.Version() != len(migraciones) || len(migraciones) != 24 {
 		t.Fatalf("versión %d", a.Version())

@@ -5,6 +5,7 @@
 package asistente
 
 import (
+	"botchat/internal/estilo"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -59,6 +60,8 @@ type Borrador struct {
 		Activo   bool     `json:"activo"`
 		Titulo   string   `json:"titulo"`
 		Opciones []Opcion `json:"opciones"`
+		// Fabrica: usa el menú completo «Bot para todos» (categorías y submenús). Una vez aplicado es un menú normal que se edita en Automatizaciones.
+		Fabrica bool `json:"fabrica,omitempty"`
 	} `json:"menu"`
 
 	// 4) Reglas (la lista vive en las reglas generales de siempre: aquí solo se elige a quién se mandan)
@@ -127,12 +130,24 @@ const RepoBotBase = "https://github.com/Char404NF/BotVerde"
 func NuevoBase() *Borrador {
 	b := Nuevo()
 	b.Grupos = true
-	b.Bienvenida.Texto = "¡Hola {nombre}! 👋 Soy tu bot. Toca una opción para empezar."
+	b.Privados = true
+	b.Bienvenida.Texto = estilo.Tarjeta("🤖", "¡Hola {nombre}! Soy Bot Chat", []string{
+		"Hago stickers, bajo videos, respondo con IA,",
+		"te ayudo con el clima, cuentas y más, y tengo juegos 🎮",
+		"",
+		"Toca *!menu* para ver todo lo que puedo hacer 👇",
+	}, "")
+	b.Bienvenida.Cuando = "primera"
+	b.Menu.Fabrica = true
 	b.Menu.Titulo = "¿Qué quieres hacer?"
 	b.Menu.Opciones = []Opcion{
-		{"GitHub", "Este proyecto es de código abierto 💚\n" + RepoBotBase},
-		{"Menú", "Esto puedes hacer:\n• !ayuda — te explico cada comando\n• !reglas — las reglas del grupo\n• !grupo — datos del grupo\n\nLos administradores y el dueño tienen más comandos: escribe !ayuda para ver los tuyos."},
-		{"Ayuda", "Escribe *!ayuda* para ver lo que puedes hacer, o *!ayuda* y el nombre de un comando (por ejemplo *!ayuda silenciar*) y te lo explico con un ejemplo. Si te pierdes, escribe *menu*."},
+		{"Stickers y fotos", "Responde a una foto con !sticker."},
+		{"Descargar videos", "!descargar enlace"},
+		{"Preguntarle a la IA", "!ia tu pregunta"},
+		{"Utilidades", "!clima, !calc, !hora, !dolar, !definir, !acortar, !qr"},
+		{"Juegos y diversión", "!juegos, !chiste, !dato, !frase"},
+		{"Notas y pendientes", "!anotar, !tarea"},
+		{"Ayuda", "!ayuda"},
 	}
 	return b
 }
@@ -272,6 +287,15 @@ func (b *Borrador) quien() auto.Quien {
 
 // DefMenu arma la automatización del menú con las tarjetas del borrador.
 func (b *Borrador) DefMenu() *flujo.Def {
+	if b.Menu.Fabrica {
+		d := flujo.PlantillaBotParaTodos()
+		d.Alcance = flujo.Alcance{Privados: b.Privados, TodosGrupos: b.Grupos && len(b.GruposElegidos) == 0}
+		if b.Grupos && len(b.GruposElegidos) > 0 {
+			d.Alcance.Grupos = append([]string(nil), b.GruposElegidos...)
+		}
+		d.Normalizar()
+		return d
+	}
 	d := &flujo.Def{V: 1, Nombre: "Mi menú (asistente)", Inicio: "menu"}
 	titulo := b.Menu.Titulo
 	if titulo == "" {

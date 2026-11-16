@@ -274,16 +274,29 @@ func TestSaltarUnaSeccionNoCreaNiCambiaNada(t *testing.T) {
 	}
 }
 
-func TestNuevoBaseTieneTresOpcionesYSePuedeAplicar(t *testing.T) {
+func TestNuevoBaseEsElBotParaTodosYSePuedeAplicar(t *testing.T) {
 	b := NuevoBase()
-	if len(b.Menu.Opciones) != 3 || b.Menu.Opciones[0].Texto != "GitHub" || b.Menu.Opciones[1].Texto != "Menú" || b.Menu.Opciones[2].Texto != "Ayuda" {
-		t.Fatalf("%+v", b.Menu.Opciones)
-	}
-	if !strings.Contains(b.Menu.Opciones[0].Respuesta, RepoBotBase) {
-		t.Fatal("el botón GitHub no lleva al repositorio")
+	if !b.Menu.Fabrica || !b.Privados || !b.Grupos || len(b.Menu.Opciones) != 7 || !strings.Contains(b.Bienvenida.Texto, "!menu") {
+		t.Fatalf("%+v", b.Menu)
 	}
 	b.Normalizar()
 	if p := b.Problemas(); len(p) > 0 {
 		t.Fatalf("el bot base debe estar listo para usar: %v", p)
+	}
+	d := b.DefMenu()
+	if d.Nombre != flujo.NombreBotParaTodos || len(d.Pasos) < 15 || !d.Alcance.Privados || !d.Alcance.TodosGrupos {
+		t.Fatalf("el menú de fábrica es el completo: %q %d %+v", d.Nombre, len(d.Pasos), d.Alcance)
+	}
+	// aplicado en una base vacía crea la bienvenida y el menú, y se puede deshacer
+	a := abre(t)
+	c, err := Aplicar(a, 1, b, nil)
+	if err != nil || c.Menu == 0 || len(c.Autos) != 1 {
+		t.Fatalf("%+v %v", c, err)
+	}
+	if err := Deshacer(a, 1, b, nil); err != nil {
+		t.Fatal(err)
+	}
+	if ms, _ := a.ListarMenus(1); len(ms) != 0 {
+		t.Fatalf("deshacer deja el menú: %d", len(ms))
 	}
 }

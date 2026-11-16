@@ -90,3 +90,49 @@ func TestApiTopePendienteSeConfirmaPorLaApi(t *testing.T) {
 		t.Fatal("confirmado")
 	}
 }
+
+func TestApiBotParaTodosSeAplicaConAvatarMenuYRangoDeTodos(t *testing.T) {
+	_, a := abreSolo(t)
+	e := decodifica[estadoAsistente](t, func() (string, error) { return AsistenteBase(1) })
+	if e.Borrador == nil || !e.Borrador.Menu.Fabrica || len(e.Borrador.Bienvenida.Adjuntos) != 1 || e.Borrador.Bienvenida.Adjuntos[0].Tipo != "imagen" {
+		t.Fatalf("el borrador trae el menú de fábrica y la cara del avatar: %+v", e.Borrador)
+	}
+	// el teléfono guarda el borrador sin el campo «fabrica»: se conserva si no cambió las opciones, y se pierde si las cambió
+	sinCampo := *e.Borrador
+	sinCampo.Menu.Fabrica = false
+	raw, _ := json.Marshal(sinCampo)
+	if err := AsistenteGuardar(1, string(raw)); err != nil {
+		t.Fatal(err)
+	}
+	if e = decodifica[estadoAsistente](t, func() (string, error) { return AsistenteEstado(1) }); !e.Borrador.Menu.Fabrica {
+		t.Fatal("sin cambios en las opciones sigue siendo el menú de fábrica")
+	}
+	if _, err := AsistenteAplicar(1); err != nil {
+		t.Fatal(err)
+	}
+	ms, _ := a.ListarMenus(1)
+	if len(ms) != 1 || !strings.Contains(string(ms[0].Def), "Bot Chat") {
+		t.Fatalf("menús: %+v", ms)
+	}
+	r, _ := a.RolPorID(1, int64(a.AjusteBotInt(1, "usuario_rol")))
+	if r == nil || len(r.Casillas) < 7 {
+		t.Fatalf("el rango de todos queda completo: %+v", r)
+	}
+	if a.AjusteBot(1, "lab_modo_menu") != "botones" {
+		t.Fatal("los botones van encendidos por defecto (solo en privado)")
+	}
+}
+
+func TestApiCambiarLasOpcionesDelMenuQuitaElMenuDeFabrica(t *testing.T) {
+	abreSolo(t)
+	e := decodifica[estadoAsistente](t, func() (string, error) { return AsistenteBase(1) })
+	e.Borrador.Menu.Opciones[0].Texto = "Mi opción"
+	e.Borrador.Menu.Fabrica = false
+	raw, _ := json.Marshal(e.Borrador)
+	if err := AsistenteGuardar(1, string(raw)); err != nil {
+		t.Fatal(err)
+	}
+	if e = decodifica[estadoAsistente](t, func() (string, error) { return AsistenteEstado(1) }); e.Borrador.Menu.Fabrica {
+		t.Fatal("al editar las opciones se usan las del usuario")
+	}
+}

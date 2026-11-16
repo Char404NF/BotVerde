@@ -237,7 +237,6 @@ func (e *entorno) voto(pollID string, opciones []string, chatVoto, remitente typ
 func TestEnTextoNoMandaNadaYNoNecesitaLaboratorio(t *testing.T) {
 	e := nuevoEntorno(t)
 	for _, caso := range []func(){
-		func() {}, // todo por defecto: texto
 		func() { e.fija("lab_modo_menu", ModoTexto) },
 	} {
 		caso()

@@ -24,7 +24,7 @@ import (
 func TestApiLabAjustesValidanYExigenElAviso(t *testing.T) {
 	_, a := abreSolo(t)
 	st := decodifica[estadoLab](t, func() (string, error) { return EstadoLab(1) })
-	if st.Activo || st.AvisoAceptado || st.Modo != "texto" || st.ModoEfectivo != "texto" || st.Grupos || st.EnMarcha || len(st.Plan) < 10 || st.EncMax != 12 {
+	if st.Activo || st.AvisoAceptado || st.Modo != "botones" || st.ModoEfectivo != "botones" || st.Grupos || st.EnMarcha || len(st.Plan) < 10 || st.EncMax != 12 {
 		t.Fatalf("por defecto todo apagado: %+v", st)
 	}
 	// sin aceptar el aviso no se enciende el Laboratorio (las pruebas), pero elegir el formato de los menús no lo necesita
@@ -150,7 +150,8 @@ func TestEnviadorMandaElMenuComoEncuestaYSiFallaSaleEnTexto(t *testing.T) {
 	ctx := context.Background()
 	sal := motor.Salida{Texto: "¿Qué necesitas?\n1. Horario\n2. Precios", Menu: &motor.MenuLab{Persona: ana, Titulo: "¿Qué necesitas?",
 		Opciones: []motor.OpcionMenu{{Num: 1, Texto: "Horario"}, {Num: 2, Texto: "Precios"}}}}
-	// Laboratorio apagado: texto numerado de siempre
+	// formato «texto»: texto numerado de siempre
+	_ = a.FijarAjusteBot(1, "lab_modo_menu", "texto")
 	if id, err := e.EnviarSalida(ctx, ana, sal, "", "", ""); err != nil || id == "" {
 		t.Fatal(id, err)
 	}

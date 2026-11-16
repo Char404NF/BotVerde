@@ -85,7 +85,7 @@ func TestUnComandoSinPermisoNoMandaArchivo(t *testing.T) {
 	e := nuevoEntorno(t, func(c *Config) {
 		p, _ := permisos.Nuevo(c.Alm, c.BotID)
 		d := comandos.Nuevo(c.Alm, c.BotID, p)
-		_ = d.Registrar(comandos.Comando{Nombre: "foto", Casilla: "util.sticker", Ejecutar: func(cx *comandos.Contexto) (string, error) {
+		_ = d.Registrar(comandos.Comando{Nombre: "foto", Casilla: "grupos.banear", Ejecutar: func(cx *comandos.Contexto) (string, error) {
 			cx.Archivo = &comandos.Archivo{ID: "0123456789abcdef01234567", Tipo: "sticker"}
 			return "", nil
 		}})

@@ -1,6 +1,7 @@
 package comandos
 
 import (
+	"botchat/internal/estilo"
 	"errors"
 	"fmt"
 	"strings"
@@ -23,25 +24,23 @@ func (d *Despachador) registrarBase() {
 func cmdAyuda(cx *Contexto) (string, error) {
 	cs := cx.D.Lista(cx)
 	pref := cx.D.Prefijo()
-	var b strings.Builder
 	rangoTxt := ""
 	if cx.Rol != nil {
 		rangoTxt = " (rango " + cx.Rol.Nombre + ")"
 	}
-	b.WriteString(cx.D.R("cmd.ayuda_titulo", "rango", rangoTxt) + "\n")
+	titulo := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(cx.D.R("cmd.ayuda_titulo", "rango", rangoTxt)), ":"))
+	var lineas []string
 	for _, c := range cs {
-		b.WriteString("• " + pref + c.Nombre)
+		l := "• *" + pref + c.Nombre + "*"
 		if c.Resumen != "" {
-			b.WriteString(" — " + c.Resumen)
+			l += " — " + c.Resumen
 		}
-		b.WriteString("\n")
+		lineas = append(lineas, l)
 	}
 	if cx.D.Extra != nil {
-		for _, l := range cx.D.Extra(cx) {
-			b.WriteString(l + "\n")
-		}
+		lineas = append(lineas, cx.D.Extra(cx)...)
 	}
-	return strings.TrimRight(b.String(), "\n"), nil
+	return estilo.Tarjeta("🤖", titulo, lineas, "Escribe "+pref+"menu para verlo con botones"), nil
 }
 
 func textoCaduca(as *almacen.Asignacion, ahora time.Time) string {

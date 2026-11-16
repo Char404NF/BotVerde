@@ -28,11 +28,24 @@ func TestRolUsuarioSeCreaUnaVezYPuedePedirDescargas(t *testing.T) {
 		t.Fatalf("debía crearse una sola vez: %d", id)
 	}
 	r, _ := e.alm.RolPorID(1, id)
-	if r == nil || r.Nombre != "Usuario" || r.Plantilla != "usuario" || len(r.Casillas) != 1 {
+	if r == nil || r.Nombre != "Usuario" || r.Plantilla != "usuario" || len(r.Casillas) != len(IDsCasillasUsuario) {
 		t.Fatalf("%+v", r)
 	}
-	if _, ok := r.Casillas["video.pedir"]; !ok {
-		t.Fatalf("solo debía poder pedir descargas: %v", r.Casillas)
+	for _, c := range []string{"video.pedir", "util.sticker", "ia.usar", "juegos.jugar"} {
+		if _, ok := r.Casillas[c]; !ok {
+			t.Fatalf("el rango de todos debía traer %s: %v", c, r.Casillas)
+		}
+	}
+	if _, ok := r.Casillas["grupos.banear"]; ok || e.s.CompletarUsuario() != 0 {
+		t.Fatalf("no debe traer permisos de administración ni agregar de más: %v", r.Casillas)
+	}
+	// un bot que ya existía con el rango viejo (solo descargas) queda completo, sin quitar lo que el dueño ya tenía
+	r.Casillas = map[string]almacen.Alcance{"video.pedir": {}, "util.notas": {}}
+	if err := e.alm.GuardarRol(1, *r); err != nil {
+		t.Fatal(err)
+	}
+	if n := e.s.CompletarUsuario(); n != len(IDsCasillasUsuario)-2 {
+		t.Fatalf("debía agregar las que faltan: %d", n)
 	}
 	// si el dueño lo borra, no vuelve a aparecer solo
 	if _, err := e.alm.BorrarRol(1, id); err != nil {

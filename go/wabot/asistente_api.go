@@ -1,7 +1,9 @@
 package wabot
 
 import (
+	"botchat/internal/estilo"
 	"botchat/internal/permisos"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -12,6 +14,7 @@ import (
 
 	"botchat/internal/almacen"
 	"botchat/internal/asistente"
+	"botchat/internal/modulos"
 )
 
 // API del asistente «Crea tu bot» (v0.6.0, E9). El borrador vive cifrado en bot_ajustes; Aplicar crea todo de golpe y Deshacer lo quita.
@@ -66,12 +69,27 @@ func AsistenteBase(botID int64) (string, error) {
 		b.Creado = viejo.Creado
 	}
 	b.DesdeAjustes(a, botID)
+	// La bienvenida lleva la cara feliz del avatar (la imagen viaja dentro de la app).
+	if png := estilo.Cara(estilo.CaraFeliz); png != nil && len(b.Bienvenida.Adjuntos) == 0 {
+		if id, n, err := a.GuardarAdjuntoMenu(botID, bytes.NewReader(png)); err == nil {
+			b.Bienvenida.Adjuntos = []almacen.AdjuntoRef{{ID: id, Tipo: almacen.TipoImagen, Mime: "image/png", Nombre: "avatar_feliz.png", Bytes: n}}
+		}
+	}
 	if err := asistente.Guardar(a, botID, b); err != nil {
 		return "", err
 	}
 	// El rango Admin de fábrica (si el bot todavía no lo tiene), para que el bot base ya traiga sus tres niveles: Dueño, Admin y todos los demás.
 	if p, err := permisos.Nuevo(a, botID); err == nil {
 		_, _ = p.AsegurarAdmin()
+		p.CompletarUsuario() // el rango de todos puede usar stickers, descargas, IA, notas y juegos
+	}
+	// Módulos de uso diario (solo responden a comandos y traen sus topes). Los que ya estaban encendidos se dejan como están.
+	if g, err := gestorDe(botID); err == nil {
+		for _, id := range []string{modulos.IDExtras, modulos.IDJuegos} {
+			if !g.Activo(id) {
+				_ = g.Activar(id)
+			}
+		}
 	}
 	return AsistenteEstado(botID)
 }
@@ -87,10 +105,21 @@ func AsistenteGuardar(botID int64, borradorJSON string) error {
 		return errors.New("El borrador no es válido.")
 	}
 	// Lo que ya se aplicó es del servidor, no del teléfono: se conserva aunque Kotlin no lo mande.
-	if viejo := asistente.Leer(a, botID); viejo.Creado != nil {
+	viejo := asistente.Leer(a, botID)
+	if viejo.Creado != nil {
 		b.Creado = viejo.Creado
 	} else {
 		b.Creado = nil
+	}
+	// «Fabrica» (el menú completo del Bot para todos) no viaja por el teléfono: sigue mientras no se cambien las opciones del paso del menú.
+	if viejo.Menu.Fabrica && b.Menu.Titulo == viejo.Menu.Titulo && len(b.Menu.Opciones) == len(viejo.Menu.Opciones) {
+		igual := true
+		for i, o := range b.Menu.Opciones {
+			if o != viejo.Menu.Opciones[i] {
+				igual = false
+			}
+		}
+		b.Menu.Fabrica = igual
 	}
 	return asistente.Guardar(a, botID, b)
 }
