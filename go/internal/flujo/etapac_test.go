@@ -139,12 +139,15 @@ func TestComandosSiempreActivosDentroDeUnMenu(t *testing.T) {
 	}
 	// salir cierra la conversación con el mensaje editable
 	d := e.dice(t, ana, ana, "salir")
-	if textos(d) != "Listo. Cuando necesites algo, escribe *menú*." || e.sesion(t, ana, ana) != nil {
+	if textos(d) != "Listo. Cuando necesites algo, escribe *!menu*." || e.sesion(t, ana, ana) != nil {
 		t.Fatalf("salir: %q", textos(d))
 	}
-	// y con "menú" suelto se vuelve a abrir aunque ninguna regla lo pida
-	if d := e.dice(t, ana, ana, "menú"); !strings.HasPrefix(textos(d), "Hola Ana") {
-		t.Fatalf("menú abre el menú: %q", textos(d))
+	// la palabra «menú» suelta NO abre nada (no se activa por error); con el símbolo sí, aunque ninguna regla lo pida
+	if d := e.dice(t, ana, ana, "menú"); strings.HasPrefix(textos(d), "Hola Ana") {
+		t.Fatalf("«menú» sin símbolo no debe abrir el menú: %q", textos(d))
+	}
+	if d := e.dice(t, ana, ana, "!menú"); !strings.HasPrefix(textos(d), "Hola Ana") {
+		t.Fatalf("!menú abre el menú: %q", textos(d))
 	}
 	// el prefijo es configurable
 	e.m.c.Prefijo = func() string { return "#" }

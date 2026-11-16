@@ -219,7 +219,7 @@ func TestFormularioCancelarEnCualquierMomentoYReintentosAgotados(t *testing.T) {
 	e2.crea(t, solo, true)
 	e2.dice(t, ana, ana, ".datos")
 	d = e2.dice(t, ana, ana, "cancelar")
-	if textos(d) != "Cancelado. Cuando quieras, escribe *menú*." || e2.sesion(t, ana, ana) != nil {
+	if textos(d) != "Cancelado. Cuando quieras, escribe *!menu*." || e2.sesion(t, ana, ana) != nil {
 		t.Fatalf("%q", textos(d))
 	}
 	// con un solo campo, "Corregir" va directo a esa pregunta; y sin resumen se guarda de una vez

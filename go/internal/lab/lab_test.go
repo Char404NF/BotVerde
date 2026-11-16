@@ -512,7 +512,7 @@ func TestBotonesListasEInteractivoSeArmanYRespondenPorId(t *testing.T) {
 
 	// auto: 3 o menos = botones; hasta 10 = lista; más = texto
 	r, ok, err := e.s.EnviarMenu(c, jidVotante, jidVotante, menu(3), "", "", "")
-	if !ok || err != nil || r.Tipo != almacen.LabBotones || !r.Respaldo {
+	if !ok || err != nil || r.Tipo != almacen.LabBotones || r.Respaldo {
 		t.Fatalf("botones: %+v %v %v", r, ok, err)
 	}
 	b := e.em.enviados[0].GetInteractiveMessage().GetNativeFlowMessage()

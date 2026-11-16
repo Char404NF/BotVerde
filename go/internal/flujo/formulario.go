@@ -347,7 +347,7 @@ func (m *Motor) cancelaForm(def *Def, s *almacen.Sesion, p *Paso, e entrada, pru
 	if motivo == "" {
 		r.texto(m.ajuste("menu_txt_cancelar"))
 	} else {
-		r.texto(motivo + " Cuando quieras, escribe *menú*.")
+		r.texto(motivo + " Cuando quieras, escribe *!menu*.")
 	}
 	return r, nil
 }

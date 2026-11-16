@@ -284,7 +284,8 @@ func (b *Borrador) DefMenu() *flujo.Def {
 		d.Pasos = append(d.Pasos, flujo.Paso{ID: id, Tipo: flujo.PasoRespuesta, Texto: o.Respuesta})
 	}
 	d.Pasos = append([]flujo.Paso{m}, d.Pasos...)
-	d.Disparadores = flujo.Disparadores{Palabras: []string{"menu", "menú", "opciones"}, Comando: ".menu"}
+	// Solo con el símbolo («!menu»): una palabra suelta como «menu» u «opciones» no debe abrirlo por error en una conversación normal.
+	d.Disparadores = flujo.Disparadores{Comando: ".menu"}
 	d.Alcance = flujo.Alcance{Privados: b.Privados}
 	if b.Grupos && len(b.GruposElegidos) > 0 {
 		d.Alcance.Grupos = append([]string(nil), b.GruposElegidos...)

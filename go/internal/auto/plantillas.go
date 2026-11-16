@@ -35,7 +35,7 @@ func Plantillas(hoy time.Time) []Plantilla {
 		{almacen.AutoAusencia, "Vacaciones", "Avisa durante un rango de fechas.", "Hola {nombre}, estamos de vacaciones y no podemos atenderte por ahora. Volvemos pronto y te respondemos en cuanto regresemos. ¡Gracias!", vac},
 		{almacen.AutoAusencia, "Días festivos", "Avisa en fechas que se repiten cada año.", "Hola {nombre}, hoy ({fecha}) es día festivo y no tenemos atención. Te respondemos el siguiente día hábil. ¡Felices fiestas! 🎉", fest},
 		{almacen.AutoRecibido, "Ya vi tu mensaje", "Avisa que recibiste el mensaje, una vez por conversación.", "Recibí tu mensaje, {nombre}. Te respondo en cuanto pueda. 🙌", c(almacen.AutoRecibido)},
-		{almacen.AutoCierre, "Gracias por contactarnos", "Se manda al terminar un menú.", "Gracias por contactarnos, {nombre}. Si necesitas algo más, escribe *menú*.", c(almacen.AutoCierre)},
+		{almacen.AutoCierre, "Gracias por contactarnos", "Se manda al terminar un menú.", "Gracias por contactarnos, {nombre}. Si necesitas algo más, escribe *!menu*.", c(almacen.AutoCierre)},
 		{almacen.AutoAtajo, "/gracias", "Una respuesta rápida de agradecimiento.", "¡Gracias por tu mensaje, {nombre}! Quedamos al pendiente.", Config{}},
 		{almacen.AutoAtajo, "/horario", "Dice tu horario de atención.", "Atendemos {horario}.", Config{}},
 		{almacen.AutoAtajo, "/ubicacion", "Dice dónde estás.", "Estamos en: escribe aquí tu dirección.", Config{}},
