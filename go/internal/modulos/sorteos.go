@@ -113,7 +113,7 @@ func sorteos() Modulo {
 			if n == 0 {
 				return ""
 			}
-			return fmt.Sprintf("Encendido · %d sorteos en marcha", n)
+			return "Encendido · " + plural1(n, "sorteo en marcha", "sorteos en marcha")
 		},
 		ComandosG: comandosSorteos,
 		Paneles:   panelesSorteos,

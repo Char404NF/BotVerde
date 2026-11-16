@@ -94,7 +94,7 @@ func votaciones() Modulo {
 			if ab == 0 {
 				return ""
 			}
-			return fmt.Sprintf("Encendido · %d votaciones abiertas", ab)
+			return "Encendido · " + plural1(ab, "votación abierta", "votaciones abiertas")
 		},
 		ComandosG: comandosVotaciones,
 		Paneles:   panelesVotaciones,

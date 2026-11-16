@@ -70,7 +70,7 @@ func tablon() Modulo {
 			if n == 0 {
 				return ""
 			}
-			return fmt.Sprintf("Encendido · %d tablones", n)
+			return "Encendido · " + plural1(n, "tablón", "tablones")
 		},
 		ComandosG: comandosTablon,
 		Paneles:   panelesTablon,
