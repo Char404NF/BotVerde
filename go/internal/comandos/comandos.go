@@ -64,6 +64,8 @@ type Comando struct {
 	// gastar un código en algo que de todos modos no se puede hacer.
 	Validar  func(*Contexto) error
 	Ejecutar func(*Contexto) (string, error)
+	// Avatar: momento («ayuda»…) en que la respuesta de este comando puede llevar la imagen del avatar del bot.
+	Avatar string
 }
 
 // Resultado es lo que sale de ejecutar un texto.
@@ -71,6 +73,7 @@ type Resultado struct {
 	Manejado bool     // el texto era un comando conocido (si no, que siga el motor de menús)
 	Texto    string   // respuesta ("" = no contestar)
 	Archivo  *Archivo // archivo que acompaña la respuesta (nil = ninguno)
+	Avatar   string   // momento del avatar del comando ("" = sin avatar)
 }
 
 // Despachador guarda los comandos y los ejecuta con permisos, límites y confirmaciones.
@@ -343,10 +346,10 @@ func (d *Despachador) correr(cmd *Comando, cx *Contexto, registro func(res, det 
 		} else {
 			registro("error", "")
 		}
-		return Resultado{Manejado: true, Texto: mensajeError(err)}
+		return Resultado{Manejado: true, Texto: mensajeError(err), Avatar: "error"}
 	}
 	registro("ok", "")
-	return Resultado{Manejado: true, Texto: texto, Archivo: cx.Archivo}
+	return Resultado{Manejado: true, Texto: texto, Archivo: cx.Archivo, Avatar: cmd.Avatar}
 }
 
 func mensajeError(err error) string {

@@ -62,7 +62,7 @@ func (s *estado) armarSilencio() {
 		if m == nil {
 			return errors.New("el motor no está listo")
 		}
-		return m.ResponderA(chat, "", texto)
+		return m.ResponderAvatar(chat, "", texto, "aviso")
 	}
 	v.RegistrarComandos(s.cmd)
 	s.sil = v

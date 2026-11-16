@@ -59,7 +59,7 @@ func TestBotParaTodosEnLaPracticaConDuenoYSubmenus(t *testing.T) {
 		t.Fatalf("submenú: %+v", d.Respuestas[0].Menu)
 	}
 	d = e.dice(t, ana, ana, "1") // Clima
-	if !strings.Contains(textos(d), "!clima Monterrey") {
+	if !strings.Contains(textos(d), "!clima Monterrey") || d.Respuestas[0].Avatar != "" {
 		t.Fatalf("respuesta: %q", textos(d))
 	}
 }

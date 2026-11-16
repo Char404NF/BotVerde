@@ -61,6 +61,9 @@ type Salida struct {
 	// Menu, si viene, es el mismo menú que va en Texto pero con sus partes separadas. Si el Laboratorio está encendido, quien envía
 	// puede mandarlo como encuesta o botones; Texto (el menú numerado) es SIEMPRE el respaldo.
 	Menu *MenuLab
+	// Avatar, si viene, es el momento («menu», «ayuda», «aviso»…) en que a la respuesta se le puede sumar la imagen del avatar del bot
+	// (el texto va de pie de foto). Quien envía decide si va o no según los ajustes del avatar; si no va, sale como siempre.
+	Avatar string
 }
 
 // MenuLab es un menú numerado con sus partes: el título y las opciones con el número que el menú de texto entiende (0 = volver).
@@ -818,7 +821,7 @@ func (m *Motor) atiende(chat string, lote []Mensaje) {
 			if r.Archivo != nil {
 				deComandos = append(deComandos, Salida{Texto: m.sinPrefijo(r.Texto), Medio: &Medio{ID: r.Archivo.ID, Tipo: r.Archivo.Tipo, Mime: r.Archivo.Mime, Nombre: r.Archivo.Nombre}, Etiqueta: "comando"})
 			} else if r.Texto != "" {
-				deComandos = append(deComandos, Salida{Texto: m.sinPrefijo(r.Texto), Etiqueta: "comando"})
+				deComandos = append(deComandos, Salida{Texto: m.sinPrefijo(r.Texto), Etiqueta: "comando", Avatar: r.Avatar})
 			}
 			if x.ID == ultimo.ID {
 				ultimoEsComando = true
@@ -946,7 +949,7 @@ func (m *Motor) enviar(chat, texto, citaID, mencion string, ts time.Time) error 
 func (m *Motor) enviarSalida(chat string, sal Salida, citaID, citaAutor, mencion string, ts time.Time, ref *RefSesion) error {
 	p := &pedido{chat: chat, texto: sal.Texto, citaID: citaID, citaAutor: citaAutor, mencion: mencion, ts: ts, ref: ref, res: make(chan error, 1),
 		continua: sal.Continua, etiqueta: sal.Etiqueta}
-	if sal.Medio != nil || sal.Ubicacion != nil || sal.Contacto != nil || sal.Auto != nil || sal.Menu != nil {
+	if sal.Medio != nil || sal.Ubicacion != nil || sal.Contacto != nil || sal.Auto != nil || sal.Menu != nil || sal.Avatar != "" {
 		p.salida = &sal
 	}
 	select {
@@ -1140,6 +1143,14 @@ func (m *Motor) ResponderA(chat, citaID, texto string) error {
 		return errors.New("el motor no está iniciado")
 	}
 	return m.enviar(chat, m.sinPrefijo(texto), citaID, "", time.Time{})
+}
+
+// ResponderAvatar es como ResponderA pero la respuesta puede llevar la imagen del avatar del bot (momento: «aviso», «error»…).
+func (m *Motor) ResponderAvatar(chat, citaID, texto, momento string) error {
+	if m.ctx == nil {
+		return errors.New("el motor no está iniciado")
+	}
+	return m.enviarSalida(chat, Salida{Texto: m.sinPrefijo(texto), Avatar: momento}, citaID, "", "", time.Time{}, nil)
 }
 
 // ProcesarDiferidas entrega las respuestas que se liberaron en la fila de espera de los grupos (se llama solo cada TickDiferidas; las

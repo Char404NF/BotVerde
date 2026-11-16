@@ -18,7 +18,7 @@ func PlantillaBotParaTodos() *Def {
 	}
 	d := &Def{V: 1, Nombre: NombreBotParaTodos, Inicio: "m",
 		Pasos: []Paso{
-			{ID: "m", Tipo: PasoMenu, Titulo: "🤖 *¿Qué quieres hacer, {nombre}?*\nElige una opción 👇", Opciones: []Opcion{
+			{ID: "m", Tipo: PasoMenu, Avatar: "menu", Titulo: "🤖 *¿Qué quieres hacer, {nombre}?*\nElige una opción 👇", Opciones: []Opcion{
 				{Texto: "🎨 Stickers y fotos", Destino: "r_stickers"},
 				{Texto: "⬇️ Descargar videos", Destino: "r_descargar"},
 				{Texto: "🧠 Preguntarle a la IA", Destino: "r_ia"},

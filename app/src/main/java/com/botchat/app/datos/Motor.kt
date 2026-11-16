@@ -392,6 +392,9 @@ interface Motor {
     fun resumenSemanalAhora(bot: Long): String = ""
     fun respaldoConfigExportar(bot: Long, contrasena: String): ByteArray = ByteArray(0)
     fun respaldoConfigRestaurar(bot: Long, contrasena: String, datos: ByteArray): String = "{}"
+    fun avatarEstado(bot: Long): String = "{}"
+    fun avatarConfigurar(bot: Long, activo: Boolean, momentos: String) {}
+    fun avatarPropio(bot: Long, id: String, mime: String) {}
 }
 
 /** El módulo Go de verdad (whatsmeow + almacén cifrado). */
@@ -752,4 +755,7 @@ object MotorGo : Motor {
     override fun resumenSemanalAhora(bot: Long) = Wabot.resumenSemanalAhora(bot)
     override fun respaldoConfigExportar(bot: Long, contrasena: String): ByteArray = Wabot.respaldoConfigExportar(bot, contrasena)
     override fun respaldoConfigRestaurar(bot: Long, contrasena: String, datos: ByteArray) = Wabot.respaldoConfigRestaurar(bot, contrasena, datos)
+    override fun avatarEstado(bot: Long) = Wabot.avatarEstado(bot)
+    override fun avatarConfigurar(bot: Long, activo: Boolean, momentos: String) = Wabot.avatarConfigurar(bot, activo, momentos)
+    override fun avatarPropio(bot: Long, id: String, mime: String) = Wabot.avatarPropio(bot, id, mime)
 }

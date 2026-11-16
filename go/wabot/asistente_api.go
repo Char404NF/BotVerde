@@ -1,9 +1,7 @@
 package wabot
 
 import (
-	"botchat/internal/estilo"
 	"botchat/internal/permisos"
-	"bytes"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -14,6 +12,7 @@ import (
 
 	"botchat/internal/almacen"
 	"botchat/internal/asistente"
+	"botchat/internal/avatar"
 	"botchat/internal/modulos"
 )
 
@@ -70,9 +69,9 @@ func AsistenteBase(botID int64) (string, error) {
 	}
 	b.DesdeAjustes(a, botID)
 	// La bienvenida lleva la cara feliz del avatar (la imagen viaja dentro de la app).
-	if png := estilo.Cara(estilo.CaraFeliz); png != nil && len(b.Bienvenida.Adjuntos) == 0 {
-		if id, n, err := a.GuardarAdjuntoMenu(botID, bytes.NewReader(png)); err == nil {
-			b.Bienvenida.Adjuntos = []almacen.AdjuntoRef{{ID: id, Tipo: almacen.TipoImagen, Mime: "image/png", Nombre: "avatar_feliz.png", Bytes: n}}
+	if len(b.Bienvenida.Adjuntos) == 0 {
+		if id, mime, nombre, ok := avatar.Nuevo(a, botID).Imagen(avatar.Bienvenida); ok {
+			b.Bienvenida.Adjuntos = []almacen.AdjuntoRef{{ID: id, Tipo: almacen.TipoImagen, Mime: mime, Nombre: nombre}}
 		}
 	}
 	if err := asistente.Guardar(a, botID, b); err != nil {

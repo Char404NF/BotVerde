@@ -85,7 +85,7 @@ func (m *Motor) menuPartes(def *Def, p *Paso, s *almacen.Sesion, e entrada) (str
 // salidaMenu es el mensaje de un menú: el texto numerado de siempre y sus partes (ver motor.Salida.Menu).
 func (m *Motor) salidaMenu(def *Def, p *Paso, s *almacen.Sesion, e entrada) motor.Salida {
 	texto, menu := m.menuPartes(def, p, s, e)
-	return motor.Salida{Texto: texto, Menu: menu}
+	return motor.Salida{Texto: texto, Menu: menu, Avatar: p.Avatar}
 }
 
 // mostrarPaso repite lo que se le preguntó a la persona en el paso donde va ("repetir").
@@ -536,6 +536,9 @@ func (m *Motor) salidasDeRespuesta(def *Def, p *Paso, e entrada, vars map[string
 		medios = append(medios, motor.Medio{ID: a.ID, Tipo: a.Tipo, Mime: a.Mime, Nombre: a.Nombre})
 	}
 	out := motor.ArmarSalidas(texto, medios)
+	if p.Avatar != "" && len(out) > 0 && out[0].Medio == nil && out[0].Texto != "" {
+		out[0].Avatar = p.Avatar
+	}
 	if u := p.Ubicacion; u != nil {
 		out = append(out, motor.Salida{Ubicacion: &motor.Ubicacion{Lat: u.Lat, Lon: u.Lon, Nombre: m.sustituye(def, u.Nombre, e, vars), Direccion: m.sustituye(def, u.Direccion, e, vars)}})
 	}

@@ -113,6 +113,12 @@ func TestAyudaMuestraSoloLoQuePuede(t *testing.T) {
 	e.rol("Raso")
 	_ = e.alm.AsignarRol(1, pnLuis, e.ids["Raso"], 0, "yo")
 
+	if r := e.priv(pnRosa, "!ayuda"); r.Avatar != "ayuda" {
+		t.Fatalf("la ayuda puede salir con el avatar: %+v", r)
+	}
+	if r := e.priv(pnRosa, "!rango"); r.Avatar != "" {
+		t.Fatalf("los demás comandos salen sin avatar: %+v", r)
+	}
 	sin := e.priv(pnRosa, "!ayuda").Texto
 	if !strings.Contains(sin, "!ayuda") || !strings.Contains(sin, "!rango") || strings.Contains(sin, "!asignar") || strings.Contains(sin, "!quitarrango") {
 		t.Fatalf("sin rango:\n%s", sin)

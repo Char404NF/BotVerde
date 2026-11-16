@@ -847,6 +847,18 @@ class MotorFalso : Motor {
     override fun grupoBaseAplicar(bot: Long, gruposJson: String): Long { llamadas += "baseAplicar:$gruposJson"; return JSONArray(gruposJson).length().toLong() }
     override fun grupoEncuesta(bot: Long, chat: String, titulo: String, opcionesJson: String, multiple: Boolean) { llamadas += "encuesta:$titulo:$opcionesJson:$multiple"; gFalla() }
     override fun grupoFijar(bot: Long, chat: String, msgId: String, dias: Long, fijar: Boolean) { llamadas += "fijar:$msgId:$dias:$fijar"; gFalla() }
+    var avatarJson = """{"activo":true,"propio":false,"momentos":[{"id":"menu","nombre":"Menú principal","cara":"feliz","activo":true,"grupos":true},{"id":"ayuda","nombre":"Ayuda (!ayuda)","cara":"contento","activo":true,"grupos":false},{"id":"aviso","nombre":"Avisos y advertencias en privado","cara":"enojado","activo":false,"grupos":false}]}"""
+    override fun avatarEstado(bot: Long) = avatarJson
+    override fun avatarConfigurar(bot: Long, activo: Boolean, momentos: String) {
+        llamadas += "avatar:$activo:$momentos"
+        val o = org.json.JSONObject(avatarJson)
+        o.put("activo", activo)
+        val ids = momentos.split(",").filter { it.isNotBlank() }
+        val arr = o.getJSONArray("momentos")
+        for (i in 0 until arr.length()) arr.getJSONObject(i).let { it.put("activo", it.getString("id") in ids) }
+        avatarJson = o.toString()
+    }
+    override fun avatarPropio(bot: Long, id: String, mime: String) { llamadas += "avatarPropio:$id:$mime" }
     override fun alertasLeer(bot: Long) = avisosJson
     override fun alertasGuardar(bot: Long, ajustesJson: String) { llamadas += "alertas:$ajustesJson"; avisosJson = ajustesJson }
     override fun resumenSemanalAhora(bot: Long): String { llamadas += "resumenSemanal"; return resumenTexto }

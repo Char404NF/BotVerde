@@ -54,6 +54,8 @@ type Paso struct {
 	Aviso     string   `json:"aviso,omitempty"`     // texto del aviso (admite variables)
 	// Formato: cómo sale ESTE menú: "" (el general), "texto", "encuesta" o "botones" (solo en chats privados).
 	Formato string `json:"formato,omitempty"`
+	// Avatar: momento del avatar («menu»…) si este paso puede salir con la imagen del avatar del bot (según sus ajustes en la app).
+	Avatar string `json:"avatar,omitempty"`
 
 	// Respuesta: archivos, ubicación y tarjeta de contacto que se mandan junto con el texto (bloque C).
 	Adjuntos  []AdjuntoMenu `json:"adjuntos,omitempty"`

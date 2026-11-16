@@ -179,8 +179,14 @@ var ajustesBotDefecto = map[string]string{
 	"todos_espera_seg": "300", // espera mínima entre dos "!todos" en el mismo grupo
 	"grupo_dias":       "30",  // periodo por defecto del ranking y de los inactivos
 	// Laboratorio (bloque G). Todo apagado: el menú sigue en texto numerado mientras no se active y se acepte el riesgo.
-	"lab_activo":    "0",       // interruptor del Laboratorio
-	"lab_aviso_ts":  "0",       // cuándo se aceptó el aviso de riesgo (0 = nunca)
+	"lab_activo":         "0",                         // interruptor del Laboratorio
+	"lab_aviso_ts":       "0",                         // cuándo se aceptó el aviso de riesgo (0 = nunca)
+	"avatar_activo":      "1",                         // el avatar del bot sale como imagen en algunas respuestas
+	"avatar_en":          "",                          // momentos elegidos (vacío = los de fábrica: menú, ayuda, bienvenida y avisos)
+	"avatar_propio":      "",                          // id de la imagen propia del avatar ("" = las caras de fábrica)
+	"avatar_propio_mime": "", "avatar_en_fijado": "0", // tipo de la imagen propia; «1» = el dueño ya eligió los momentos (aunque no quede ninguno)
+	"avatar_cara_feliz": "", "avatar_cara_contento": "", "avatar_cara_guino": "", "avatar_cara_pensando": "", // adjuntos ya guardados de cada cara
+	"avatar_cara_sorprendido": "", "avatar_cara_triste": "", "avatar_cara_enojado": "", "avatar_cara_dormido": "",
 	"lab_modo_menu": "botones", // texto | encuesta | botones (botones solo en chats privados; en grupos siempre texto)
 	// Descargas de video: versión de yt-dlp en uso, la última publicada y cuándo se revisó (la app no los muestra como ajustes).
 	"video_ytdlp_ver":    "",

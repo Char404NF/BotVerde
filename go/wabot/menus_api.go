@@ -415,6 +415,9 @@ func (e enviadorMotor) EnviarSalida(ctx context.Context, chat string, sal motor.
 	}
 	var r envio.Resultado
 	var err error
+	if sal, err = e.conAvatar(ctx, chat, sal, citaID, citaAutorWA, men); err != nil {
+		return "", err
+	}
 	switch {
 	case sal.Menu != nil && sal.Medio == nil && e.s.lab != nil:
 		// Laboratorio: el menú como encuesta o botones. Si no corresponde o el envío falla, sigue el texto numerado de siempre.

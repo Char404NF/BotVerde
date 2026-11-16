@@ -12,7 +12,7 @@ import (
 )
 
 func (d *Despachador) registrarBase() {
-	_ = d.Registrar(Comando{Nombre: "ayuda", Alias: []string{"help", "comandos"}, Resumen: "Ver lo que puedes usar", Casilla: "cmd.ayuda", Ejecutar: cmdAyuda})
+	_ = d.Registrar(Comando{Nombre: "ayuda", Alias: []string{"help", "comandos"}, Resumen: "Ver lo que puedes usar", Casilla: "cmd.ayuda", Avatar: "ayuda", Ejecutar: cmdAyuda})
 	_ = d.Registrar(Comando{Nombre: "rango", Resumen: "Ver cuál es tu rango", Casilla: "cmd.rango", Ejecutar: cmdRango})
 	_ = d.Registrar(Comando{Nombre: "asignar", Alias: []string{"darrango"}, Resumen: "Dar un rango a una persona", Uso: "asignar <persona> <rango> [24h|7d|permanente]",
 		Casilla: "rangos.asignar", Ejecutar: cmdAsignar})
