@@ -179,9 +179,16 @@ func (s *Servicio) enviarEspecialID(ctx context.Context, chat, tipo, texto, cita
 // EnviarEncuesta manda una encuesta al chat como mensaje automático. `multiple` deja elegir varias opciones. En el chat se guarda como
 // texto (la pregunta y sus opciones numeradas).
 func (s *Servicio) EnviarEncuesta(ctx context.Context, chat, titulo string, opciones []string, multiple bool) (Resultado, error) {
+	r, _, err := s.EnviarEncuestaSecreta(ctx, chat, titulo, opciones, multiple)
+	return r, err
+}
+
+// EnviarEncuestaSecreta es EnviarEncuesta y además devuelve el secreto de la encuesta: con él se abren los votos aunque la librería
+// no lo encuentre (por ejemplo, si el voto llega por el chat con LID y la encuesta salió al chat con número).
+func (s *Servicio) EnviarEncuestaSecreta(ctx context.Context, chat, titulo string, opciones []string, multiple bool) (Resultado, []byte, error) {
 	titulo = strings.TrimSpace(titulo)
 	if titulo == "" || len(opciones) < 2 || len(opciones) > 12 {
-		return Resultado{}, ErrEncuesta
+		return Resultado{}, nil, ErrEncuesta
 	}
 	var b strings.Builder
 	b.WriteString("📊 " + titulo)
@@ -192,9 +199,13 @@ func (s *Servicio) EnviarEncuesta(ctx context.Context, chat, titulo string, opci
 	if multiple {
 		n = len(opciones)
 	}
-	return s.EnviarInteractivo(ctx, chat, b.String(), "", "", func(_ string, _ *waE2E.ContextInfo) *waE2E.Message {
-		return construirEncuesta(titulo, opciones, n)
+	var secreto []byte
+	r, err := s.EnviarInteractivo(ctx, chat, b.String(), "", "", func(_ string, _ *waE2E.ContextInfo) *waE2E.Message {
+		m := construirEncuesta(titulo, opciones, n)
+		secreto = m.GetMessageContextInfo().GetMessageSecret()
+		return m
 	}, nil)
+	return r, secreto, err
 }
 
 // construirEncuesta arma el mensaje de encuesta (lo mismo que hace whatsmeow, sin necesitar el cliente).

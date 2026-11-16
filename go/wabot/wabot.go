@@ -433,7 +433,7 @@ func (s *estado) evento(e any) {
 			s.alSilencio(v, sinc) // silenciar en grupos: solo encola (nada de red aquí)
 			s.pausaPorTelefono(v)
 			// Votos y toques de nuestros menús interactivos (Laboratorio): se atienden aquí, en el trabajador.
-			if !s.alLab(v, sinc) {
+			if !s.alVotoModulo(v) && !s.alLab(v, sinc) {
 				s.alMotor(v, sinc)
 			}
 		})

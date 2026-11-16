@@ -378,7 +378,7 @@ func accionProgramados(g *Gestor, accion string, a Args) (string, error) {
 // La app programa con esto la alarma de Android.
 func (g *Gestor) ProximoAgenda() int64 {
 	var ids []string
-	for _, id := range []string{IDProgramados, IDDifusion} {
+	for _, id := range []string{IDProgramados, IDDifusion, IDSorteos, IDVotaciones, IDTablon} {
 		if g.Activo(id) {
 			ids = append(ids, id)
 		}

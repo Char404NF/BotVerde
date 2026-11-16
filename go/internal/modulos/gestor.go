@@ -27,8 +27,10 @@ type Gestor struct {
 	Enviador  Enviador
 	Ahora     func() time.Time
 	Aleatorio func(n int64) int64
-	Zona      func() *time.Location
-	Log       func(string)
+	// AzarSeguro elige un número de 0 a n-1 con azar criptográfico (los sorteos). nil = el del sistema; las pruebas lo fijan.
+	AzarSeguro func(n int64) int64
+	Zona       func() *time.Location
+	Log        func(string)
 	// Cambio avisa a la pantalla ("modulos", "iniciativas").
 	Cambio func(ev string)
 	// Aviso crea un aviso local (notificación de Android) para el dueño.

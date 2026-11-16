@@ -3,6 +3,8 @@ package modulos
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -26,6 +28,10 @@ type accFalsa struct {
 	errExpulsar error
 	rechazadas  []string
 	errRechazar error
+	encuestas   []string
+	textos      []string
+	fijados     []string
+	borrados    []string
 }
 
 func (a *accFalsa) EsAdmin(_ context.Context, _ string) (bool, error) { return a.admin, nil }
@@ -65,6 +71,32 @@ func (a *accFalsa) Agregar(_ context.Context, chat, p string) (string, error) {
 		return AgregOK, nil
 	}
 	return a.resAgregar, nil
+}
+
+func (a *accFalsa) EnviarEncuesta(_ context.Context, chat, titulo string, ops []string, multiple bool) (string, []byte, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.encuestas = append(a.encuestas, chat+"|"+titulo+"|"+strings.Join(ops, ","))
+	id := "POLL" + strconv.Itoa(len(a.encuestas))
+	return id, []byte("secreto-" + id), nil
+}
+func (a *accFalsa) EnviarTextoID(_ context.Context, chat, texto string, menc []string) (string, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.textos = append(a.textos, chat+"|"+texto)
+	return "TXT" + strconv.Itoa(len(a.textos)), nil
+}
+func (a *accFalsa) FijarMensaje(_ context.Context, chat, id string, dias int, fijar bool) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.fijados = append(a.fijados, fmt.Sprintf("%s|%s|%d|%v", chat, id, dias, fijar))
+	return nil
+}
+func (a *accFalsa) BorrarMensaje(_ context.Context, chat, id string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.borrados = append(a.borrados, chat+"|"+id)
+	return nil
 }
 
 // entH arma el bot de prueba con los módulos H registrados (apagados).

@@ -34,6 +34,14 @@ type Acciones interface {
 	RechazarLlamada(ctx context.Context, de, id string) error
 	// EnviarMenu manda opciones como botones o encuesta (si el Laboratorio está encendido) o, si no, el texto numerado.
 	EnviarMenu(ctx context.Context, chat, persona, titulo, textoNumerado string, opciones []string, citaID string) error
+	// EnviarEncuesta manda una encuesta a un grupo y devuelve su id y su secreto (hace falta para abrir los votos).
+	EnviarEncuesta(ctx context.Context, chat, titulo string, opciones []string, multiple bool) (id string, secreto []byte, err error)
+	// EnviarTextoID manda un texto (con menciones) y devuelve el id del mensaje.
+	EnviarTextoID(ctx context.Context, chat, texto string, menciones []string) (string, error)
+	// FijarMensaje fija (dias = 1, 7 o 30) o suelta un mensaje del chat para todos.
+	FijarMensaje(ctx context.Context, chat, id string, dias int, fijar bool) error
+	// BorrarMensaje borra para todos un mensaje que mandó el bot.
+	BorrarMensaje(ctx context.Context, chat, id string) error
 }
 
 // ---------- ayudas comunes de los módulos H ----------

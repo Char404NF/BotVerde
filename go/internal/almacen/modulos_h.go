@@ -263,6 +263,19 @@ func (a *Almacen) ActualizarAgenda(botID, id int64, estado string, proximo int64
 	return err
 }
 
+// ActualizarContenidoAgenda reemplaza el contenido (cifrado) de una fila de la agenda.
+func (a *Almacen) ActualizarContenidoAgenda(botID, id int64, contenido string) error {
+	sel, err := cifrado.SellarTexto(a.clave, "mod_agenda", []byte(contenido))
+	if err != nil {
+		return err
+	}
+	_, err = a.db.Exec(`UPDATE mod_agenda SET contenido=? WHERE bot_id=? AND id=?`, sel, botID, id)
+	if err == nil {
+		a.avisa("modulos")
+	}
+	return err
+}
+
 // BorrarAgenda borra una fila y sus destinatarios.
 func (a *Almacen) BorrarAgenda(botID, id int64) error {
 	if _, err := a.db.Exec(`DELETE FROM mod_dest WHERE bot_id=? AND agenda_id=?`, botID, id); err != nil {

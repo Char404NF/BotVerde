@@ -69,6 +69,40 @@ func (a accionesModulos) EnviarMenu(ctx context.Context, chat, persona, titulo, 
 	return err
 }
 
+// EnviarEncuesta manda una encuesta a un grupo y devuelve su id y su secreto.
+func (a accionesModulos) EnviarEncuesta(ctx context.Context, chat, titulo string, opciones []string, multiple bool) (string, []byte, error) {
+	r, sec, err := a.s.envio.EnviarEncuestaSecreta(ctx, chat, titulo, opciones, multiple)
+	if err != nil {
+		return "", nil, err
+	}
+	if r.Estado != "enviado" {
+		return "", nil, errNoEnviado
+	}
+	return r.ID, sec, nil
+}
+
+// EnviarTextoID manda un texto con menciones y devuelve el id del mensaje.
+func (a accionesModulos) EnviarTextoID(ctx context.Context, chat, texto string, menciones []string) (string, error) {
+	r, err := a.s.envio.EnviarAuto(ctx, chat, texto, "", menciones)
+	if err != nil {
+		return "", err
+	}
+	if r.Estado != "enviado" {
+		return "", errNoEnviado
+	}
+	return r.ID, nil
+}
+
+// FijarMensaje fija o suelta un mensaje para todos.
+func (a accionesModulos) FijarMensaje(ctx context.Context, chat, id string, dias int, fijar bool) error {
+	return a.s.envio.FijarMensaje(ctx, chat, id, dias*86400, fijar)
+}
+
+// BorrarMensaje borra para todos un mensaje del bot.
+func (a accionesModulos) BorrarMensaje(ctx context.Context, chat, id string) error {
+	return a.s.envio.BorrarParaTodos(ctx, chat, id)
+}
+
 // ---------- API para la pantalla de descargas ----------
 
 // VideoEstado devuelve (JSON) la versión de yt-dlp, si hay una nueva y qué se está descargando.
