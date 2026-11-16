@@ -103,8 +103,9 @@ type Servicio struct {
 	// AlVolverATexto se llama cuando el menú vuelve solo a texto por fallos seguidos.
 	AlVolverATexto func(motivo string)
 
-	mu     sync.Mutex
-	fallos int
+	mu         sync.Mutex
+	fallos     int
+	envBotones []time.Time // cuándo salieron los últimos menús con botones o listas (para el tope por hora)
 }
 
 // Nuevo crea el Laboratorio.
@@ -136,16 +137,22 @@ func (s *Servicio) Habilitado() error {
 	return nil
 }
 
-// Modo es el modo del menú que vale ahora: texto salvo que el Laboratorio esté habilitado y se haya elegido otro.
+// Modo es el formato general de los menús (Ajustes → Automatizaciones → Ajustes de menús): texto, encuesta o botones.
 func (s *Servicio) Modo() string {
-	if s.Habilitado() != nil {
-		return ModoTexto
-	}
 	switch m := strings.TrimSpace(s.aj("lab_modo_menu")); m {
 	case ModoEncuesta, ModoBotones:
 		return m
 	}
 	return ModoTexto
+}
+
+// ModoDe es el formato que vale para un menú: el suyo si lo trae («texto», «encuesta» o «botones») y, si no, el general.
+func (s *Servicio) ModoDe(formato string) string {
+	switch f := strings.TrimSpace(formato); f {
+	case ModoTexto, ModoEncuesta, ModoBotones:
+		return f
+	}
+	return s.Modo()
 }
 
 // ---------- utilidades ----------

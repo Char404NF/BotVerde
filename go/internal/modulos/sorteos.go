@@ -187,6 +187,12 @@ func (g *Gestor) sorteoElegir(d *sorteoDatos) (almacen.MiembroVista, bool) {
 
 // sorteoDecir le avisa a una persona: por privado si se puede; si no, mencionándola en el grupo.
 func (g *Gestor) sorteoDecir(d *sorteoDatos, persona, jid, privado, grupo string) {
+	g.sorteoDecirBotones(d, persona, jid, privado, grupo, nil)
+}
+
+// sorteoDecirBotones es sorteoDecir; si el aviso va por privado y el formato general de menús es «Botones», lleva esos botones (por
+// ejemplo «Reclamar premio» → !reclamar). Si no se puede con botones, sale el mismo texto de siempre.
+func (g *Gestor) sorteoDecirBotones(d *sorteoDatos, persona, jid, privado, grupo string, botones []BotonCmd) {
 	cfg := g.Config(IDSorteos)
 	dm := cfg.Bool("avisar_privado")
 	if dm && cfg.Bool("privado_conocidos") {
@@ -194,7 +200,16 @@ func (g *Gestor) sorteoDecir(d *sorteoDatos, persona, jid, privado, grupo string
 		dm = c != nil && c.UltimoTS > 0
 	}
 	if dm {
-		_, _ = g.Enviar(Iniciativa{Modulo: IDSorteos, Que: qSorteo, Chat: persona, Personas: []string{persona}, Texto: privado, Noche: NocheDiferir})
+		ini := Iniciativa{Modulo: IDSorteos, Que: qSorteo, Chat: persona, Personas: []string{persona}, Texto: privado, Noche: NocheDiferir}
+		if acc := g.Acc; acc != nil && len(botones) > 0 {
+			ini.Accion = func(ctx context.Context) error {
+				if ok, err := acc.EnviarBotones(ctx, persona, persona, privado, botones); ok && err == nil {
+					return nil
+				}
+				return g.Enviador.Texto(ctx, persona, privado, "", nil) // sin botones (o no salió): el texto de siempre
+			}
+		}
+		_, _ = g.Enviar(ini)
 		return
 	}
 	g.sorteoGrupo(d, "@"+usuarioDe(jid)+" "+grupo, []string{jid}, []string{persona})
@@ -259,9 +274,10 @@ func (g *Gestor) sorteoAnunciar(nombre string, d *sorteoDatos, slots []sorteoSlo
 	}
 	g.sorteoGrupo(d, fmt.Sprintf("🎉 Sorteo «%s»: %s\nPremio: %s\nTienes %s para reclamarlo escribiendo !reclamar (por privado al bot o aquí).", nombre, strings.Join(nombres, ", "), d.Premio, minutosTexto(d.ReclamoMin)), men, pers)
 	for _, s := range slots {
-		g.sorteoDecir(d, s.Persona, s.JID,
+		g.sorteoDecirBotones(d, s.Persona, s.JID,
 			fmt.Sprintf("🎉 ¡Ganaste el sorteo «%s»!\nPremio: %s\nResponde !reclamar en los próximos %s para quedártelo. Si no lo haces, se sortea otra persona.", nombre, d.Premio, minutosTexto(d.ReclamoMin)),
-			fmt.Sprintf("ganaste el sorteo «%s» (%s). Escribe !reclamar al bot en %s o se sortea otra persona.", nombre, d.Premio, minutosTexto(d.ReclamoMin)))
+			fmt.Sprintf("ganaste el sorteo «%s» (%s). Escribe !reclamar al bot en %s o se sortea otra persona.", nombre, d.Premio, minutosTexto(d.ReclamoMin)),
+			[]BotonCmd{{Texto: "Reclamar premio", Comando: "!reclamar"}})
 	}
 }
 

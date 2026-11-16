@@ -40,6 +40,8 @@ type OpcionLab struct {
 	Num   int    `json:"n"`
 	Texto string `json:"t"`
 	ID    string `json:"i,omitempty"` // id de botón o fila (botones y listas)
+	// Cmd: lo que se hace al tocar (botones de módulos): el bot lo recibe como si esa persona lo hubiera escrito («!reclamar»).
+	Cmd string `json:"c,omitempty"`
 }
 
 // SesionLab es un menú interactivo que salió.

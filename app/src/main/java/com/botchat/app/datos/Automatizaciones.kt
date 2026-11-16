@@ -6,7 +6,10 @@ import org.json.JSONObject
 data class AutoResumen(val id: Long, val activo: Boolean, val sistema: Boolean, val version: Int, val nombre: String, val resumen: String, val avisos: Int, val pasos: Int)
 
 /** Una opción de un menú. [ambito]: "" (en todos lados), "privado" o "grupo". [horario]: solo se ofrece dentro de ese horario. */
-data class OpcionDef(val texto: String = "", val destino: String = "", val id: String = "", val ambito: String = "", val horario: HorarioDef? = null)
+data class OpcionDef(val texto: String = "", val destino: String = "", val id: String = "", val ambito: String = "", val horario: HorarioDef? = null, val boton: BotonDef? = null)
+
+/** Botón especial de una opción cuando el menú sale con botones: [tipo] enlace (abre una página), copiar (copia un texto) o llamar (marca un número). */
+data class BotonDef(val tipo: String = "", val valor: String = "")
 
 data class AdjuntoDef(val id: String, val tipo: String, val mime: String = "", val nombre: String = "")
 data class UbicacionDef(val lat: Double = 0.0, val lon: Double = 0.0, val nombre: String = "", val direccion: String = "")
@@ -45,6 +48,8 @@ data class PasoDef(
     val campos: List<CampoDef> = emptyList(),
     val maxReintentos: Int = 0,
     val sinResumen: Boolean = false,
+    /** Cómo sale ESTE menú: "" (el general de Ajustes), "texto", "encuesta" o "botones" (solo en chats privados). */
+    val formato: String = "",
 )
 
 data class DispDef(
@@ -167,6 +172,7 @@ object JsonAuto {
                     if (op.id.isNotEmpty()) j.put("id", op.id)
                     if (op.ambito.isNotEmpty()) j.put("ambito", op.ambito)
                     if (op.horario != null && (op.horario.dias.isNotEmpty() || op.horario.desde.isNotEmpty() || op.horario.hasta.isNotEmpty())) j.put("horario", horarioJson(op.horario))
+                    if (op.boton != null && op.boton.tipo.isNotEmpty()) j.put("boton", JSONObject().put("tipo", op.boton.tipo).put("valor", op.boton.valor))
                     a.put(j)
                 }
             })
@@ -187,6 +193,7 @@ object JsonAuto {
         })
         if (p.maxReintentos != 0) o.put("maxReintentos", p.maxReintentos)
         if (p.sinResumen) o.put("sinResumen", true)
+        if (p.formato.isNotEmpty()) o.put("formato", p.formato)
         return o
     }
 
@@ -197,7 +204,8 @@ object JsonAuto {
         return PasoDef(
             p.optString("id"), p.optString("tipo"), p.optString("titulo"),
             List(op?.length() ?: 0) { j ->
-                op!!.getJSONObject(j).let { OpcionDef(it.optString("texto"), it.optString("destino"), it.optString("id"), it.optString("ambito"), it.optJSONObject("horario")?.let { h -> AutoDef.horario(h) }) }
+                op!!.getJSONObject(j).let { OpcionDef(it.optString("texto"), it.optString("destino"), it.optString("id"), it.optString("ambito"), it.optJSONObject("horario")?.let { h -> AutoDef.horario(h) },
+                    it.optJSONObject("boton")?.let { b -> BotonDef(b.optString("tipo"), b.optString("valor")) }) }
             },
             p.optString("texto"), p.optString("pregunta"), p.optString("variable"), p.optString("siguiente"), p.optBoolean("notificar"), p.optString("aviso"),
             List(ad?.length() ?: 0) { j -> ad!!.getJSONObject(j).let { AdjuntoDef(it.optString("id"), it.optString("tipo"), it.optString("mime"), it.optString("nombre")) } },
@@ -213,7 +221,7 @@ object JsonAuto {
                     )
                 }
             },
-            p.optInt("maxReintentos"), p.optBoolean("sinResumen"),
+            p.optInt("maxReintentos"), p.optBoolean("sinResumen"), p.optString("formato"),
         )
     }
 

@@ -223,7 +223,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         alMiBot = { nav.navigate("estado_bot") }, alAlmacenamiento = { nav.navigate("espacio") }, alAuditoria = { nav.navigate("auditoria") },
                         alSilencios = { nav.navigate("silencios") }, alAdvertencias = { nav.navigate("advertencias") }, alEtiquetas = { nav.navigate("etiquetas") },
                         alAjustes = { nav.navigate("ajustes") }, alComandos = { nav.navigate("comandos_propios") }, alModulos = { nav.navigate("modulos") },
-                        alLimites = { nav.navigate("iniciativa") }, alLaboratorio = { nav.navigate("laboratorio") }, alActividad = { nav.navigate("actividad") },
+                        alLimites = { nav.navigate("iniciativa") }, alActividad = { nav.navigate("actividad") },
                         alAsistente = { nav.navigate("asistente_bot") }, alRespuestas = { nav.navigate("respuestas_bot") }, alAvisos = { nav.navigate("avisos_copia") },
                     )
                     }
@@ -432,10 +432,6 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 composable("politicas_grupos") { PantallaPoliticasGrupo(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("permisos_avanzado") { PantallaPermisosAvanzado(bot.id, alVolver = { nav.popBackStack() }, alRegistro = { nav.navigate("registro_acciones") }) }
                 composable("registro_acciones") { PantallaRegistroAcciones(bot.id, alVolver = { nav.popBackStack() }) }
-                composable("laboratorio") { PantallaLaboratorio(bot.id, alVolver = { nav.popBackStack() }, alAviso = { nav.navigate("laboratorio_aviso") }, alMatriz = { nav.navigate("laboratorio_matriz") }, alCaptura = { nav.navigate("laboratorio_captura") }) }
-                composable("laboratorio_aviso") { PantallaAvisoLab(bot.id, alVolver = { nav.popBackStack() }) }
-                composable("laboratorio_captura") { PantallaCapturaLab(bot.id, alVolver = { nav.popBackStack() }) }
-                composable("laboratorio_matriz") { PantallaMatrizLab(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("utilidades") { PantallaUtilidades(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("avisos") { PantallaAvisos(bot.id, alVolver = { nav.popBackStack() }, alRecordatorio = { nav.navigate("recordatorio/$it") }) }
                 composable("recordatorio/{id}") { be ->
@@ -530,7 +526,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                         ajustes, bot.nombre, vm.eliminando, alVolver = { nav.popBackStack() },
                         alAbrirEspacio = { nav.navigate("espacio") }, alMedirRendimiento = { nav.navigate("diagnostico") },
                         alFunciones = { nav.navigate("funciones") }, alActividad = { nav.navigate("actividad") }, alEliminarBot = { vm.eliminar(ctx) },
-                        alPermisosAvanzado = { nav.navigate("permisos_avanzado") }, alMenus = { nav.navigate("ajustes_menus") }, alLaboratorio = { nav.navigate("laboratorio") }, botId = bot.id,
+                        alPermisosAvanzado = { nav.navigate("permisos_avanzado") }, alMenus = { nav.navigate("ajustes_menus") }, botId = bot.id,
                     )
                 }
                 composable("estado_bot") { PantallaBot(vm, conPermiso, alVolver = { nav.popBackStack() }, alAbrirAvanzado = { nav.navigate("avanzado") }, alAbrirAyuda = { nav.navigate("ayuda") }) }

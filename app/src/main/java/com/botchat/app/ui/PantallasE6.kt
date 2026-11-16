@@ -227,7 +227,7 @@ private fun BotonGrande(icono: ImageVector, titulo: String, texto: String, etiqu
 fun PantallaCentroBot(
     alMiBot: () -> Unit, alAlmacenamiento: () -> Unit, alAuditoria: () -> Unit, alSilencios: () -> Unit, alAdvertencias: () -> Unit,
     alEtiquetas: () -> Unit, alAjustes: () -> Unit,
-    alComandos: () -> Unit = {}, alModulos: () -> Unit = {}, alLimites: () -> Unit = {}, alLaboratorio: () -> Unit = {}, alActividad: () -> Unit = {},
+    alComandos: () -> Unit = {}, alModulos: () -> Unit = {}, alLimites: () -> Unit = {}, alActividad: () -> Unit = {},
     alAsistente: () -> Unit = {}, alRespuestas: () -> Unit = {}, alAvisos: () -> Unit = {},
 ) {
     val completo = LocalModoCompleto.current
@@ -251,7 +251,6 @@ fun PantallaCentroBot(
             BotonGrande(Ico.Agregar, "Módulos", "Extras opcionales, apagados hasta que los enciendas", "hub_modulos", alModulos)
             BotonGrande(Ico.Reloj, "Límites e iniciativa", "Lo que el bot escribe solo, topes y No molestar", "hub_limites", alLimites)
             BotonGrande(Ico.Estadisticas, "Actividad del bot", "Qué llegó, qué respondió y por qué no", "hub_actividad", alActividad)
-            BotonGrande(Ico.Aviso, "Laboratorio", "Pruebas experimentales, apagadas de fábrica", "hub_laboratorio", alLaboratorio)
         }
     }
 }
@@ -268,7 +267,7 @@ fun AvisoModoSimple(yaCompleto: Boolean, alCompleto: () -> Unit, alSimple: () ->
             Column(verticalArrangement = Arrangement.spacedBy(Esp.s)) {
                 Text(
                     if (yaCompleto) "Como ya usas módulos, sigues viendo todo. Si quieres menos botones, puedes pasar al modo Simple."
-                    else "Ahora ves lo básico: Chats, Personas, Grupos y Bot. Los comandos propios, los módulos, el Laboratorio y los límites siguen ahí, en el modo Completo.",
+                    else "Ahora ves lo básico: Chats, Personas, Grupos y Bot. Los comandos propios, los módulos y los límites siguen ahí, en el modo Completo.",
                 )
                 Text("No se borró ni se apagó nada. Puedes cambiar de modo cuando quieras en Ajustes → Avanzado.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Start)
             }

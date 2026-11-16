@@ -46,6 +46,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import com.botchat.app.datos.AdjuntoDef
+import com.botchat.app.datos.BotonDef
 import com.botchat.app.datos.AdjuntoSubido
 import com.botchat.app.datos.AjustesMenuDef
 import com.botchat.app.datos.AutoDef
@@ -253,5 +254,64 @@ internal fun PestanaAjustesMenu(d: AutoDef, alCambiar: (AutoDef) -> Unit) {
             cual.forEachIndexed { k, (v, t) -> SegmentedButton(a.cualquiera == v, { cambia { it.copy(cualquiera = v) } }, SegmentedButtonDefaults.itemShape(k, cual.size), modifier = Modifier.testTag("aj_cualquiera_${v.ifEmpty { "general" }}")) { Text(t, maxLines = 1) } }
         }
         Spacer(Modifier.size(80.dp))
+    }
+}
+
+// ---------- cómo se muestra el menú y botones especiales ----------
+
+private val FORMATOS_MENU = listOf("" to "General", "texto" to "Texto", "encuesta" to "Encuesta", "botones" to "Botones")
+
+/** Elige cómo sale ESTE menú: como el formato general de Ajustes, texto numerado, encuesta o botones (solo en chats privados). */
+@Composable
+internal fun FormatoDelMenu(p: PasoDef, cambia: (String, (PasoDef) -> PasoDef) -> Unit) {
+    Text("Cómo se muestra este menú", style = MaterialTheme.typography.labelMedium)
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().testTag("formato_menu_${p.id}")) {
+        FORMATOS_MENU.forEachIndexed { k, (v, t) ->
+            SegmentedButton(p.formato == v, { cambia(p.id) { it.copy(formato = v) } }, SegmentedButtonDefaults.itemShape(k, FORMATOS_MENU.size), modifier = Modifier.testTag("formato_${p.id}_${v.ifEmpty { "general" }}")) { Text(t, maxLines = 1) }
+        }
+    }
+    Text(
+        when (p.formato) {
+            "texto" -> "Siempre texto con números: la persona escribe 1, 2, 3…"
+            "encuesta" -> "Una encuesta de WhatsApp: la persona toca una opción. En grupos solo si lo permites en Ajustes → Menús."
+            "botones" -> "Hasta 3 opciones salen como botones y hasta 10 como lista. Solo en chats privados: en un grupo sale texto. Si algo falla, sale texto."
+            else -> "El que elegiste en Ajustes → Automatizaciones → Menús."
+        },
+        Modifier.testTag("formato_ayuda_${p.id}"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+private val BOTONES_ESPECIALES = listOf("" to "Normal", "enlace" to "Enlace", "copiar" to "Copiar", "llamar" to "Llamar")
+
+/** Convierte una opción en un botón especial (abre una página, copia un texto o marca un número) cuando el menú sale con botones. */
+@Composable
+internal fun BotonEspecialDeOpcion(p: PasoDef, i: Int, o: OpcionDef, cambia: (String, (PasoDef) -> PasoDef) -> Unit) {
+    var abierto by remember { mutableStateOf(o.boton != null) }
+    TextButton({ abierto = !abierto }, Modifier.testTag("boton_especial_${p.id}_$i")) { Text(if (abierto) "Ocultar el botón especial" else "Botón especial (enlace, copiar, llamar)…") }
+    if (!abierto) return
+    fun cambiaO(f: (OpcionDef) -> OpcionDef) = cambia(p.id) { q -> q.copy(opciones = q.opciones.mapIndexed { j, x -> if (j == i) f(x) else x }) }
+    val tipo = o.boton?.tipo.orEmpty()
+    Column(Modifier.padding(start = Esp.m), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().testTag("boton_tipo_${p.id}_$i")) {
+            BOTONES_ESPECIALES.forEachIndexed { k, (v, t) ->
+                SegmentedButton(tipo == v, { cambiaO { q -> q.copy(boton = if (v.isEmpty()) null else BotonDef(v, q.boton?.valor.orEmpty())) } }, SegmentedButtonDefaults.itemShape(k, BOTONES_ESPECIALES.size),
+                    modifier = Modifier.testTag("boton_${p.id}_${i}_${v.ifEmpty { "normal" }}")) { Text(t, maxLines = 1) }
+            }
+        }
+        if (tipo.isNotEmpty()) {
+            OutlinedTextField(
+                o.boton?.valor.orEmpty(), { t -> cambiaO { q -> q.copy(boton = BotonDef(tipo, t.take(500))) } }, Modifier.fillMaxWidth().testTag("boton_valor_${p.id}_$i"), singleLine = true,
+                label = { Text(when (tipo) { "enlace" -> "Dirección (https://…)"; "copiar" -> "Texto que se copia"; else -> "Número (con código de país)" }) },
+            )
+        }
+        Text(
+            when (tipo) {
+                "enlace" -> "Con botones, esta opción abre la página. Con texto o encuesta funciona como siempre (lleva a su respuesta)."
+                "copiar" -> "Con botones, esta opción copia el texto (una CLABE, un código). Con texto o encuesta funciona como siempre."
+                "llamar" -> "Con botones, esta opción marca el número. Con texto o encuesta funciona como siempre."
+                else -> "Un botón normal responde al menú. Con botones especiales el menú lleva como máximo 3 opciones (sin lista)."
+            },
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }

@@ -163,7 +163,7 @@ class Ajustes private constructor(ctx: Context) {
     }
 
     private val _completo = MutableStateFlow(p.getBoolean("modo_completo", false))
-    /** true = modo Completo (todo a la vista); false = Simple (se ocultan comandos, módulos, Laboratorio y límites). No borra nada. */
+    /** true = modo Completo (todo a la vista); false = Simple (se ocultan comandos, módulos y límites). No borra nada. */
     val modoCompleto: StateFlow<Boolean> = _completo
     fun fijarModoCompleto(v: Boolean) { p.edit().putBoolean("modo_completo", v).apply(); _completo.value = v }
 

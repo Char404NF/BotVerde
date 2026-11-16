@@ -78,7 +78,7 @@ class E6UiTest {
         assertFalse(hay("aviso_modo"))
         regla.onNodeWithTag("nav_bot").performClick(); regla.esperaEtiqueta("hub_mi_bot")
         listOf("hub_mi_bot", "hub_almacenamiento", "hub_auditoria", "hub_silencios", "hub_advertencias", "hub_etiquetas", "hub_ajustes").forEach { assertTrue(it, hay(it)) }
-        listOf("hub_comandos", "hub_modulos", "hub_limites", "hub_laboratorio", "hub_actividad").forEach { assertFalse(it, hay(it)) }
+        listOf("hub_comandos", "hub_modulos", "hub_limites", "hub_actividad").forEach { assertFalse(it, hay(it)) }
         regla.onNodeWithTag("hub_ajustes").performClick(); regla.esperaEtiqueta("ajuste_seguridad")
         assertFalse(hay("ajuste_modulos")); assertFalse(hay("ajuste_comandos_propios")); assertFalse(hay("ajuste_iniciativa"))
     }
@@ -87,10 +87,10 @@ class E6UiTest {
         val a = Ajustes.get(Apoyo.ctx()); a.aceptarAviso()
         regla.setContent { BotChatTema { PantallaAvanzado(a, "Mi bot", false, {}, {}, {}, {}) } }
         regla.esperaEtiqueta("modo_completo")
-        assertFalse(hay("abrir_laboratorio")); assertFalse(hay("abrir_actividad"))
+        assertFalse(hay("abrir_actividad"))
         regla.onNodeWithTag("modo_completo").performClick()
         regla.espera { a.modoCompleto.value }
-        regla.esperaEtiqueta("abrir_laboratorio"); assertTrue(hay("abrir_actividad"))
+        regla.esperaEtiqueta("abrir_actividad")
         regla.onNodeWithTag("modo_simple").performClick()
         regla.espera { !a.modoCompleto.value }
         regla.esperaSinTexto("Laboratorio")
@@ -101,19 +101,18 @@ class E6UiTest {
         regla.setContent {
             BotChatTema {
                 CompositionLocalProvider(LocalModoCompleto provides true) {
-                    PantallaCentroBot({ abiertos += "mibot" }, {}, {}, {}, {}, {}, {}, alComandos = { abiertos += "comandos" }, alModulos = { abiertos += "modulos" }, alLimites = { abiertos += "limites" }, alLaboratorio = { abiertos += "lab" }, alActividad = { abiertos += "act" })
+                    PantallaCentroBot({ abiertos += "mibot" }, {}, {}, {}, {}, {}, {}, alComandos = { abiertos += "comandos" }, alModulos = { abiertos += "modulos" }, alLimites = { abiertos += "limites" }, alActividad = { abiertos += "act" })
                 }
             }
         }
         regla.esperaEtiqueta("hub_comandos")
         regla.onNodeWithTag("hub_comandos").performScrollTo().performClick()
-        regla.onNodeWithTag("hub_laboratorio").performScrollTo().performClick()
         regla.onNodeWithTag("hub_mi_bot").performScrollTo().performClick()
-        assertEquals(listOf("comandos", "lab", "mibot"), abiertos)
+        assertEquals(listOf("comandos", "mibot"), abiertos)
     }
 
     @Test fun quienActualizaSinModulosQuedaEnSimpleYVeElAvisoUnaSolaVez() {
-        prefs().edit().putBoolean("aviso_aceptado", true).commit(); Ajustes.reiniciarParaPruebas()
+        prefs().edit().putBoolean("aviso_aceptado", true).putBoolean("terminos_v1", true).commit(); Ajustes.reiniciarParaPruebas()
         val a = Ajustes.get(Apoyo.ctx())
         assertTrue(a.avisoModoPendiente.value); assertFalse(a.modoCompleto.value)
         raiz()
@@ -127,7 +126,7 @@ class E6UiTest {
     }
 
     @Test fun elAvisoTraeUnAtajoAModoCompleto() {
-        prefs().edit().putBoolean("aviso_aceptado", true).commit(); Ajustes.reiniciarParaPruebas()
+        prefs().edit().putBoolean("aviso_aceptado", true).putBoolean("terminos_v1", true).commit(); Ajustes.reiniciarParaPruebas()
         val a = Ajustes.get(Apoyo.ctx())
         raiz(); regla.esperaTexto("La app ahora es más simple")
         regla.onNodeWithTag("aviso_modo_completo").performClick()
@@ -138,7 +137,7 @@ class E6UiTest {
 
     @Test fun quienTieneModulosEncendidosArrancaEnCompleto() {
         motor.modulosLista[1].put("activo", true)
-        prefs().edit().putBoolean("aviso_aceptado", true).commit(); Ajustes.reiniciarParaPruebas()
+        prefs().edit().putBoolean("aviso_aceptado", true).putBoolean("terminos_v1", true).commit(); Ajustes.reiniciarParaPruebas()
         val a = Ajustes.get(Apoyo.ctx())
         raiz()
         regla.esperaTexto("Te dejamos en modo Completo")

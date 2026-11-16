@@ -42,7 +42,13 @@ type Acciones interface {
 	FijarMensaje(ctx context.Context, chat, id string, dias int, fijar bool) error
 	// BorrarMensaje borra para todos un mensaje que mandó el bot.
 	BorrarMensaje(ctx context.Context, chat, id string) error
+	// EnviarBotones manda un mensaje con hasta 3 botones que ejecutan comandos. ok=false = no salió con botones (el formato general no es
+	// «Botones», el chat es un grupo o no hay cupo): quien llama manda su texto de siempre.
+	EnviarBotones(ctx context.Context, chat, persona, texto string, botones []BotonCmd) (ok bool, err error)
 }
+
+// BotonCmd es un botón de un módulo: al tocarlo, el bot recibe Comando como si esa persona lo hubiera escrito.
+type BotonCmd struct{ Texto, Comando string }
 
 // ---------- ayudas comunes de los módulos H ----------
 

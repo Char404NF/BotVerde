@@ -42,6 +42,9 @@ type Entrada struct {
 	Num     int
 	Texto   string // texto de la opción elegida
 	Votante string
+	// Comando: si el botón que tocó es de un módulo, lo que el bot debe recibir como si ella lo hubiera escrito («!reclamar»). Vacío = un
+	// menú: se pasa Num.
+	Comando string
 	Navega  bool
 	Prueba  bool // era una prueba de la matriz: ya se anotó "respondió"
 }
@@ -377,5 +380,10 @@ func (s *Servicio) recibirToque(ctx context.Context, evt *events.Message, res Re
 		return e
 	}
 	s.cierra(ses, e)
+	for _, o := range ses.Opciones {
+		if o.Num == num && o.Cmd != "" {
+			e.Comando = o.Cmd
+		}
+	}
 	return e
 }

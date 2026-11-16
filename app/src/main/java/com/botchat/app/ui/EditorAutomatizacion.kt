@@ -261,6 +261,7 @@ private fun EditorDePaso(
     when (p.tipo) {
         "menu" -> {
             Campo(p.titulo, "Título del menú", "titulo_${p.id}") { t -> cambia(p.id) { it.copy(titulo = t) } }
+            FormatoDelMenu(p, cambia)
             p.opciones.forEachIndexed { i, o ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("${i + 1}.", fontWeight = FontWeight.SemiBold)
@@ -269,6 +270,7 @@ private fun EditorDePaso(
                 }
                 SelectorDestino(d, o.destino, "destino_${p.id}_$i", conTerminar = false, alElegir = { dest -> cambia(p.id) { q -> q.copy(opciones = q.opciones.mapIndexed { j, x -> if (j == i) x.copy(destino = dest) else x }) } },
                     alNuevo = { tipo -> agrega(tipo) { nuevo -> d.copy(pasos = d.pasos.map { q -> if (q.id == p.id) q.copy(opciones = q.opciones.mapIndexed { j, x -> if (j == i) x.copy(destino = nuevo.id) else x }) else q } + nuevo) } })
+                BotonEspecialDeOpcion(p, i, o, cambia)
                 AjustesDeOpcion(p, i, o, cambia)
             }
             OutlinedButton({ cambia(p.id) { it.copy(opciones = it.opciones + OpcionDef("Opción ${it.opciones.size + 1}", "")) } }, Modifier.testTag("agregar_opcion_${p.id}")) { Icon(Ico.Agregar, null); Text(" Agregar opción") }

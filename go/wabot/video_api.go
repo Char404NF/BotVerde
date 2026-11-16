@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"botchat/internal/envio"
+	"botchat/internal/lab"
 	"botchat/internal/modulos"
 	"botchat/internal/motor"
 )
@@ -67,6 +68,18 @@ func (a accionesModulos) EnviarMenu(ctx context.Context, chat, persona, titulo, 
 	}
 	_, err := s.envio.EnviarAutoCita(ctx, chat, textoNumerado, citaID, "", nil)
 	return err
+}
+
+// EnviarBotones manda botones que ejecutan comandos (solo en privado y con el formato general en «Botones»).
+func (a accionesModulos) EnviarBotones(ctx context.Context, chat, persona, texto string, botones []modulos.BotonCmd) (bool, error) {
+	if a.s.lab == nil {
+		return false, nil
+	}
+	bs := make([]lab.BotonCmd, len(botones))
+	for i, b := range botones {
+		bs[i] = lab.BotonCmd{Texto: b.Texto, Comando: b.Comando}
+	}
+	return a.s.lab.EnviarBotones(ctx, chat, persona, texto, bs)
 }
 
 // EnviarEncuesta manda una encuesta a un grupo y devuelve su id y su secreto.

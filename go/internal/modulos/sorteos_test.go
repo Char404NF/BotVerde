@@ -247,3 +247,22 @@ func comandoDe(t *testing.T, e *ent, id, nombre string) *comandos.Comando {
 	t.Fatalf("el módulo %s no tiene el comando %s", id, nombre)
 	return nil
 }
+
+func TestSorteoAvisoPrivadoLlevaBotonReclamarSiHayBotones(t *testing.T) {
+	e, socio := sorteoListo(t)
+	acc := e.g.Acc.(*accFalsa)
+	acc.conBotones = true
+	_, _ = e.alm.GuardarMensaje(&almacen.Mensaje{ID: "m1", ChatJID: pnAna, BotID: 1, RemitenteJID: pnAna, Tipo: almacen.TipoTexto, Texto: "hola", TS: e.hora.Unix() - 100})
+	e.g.AzarSeguro = func(n int64) int64 { return 0 }
+	crearSorteo(t, e, Args{"rango1": itoa64(socio)})
+	_, d := sorteoFilaDe(t, e)
+	if d.Slots[0].Persona != pnAna {
+		t.Skip("el ganador no es quien ya le escribió al bot")
+	}
+	if len(acc.botones) != 1 || !strings.Contains(acc.botones[0], pnAna+"|🎉 ¡Ganaste el sorteo") || !strings.Contains(acc.botones[0], "Reclamar premio=!reclamar") {
+		t.Fatalf("botones: %v", acc.botones)
+	}
+	if e.hay(pnAna + "|🎉 ¡Ganaste") {
+		t.Fatal("con botones no debe mandarse además el texto suelto")
+	}
+}

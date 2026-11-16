@@ -76,7 +76,6 @@ fun PantallaAvanzado(
     alActividad: () -> Unit = {},
     alPermisosAvanzado: () -> Unit = {},
     alMenus: () -> Unit = {},
-    alLaboratorio: () -> Unit = {},
     botId: Long = 0,
 ) {
     val ctx = LocalContext.current
@@ -106,8 +105,8 @@ fun PantallaAvanzado(
                         }
                     }
                     Text(
-                        if (completo) "Completo: ves todo, incluidos comandos propios, módulos, Laboratorio y límites."
-                        else "Simple: se ocultan los comandos propios, los módulos, el Laboratorio y los límites. No se borra nada; vuelven en modo Completo.",
+                        if (completo) "Completo: ves todo, incluidos comandos propios, módulos y límites."
+                        else "Simple: se ocultan los comandos propios, los módulos y los límites. No se borra nada; vuelven en modo Completo.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("texto_modo_app"),
                     )
                 }
@@ -146,7 +145,6 @@ fun PantallaAvanzado(
                 if (completo) Fila("Actividad del bot", "Qué llegó, qué respondió y por qué no", Ico.Estadisticas) { OutlinedButton(alActividad, Modifier.testTag("abrir_actividad")) { Text("Ver") } }
                 if (completo) Fila("Permisos y comandos", "Prefijo, topes, códigos y registro de acciones", Ico.Candado) { OutlinedButton(alPermisosAvanzado, Modifier.testTag("abrir_permisos_avanzado")) { Text("Abrir") } }
                 Fila("Menús", "Escalera de errores, saludos, grupos y lo que no entendió", Ico.Chats) { OutlinedButton(alMenus, Modifier.testTag("abrir_ajustes_menus_avanzado")) { Text("Abrir") } }
-                if (completo) Fila("Laboratorio", "Menús como encuesta o botones (experimental, apagado)", Ico.Aviso) { OutlinedButton(alLaboratorio, Modifier.testTag("abrir_laboratorio")) { Text("Abrir") } }
                 Fila("Aa Estilo de letra", "Botón para escribir con letras especiales (𝗡𝗲𝗴𝗿𝗶𝘁𝗮, 𝒮𝒸𝓇𝒾𝓅𝓉…). Puede verse distinto en otros teléfonos, no se puede buscar y los lectores de pantalla lo leen mal", Ico.Editar) {
                     Switch(estiloLetra, { haptica(Toque.Suave); ajustes.fijarEstiloLetra(it) }, Modifier.testTag("sw_estilo_letra"))
                 }

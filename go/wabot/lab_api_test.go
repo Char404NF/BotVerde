@@ -27,12 +27,21 @@ func TestApiLabAjustesValidanYExigenElAviso(t *testing.T) {
 	if st.Activo || st.AvisoAceptado || st.Modo != "texto" || st.ModoEfectivo != "texto" || st.Grupos || st.EnMarcha || len(st.Plan) < 10 || st.EncMax != 12 {
 		t.Fatalf("por defecto todo apagado: %+v", st)
 	}
-	// sin aceptar el aviso no se enciende ni se elige otro modo
+	// sin aceptar el aviso no se enciende el Laboratorio (las pruebas), pero elegir el formato de los menús no lo necesita
 	if err := FijarAjusteLab(1, "lab_activo", "1"); err == nil {
 		t.Fatal("sin aviso no enciende")
 	}
-	if err := FijarAjusteLab(1, "lab_modo_menu", "encuesta"); err == nil {
-		t.Fatal("sin aviso no hay encuesta")
+	if err := FijarAjusteLab(1, "lab_modo_menu", "botones"); err != nil {
+		t.Fatalf("el formato de los menús se elige sin aviso: %v", err)
+	}
+	if err := FijarAjusteLab(1, "menu_botones_hora", "25"); err != nil {
+		t.Fatal(err)
+	}
+	if err := FijarAjusteLab(1, "menu_botones_hora", "9999"); err == nil {
+		t.Fatal("el tope por hora va de 0 a 500")
+	}
+	if st2 := decodifica[estadoLab](t, func() (string, error) { return EstadoLab(1) }); st2.ModoEfectivo != "botones" || st2.BotonesHora != 25 {
+		t.Fatalf("%+v", st2)
 	}
 	if err := AceptarAvisoLab(1); err != nil {
 		t.Fatal(err)
@@ -61,10 +70,10 @@ func TestApiLabAjustesValidanYExigenElAviso(t *testing.T) {
 	if !st.Activo || !st.AvisoAceptado || st.ModoEfectivo != "encuesta" || !st.Grupos || st.EncMax != 10 || st.PruebaChat == "" || st.VersionWA != "2.26.1" {
 		t.Fatalf("%+v", st)
 	}
-	// apagar el interruptor deja el menú en texto aunque el modo siga elegido
+	// el interruptor del Laboratorio ya no manda sobre el formato de los menús
 	_ = FijarAjusteLab(1, "lab_activo", "0")
 	st = decodifica[estadoLab](t, func() (string, error) { return EstadoLab(1) })
-	if st.Modo != "encuesta" || st.ModoEfectivo != "texto" {
+	if st.Modo != "encuesta" || st.ModoEfectivo != "encuesta" {
 		t.Fatalf("%+v", st)
 	}
 	// el camino general de ajustes no deja saltarse el aviso

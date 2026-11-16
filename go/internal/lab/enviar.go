@@ -10,6 +10,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	waBinary "go.mau.fi/whatsmeow/binary"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 
 	"botchat/internal/almacen"
@@ -29,7 +30,12 @@ type spec struct {
 	Tipo     string
 	Titulo   string
 	Opciones []almacen.OpcionLab // Num, Texto (tal como sale) e ID (botones y listas, se completa al armar)
+	// Especiales: botones de enlace, copiar o llamar por número de opción (solo con botones; no hay respuesta que esperar).
+	Especiales map[int]especial
 }
+
+// especial es un botón que abre un enlace, copia un texto o marca un número en vez de responder.
+type especial struct{ Tipo, Valor string }
 
 func (s *Servicio) tipoBotones(n int) string {
 	switch t := s.aj("lab_botones_tipo"); t {
@@ -61,12 +67,12 @@ func (s *Servicio) decidir(chat string, menu *motor.MenuLab) (spec, bool) {
 	if menu == nil || len(menu.Opciones) == 0 {
 		return spec{}, false
 	}
-	modo := s.Modo()
+	modo := s.ModoDe(menu.Formato)
 	if modo == ModoTexto {
 		return spec{}, false
 	}
-	if esGrupo(chat) && s.aj("lab_grupos") != "1" {
-		return spec{}, false // solo privado por defecto: en un grupo todos ven los votos
+	if esGrupo(chat) && (modo == ModoBotones || s.aj("lab_grupos") != "1") {
+		return spec{}, false // botones y listas solo en privado; la encuesta, en grupos, solo si se pidió (todos ven los votos)
 	}
 	n := len(menu.Opciones)
 	titulo := strings.TrimSpace(menu.Titulo)
@@ -94,11 +100,27 @@ func (s *Servicio) decidir(chat string, menu *motor.MenuLab) (spec, bool) {
 			sp.Opciones = append(sp.Opciones, almacen.OpcionLab{Num: o.Num, Texto: nombres[i]})
 		}
 	case ModoBotones:
+		especiales := map[int]especial{}
+		for _, o := range menu.Opciones {
+			if o.BotonTipo != "" && o.BotonValor != "" {
+				especiales[o.Num] = especial{o.BotonTipo, o.BotonValor}
+			}
+		}
 		t := s.tipoBotones(n)
-		if t == "" {
+		if len(especiales) > 0 {
+			// una lista no puede llevar enlaces, copiar ni llamar: con botones especiales solo caben hasta 3 botones
+			t = ""
+			if n <= maxBotones {
+				t = almacen.LabBotones
+			}
+		}
+		if t == "" || !s.cupoBotones() {
 			return spec{}, false
 		}
 		sp.Tipo = t
+		if len(especiales) > 0 {
+			sp.Especiales = especiales
+		}
 		lim := maxBoton
 		if t == almacen.LabLista {
 			lim = maxFila
@@ -126,31 +148,8 @@ func (s *Servicio) armar(sp *spec, id string) *waE2E.Message {
 			nombres[i] = o.Texto
 		}
 		return s.Cli.BuildPollCreation(sp.Titulo, nombres, 1)
-	case almacen.LabBotones:
-		bs := make([]*waE2E.ButtonsMessage_Button, len(sp.Opciones))
-		for i := range sp.Opciones {
-			sp.Opciones[i].ID = idBoton(id, sp.Opciones[i].Num)
-			bs[i] = &waE2E.ButtonsMessage_Button{
-				ButtonID:   proto.String(sp.Opciones[i].ID),
-				ButtonText: &waE2E.ButtonsMessage_Button_ButtonText{DisplayText: proto.String(sp.Opciones[i].Texto)},
-				Type:       waE2E.ButtonsMessage_Button_RESPONSE.Enum(),
-			}
-		}
-		return &waE2E.Message{ButtonsMessage: &waE2E.ButtonsMessage{
-			ContentText: proto.String(sp.Titulo), FooterText: proto.String("Toca una opción"),
-			Buttons: bs, HeaderType: waE2E.ButtonsMessage_EMPTY.Enum(),
-		}}
-	case almacen.LabLista:
-		rows := make([]*waE2E.ListMessage_Row, len(sp.Opciones))
-		for i := range sp.Opciones {
-			sp.Opciones[i].ID = idBoton(id, sp.Opciones[i].Num)
-			rows[i] = &waE2E.ListMessage_Row{Title: proto.String(sp.Opciones[i].Texto), RowID: proto.String(sp.Opciones[i].ID)}
-		}
-		return &waE2E.Message{ListMessage: &waE2E.ListMessage{
-			Title: proto.String("Menú"), Description: proto.String(sp.Titulo), ButtonText: proto.String("Ver opciones"),
-			ListType: waE2E.ListMessage_SINGLE_SELECT.Enum(),
-			Sections: []*waE2E.ListMessage_Section{{Title: proto.String("Opciones"), Rows: rows}},
-		}}
+	case almacen.LabBotones, almacen.LabLista:
+		return s.armarNativo(sp, id)
 	default: // interactivo con quick_reply
 		bs := make([]*waE2E.InteractiveMessage_NativeFlowMessage_NativeFlowButton, len(sp.Opciones))
 		for i := range sp.Opciones {
@@ -164,6 +163,71 @@ func (s *Servicio) armar(sp *spec, id string) *waE2E.Message {
 				NativeFlowMessage: &waE2E.InteractiveMessage_NativeFlowMessage{Buttons: bs}},
 		}}
 	}
+}
+
+// armarNativo arma botones (hasta 3) o una lista (hasta 10 filas) como mensaje interactivo «native flow», que es lo único que WhatsApp
+// muestra a una cuenta normal cuando va con el nodo <biz> (ver NodoBiz). Un botón normal responde con su id; los especiales abren un
+// enlace, copian un texto o marcan un número.
+func (s *Servicio) armarNativo(sp *spec, id string) *waE2E.Message {
+	var bs []*waE2E.InteractiveMessage_NativeFlowMessage_NativeFlowButton
+	boton := func(nombre string, params map[string]any) {
+		pj, _ := json.Marshal(params)
+		bs = append(bs, &waE2E.InteractiveMessage_NativeFlowMessage_NativeFlowButton{Name: proto.String(nombre), ButtonParamsJSON: proto.String(string(pj))})
+	}
+	if sp.Tipo == almacen.LabLista {
+		filas := make([]map[string]any, len(sp.Opciones))
+		for i := range sp.Opciones {
+			sp.Opciones[i].ID = idBoton(id, sp.Opciones[i].Num)
+			filas[i] = map[string]any{"id": sp.Opciones[i].ID, "title": sp.Opciones[i].Texto}
+		}
+		boton("single_select", map[string]any{"title": "Ver opciones", "sections": []any{map[string]any{"title": "Opciones", "rows": filas}}})
+	} else {
+		for i := range sp.Opciones {
+			o := &sp.Opciones[i]
+			if e, ok := sp.Especiales[o.Num]; ok {
+				switch e.Tipo {
+				case "enlace":
+					boton("cta_url", map[string]any{"display_text": o.Texto, "url": e.Valor, "merchant_url": e.Valor})
+				case "copiar":
+					boton("cta_copy", map[string]any{"display_text": o.Texto, "copy_code": e.Valor})
+				case "llamar":
+					boton("cta_call", map[string]any{"display_text": o.Texto, "phone_number": e.Valor})
+				}
+				continue
+			}
+			o.ID = idBoton(id, o.Num)
+			boton("quick_reply", map[string]any{"display_text": o.Texto, "id": o.ID})
+		}
+	}
+	return &waE2E.Message{InteractiveMessage: &waE2E.InteractiveMessage{
+		Body: &waE2E.InteractiveMessage_Body{Text: proto.String(sp.Titulo)},
+		InteractiveMessage: &waE2E.InteractiveMessage_NativeFlowMessage_{
+			NativeFlowMessage: &waE2E.InteractiveMessage_NativeFlowMessage{Buttons: bs}},
+	}}
+}
+
+// cupoBotones dice si todavía caben menús con botones o listas en esta hora (tope «menu_botones_hora»; 0 = sin tope). Si no caben,
+// el menú sale en texto. Cuenta al preguntar.
+func (s *Servicio) cupoBotones() bool {
+	tope := s.ajInt("menu_botones_hora")
+	if tope <= 0 {
+		return true
+	}
+	ahora := s.ahora()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := s.envBotones[:0]
+	for _, t := range s.envBotones {
+		if ahora.Sub(t) < time.Hour {
+			n = append(n, t)
+		}
+	}
+	s.envBotones = n
+	if len(s.envBotones) >= tope {
+		return false
+	}
+	s.envBotones = append(s.envBotones, ahora)
+	return true
 }
 
 // resumenTexto es lo que se guarda en el chat (la pantalla del teléfono lo muestra como un mensaje de texto).
@@ -193,24 +257,30 @@ func (s *Servicio) EnviarMenu(ctx context.Context, chat, persona string, menu *m
 	}
 	exp := s.ahora().Add(time.Duration(maxInt(s.ajInt("lab_expira_min"), 1)) * time.Minute)
 	var sesID string
-	r, err := s.Env.EnviarInteractivo(ctx, chat, resumenTexto(&sp, textoNumerado), citaID, citaAutorWA,
-		func(id string, ci *waE2E.ContextInfo) *waE2E.Message {
-			m := s.armar(&sp, id)
-			ponerContexto(m, ci)
-			return m
-		},
-		func(id string, m *waE2E.Message) error {
-			ses := almacen.SesionLab{ID: id, Chat: chat, Persona: persona, Tipo: sp.Tipo, Origen: almacen.LabOrigenMenu,
-				TS: s.ahora().Unix(), ExpiraTS: exp.Unix(), Opciones: sp.Opciones}
-			if sp.Tipo == almacen.LabEncuesta {
-				ses.Secreto = m.GetMessageContextInfo().GetMessageSecret()
-			}
-			if err := s.Alm.GuardarSesionLab(s.BotID, ses); err != nil {
-				return err
-			}
-			sesID = id
-			return nil
-		})
+	armar := func(id string, ci *waE2E.ContextInfo) *waE2E.Message {
+		m := s.armar(&sp, id)
+		ponerContexto(m, ci)
+		return m
+	}
+	antes := func(id string, m *waE2E.Message) error {
+		ses := almacen.SesionLab{ID: id, Chat: chat, Persona: persona, Tipo: sp.Tipo, Origen: almacen.LabOrigenMenu,
+			TS: s.ahora().Unix(), ExpiraTS: exp.Unix(), Opciones: sp.Opciones}
+		if sp.Tipo == almacen.LabEncuesta {
+			ses.Secreto = m.GetMessageContextInfo().GetMessageSecret()
+		}
+		if err := s.Alm.GuardarSesionLab(s.BotID, ses); err != nil {
+			return err
+		}
+		sesID = id
+		return nil
+	}
+	var r envio.Resultado
+	var err error
+	if en, ok := s.Env.(EmisorNodos); ok && (sp.Tipo == almacen.LabBotones || sp.Tipo == almacen.LabLista) {
+		r, err = en.EnviarInteractivoNodos(ctx, chat, resumenTexto(&sp, textoNumerado), citaID, citaAutorWA, armar, antes, []waBinary.Node{NodoBiz(s.ahora(), nil)})
+	} else {
+		r, err = s.Env.EnviarInteractivo(ctx, chat, resumenTexto(&sp, textoNumerado), citaID, citaAutorWA, armar, antes)
+	}
 	if err != nil {
 		if sesID != "" {
 			s.Alm.BorrarSesionLab(s.BotID, sesID)
@@ -251,4 +321,42 @@ func (s *Servicio) falla(err error) {
 			s.AlVolverATexto("fallos_seguidos")
 		}
 	}
+}
+
+// BotonCmd es un botón de un módulo: al tocarlo, el bot recibe `Comando` como si esa persona lo hubiera escrito.
+type BotonCmd struct{ Texto, Comando string }
+
+// EnviarBotones manda un mensaje con hasta 3 botones que ejecutan comandos (por ejemplo «Reclamar premio» → «!reclamar»). Solo sale con
+// botones si el menú general está en «Botones», el chat es privado y hay cupo; si no, devuelve ok=false y quien llama manda su texto de
+// siempre. Si el envío falla, devuelve el error (y también conviene mandar el texto).
+func (s *Servicio) EnviarBotones(ctx context.Context, chat, persona, texto string, botones []BotonCmd) (bool, error) {
+	if s.Modo() != ModoBotones || esGrupo(chat) || len(botones) == 0 || len(botones) > maxBotones || strings.TrimSpace(texto) == "" || !s.cupoBotones() {
+		return false, nil
+	}
+	if persona == "" {
+		persona = chat
+	}
+	sp := spec{Tipo: almacen.LabBotones, Titulo: truncar(texto, 1000)}
+	for i, b := range botones {
+		sp.Opciones = append(sp.Opciones, almacen.OpcionLab{Num: i + 1, Texto: truncar(b.Texto, maxBoton), Cmd: strings.TrimSpace(b.Comando)})
+	}
+	exp := s.ahora().Add(24 * time.Hour)
+	en, ok := s.Env.(EmisorNodos)
+	if !ok {
+		return false, nil
+	}
+	_, err := en.EnviarInteractivoNodos(ctx, chat, texto, "", "",
+		func(id string, ci *waE2E.ContextInfo) *waE2E.Message {
+			m := s.armar(&sp, id)
+			ponerContexto(m, ci)
+			return m
+		},
+		func(id string, m *waE2E.Message) error {
+			return s.Alm.GuardarSesionLab(s.BotID, almacen.SesionLab{ID: id, Chat: chat, Persona: persona, Tipo: sp.Tipo, Origen: almacen.LabOrigenMenu,
+				TS: s.ahora().Unix(), ExpiraTS: exp.Unix(), Opciones: sp.Opciones})
+		}, []waBinary.Node{NodoBiz(s.ahora(), nil)})
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }

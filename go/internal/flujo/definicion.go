@@ -29,6 +29,15 @@ type Opcion struct {
 	Ambito string `json:"ambito,omitempty"`
 	// Horario: la opción solo se ofrece dentro de este horario (vacío = siempre).
 	Horario *Horario `json:"horario,omitempty"`
+	// Boton: si el menú sale con botones, esta opción es un botón especial (enlace, copiar o llamar). Con menú de texto o encuesta se
+	// ignora y la opción funciona como siempre.
+	Boton *BotonOpcion `json:"boton,omitempty"`
+}
+
+// BotonOpcion es un botón especial de una opción de menú.
+type BotonOpcion struct {
+	Tipo  string `json:"tipo"`  // enlace | copiar | llamar
+	Valor string `json:"valor"` // la dirección, el texto a copiar o el número
 }
 
 // Paso es una pieza de la conversación.
@@ -43,6 +52,8 @@ type Paso struct {
 	Siguiente string   `json:"siguiente,omitempty"` // respuesta y pedir: a dónde sigue ("" = termina)
 	Notificar bool     `json:"notificar,omitempty"` // respuesta: avisa con una notificación local
 	Aviso     string   `json:"aviso,omitempty"`     // texto del aviso (admite variables)
+	// Formato: cómo sale ESTE menú: "" (el general), "texto", "encuesta" o "botones" (solo en chats privados).
+	Formato string `json:"formato,omitempty"`
 
 	// Respuesta: archivos, ubicación y tarjeta de contacto que se mandan junto con el texto (bloque C).
 	Adjuntos  []AdjuntoMenu `json:"adjuntos,omitempty"`
@@ -242,7 +253,15 @@ func (d *Def) Validar() []Aviso {
 			if len(p.Opciones) == 0 {
 				add(p.ID, "El menú no tiene opciones.", true)
 			}
+			switch p.Formato {
+			case "", "texto", "encuesta", "botones":
+			default:
+				add(p.ID, "El formato del menú no es válido: usa texto, encuesta o botones.", true)
+			}
 			for i, o := range p.Opciones {
+				if msg := o.Boton.problema(); msg != "" {
+					add(p.ID, fmt.Sprintf("La opción %d (%s): %s", i+1, o.Texto, msg), true)
+				}
 				switch {
 				case strings.TrimSpace(o.Texto) == "":
 					add(p.ID, fmt.Sprintf("La opción %d no tiene texto.", i+1), true)
@@ -331,4 +350,39 @@ func (d *Def) Validar() []Aviso {
 		add("", "En grupos solo responde si lo mencionan o usan un comando.", false)
 	}
 	return av
+}
+
+// problema dice qué está mal en un botón especial ("" = bien o no hay botón).
+func (b *BotonOpcion) problema() string {
+	if b == nil || (b.Tipo == "" && strings.TrimSpace(b.Valor) == "") {
+		return ""
+	}
+	v := strings.TrimSpace(b.Valor)
+	switch b.Tipo {
+	case "enlace":
+		if !(strings.HasPrefix(strings.ToLower(v), "https://") || strings.HasPrefix(strings.ToLower(v), "http://")) || len(v) > 500 || strings.ContainsAny(v, " \n\t") {
+			return "el enlace debe empezar con https:// y no llevar espacios."
+		}
+	case "copiar":
+		if v == "" || len([]rune(v)) > 200 {
+			return "el texto a copiar va de 1 a 200 letras."
+		}
+	case "llamar":
+		n := 0
+		for _, r := range v {
+			switch {
+			case r >= '0' && r <= '9':
+				n++
+			case r == '+' || r == ' ' || r == '-' || r == '(' || r == ')':
+			default:
+				return "el número solo lleva dígitos, +, espacios y guiones."
+			}
+		}
+		if n < 7 || n > 15 {
+			return "el número debe tener de 7 a 15 dígitos."
+		}
+	default:
+		return "el botón especial debe ser enlace, copiar o llamar."
+	}
+	return ""
 }

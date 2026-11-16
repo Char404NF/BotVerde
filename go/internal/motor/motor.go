@@ -68,12 +68,18 @@ type MenuLab struct {
 	Persona  string // persona canónica a la que le toca elegir (en privado es el chat)
 	Titulo   string
 	Opciones []OpcionMenu
+	// Formato de ESTE menú: "" (el general de Ajustes), "texto", "encuesta" o "botones".
+	Formato string
 }
 
 // OpcionMenu es una opción de un menú: su número y su texto.
 type OpcionMenu struct {
 	Num   int
 	Texto string
+	// BotonTipo y BotonValor: la opción sale como un botón especial cuando el menú sale con botones: "enlace" (abre una página),
+	// "copiar" (copia un texto) o "llamar" (marca un número). Vacío = un botón normal que responde.
+	BotonTipo  string
+	BotonValor string
 }
 
 // AutoInfo es lo que se anota de un mensaje automático al terminar de mandarlo. Lo comparten todas sus salidas (texto y archivos).

@@ -610,7 +610,7 @@ class MotorFalso : Motor {
             .put(JSONObject().put("tipo", "lista").put("variante", 10).put("nombre", "Lista de 10 filas"))
             .put(JSONObject().put("tipo", "interactivo").put("variante", 3).put("nombre", "Interactivo quick_reply (3)"))
         return JSONObject().put("activo", labAj["lab_activo"] == "1").put("avisoAceptado", labAj["lab_aviso_ts"] != "0").put("avisoTs", 0).put("modo", labAj["lab_modo_menu"])
-            .put("modoReal", if (on) labAj["lab_modo_menu"] else "texto").put("grupos", labAj["lab_grupos"] == "1").put("encMax", labAj["lab_enc_max_opc"]!!.toInt())
+            .put("modoReal", labAj["lab_modo_menu"]).put("botonesHora", (labAj["menu_botones_hora"] ?: "40").toInt()).put("grupos", labAj["lab_grupos"] == "1").put("encMax", labAj["lab_enc_max_opc"]!!.toInt())
             .put("expiraMin", labAj["lab_expira_min"]!!.toInt()).put("respaldoEnc", labAj["lab_respaldo_enc"] == "1").put("respaldoBot", labAj["lab_respaldo_bot"] == "1")
             .put("botonesTipo", labAj["lab_botones_tipo"]).put("pruebaChat", labAj["lab_prueba_chat"]).put("pruebaHora", labAj["lab_prueba_hora"]!!.toInt())
             .put("pruebaDia", labAj["lab_prueba_dia"]!!.toInt()).put("versionWa", labAj["lab_version_wa"]).put("versionCliente", "2.3000.1").put("enMarcha", labEnMarcha)

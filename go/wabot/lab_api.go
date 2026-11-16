@@ -60,11 +60,15 @@ func (s *estado) alLab(v *events.Message, sincronizando bool) bool {
 		return true // un voto que llegó mientras el teléfono estaba sin conexión no navega el menú
 	}
 	chat := e.Sesion.Chat
-	if s.mods != nil && s.mods.VideoResponder(chat, e.Votante, e.Num) {
+	if e.Comando == "" && s.mods != nil && s.mods.VideoResponder(chat, e.Votante, e.Num) {
 		return true // era la respuesta a las opciones de una descarga de video
 	}
+	texto := strconv.Itoa(e.Num)
+	if e.Comando != "" {
+		texto = e.Comando // un botón de un módulo («Reclamar premio»): el bot lo recibe como si ella lo hubiera escrito
+	}
 	m := motor.Mensaje{
-		Chat: chat, ID: string(v.Info.ID), Texto: strconv.Itoa(e.Num), EsTexto: true, EsGrupo: esGrupoChat(chat),
+		Chat: chat, ID: string(v.Info.ID), Texto: texto, EsTexto: true, EsGrupo: esGrupoChat(chat),
 		TS: v.Info.Timestamp, RemitenteWA: v.Info.Sender.ToNonAD().String(), Remitente: e.Votante, Nombre: v.Info.PushName,
 		// Votar o tocar es contestar al menú que mandé yo: en un grupo cuenta como respuesta a un mensaje mío.
 		CitaEsMia: true, CitaID: e.Sesion.ID,
@@ -112,6 +116,7 @@ type estadoLab struct {
 	Plan           []lab.Prueba `json:"plan"`
 	BizActivo      bool         `json:"bizActivo"`
 	BizAck         bool         `json:"bizAck"`
+	BotonesHora    int          `json:"botonesHora"` // tope de menús con botones o listas por hora
 }
 
 // EstadoLab devuelve (JSON) los ajustes del Laboratorio y lo que se puede probar.
@@ -134,9 +139,11 @@ func EstadoLab(botID int64) (string, error) {
 		e.Plan = append(e.Plan, lab.PlanBiz()...)
 	}
 	e.ModoEfectivo = lab.ModoTexto
-	if e.Activo && e.AvisoAceptado {
+	switch e.Modo {
+	case lab.ModoEncuesta, lab.ModoBotones:
 		e.ModoEfectivo = e.Modo
 	}
+	e.BotonesHora = n("menu_botones_hora")
 	ahora := time.Now()
 	e.PruebasHora = a.ContarEnviosLab(botID, ahora.Add(-time.Hour))
 	e.PruebasDia = a.ContarEnviosLab(botID, ahora.Add(-24*time.Hour))
@@ -212,11 +219,12 @@ func FijarAjusteLab(botID int64, clave, valor string) error {
 		if valor != lab.ModoTexto && valor != lab.ModoEncuesta && valor != lab.ModoBotones {
 			return errors.New("el modo debe ser texto, encuesta o botones")
 		}
-		if valor != lab.ModoTexto && !aviso {
-			return lab.ErrSinAviso
-		}
 	case "lab_grupos", "lab_respaldo_enc", "lab_respaldo_bot":
 		if err := num(0, 1); err != nil {
+			return err
+		}
+	case "menu_botones_hora":
+		if err := num(0, 500); err != nil {
 			return err
 		}
 	case "lab_enc_max_opc":

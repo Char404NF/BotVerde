@@ -115,6 +115,7 @@ fun PantallaAjustesMenus(botId: Long, alVolver: () -> Unit) {
         Column(Modifier.fillMaxSize().padding(relleno).verticalScroll(rememberScrollState()).padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
             Text("Valores generales de todos los menús. Cada menú puede cambiarlos en su propia pestaña “Ajustes”. El bot solo responde: nunca escribe primero.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("error_ajustes_menus")) }
+            TarjetaFormatoMenus(botId)
 
             Text("Cuando no entiende", style = MaterialTheme.typography.titleMedium)
             val errMax = v("menu_err_max").toIntOrNull() ?: 3

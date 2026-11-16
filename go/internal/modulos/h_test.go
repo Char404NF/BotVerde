@@ -32,6 +32,8 @@ type accFalsa struct {
 	textos      []string
 	fijados     []string
 	borrados    []string
+	botones     []string
+	conBotones  bool
 }
 
 func (a *accFalsa) EsAdmin(_ context.Context, _ string) (bool, error) { return a.admin, nil }
@@ -91,6 +93,19 @@ func (a *accFalsa) FijarMensaje(_ context.Context, chat, id string, dias int, fi
 	defer a.mu.Unlock()
 	a.fijados = append(a.fijados, fmt.Sprintf("%s|%s|%d|%v", chat, id, dias, fijar))
 	return nil
+}
+func (a *accFalsa) EnviarBotones(_ context.Context, chat, persona, texto string, bs []BotonCmd) (bool, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if !a.conBotones {
+		return false, nil
+	}
+	var t []string
+	for _, b := range bs {
+		t = append(t, b.Texto+"="+b.Comando)
+	}
+	a.botones = append(a.botones, chat+"|"+texto+"|"+strings.Join(t, ","))
+	return true, nil
 }
 func (a *accFalsa) BorrarMensaje(_ context.Context, chat, id string) error {
 	a.mu.Lock()

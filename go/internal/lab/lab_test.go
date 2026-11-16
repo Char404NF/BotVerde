@@ -214,13 +214,11 @@ func (e *entorno) voto(pollID string, opciones []string, chatVoto, remitente typ
 
 // ---------- envío ----------
 
-func TestApagadoOEnTextoNoMandaNada(t *testing.T) {
+func TestEnTextoNoMandaNadaYNoNecesitaLaboratorio(t *testing.T) {
 	e := nuevoEntorno(t)
 	for _, caso := range []func(){
-		func() {}, // todo por defecto: apagado
-		func() { e.fija("lab_activo", "1"); e.fija("lab_modo_menu", "encuesta") },           // sin aviso aceptado
-		func() { e.fija("lab_aviso_ts", "1700000000"); e.fija("lab_modo_menu", ModoTexto) }, // en texto
-		func() { e.fija("lab_modo_menu", "encuesta"); e.fija("lab_activo", "0") },           // apagado otra vez
+		func() {}, // todo por defecto: texto
+		func() { e.fija("lab_modo_menu", ModoTexto) },
 	} {
 		caso()
 		_, ok, err := e.s.EnviarMenu(context.Background(), jidVotante, jidVotante, menu(3), "texto", "", "")
@@ -228,6 +226,12 @@ func TestApagadoOEnTextoNoMandaNada(t *testing.T) {
 			t.Fatalf("debía salir como texto: ok=%v err=%v", ok, err)
 		}
 	}
+	// ya no hace falta «encender el Laboratorio» ni aceptar un aviso: elegir el formato basta
+	e.fija("lab_modo_menu", "encuesta")
+	if _, ok, err := e.s.EnviarMenu(context.Background(), jidVotante, jidVotante, menu(3), "texto", "", ""); !ok || err != nil {
+		t.Fatalf("la encuesta debía salir: ok=%v err=%v", ok, err)
+	}
+	e.fija("lab_modo_menu", ModoTexto)
 	if e.s.Modo() != ModoTexto {
 		t.Fatal("modo")
 	}
@@ -511,9 +515,14 @@ func TestBotonesListasEInteractivoSeArmanYRespondenPorId(t *testing.T) {
 	if !ok || err != nil || r.Tipo != almacen.LabBotones || !r.Respaldo {
 		t.Fatalf("botones: %+v %v %v", r, ok, err)
 	}
-	b := e.em.enviados[0].GetButtonsMessage()
-	if b == nil || len(b.GetButtons()) != 3 || b.GetButtons()[1].GetButtonText().GetDisplayText() != "Precios" || b.GetButtons()[1].GetButtonID() != "bc|"+r.ID+"|2" {
+	b := e.em.enviados[0].GetInteractiveMessage().GetNativeFlowMessage()
+	if b == nil || len(b.GetButtons()) != 3 || b.GetButtons()[1].GetName() != "quick_reply" ||
+		!strings.Contains(b.GetButtons()[1].GetButtonParamsJSON(), `"display_text":"Precios"`) || !strings.Contains(b.GetButtons()[1].GetButtonParamsJSON(), `"id":"bc|`+r.ID+`|2"`) {
 		t.Fatalf("botones armados: %+v", b)
+	}
+	// van con el nodo <biz> (sin él WhatsApp los acepta pero no los muestra)
+	if len(e.em.nodos) == 0 || len(e.em.nodos[len(e.em.nodos)-1]) != 1 || e.em.nodos[len(e.em.nodos)-1][0].Tag != "biz" {
+		t.Fatalf("faltó el nodo biz: %+v", e.em.nodos)
 	}
 	// la respuesta de un botón
 	resp := &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: chat}, ID: "T1"},
@@ -528,8 +537,8 @@ func TestBotonesListasEInteractivoSeArmanYRespondenPorId(t *testing.T) {
 	if r.Tipo != almacen.LabLista {
 		t.Fatalf("lista: %+v", r)
 	}
-	l := e.em.enviados[len(e.em.enviados)-1].GetListMessage()
-	if l == nil || len(l.GetSections()[0].GetRows()) != 8 || l.GetListType() != waE2E.ListMessage_SINGLE_SELECT {
+	l := e.em.enviados[len(e.em.enviados)-1].GetInteractiveMessage().GetNativeFlowMessage()
+	if l == nil || len(l.GetButtons()) != 1 || l.GetButtons()[0].GetName() != "single_select" || strings.Count(l.GetButtons()[0].GetButtonParamsJSON(), `"bc|`+r.ID+`|`) != 8 {
 		t.Fatalf("lista armada: %+v", l)
 	}
 	resp = &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: chat}, ID: "T2"},
@@ -881,5 +890,105 @@ func TestTemplateButtonReplyYEnvolturasSeAtienden(t *testing.T) {
 	env = &waE2E.Message{DeviceSentMessage: &waE2E.DeviceSentMessage{Message: env}}
 	if x := e.s.Recibir(c, ev(env), res); x == nil || x.Num != 2 || !x.Navega {
 		t.Fatalf("envuelto: %+v", x)
+	}
+}
+
+// ---------- formato por menú, botones especiales, solo privado, tope y botones de módulos ----------
+
+func TestFormatoPorMenuGanaAlGeneralYLosGruposNuncaLlevanBotones(t *testing.T) {
+	e := nuevoEntorno(t)
+	c := context.Background()
+	e.fija("lab_modo_menu", ModoTexto)
+	m := menu(3)
+	m.Formato = "botones"
+	if r, ok, err := e.s.EnviarMenu(c, jidVotante, jidVotante, m, "", "", ""); !ok || err != nil || r.Tipo != almacen.LabBotones {
+		t.Fatalf("el menú pide botones aunque el general sea texto: %+v %v %v", r, ok, err)
+	}
+	m2 := menu(3)
+	m2.Formato = "texto"
+	e.fija("lab_modo_menu", ModoBotones)
+	if _, ok, _ := e.s.EnviarMenu(c, jidVotante, jidVotante, m2, "", "", ""); ok {
+		t.Fatal("el menú pide texto aunque el general sea botones")
+	}
+	// grupo: botones no, ni con lab_grupos
+	e.fija("lab_grupos", "1")
+	n := len(e.em.enviados)
+	if _, ok, _ := e.s.EnviarMenu(c, "120363000000000001@g.us", jidVotante, menu(3), "", "", ""); ok || len(e.em.enviados) != n {
+		t.Fatal("en un grupo los botones nunca salen")
+	}
+	// la encuesta sí, si se permitió en grupos
+	e.fija("lab_modo_menu", ModoEncuesta)
+	if r, ok, _ := e.s.EnviarMenu(c, "120363000000000001@g.us", jidVotante, menu(3), "", "", ""); !ok || r.Tipo != almacen.LabEncuesta {
+		t.Fatal("la encuesta en grupo debía salir con lab_grupos")
+	}
+}
+
+func TestBotonesEspecialesEnlaceCopiarLlamar(t *testing.T) {
+	e := nuevoEntorno(t)
+	c := context.Background()
+	e.fija("lab_modo_menu", ModoBotones)
+	m := menu(3)
+	m.Opciones[0].BotonTipo, m.Opciones[0].BotonValor = "enlace", "https://ejemplo.com/catalogo"
+	m.Opciones[1].BotonTipo, m.Opciones[1].BotonValor = "copiar", "CLABE 0123"
+	m.Opciones[2].BotonTipo, m.Opciones[2].BotonValor = "llamar", "+52 55 1234 5678"
+	r, ok, err := e.s.EnviarMenu(c, jidVotante, jidVotante, m, "", "", "")
+	if !ok || err != nil || r.Tipo != almacen.LabBotones {
+		t.Fatalf("%+v %v %v", r, ok, err)
+	}
+	bs := e.em.enviados[len(e.em.enviados)-1].GetInteractiveMessage().GetNativeFlowMessage().GetButtons()
+	if len(bs) != 3 || bs[0].GetName() != "cta_url" || !strings.Contains(bs[0].GetButtonParamsJSON(), "https://ejemplo.com/catalogo") ||
+		bs[1].GetName() != "cta_copy" || !strings.Contains(bs[1].GetButtonParamsJSON(), `"copy_code":"CLABE 0123"`) ||
+		bs[2].GetName() != "cta_call" || !strings.Contains(bs[2].GetButtonParamsJSON(), `"phone_number":"+52 55 1234 5678"`) {
+		t.Fatalf("botones especiales: %+v", bs)
+	}
+	// con botones especiales y más de 3 opciones no hay lista (no puede llevar enlaces): sale en texto
+	m4 := menu(5)
+	m4.Opciones[0].BotonTipo, m4.Opciones[0].BotonValor = "enlace", "https://ejemplo.com"
+	if _, ok, _ := e.s.EnviarMenu(c, jidVotante, jidVotante, m4, "", "", ""); ok {
+		t.Fatal("5 opciones con un enlace salen en texto")
+	}
+}
+
+func TestTopePorHoraDeBotonesYBotonesDeModulos(t *testing.T) {
+	e := nuevoEntorno(t)
+	c := context.Background()
+	e.fija("lab_modo_menu", ModoBotones)
+	e.fija("menu_botones_hora", "2")
+	for i := 0; i < 2; i++ {
+		if _, ok, _ := e.s.EnviarMenu(c, jidVotante, jidVotante, menu(3), "", "", ""); !ok {
+			t.Fatalf("el menú %d debía salir con botones", i+1)
+		}
+	}
+	if _, ok, _ := e.s.EnviarMenu(c, jidVotante, jidVotante, menu(3), "", "", ""); ok {
+		t.Fatal("pasado el tope por hora el menú sale en texto")
+	}
+	e.ahora = e.ahora.Add(61 * time.Minute)
+	if _, ok, _ := e.s.EnviarMenu(c, jidVotante, jidVotante, menu(3), "", "", ""); !ok {
+		t.Fatal("pasada la hora vuelven los botones")
+	}
+	// botones de un módulo: «Reclamar premio» → !reclamar
+	e.fija("menu_botones_hora", "0")
+	ok, err := e.s.EnviarBotones(c, jidVotante, jidVotante, "🎉 Ganaste", []BotonCmd{{Texto: "Reclamar premio", Comando: "!reclamar"}})
+	if !ok || err != nil {
+		t.Fatalf("%v %v", ok, err)
+	}
+	ses := e.alm.ObtenerSesionLab(1, "ID"+string(rune('A'+e.em.n)))
+	if ses == nil || len(ses.Opciones) != 1 || ses.Opciones[0].Cmd != "!reclamar" {
+		t.Fatalf("sesión: %+v", ses)
+	}
+	chat, _ := types.ParseJID(jidVotante)
+	resp := &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: chat}, ID: "TC"},
+		Message: &waE2E.Message{InteractiveResponseMessage: &waE2E.InteractiveResponseMessage{
+			InteractiveResponseMessage: &waE2E.InteractiveResponseMessage_NativeFlowResponseMessage_{NativeFlowResponseMessage: &waE2E.InteractiveResponseMessage_NativeFlowResponseMessage{
+				Name: proto.String("quick_reply"), ParamsJSON: proto.String(`{"id":"` + ses.Opciones[0].ID + `","display_text":"Reclamar premio"}`)}},
+			ContextInfo: &waE2E.ContextInfo{StanzaID: proto.String(ses.ID)}}}}
+	x := e.s.Recibir(c, resp, resolverFijo(jidVotante, jidVotante))
+	if x == nil || x.Comando != "!reclamar" || !x.Navega {
+		t.Fatalf("toque de módulo: %+v", x)
+	}
+	// con el formato general en texto no hay botones de módulos
+	e.fija("lab_modo_menu", ModoTexto)
+	if ok, _ := e.s.EnviarBotones(c, jidVotante, jidVotante, "x", []BotonCmd{{"A", "!a"}}); ok {
+		t.Fatal("sin el formato Botones no salen botones de módulos")
 	}
 }

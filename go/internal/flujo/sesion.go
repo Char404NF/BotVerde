@@ -63,7 +63,11 @@ func (m *Motor) menuPartes(def *Def, p *Paso, s *almacen.Sesion, e entrada) (str
 			b.WriteString(" (solo en privado)")
 			t += " (solo en privado)"
 		}
-		ops = append(ops, motor.OpcionMenu{Num: v.Num, Texto: t})
+		om := motor.OpcionMenu{Num: v.Num, Texto: t}
+		if b := v.O.Boton; b != nil && b.problema() == "" && b.Tipo != "" {
+			om.BotonTipo, om.BotonValor = b.Tipo, strings.TrimSpace(b.Valor)
+		}
+		ops = append(ops, om)
 	}
 	if len(vis) == 0 {
 		b.WriteString("\nPor ahora no hay opciones disponibles.")
@@ -75,7 +79,7 @@ func (m *Motor) menuPartes(def *Def, p *Paso, s *almacen.Sesion, e entrada) (str
 	if len(vis) == 0 {
 		return b.String(), nil
 	}
-	return b.String(), &motor.MenuLab{Persona: s.Sender, Titulo: strings.TrimSpace(titulo), Opciones: ops}
+	return b.String(), &motor.MenuLab{Persona: s.Sender, Titulo: strings.TrimSpace(titulo), Opciones: ops, Formato: p.Formato}
 }
 
 // salidaMenu es el mensaje de un menú: el texto numerado de siempre y sus partes (ver motor.Salida.Menu).

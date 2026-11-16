@@ -234,9 +234,10 @@ var ajustesBotDefecto = map[string]string{
 	"alerta_wa_tipos":     "reporte,grupos,conexion,resumen", // qué avisos se repiten por WhatsApp
 	"aviso_desconexion":   "10",                              // minutos sin conexión antes de avisarme (0 = no avisar)
 	"resumen_sem_ultimo":  "",
-	"resumen_semanal":     "0", // 1 = cada domingo en la noche me llega el resumen de la semana
-	"grupo_base_auto":     "0", // 1 = al entrar a un grupo nuevo se le aplica la configuración base
-	"adv_tipos_sembrados": "0", // 1 = ya se crearon los tipos de fábrica (Spam, Insultos, Enlaces, Otro)
+	"resumen_semanal":     "0",  // 1 = cada domingo en la noche me llega el resumen de la semana
+	"menu_botones_hora":   "40", // tope de menús con botones o listas por hora (los demás salen en texto)
+	"grupo_base_auto":     "0",  // 1 = al entrar a un grupo nuevo se le aplica la configuración base
+	"adv_tipos_sembrados": "0",  // 1 = ya se crearon los tipos de fábrica (Spam, Insultos, Enlaces, Otro)
 }
 
 // AjusteBot devuelve un ajuste del bot (su valor por defecto si nunca se fijó).
