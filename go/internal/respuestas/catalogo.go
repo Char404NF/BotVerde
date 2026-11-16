@@ -11,6 +11,7 @@ func init() {
 		gSil   = "Silencios"
 		gUtil  = "Notas y pendientes"
 		gRepor = "Reportes"
+		gExt   = "Extras de todos los días"
 	)
 	Registrar(
 		// ---- en general
@@ -50,6 +51,22 @@ func init() {
 		Def{"reportar.ok", gRepor, "Alguien reporta un mensaje con !reportar (si «Contestar gracias» está encendido).", "Gracias por tu reporte, lo analizaremos. Gracias.", nil},
 		Def{"reportar.no_propio", gRepor, "Alguien intenta reportar un mensaje suyo.", "No puedes reportar un mensaje tuyo: responde al mensaje de otra persona", nil},
 		Def{"reportar.no_bot", gRepor, "Alguien intenta reportar un mensaje del bot.", "No puedes reportar un mensaje del bot: responde al mensaje de una persona", nil},
+		// ---- extras (títulos de las tarjetas y pie)
+		Def{"extras.pie", gExt, "Línea de ayuda al final de cada tarjeta de los extras.", "Escribe {prefijo}ayuda para ver todo lo que puedo hacer", []string{"prefijo"}},
+		Def{"extras.t_calc", gExt, "Título de !calc.", "Calculadora", nil},
+		Def{"extras.t_hora_mundo", gExt, "Título de !hora sin ciudad.", "Hora en el mundo", nil},
+		Def{"extras.t_hora", gExt, "Título de !hora con una ciudad.", "Hora en {ciudad}", []string{"ciudad"}},
+		Def{"extras.t_chiste", gExt, "Título de !chiste.", "Chiste", nil},
+		Def{"extras.t_dato", gExt, "Título de !dato.", "¿Sabías que…?", nil},
+		Def{"extras.t_efemeride", gExt, "Título de !dato cuando el dato viene de internet (un hecho de un día como hoy).", "Un día como hoy", nil},
+		Def{"extras.t_frase", gExt, "Título de !frase.", "Frase del día", nil},
+		Def{"extras.t_clima", gExt, "Título de !clima.", "Clima en {ciudad}", []string{"ciudad"}},
+		Def{"extras.t_dolar", gExt, "Título de !dolar.", "Dólar", nil},
+		Def{"extras.t_acortar", gExt, "Título de !acortar.", "Enlace corto", nil},
+		Def{"extras.t_qr", gExt, "Título de !qr.", "Tu código QR", nil},
+		Def{"extras.qr_linea", gExt, "Texto bajo el código QR.", "Escanéalo con la cámara.", nil},
+		Def{"extras.t_buscar", gExt, "Título de !buscar.", "Esto encontré de «{texto}»", []string{"texto"}},
+		Def{"cmd.pie_menu", gGen, "Pie de la lista de comandos (!ayuda).", "Escribe {prefijo}menu para verlo con botones", []string{"prefijo"}},
 		// ---- grupos
 		Def{"grupo.cerrado", gGrup, "Se cierra el grupo (!cerrar).", "Listo: el grupo quedó cerrado, solo los administradores pueden escribir.", nil},
 		Def{"grupo.abierto", gGrup, "Se abre el grupo (!abrir).", "Listo: el grupo quedó abierto, todos pueden escribir.", nil},

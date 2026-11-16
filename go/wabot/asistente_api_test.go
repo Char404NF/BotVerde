@@ -9,7 +9,7 @@ import (
 func TestApiAsistenteGuardarAplicarDeshacer(t *testing.T) {
 	abreSolo(t)
 	e := decodifica[estadoAsistente](t, func() (string, error) { return AsistenteEstado(1) })
-	if e.Borrador == nil || e.Aplicado || e.Visto || len(e.Borrador.Menu.Opciones) != 3 || e.NumeroPrb != "" {
+	if e.Borrador == nil || e.Aplicado || e.Visto || len(e.Borrador.Menu.Opciones) != 3 {
 		t.Fatalf("estado inicial: %+v", e)
 	}
 	e.Borrador.Paso = 3

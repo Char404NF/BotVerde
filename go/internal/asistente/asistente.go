@@ -78,8 +78,6 @@ type Borrador struct {
 		Notas         bool `json:"notas"`
 	} `json:"util"`
 
-	OtroNumero string `json:"otroNumero,omitempty"` // para «Probar mi bot» (solo se guarda aquí, cifrado)
-
 	Creado *Creado `json:"creado,omitempty"`
 }
 

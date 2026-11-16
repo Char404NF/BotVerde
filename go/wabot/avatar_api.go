@@ -106,6 +106,7 @@ type avatarMomento struct {
 	Activo  bool   `json:"activo"`
 	Grupos  bool   `json:"grupos"`
 	Mostrar bool   `json:"mostrar"`
+	Propio  bool   `json:"propio"` // tiene su propia imagen solo para este momento
 }
 
 // AvatarEstado devuelve (JSON) cómo está el avatar: encendido, si hay imagen propia y en qué momentos sale.
@@ -121,7 +122,7 @@ func AvatarEstado(botID int64) (string, error) {
 		e.Propio, e.PropioID = true, id
 	}
 	for _, m := range avatar.Momentos {
-		e.Momentos = append(e.Momentos, avatarMomento{ID: m.ID, Nombre: m.Nombre, Cara: m.Cara, Activo: el[m.ID], Grupos: avatar.EnGrupos[m.ID], Mostrar: true})
+		e.Momentos = append(e.Momentos, avatarMomento{ID: m.ID, Nombre: m.Nombre, Cara: m.Cara, Activo: el[m.ID], Grupos: avatar.EnGrupos[m.ID], Mostrar: true, Propio: av.PropioDe(m.ID) != ""})
 	}
 	return js(e, nil)
 }
@@ -150,7 +151,10 @@ func AvatarConfigurar(botID int64, activo bool, momentos string) error {
 }
 
 // AvatarPropio usa como avatar una imagen ya subida como adjunto (id); con id vacío vuelve a las caras de fábrica.
-func AvatarPropio(botID int64, id, mime string) error {
+func AvatarPropio(botID int64, id, mime string) error { return AvatarPropioDe(botID, "", id, mime) }
+
+// AvatarPropioDe lo mismo, pero solo para un momento (menu, ayuda, bienvenida, aviso o error); con momento vacío vale para todos.
+func AvatarPropioDe(botID int64, momento, id, mime string) error {
 	a, err := almacenAbierto()
 	if err != nil {
 		return err
@@ -163,9 +167,9 @@ func AvatarPropio(botID int64, id, mime string) error {
 			return errors.New("El avatar tiene que ser una imagen.")
 		}
 	}
-	if err := avatar.Nuevo(a, botID).FijarPropio(id, mime); err != nil {
+	if err := avatar.Nuevo(a, botID).FijarPropioDe(momento, id, mime); err != nil {
 		return err
 	}
-	a.RegistrarAccion(botID, almacen.PersonaDueno, "avatar.propio", "", "", "ok", "")
+	a.RegistrarAccion(botID, almacen.PersonaDueno, "avatar.propio", momento, "", "ok", "")
 	return nil
 }

@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -29,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.botchat.app.datos.EstadoAvatar
 import com.botchat.app.datos.Repo
 import com.botchat.app.datos.avatarPropio
+import com.botchat.app.datos.avatarPropioDe
 import com.botchat.app.datos.configurarAvatar
 import com.botchat.app.datos.estadoAvatar
 import com.botchat.app.medios.PrepararAdjunto
@@ -64,15 +67,17 @@ fun PantallaAvatar(botId: Long, alVolver: () -> Unit) {
         }
     }
 
+    var paraMomento by remember { mutableStateOf("") }
     val elegir = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
+            val momento = paraMomento
             ocupado = true
             scope.launch {
                 PrepararAdjunto.desdeUri(ctx, uri).onSuccess { listo ->
                     if (listo.tipo != "imagen") avisaToast(ctx, "El avatar tiene que ser una imagen.", true)
                     else runCatching {
                         val a = Repo.subirAdjunto(botId, listo.archivo.path, listo.tipo, listo.mime, listo.nombre)
-                        Repo.avatarPropio(botId, a.id, listo.mime)
+                        Repo.avatarPropioDe(botId, momento, a.id, listo.mime)
                     }.onFailure { avisaToast(ctx, it.message ?: "No se pudo guardar la imagen", true) }
                 }.onFailure { avisaToast(ctx, it.message ?: "No se pudo leer el archivo", true) }
                 recarga()
@@ -104,10 +109,14 @@ fun PantallaAvatar(botId: Long, alVolver: () -> Unit) {
                 s.momentos.forEach { m ->
                     Card(Modifier.fillMaxWidth()) {
                         Row(Modifier.padding(Esp.m), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Esp.m)) {
-                            if (!s.propio) AvatarAnimo(m.cara, Modifier.size(48.dp))
+                            if (!s.propio && !m.propio) AvatarAnimo(m.cara, Modifier.size(48.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(m.nombre, style = MaterialTheme.typography.bodyLarge)
                                 Text(if (m.grupos) "En privado y en grupos" else "Solo en chats privados", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Row(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
+                                    TextButton({ paraMomento = m.id; elegir.launch(arrayOf("image/*")) }, Modifier.testTag("avatar_imagen_${m.id}"), enabled = !ocupado) { Text(if (m.propio) "Cambiar su imagen" else "Imagen solo para esto") }
+                                    if (m.propio) TextButton({ scope.launch { runCatching { Repo.avatarPropioDe(botId, m.id, "", "") }; recarga() } }, Modifier.testTag("avatar_quitar_${m.id}"), enabled = !ocupado) { Text("Quitar") }
+                                }
                             }
                             Switch(
                                 m.activo,
@@ -119,10 +128,10 @@ fun PantallaAvatar(botId: Long, alVolver: () -> Unit) {
                 }
                 Text("Tu propia imagen", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    if (s.propio) "Ahora el bot usa tu imagen en todos los momentos." else "Ahora usa las 8 caras del avatar, una distinta según el momento (feliz, enojado, pensando…). Puedes poner tu propia imagen, por ejemplo el logo de tu grupo.",
+                    if (s.propio) "Ahora el bot usa tu imagen en todos los momentos (menos en los que tengan la suya)." else "Ahora usa las 8 caras del avatar, una distinta según el momento (feliz, enojado, pensando…). Puedes poner tu propia imagen, por ejemplo el logo de tu grupo.",
                     style = MaterialTheme.typography.bodySmall,
                 )
-                Button({ elegir.launch(arrayOf("image/*")) }, Modifier.fillMaxWidth().testTag("avatar_elegir"), enabled = !ocupado) { Text(if (s.propio) "Cambiar mi imagen" else "Elegir mi imagen") }
+                Button({ paraMomento = ""; elegir.launch(arrayOf("image/*")) }, Modifier.fillMaxWidth().testTag("avatar_elegir"), enabled = !ocupado) { Text(if (s.propio) "Cambiar mi imagen" else "Elegir mi imagen") }
                 if (s.propio) {
                     OutlinedButton(
                         { scope.launch { runCatching { Repo.avatarPropio(botId, "", "") }; recarga() } },

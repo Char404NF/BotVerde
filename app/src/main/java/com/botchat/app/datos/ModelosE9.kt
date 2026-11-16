@@ -28,7 +28,6 @@ data class BorradorAsistente(
     val etiquetas: Boolean = true,
     val recordatorios: Boolean = true,
     val notas: Boolean = true,
-    val otroNumero: String = "",
 ) {
     fun json(): String {
         val o = JSONObject()
@@ -40,7 +39,6 @@ data class BorradorAsistente(
             .put("opciones", JSONArray(menuOpciones.map { JSONObject().put("texto", it.texto).put("respuesta", it.respuesta) })))
         o.put("reglas", JSONObject().put("alEntrar", reglasAlEntrar))
         o.put("util", JSONObject().put("silenciar", silenciar).put("advertencias", advertencias).put("etiquetas", etiquetas).put("recordatorios", recordatorios).put("notas", notas))
-        o.put("otroNumero", otroNumero)
         return o.toString()
     }
 
@@ -77,7 +75,6 @@ object JsonE9 {
             reglasAlEntrar = r.optBoolean("alEntrar"),
             silenciar = u.optBoolean("silenciar", true), advertencias = u.optBoolean("advertencias", true), etiquetas = u.optBoolean("etiquetas", true),
             recordatorios = u.optBoolean("recordatorios", true), notas = u.optBoolean("notas", true),
-            otroNumero = o.optString("otroNumero"),
         )
     }
 

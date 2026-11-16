@@ -835,6 +835,11 @@ class MotorFalso : Motor {
         avatarJson = o.toString()
     }
     override fun avatarPropio(bot: Long, id: String, mime: String) { llamadas += "avatarPropio:$id:$mime" }
+    override fun avatarPropioDe(bot: Long, momento: String, id: String, mime: String) {
+        llamadas += "avatarPropioDe:$momento:$id:$mime"
+        val arr = org.json.JSONObject(avatarJson).also { o -> val a = o.getJSONArray("momentos"); for (i in 0 until a.length()) a.getJSONObject(i).let { if (it.getString("id") == momento) it.put("propio", id.isNotEmpty()) }; avatarJson = o.toString() }
+        arr.length()
+    }
     override fun alertasLeer(bot: Long) = avisosJson
     override fun alertasGuardar(bot: Long, ajustesJson: String) { llamadas += "alertas:$ajustesJson"; avisosJson = ajustesJson }
     override fun resumenSemanalAhora(bot: Long): String { llamadas += "resumenSemanal"; return resumenTexto }

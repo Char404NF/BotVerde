@@ -4,6 +4,7 @@ package avatar
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 
 	"botchat/internal/almacen"
@@ -84,10 +85,32 @@ func (s *Servicio) Corresponde(momento, chat, pie string) bool {
 
 // Imagen devuelve la imagen que toca en ese momento: la propia si hay (y existe todavía) o la cara de fábrica. Ref es el id del adjunto.
 func (s *Servicio) Imagen(momento string) (ref, mime, nombre string, ok bool) {
+	if id := s.PropioDe(momento); id != "" {
+		return id, s.Alm.AjusteBot(s.BotID, ClavePropio(momento)+"_mime"), "avatar_" + momento, true
+	}
 	if id := s.Alm.AjusteBot(s.BotID, AjPropio); id != "" && s.Alm.ExisteAdjunto(s.BotID, id) {
 		return id, s.Alm.AjusteBot(s.BotID, AjPropio+"_mime"), "avatar", true
 	}
 	return s.Cara(CaraDe(momento))
+}
+
+// ClavePropio es el ajuste donde se guarda la imagen propia de un momento ("" = la general de todos los momentos).
+func ClavePropio(momento string) string {
+	if momento == "" {
+		return AjPropio
+	}
+	return AjPropio + "_" + momento
+}
+
+// PropioDe da el id de la imagen propia de ese momento (si el dueño subió una solo para él y todavía existe), o "".
+func (s *Servicio) PropioDe(momento string) string {
+	if momento == "" {
+		return ""
+	}
+	if id := s.Alm.AjusteBot(s.BotID, ClavePropio(momento)); id != "" && s.Alm.ExisteAdjunto(s.BotID, id) {
+		return id
+	}
+	return ""
 }
 
 // CaraDe es la cara de fábrica de un momento.
@@ -140,10 +163,23 @@ func (s *Servicio) Configurar(activo bool, momentos []string) error {
 }
 
 // FijarPropio usa una imagen ya guardada como adjunto como avatar propio ("" = volver a las caras de fábrica). Borra la anterior.
-func (s *Servicio) FijarPropio(id, mime string) error {
-	if viejo := s.Alm.AjusteBot(s.BotID, AjPropio); viejo != "" && viejo != id {
+func (s *Servicio) FijarPropio(id, mime string) error { return s.FijarPropioDe("", id, mime) }
+
+// FijarPropioDe hace lo mismo para un solo momento (menú, bienvenida…); con momento vacío es la imagen de todos. La de un momento gana a la general.
+func (s *Servicio) FijarPropioDe(momento, id, mime string) error {
+	clave := ClavePropio(momento)
+	if momento != "" {
+		conocido := false
+		for _, m := range Momentos {
+			conocido = conocido || m.ID == momento
+		}
+		if !conocido {
+			return errors.New("ese momento no existe")
+		}
+	}
+	if viejo := s.Alm.AjusteBot(s.BotID, clave); viejo != "" && viejo != id {
 		s.Alm.BorrarAdjuntoMenu(s.BotID, viejo)
 	}
-	_ = s.Alm.FijarAjusteBot(s.BotID, AjPropio+"_mime", mime)
-	return s.Alm.FijarAjusteBot(s.BotID, AjPropio, id)
+	_ = s.Alm.FijarAjusteBot(s.BotID, clave+"_mime", mime)
+	return s.Alm.FijarAjusteBot(s.BotID, clave, id)
 }

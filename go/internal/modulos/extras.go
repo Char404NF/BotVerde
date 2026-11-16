@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"math"
 	"net/url"
@@ -20,6 +21,7 @@ import (
 	"botchat/internal/comandos"
 	"botchat/internal/estilo"
 	"botchat/internal/permisos"
+	"botchat/internal/respuestas"
 )
 
 // ---------- Extras de todos los días ----------
@@ -32,19 +34,22 @@ import (
 const IDExtras = "extras"
 
 // hostsExtras son los únicos servicios a los que llegan estos comandos.
-var hostsExtras = []string{"geocoding-api.open-meteo.com", "api.open-meteo.com", "open.er-api.com", "es.wikipedia.org", "is.gd", "api.qrserver.com"}
+var hostsExtras = []string{"geocoding-api.open-meteo.com", "api.open-meteo.com", "open.er-api.com", "es.wikipedia.org", "is.gd", "api.qrserver.com", "v2.jokeapi.dev", "es.wikiquote.org"}
 
 func extras() Modulo {
 	return Nuevo(Def{
 		ID: IDExtras, Nombre: "Extras de todos los días", Icono: "info", Riesgo: RiesgoBajo,
-		Descripcion: "Comandos útiles para todos: !calc, !hora, !chiste, !dato, !frase, !clima, !dolar, !definir, !acortar y !qr. Los de clima, dólar, definiciones, acortar y QR usan servicios gratuitos de internet que no piden cuenta.",
+		Descripcion: "Comandos útiles para todos: !calc, !hora, !chiste, !dato, !frase, !clima, !dolar, !definir, !buscar, !acortar y !qr. Chistes, datos, clima, dólar, búsquedas, acortar y QR salen de servicios gratuitos de internet que no piden cuenta; si fallan o los apagas, el bot usa tus listas (o las de fábrica). Los títulos de cada tarjeta se cambian en «Respuestas del bot».",
 		Casillas: []permisos.Casilla{
-			{ID: "extras.usar", Nombre: "Usar los extras", Descripcion: "Pedir !calc, !hora, !chiste, !dato, !frase, !clima, !dolar, !definir, !acortar y !qr.", Grupo: "Extras", Riesgo: permisos.RiesgoBajo, Privado: true, Grupos: true, Base: true},
+			{ID: "extras.usar", Nombre: "Usar los extras", Descripcion: "Pedir !calc, !hora, !chiste, !dato, !frase, !clima, !dolar, !definir, !buscar, !acortar y !qr.", Grupo: "Extras", Riesgo: permisos.RiesgoBajo, Privado: true, Grupos: true, Base: true},
 		},
 		Esquema: []Campo{
 			{Clave: "ciudad", Titulo: "Ciudad por defecto del clima", Ayuda: "La que usa !clima cuando no dicen ninguna.", Tipo: CampoTexto, Largo: 60, Defecto: "Ciudad de México"},
 			{Clave: "usos_hora", Titulo: "Usos por persona y hora", Ayuda: "Tope de comandos de este módulo por persona cada hora. 0 = sin tope.", Tipo: CampoNumero, Defecto: 40.0, Min: 0, Max: 1000},
-			{Clave: "internet", Titulo: "Permitir los que usan internet", Ayuda: "Clima, dólar, definiciones, acortar y QR. Apagado, solo funcionan los que no necesitan conexión.", Tipo: CampoInterruptor, Defecto: true},
+			{Clave: "internet", Titulo: "Permitir los que usan internet", Ayuda: "Clima, dólar, definiciones, búsquedas, acortar, QR y chistes o datos nuevos cada vez. Apagado, solo funcionan los que no necesitan conexión.", Tipo: CampoInterruptor, Defecto: true},
+			{Clave: "mis_chistes", Titulo: "Mis chistes", Ayuda: "Uno por línea. Si escribes alguno, !chiste usa solo los tuyos (sin internet). Vacío = chistes nuevos de internet, o los de fábrica si falla.", Tipo: CampoTexto, Varias: true, Largo: 6000},
+			{Clave: "mis_datos", Titulo: "Mis datos curiosos", Ayuda: "Uno por línea. Si escribes alguno, !dato usa solo los tuyos. Vacío = un hecho de «un día como hoy» de Wikipedia, o los de fábrica si falla.", Tipo: CampoTexto, Varias: true, Largo: 6000},
+			{Clave: "mis_frases", Titulo: "Mis frases del día", Ayuda: "Una por línea. Si escribes alguna, !frase usa solo las tuyas. Vacío = la «cita del día» de Wikiquote, o las de fábrica si falla.", Tipo: CampoTexto, Varias: true, Largo: 6000},
 		},
 		ComandosG: comandosExtras,
 	})
@@ -101,7 +106,7 @@ func ctxExtras() (context.Context, context.CancelFunc) {
 // ---------- los comandos ----------
 
 func comandosExtras(g *Gestor) []comandos.Comando {
-	pie := func(cx *comandos.Contexto) string { return estilo.Pie(cx.D.Prefijo()) }
+	pie := func(cx *comandos.Contexto) string { return g.tx("extras.pie", "prefijo", cx.D.Prefijo()) }
 	cmd := func(nombre, resumen, uso string, alias []string, f func(cx *comandos.Contexto) (string, error)) comandos.Comando {
 		return comandos.Comando{Nombre: nombre, Alias: alias, Resumen: resumen, Uso: uso, Casilla: "extras.usar", Ejecutar: func(cx *comandos.Contexto) (string, error) {
 			if err := g.extrasTope(cx); err != nil {
@@ -116,19 +121,23 @@ func comandosExtras(g *Gestor) []comandos.Comando {
 			if err != nil {
 				return "", err
 			}
-			return estilo.Tarjeta("🧮", "Calculadora", []string{"`" + strings.TrimSpace(cx.Resto) + "`", "= *" + r + "*"}, pie(cx)), nil
+			return estilo.Tarjeta("🧮", g.tx("extras.t_calc"), []string{"`" + strings.TrimSpace(cx.Resto) + "`", "= *" + r + "*"}, pie(cx)), nil
 		}),
 		cmd("hora", "Ver la hora en otra ciudad", "hora Tokio", nil, func(cx *comandos.Contexto) (string, error) {
 			return g.extrasHora(cx, pie(cx))
 		}),
 		cmd("chiste", "Un chiste", "chiste", nil, func(cx *comandos.Contexto) (string, error) {
-			return estilo.Tarjeta("😄", "Chiste", []string{g.elige(chistes)}, pie(cx)), nil
+			return estilo.Tarjeta("😄", g.tx("extras.t_chiste"), []string{g.chiste()}, pie(cx)), nil
 		}),
 		cmd("dato", "Un dato curioso", "dato", []string{"curiosidad"}, func(cx *comandos.Contexto) (string, error) {
-			return estilo.Tarjeta("🤓", "¿Sabías que…?", []string{g.elige(datos)}, pie(cx)), nil
+			t, hecho := g.dato()
+			if hecho {
+				return estilo.Tarjeta("📅", g.tx("extras.t_efemeride"), []string{t}, pie(cx)), nil
+			}
+			return estilo.Tarjeta("🤓", g.tx("extras.t_dato"), []string{t}, pie(cx)), nil
 		}),
 		cmd("frase", "Una frase para el día", "frase", nil, func(cx *comandos.Contexto) (string, error) {
-			return estilo.Tarjeta("✨", "Frase del día", []string{g.elige(frases)}, pie(cx)), nil
+			return estilo.Tarjeta("✨", g.tx("extras.t_frase"), []string{g.frase()}, pie(cx)), nil
 		}),
 		cmd("clima", "El clima de una ciudad", "clima Monterrey", nil, func(cx *comandos.Contexto) (string, error) {
 			ciudad := strings.TrimSpace(cx.Resto)
@@ -142,6 +151,9 @@ func comandosExtras(g *Gestor) []comandos.Comando {
 		}),
 		cmd("definir", "Qué significa algo", "definir fotosíntesis", []string{"significado", "wiki"}, func(cx *comandos.Contexto) (string, error) {
 			return g.extrasDefinir(cx.Resto, pie(cx))
+		}),
+		cmd("buscar", "Buscar algo en internet", "buscar historia de México", []string{"busca", "google"}, func(cx *comandos.Contexto) (string, error) {
+			return g.extrasBuscar(cx.Resto, pie(cx))
 		}),
 		cmd("acortar", "Acortar un enlace", "acortar https://…", []string{"corto"}, func(cx *comandos.Contexto) (string, error) {
 			return g.extrasAcortar(cx.Resto, pie(cx))
@@ -167,12 +179,159 @@ func comandosExtras(g *Gestor) []comandos.Comando {
 				return "", errors.New("no pude preparar el QR")
 			}
 			cx.Archivo = &comandos.Archivo{ID: ref, Tipo: almacen.TipoImagen, Mime: "image/png", Nombre: "qr.png"}
-			return estilo.Tarjeta("🔳", "Tu código QR", []string{"Escanéalo con la cámara."}, ""), nil
+			return estilo.Tarjeta("🔳", g.tx("extras.t_qr"), []string{g.tx("extras.qr_linea")}, ""), nil
 		}),
 	}
 }
 
 func (g *Gestor) elige(l []string) string { return l[g.azar(len(l))] }
+
+// tx da un texto de «Respuestas del bot» (el del dueño si lo cambió, o el de fábrica).
+func (g *Gestor) tx(id string, vars ...string) string {
+	return respuestas.Texto(g.Alm, g.BotID, id, vars...)
+}
+
+// propias da las líneas que el dueño escribió en un campo de «mis …»; si no escribió ninguna, las de fábrica.
+func (g *Gestor) propias(clave string, fabrica []string) []string {
+	var out []string
+	for _, l := range strings.Split(g.Config(IDExtras).Texto(clave), "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			out = append(out, l)
+		}
+	}
+	if len(out) == 0 {
+		return fabrica
+	}
+	return out
+}
+
+func (g *Gestor) tieneLista(clave string) bool {
+	return strings.TrimSpace(g.Config(IDExtras).Texto(clave)) != ""
+}
+
+// chiste: los del dueño si escribió; si no, uno nuevo de internet y, si falla o está apagado, de fábrica.
+func (g *Gestor) chiste() string {
+	if !g.tieneLista("mis_chistes") && g.Config(IDExtras).Bool("internet") {
+		ctx, cancel := ctxExtras()
+		defer cancel()
+		var r struct {
+			Error    bool   `json:"error"`
+			Tipo     string `json:"type"`
+			Chiste   string `json:"joke"`
+			Pregunta string `json:"setup"`
+			Remate   string `json:"delivery"`
+		}
+		if g.extrasJSON(ctx, "https://v2.jokeapi.dev/joke/Any?lang=es&safe-mode&blacklistFlags=nsfw,religious,political,racist,sexist,explicit", &r) == nil && !r.Error {
+			t := strings.TrimSpace(r.Chiste)
+			if r.Tipo == "twopart" {
+				t = strings.TrimSpace(r.Pregunta) + "\n" + strings.TrimSpace(r.Remate)
+			}
+			if t != "" && len([]rune(t)) <= 500 {
+				return t
+			}
+		}
+	}
+	return g.elige(g.propias("mis_chistes", chistes))
+}
+
+// dato: los del dueño si escribió; si no, un hecho de «un día como hoy» de Wikipedia (true) y, si falla, uno de fábrica.
+func (g *Gestor) dato() (string, bool) {
+	if !g.tieneLista("mis_datos") && g.Config(IDExtras).Bool("internet") {
+		ctx, cancel := ctxExtras()
+		defer cancel()
+		var r struct {
+			Hechos []struct {
+				Texto string `json:"text"`
+				Anio  int    `json:"year"`
+			} `json:"selected"`
+		}
+		ahora := g.ahora()
+		if g.extrasJSON(ctx, fmt.Sprintf("https://es.wikipedia.org/api/rest_v1/feed/onthisday/selected/%02d/%02d", int(ahora.Month()), ahora.Day()), &r) == nil && len(r.Hechos) > 0 {
+			h := r.Hechos[g.azar(len(r.Hechos))]
+			if t := strings.TrimSpace(h.Texto); t != "" && len([]rune(t)) <= 500 {
+				if h.Anio > 0 {
+					return fmt.Sprintf("*%d:* %s", h.Anio, t), true
+				}
+				return t, true
+			}
+		}
+	}
+	return g.elige(g.propias("mis_datos", datos)), false
+}
+
+var reCita = regexp.MustCompile(`(?s)«\s*(.+?)\s*»`)
+var reTitulo = regexp.MustCompile(`title="([^"]{2,80})"`)
+
+// frase: las del dueño si escribió; si no, la «cita del día» de la portada de Wikiquote en español y, si falla, una de fábrica.
+func (g *Gestor) frase() string {
+	if !g.tieneLista("mis_frases") && g.Config(IDExtras).Bool("internet") {
+		ctx, cancel := ctxExtras()
+		defer cancel()
+		var r struct {
+			Parse struct {
+				Texto string `json:"text"`
+			} `json:"parse"`
+		}
+		if g.extrasJSON(ctx, "https://es.wikiquote.org/w/api.php?action=parse&page=Portada&prop=text&format=json&formatversion=2", &r) == nil {
+			if i := strings.Index(r.Parse.Texto, `id="mf-FDD"`); i >= 0 {
+				seg := r.Parse.Texto[i:]
+				if len(seg) > 6000 {
+					seg = seg[:6000]
+				}
+				autor := ""
+				if m := reTitulo.FindStringSubmatch(seg); m != nil {
+					autor = strings.TrimSpace(html.UnescapeString(m[1]))
+				}
+				txt := strings.ReplaceAll(html.UnescapeString(reEtiqueta.ReplaceAllString(seg, "")), "\u00a0", " ")
+				if m := reCita.FindStringSubmatch(txt); m != nil {
+					cita := strings.Join(strings.Fields(m[1]), " ")
+					if n := len([]rune(cita)); n >= 8 && n <= 400 {
+						if autor != "" {
+							return "«" + cita + "»\n— " + autor
+						}
+						return "«" + cita + "»"
+					}
+				}
+			}
+		}
+	}
+	return g.elige(g.propias("mis_frases", frases))
+}
+
+var reEtiqueta = regexp.MustCompile(`<[^>]*>`)
+
+// extrasBuscar trae los primeros resultados de Wikipedia (en español) para lo que escribieron.
+func (g *Gestor) extrasBuscar(resto, pie string) (string, error) {
+	t := strings.TrimSpace(resto)
+	if t == "" || len([]rune(t)) > 100 {
+		return "", errors.New("escribe qué quieres buscar, por ejemplo: buscar historia de México")
+	}
+	ctx, cancel := ctxExtras()
+	defer cancel()
+	var r struct {
+		Consulta struct {
+			Resultados []struct {
+				Titulo  string `json:"title"`
+				Resumen string `json:"snippet"`
+			} `json:"search"`
+		} `json:"query"`
+	}
+	if err := g.extrasJSON(ctx, "https://es.wikipedia.org/w/api.php?action=query&list=search&srlimit=3&format=json&utf8=1&srsearch="+url.QueryEscape(t), &r); err != nil {
+		return "", err
+	}
+	if len(r.Consulta.Resultados) == 0 {
+		return "", errors.New("no encontré nada de «" + t + "»; prueba con otras palabras")
+	}
+	var l []string
+	for _, x := range r.Consulta.Resultados {
+		resumen := strings.TrimSpace(html.UnescapeString(reEtiqueta.ReplaceAllString(x.Resumen, "")))
+		if rs := []rune(resumen); len(rs) > 160 {
+			resumen = strings.TrimSpace(string(rs[:160])) + "…"
+		}
+		l = append(l, "• *"+x.Titulo+"*\n"+resumen+"\n"+"https://es.wikipedia.org/wiki/"+url.PathEscape(strings.ReplaceAll(x.Titulo, " ", "_")))
+	}
+	return estilo.Tarjeta("🔎", g.tx("extras.t_buscar", "texto", t), l, "Fuente: Wikipedia · "+pie), nil
+}
 
 // ---------- hora ----------
 
@@ -216,7 +375,7 @@ func (g *Gestor) extrasHora(cx *comandos.Contexto, pie string) (string, error) {
 				l = append(l, "• "+c.n+": "+ahora.In(loc).Format("15:04"))
 			}
 		}
-		return estilo.Tarjeta("🌎", "Hora en el mundo", l, "Prueba: "+cx.D.Prefijo()+"hora Tokio"), nil
+		return estilo.Tarjeta("🌎", g.tx("extras.t_hora_mundo"), l, "Prueba: "+cx.D.Prefijo()+"hora Tokio"), nil
 	}
 	zona, ok := zonasHora[sinAcentos(arg)]
 	if !ok {
@@ -227,7 +386,7 @@ func (g *Gestor) extrasHora(cx *comandos.Contexto, pie string) (string, error) {
 		return "", errors.New("no conozco esa ciudad; prueba con una grande, por ejemplo: hora Madrid, hora Tokio o hora Bogotá")
 	}
 	t := ahora.In(loc)
-	return estilo.Tarjeta("🕒", "Hora en "+strings.TrimSpace(arg), []string{"*" + t.Format("15:04") + "* · " + t.Format("02/01/2006")}, pie), nil
+	return estilo.Tarjeta("🕒", g.tx("extras.t_hora", "ciudad", strings.TrimSpace(arg)), []string{"*" + t.Format("15:04") + "* · " + t.Format("02/01/2006")}, pie), nil
 }
 
 // ---------- clima ----------
@@ -308,7 +467,7 @@ func (g *Gestor) extrasClima(ciudad, pie string) (string, error) {
 	if l.Country != "" {
 		nombre += ", " + l.Country
 	}
-	return estilo.Tarjeta("🌤️", "Clima en "+nombre, lineas, pie), nil
+	return estilo.Tarjeta("🌤️", g.tx("extras.t_clima", "ciudad", nombre), lineas, pie), nil
 }
 
 // ---------- dólar ----------
@@ -336,7 +495,7 @@ func (g *Gestor) extrasDolar(resto, pie string) (string, error) {
 		return "", errors.New("no pude saber el precio del dólar ahora; intenta más tarde")
 	}
 	l := []string{fmt.Sprintf("🇺🇸 %s USD", num(monto)), fmt.Sprintf("🇲🇽 *%s MXN*", num(monto*mxn)), fmt.Sprintf("🇪🇺 %s EUR", num(monto*eur))}
-	return estilo.Tarjeta("💵", "Dólar", l, "Precio de referencia, puede variar en el banco · "+pie), nil
+	return estilo.Tarjeta("💵", g.tx("extras.t_dolar"), l, "Precio de referencia, puede variar en el banco · "+pie), nil
 }
 
 func num(f float64) string {
@@ -399,7 +558,7 @@ func (g *Gestor) extrasAcortar(resto, pie string) (string, error) {
 	if !strings.HasPrefix(corto, "https://is.gd/") || strings.ContainsAny(corto, " \n") {
 		return "", errors.New("no pude acortar ese enlace; revisa que sea correcto")
 	}
-	return estilo.Tarjeta("🔗", "Enlace corto", []string{corto}, pie), nil
+	return estilo.Tarjeta("🔗", g.tx("extras.t_acortar"), []string{corto}, pie), nil
 }
 
 // ---------- calculadora ----------

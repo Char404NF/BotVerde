@@ -88,3 +88,31 @@ func TestCadaMomentoTieneSuCaraYLaImagenPropiaLasReemplazaTodas(t *testing.T) {
 		t.Fatalf("sin imagen propia usa la cara: %q", nombre)
 	}
 }
+
+func TestImagenPropiaDeUnMomentoGanaALaGeneral(t *testing.T) {
+	s := nuevo(t)
+	general, _, _ := s.Alm.GuardarAdjuntoMenu(1, strings.NewReader("GENERAL"))
+	soloMenu, _, _ := s.Alm.GuardarAdjuntoMenu(1, strings.NewReader("MENU"))
+	if err := s.FijarPropio(general, "image/png"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.FijarPropioDe(Menu, soloMenu, "image/jpeg"); err != nil {
+		t.Fatal(err)
+	}
+	if id, mime, _, ok := s.Imagen(Menu); !ok || id != soloMenu || mime != "image/jpeg" {
+		t.Fatalf("el menú usa la suya: %q %q", id, mime)
+	}
+	if id, _, _, ok := s.Imagen(Ayuda); !ok || id != general {
+		t.Fatalf("los demás usan la general: %q", id)
+	}
+	if err := s.FijarPropioDe("inventado", soloMenu, "image/png"); err == nil {
+		t.Fatal("un momento que no existe debe fallar")
+	}
+	// quitar la del menú: vuelve a la general
+	if err := s.FijarPropioDe(Menu, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if id, _, _, _ := s.Imagen(Menu); id != general || s.PropioDe(Menu) != "" {
+		t.Fatalf("sin la del menú usa la general: %q", id)
+	}
+}

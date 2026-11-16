@@ -389,6 +389,7 @@ interface Motor {
     fun avatarEstado(bot: Long): String = "{}"
     fun avatarConfigurar(bot: Long, activo: Boolean, momentos: String) {}
     fun avatarPropio(bot: Long, id: String, mime: String) {}
+    fun avatarPropioDe(bot: Long, momento: String, id: String, mime: String) {}
 }
 
 /** El módulo Go de verdad (whatsmeow + almacén cifrado). */
@@ -746,4 +747,5 @@ object MotorGo : Motor {
     override fun avatarEstado(bot: Long) = Wabot.avatarEstado(bot)
     override fun avatarConfigurar(bot: Long, activo: Boolean, momentos: String) = Wabot.avatarConfigurar(bot, activo, momentos)
     override fun avatarPropio(bot: Long, id: String, mime: String) = Wabot.avatarPropio(bot, id, mime)
+    override fun avatarPropioDe(bot: Long, momento: String, id: String, mime: String) = Wabot.avatarPropioDe(bot, momento, id, mime)
 }

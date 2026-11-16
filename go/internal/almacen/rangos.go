@@ -186,6 +186,9 @@ var ajustesBotDefecto = map[string]string{
 	"avatar_propio":      "",                          // id de la imagen propia del avatar ("" = las caras de fábrica)
 	"avatar_propio_mime": "", "avatar_en_fijado": "0", // tipo de la imagen propia; «1» = el dueño ya eligió los momentos (aunque no quede ninguno)
 	"avatar_cara_feliz": "", "avatar_cara_contento": "", "avatar_cara_guino": "", "avatar_cara_pensando": "", // adjuntos ya guardados de cada cara
+	"avatar_propio_menu": "", "avatar_propio_menu_mime": "", "avatar_propio_ayuda": "", "avatar_propio_ayuda_mime": "", // imagen propia de un solo momento
+	"avatar_propio_bienvenida": "", "avatar_propio_bienvenida_mime": "", "avatar_propio_aviso": "", "avatar_propio_aviso_mime": "",
+	"avatar_propio_error": "", "avatar_propio_error_mime": "",
 	"avatar_cara_sorprendido": "", "avatar_cara_triste": "", "avatar_cara_enojado": "", "avatar_cara_dormido": "",
 	"lab_modo_menu": "botones", // texto | encuesta | botones (botones solo en chats privados; en grupos siempre texto)
 	// Descargas de video: versión de yt-dlp en uso, la última publicada y cuándo se revisó (la app no los muestra como ajustes).

@@ -49,14 +49,15 @@ func TestCalculadoraResuelveYRechazaLoQueNoEsUnaCuenta(t *testing.T) {
 
 func TestExtrasSinInternetFuncionanYSeVenBonitos(t *testing.T) {
 	e, d := extrasLista(t)
+	d.resp = func(PeticionHTTP) (*RespuestaHTTP, error) { return nil, errors.New("sin red") }
 	for _, c := range []string{"calc", "hora", "chiste", "dato", "frase"} {
 		r, err := ejecuta(t, e, c, map[string]string{"calc": "2+2"}[c])
 		if err != nil || !strings.Contains(r, "*") || !strings.Contains(r, "━") || !strings.Contains(r, "💡") {
 			t.Errorf("%s: %q %v", c, r, err)
 		}
 	}
-	if len(d.reqs) != 0 {
-		t.Fatalf("estos no deben usar internet: %v", d.reqs)
+	if len(d.reqs) != 3 { // chiste, dato y frase intentan internet; sin red usan los de fábrica
+		t.Fatalf("solo chiste, dato y frase deben intentar internet: %v", d.reqs)
 	}
 	r, _ := ejecuta(t, e, "calc", "12*(3+4)")
 	if !strings.Contains(r, "= *84*") {
@@ -187,5 +188,53 @@ func TestExtrasEsDeTodosYNaceApagado(t *testing.T) {
 	}
 	if len(chistes) < 15 || len(datos) < 15 || len(frases) < 10 {
 		t.Fatal("faltan textos de ejemplo")
+	}
+}
+
+func TestExtrasChisteYDatoDeInternetListasPropiasYTitulos(t *testing.T) {
+	e, d := extrasLista(t)
+	d.resp = func(p PeticionHTTP) (*RespuestaHTTP, error) {
+		switch {
+		case strings.Contains(p.URL, "jokeapi"):
+			return cuerpo("application/json", "", `{"error":false,"type":"twopart","setup":"¿Qué hace una abeja?","delivery":"Zum."}`), nil
+		case strings.Contains(p.URL, "onthisday"):
+			return cuerpo("application/json", "", `{"selected":[{"text":"Pasó algo importante.","year":1969}]}`), nil
+		case strings.Contains(p.URL, "wikiquote"):
+			return cuerpo("application/json", "", `{"parse":{"text":"<div id=\"mf-FDD\"><a title=\"Jean d’Alembert\"><img></a><td>«&#160;<p>La guerra es   el arte</p>&#160;»</td></div>"}}`), nil
+		case strings.Contains(p.URL, "list=search"):
+			return cuerpo("application/json", "", `{"query":{"search":[{"title":"Fotosíntesis oxigénica","snippet":"La <span class=\"searchmatch\">fotosíntesis</span> es &quot;un proceso&quot;"}]}}`), nil
+		}
+		return nil, errors.New("no esperado: " + p.URL)
+	}
+	if r, err := ejecuta(t, e, "chiste", ""); err != nil || !strings.Contains(r, "¿Qué hace una abeja?\nZum.") {
+		t.Fatalf("chiste de internet: %q %v", r, err)
+	}
+	if r, err := ejecuta(t, e, "dato", ""); err != nil || !strings.Contains(r, "*1969:* Pasó algo importante.") || !strings.Contains(r, "Un día como hoy") {
+		t.Fatalf("dato de internet: %q %v", r, err)
+	}
+	if r, err := ejecuta(t, e, "frase", ""); err != nil || !strings.Contains(r, "«La guerra es el arte»\n— Jean d’Alembert") {
+		t.Fatalf("frase de internet: %q %v", r, err)
+	}
+	r, err := ejecuta(t, e, "buscar", "fotosíntesis")
+	if err != nil || !strings.Contains(r, "*Fotosíntesis oxigénica*") || !strings.Contains(r, "es \"un proceso\"") || strings.Contains(r, "<span") || !strings.Contains(r, "https://es.wikipedia.org/wiki/") {
+		t.Fatalf("buscar: %q %v", r, err)
+	}
+	// con listas propias no se usa internet y salen solo las del dueño
+	n := len(d.reqs)
+	e.config(IDExtras, map[string]any{"mis_chistes": "Mi chiste uno\nMi chiste dos", "mis_datos": "Mi dato", "mis_frases": "Mi frase"})
+	for cmd, esperado := range map[string]string{"chiste": "Mi chiste ", "dato": "Mi dato", "frase": "Mi frase"} {
+		if r, err := ejecuta(t, e, cmd, ""); err != nil || !strings.Contains(r, esperado) {
+			t.Errorf("%s propio: %q %v", cmd, r, err)
+		}
+	}
+	if len(d.reqs) != n {
+		t.Fatalf("con listas propias no debe ir a internet: %v", d.reqs[n:])
+	}
+	// el título se cambia desde «Respuestas del bot»
+	if err := e.g.Alm.FijarRespuesta(e.g.BotID, "extras.t_chiste", "Me río de"); err != nil {
+		t.Fatal(err)
+	}
+	if r, _ := ejecuta(t, e, "chiste", ""); !strings.Contains(r, "*Me río de*") {
+		t.Fatalf("título propio: %q", r)
 	}
 }

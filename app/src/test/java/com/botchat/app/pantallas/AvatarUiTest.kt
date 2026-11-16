@@ -64,4 +64,16 @@ class AvatarUiTest {
         regla.esperaEtiqueta("avatar_elegir")
         assertFalse(hay("avatar_quitar"))
     }
+
+    @Test fun cadaMomentoPuedeTenerSuPropiaImagenYQuitarla() {
+        motor.avatarPropioDe(bot, "ayuda", "img1", "image/png")
+        regla.setContent { BotChatTema { PantallaAvatar(bot, {}) } }
+        regla.esperaEtiqueta("avatar_imagen_menu")
+        assertTrue(hay("avatar_imagen_aviso"))
+        assertFalse(hay("avatar_quitar_menu"))
+        regla.esperaEtiqueta("avatar_quitar_ayuda") // la ayuda ya tiene la suya
+        toca("avatar_quitar_ayuda")
+        regla.espera { llamo("avatarPropioDe:ayuda::") }
+        regla.espera { !hay("avatar_quitar_ayuda") }
+    }
 }
