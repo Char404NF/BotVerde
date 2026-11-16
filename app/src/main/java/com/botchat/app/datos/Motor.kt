@@ -83,7 +83,6 @@ interface Motor {
     fun asistenteAplicar(bot: Long): String
     fun asistenteDeshacer(bot: Long)
     fun asistenteDescartar(bot: Long)
-    fun asistenteProbar(bot: Long, numero: String): String
     fun configurarVerUnaVez(dias: Long)
     fun configurarMotor(activo: Boolean, ventanaMin: Long)
     fun actividadMotor(bot: Long, limite: Long): String
@@ -287,16 +286,11 @@ interface Motor {
     fun estadoLab(bot: Long): String
     fun aceptarAvisoLab(bot: Long)
     fun fijarAjusteLab(bot: Long, clave: String, valor: String)
-    fun enviarPruebaLab(bot: Long, tipo: String, variante: Long): String
-    fun listarResultadosLab(bot: Long): String
-    fun marcarResultadoLab(bot: Long, id: Long, campo: String, valor: Long)
-    fun borrarResultadosLab(bot: Long): Long
     // Captura de mensajes (diagnóstico del Laboratorio): solo estructura, solo en memoria.
     fun estadoCaptura(bot: Long): String
     fun activarCaptura(bot: Long, activo: Boolean)
     fun mostrarTextosCaptura(bot: Long, mostrar: Boolean)
     fun borrarCaptura(bot: Long)
-    fun usarLimiteMedido(bot: Long): Long
     fun proximoAviso(bot: Long): Long
     fun dispararAvisos(bot: Long): String
     fun vistaPreviaResumen(bot: Long): String
@@ -469,7 +463,6 @@ object MotorGo : Motor {
     override fun asistenteAplicar(bot: Long) = Wabot.asistenteAplicar(bot)
     override fun asistenteDeshacer(bot: Long) = Wabot.asistenteDeshacer(bot)
     override fun asistenteDescartar(bot: Long) = Wabot.asistenteDescartar(bot)
-    override fun asistenteProbar(bot: Long, numero: String) = Wabot.asistenteProbar(bot, numero)
     override fun configurarVerUnaVez(dias: Long) = Wabot.configurarVerUnaVez(dias)
     override fun configurarMotor(activo: Boolean, ventanaMin: Long) = Wabot.configurarMotor(activo, ventanaMin)
     override fun actividadMotor(bot: Long, limite: Long) = Wabot.actividadMotor(bot, limite)
@@ -656,15 +649,10 @@ object MotorGo : Motor {
     override fun estadoLab(bot: Long) = Wabot.estadoLab(bot)
     override fun aceptarAvisoLab(bot: Long) = Wabot.aceptarAvisoLab(bot)
     override fun fijarAjusteLab(bot: Long, clave: String, valor: String) = Wabot.fijarAjusteLab(bot, clave, valor)
-    override fun enviarPruebaLab(bot: Long, tipo: String, variante: Long) = Wabot.enviarPruebaLab(bot, tipo, variante)
-    override fun listarResultadosLab(bot: Long) = Wabot.listarResultadosLab(bot)
-    override fun marcarResultadoLab(bot: Long, id: Long, campo: String, valor: Long) = Wabot.marcarResultadoLab(bot, id, campo, valor)
-    override fun borrarResultadosLab(bot: Long) = Wabot.borrarResultadosLab(bot)
     override fun estadoCaptura(bot: Long) = Wabot.estadoCaptura(bot)
     override fun activarCaptura(bot: Long, activo: Boolean) = Wabot.activarCaptura(bot, activo)
     override fun mostrarTextosCaptura(bot: Long, mostrar: Boolean) = Wabot.mostrarTextosCaptura(bot, mostrar)
     override fun borrarCaptura(bot: Long) = Wabot.borrarCaptura(bot)
-    override fun usarLimiteMedido(bot: Long) = Wabot.usarLimiteMedido(bot)
     override fun proximoAviso(bot: Long) = Wabot.proximoAviso(bot)
     override fun dispararAvisos(bot: Long) = Wabot.dispararAvisos(bot)
     override fun vistaPreviaResumen(bot: Long) = Wabot.vistaPreviaResumen(bot)

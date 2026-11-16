@@ -199,11 +199,6 @@ var ajustesBotDefecto = map[string]string{
 	"lab_respaldo_enc":   "0",    // mandar también el texto numerado debajo de la encuesta
 	"lab_respaldo_bot":   "0",    // mandar también el texto numerado debajo de los botones (apagado: se repetirían los mensajes)
 	"lab_botones_tipo":   "auto", // auto | botones | lista | interactivo
-	"lab_prueba_chat":    "",     // mi otro número o grupo de prueba (clave del chat)
-	"lab_prueba_hora":    "4",    // pruebas por hora
-	"lab_prueba_dia":     "12",   // pruebas por día
-	"lab_biz_activo":     "0",    // interruptor propio de la prueba experimental "Interactivo + biz" (apagado)
-	"lab_biz_ack":        "0",    // casilla "Entiendo que puede bloquear mi número" de esa prueba
 	"lab_version_wa":     "",     // versión de WhatsApp del teléfono que recibe las pruebas
 	// Auditoría (v0.6.0, etapa E1)
 	"audit_defecto":       "1",  // guardar el texto de los mensajes (interruptor global; cada chat puede tener el suyo)

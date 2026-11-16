@@ -3,6 +3,7 @@ package com.botchat.app.pantallas
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -31,8 +32,8 @@ class AvanzadoUiTest {
 
     @Before fun antes() { Apoyo.reinicia(); ajustes = Ajustes.get(Apoyo.ctx()) }
 
-    private fun pantalla(eliminar: () -> Unit = {}, medir: () -> Unit = {}) =
-        regla.setContent { BotChatTema { PantallaAvanzado(ajustes, "Mi bot", false, {}, {}, medir, eliminar) } }
+    private fun pantalla(eliminar: () -> Unit = {}) =
+        regla.setContent { BotChatTema { PantallaAvanzado(ajustes, "Mi bot", false, {}, {}, eliminar) } }
 
     @Test fun valoresPorDefectoCumplenLoPedido() {
         assertFalse("evitar capturas viene apagado", ajustes.secure.value)
@@ -111,11 +112,9 @@ class AvanzadoUiTest {
         assertTrue(eliminado)
     }
 
-    @Test fun registroYMedicion() {
-        var midio = false
-        pantalla(medir = { midio = true })
+    @Test fun elRegistroNoTraeTextosYYaNoHayMedicion() {
+        pantalla()
         regla.onNodeWithText("Sin textos de mensajes, nombres ni nombres de archivos. Los números van enmascarados.").performScrollTo().assertIsDisplayed()
-        regla.onNodeWithText("Medir").performScrollTo().performClick()
-        assertTrue(midio)
+        assertEquals(0, regla.onAllNodesWithText("Medir rendimiento").fetchSemanticsNodes().size)
     }
 }

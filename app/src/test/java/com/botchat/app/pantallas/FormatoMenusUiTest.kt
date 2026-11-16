@@ -53,7 +53,7 @@ class FormatoMenusUiTest {
 
     private fun editor(d: AutoDef) {
         motor.autoDetalle = JSONObject().put("id", 1).put("activo", true).put("sistema", false).put("version", 1).put("def", JSONObject(d.json())).put("avisos", JSONArray()).toString()
-        regla.setContent { BotChatTema { EditorAutomatizacion(bot, 1, {}, {}) } }
+        regla.setContent { BotChatTema { EditorAutomatizacion(bot, 1, {}) } }
     }
 
     private fun guardado(): JSONObject {

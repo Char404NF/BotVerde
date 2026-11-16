@@ -96,30 +96,21 @@ func laboratorio(botID int64) (*lab.Servicio, error) {
 }
 
 type estadoLab struct {
-	Activo         bool         `json:"activo"`
-	AvisoAceptado  bool         `json:"avisoAceptado"`
-	AvisoTS        int64        `json:"avisoTs"`
-	Modo           string       `json:"modo"`     // lo elegido (texto, encuesta, botones)
-	ModoEfectivo   string       `json:"modoReal"` // lo que vale ahora (texto si el Laboratorio está apagado)
-	Grupos         bool         `json:"grupos"`
-	EncMax         int          `json:"encMax"`
-	ExpiraMin      int          `json:"expiraMin"`
-	RespaldoEnc    bool         `json:"respaldoEnc"`
-	RespaldoBot    bool         `json:"respaldoBot"`
-	BotonesTipo    string       `json:"botonesTipo"`
-	PruebaChat     string       `json:"pruebaChat"`
-	PruebaHora     int          `json:"pruebaHora"`
-	PruebaDia      int          `json:"pruebaDia"`
-	VersionWA      string       `json:"versionWa"`
-	VersionCliente string       `json:"versionCliente"`
-	EnMarcha       bool         `json:"enMarcha"`
-	LimiteMedido   int          `json:"limiteMedido"`
-	PruebasHora    int          `json:"pruebasHora"`
-	PruebasDia     int          `json:"pruebasDia"`
-	Plan           []lab.Prueba `json:"plan"`
-	BizActivo      bool         `json:"bizActivo"`
-	BizAck         bool         `json:"bizAck"`
-	BotonesHora    int          `json:"botonesHora"` // tope de menús con botones o listas por hora
+	Activo         bool   `json:"activo"`
+	AvisoAceptado  bool   `json:"avisoAceptado"`
+	AvisoTS        int64  `json:"avisoTs"`
+	Modo           string `json:"modo"`     // lo elegido (texto, encuesta, botones)
+	ModoEfectivo   string `json:"modoReal"` // lo que vale ahora (texto si el Laboratorio está apagado)
+	Grupos         bool   `json:"grupos"`
+	EncMax         int    `json:"encMax"`
+	ExpiraMin      int    `json:"expiraMin"`
+	RespaldoEnc    bool   `json:"respaldoEnc"`
+	RespaldoBot    bool   `json:"respaldoBot"`
+	BotonesTipo    string `json:"botonesTipo"`
+	VersionWA      string `json:"versionWa"`
+	VersionCliente string `json:"versionCliente"`
+	EnMarcha       bool   `json:"enMarcha"`
+	BotonesHora    int    `json:"botonesHora"` // tope de menús con botones o listas por hora
 }
 
 // EstadoLab devuelve (JSON) los ajustes del Laboratorio y lo que se puede probar.
@@ -134,12 +125,8 @@ func EstadoLab(botID int64) (string, error) {
 	e := estadoLab{
 		Activo: aj("lab_activo") == "1", AvisoAceptado: ts > 0, AvisoTS: ts, Modo: aj("lab_modo_menu"), Grupos: aj("lab_grupos") == "1",
 		EncMax: n("lab_enc_max_opc"), ExpiraMin: n("lab_expira_min"), RespaldoEnc: aj("lab_respaldo_enc") == "1", RespaldoBot: aj("lab_respaldo_bot") == "1",
-		BotonesTipo: aj("lab_botones_tipo"), PruebaChat: aj("lab_prueba_chat"), PruebaHora: n("lab_prueba_hora"), PruebaDia: n("lab_prueba_dia"),
-		VersionWA: aj("lab_version_wa"), Plan: lab.Plan(),
-		BizActivo: aj("lab_biz_activo") == "1", BizAck: aj("lab_biz_ack") == "1",
-	}
-	if e.BizActivo && e.BizAck {
-		e.Plan = append(e.Plan, lab.PlanBiz()...)
+		BotonesTipo: aj("lab_botones_tipo"),
+		VersionWA:   aj("lab_version_wa"),
 	}
 	e.ModoEfectivo = lab.ModoTexto
 	switch e.Modo {
@@ -147,10 +134,6 @@ func EstadoLab(botID int64) (string, error) {
 		e.ModoEfectivo = e.Modo
 	}
 	e.BotonesHora = n("menu_botones_hora")
-	ahora := time.Now()
-	e.PruebasHora = a.ContarEnviosLab(botID, ahora.Add(-time.Hour))
-	e.PruebasDia = a.ContarEnviosLab(botID, ahora.Add(-24*time.Hour))
-	e.LimiteMedido = lab.LimiteMedido(a.ListarResultadosLab(botID, 500))
 	mu.Lock()
 	s := st
 	mu.Unlock()
@@ -197,27 +180,6 @@ func FijarAjusteLab(botID int64, clave, valor string) error {
 		if valor == "1" && !aviso {
 			return lab.ErrSinAviso
 		}
-	case "lab_biz_ack":
-		if err := num(0, 1); err != nil {
-			return err
-		}
-		if valor == "0" { // quitar la casilla apaga también la prueba
-			if err := a.FijarAjusteBot(botID, "lab_biz_activo", "0"); err != nil {
-				return err
-			}
-		}
-	case "lab_biz_activo":
-		if err := num(0, 1); err != nil {
-			return err
-		}
-		if valor == "1" {
-			if !aviso {
-				return lab.ErrSinAviso
-			}
-			if a.AjusteBot(botID, "lab_biz_ack") != "1" {
-				return lab.ErrBizSinAck
-			}
-		}
 	case "lab_modo_menu":
 		if valor != lab.ModoTexto && valor != lab.ModoEncuesta && valor != lab.ModoBotones {
 			return errors.New("el modo debe ser texto, encuesta o botones")
@@ -244,19 +206,6 @@ func FijarAjusteLab(botID int64, clave, valor string) error {
 		default:
 			return errors.New("el tipo debe ser auto, botones, lista o interactivo")
 		}
-	case "lab_prueba_hora", "lab_prueba_dia":
-		if err := num(1, 100); err != nil {
-			return err
-		}
-	case "lab_prueba_chat":
-		if valor != "" {
-			if _, e := types.ParseJID(valor); e != nil {
-				return errors.New("ese chat no es válido")
-			}
-			if c, _ := a.ObtenerChat(botID, valor); c == nil {
-				return errors.New("ese chat todavía no existe: escríbele algo desde el teléfono o ábrelo primero")
-			}
-		}
 	case "lab_version_wa":
 		if len([]rune(valor)) > 30 {
 			return errors.New("la versión es muy larga")
@@ -269,73 +218,6 @@ func FijarAjusteLab(botID int64, clave, valor string) error {
 	}
 	accionDueno(botID, "lab.ajuste", clave, "valor="+valor)
 	return nil
-}
-
-// EnviarPruebaLab manda UNA prueba al chat de prueba y la anota en la matriz. Devuelve (JSON) el renglón de la matriz.
-func EnviarPruebaLab(botID int64, tipo string, variante int) (string, error) {
-	l, err := laboratorio(botID)
-	if err != nil {
-		return "", err
-	}
-	ctx, cancel := ctxEnvio()
-	defer cancel()
-	r, err := l.EnviarPrueba(ctx, tipo, variante)
-	accionDueno(botID, "lab.prueba", tipo, "variante="+strconv.Itoa(variante))
-	if err != nil && r.ID == 0 {
-		return "", err
-	}
-	// Un envío fallido ya quedó anotado con su error: se devuelve el renglón para que la matriz lo muestre.
-	return js(r, nil)
-}
-
-// ListarResultadosLab devuelve (JSON) la matriz, de la prueba más nueva a la más vieja:
-// [{id, ts, tipo, variante, chat, msgId, enviado, llego, visible, tocable, respondio, versionWa, versionCliente, error}].
-// Los números son -1 (sin saber), 0 (no) y 1 (sí).
-func ListarResultadosLab(botID int64) (string, error) {
-	a, err := almacenAbierto()
-	if err != nil {
-		return "", err
-	}
-	return js(a.ListarResultadosLab(botID, 200), nil)
-}
-
-// MarcarResultadoLab anota lo que ves en el teléfono: campo "visible" o "tocable"; valor -1 (sin saber), 0 (no) o 1 (sí).
-func MarcarResultadoLab(botID, id int64, campo string, valor int) error {
-	a, err := almacenAbierto()
-	if err != nil {
-		return err
-	}
-	if campo != "visible" && campo != "tocable" {
-		return errors.New("solo puedes marcar «visible» y «tocable»: lo demás lo anota el bot")
-	}
-	return a.MarcarResultadoLab(botID, id, campo, valor)
-}
-
-// BorrarResultadosLab vacía la matriz. Devuelve cuántas pruebas había.
-func BorrarResultadosLab(botID int64) (int, error) {
-	a, err := almacenAbierto()
-	if err != nil {
-		return 0, err
-	}
-	accionDueno(botID, "lab.borrar", "", "")
-	return a.BorrarResultadosLab(botID), nil
-}
-
-// UsarLimiteMedido pone como tope de opciones de las encuestas el límite que midieron tus pruebas. Devuelve el nuevo tope.
-func UsarLimiteMedido(botID int64) (int, error) {
-	a, err := almacenAbierto()
-	if err != nil {
-		return 0, err
-	}
-	n := lab.LimiteMedido(a.ListarResultadosLab(botID, 500))
-	if n < 2 {
-		return 0, errors.New("todavía no marcaste ninguna encuesta como «visible»")
-	}
-	if err := a.FijarAjusteBot(botID, "lab_enc_max_opc", strconv.Itoa(n)); err != nil {
-		return 0, err
-	}
-	accionDueno(botID, "lab.limite", "", "n="+strconv.Itoa(n))
-	return n, nil
 }
 
 // avisaMenuViejo le dice a quien tocó un botón de un menú que ya no sirve que escriba !menu. A lo más una vez cada 2 minutos por chat, y

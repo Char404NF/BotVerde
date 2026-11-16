@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
-	"sync"
-	"time"
 
 	"go.mau.fi/whatsmeow/types"
 
@@ -17,13 +15,6 @@ import (
 )
 
 // API del asistente «Crea tu bot» (v0.6.0, E9). El borrador vive cifrado en bot_ajustes; Aplicar crea todo de golpe y Deshacer lo quita.
-
-var (
-	pruebasAsistMu sync.Mutex
-	pruebasAsist   []time.Time
-)
-
-const topePruebasAsistHora = 3
 
 type estadoAsistente struct {
 	Borrador   *asistente.Borrador `json:"borrador"`
@@ -51,8 +42,6 @@ func AsistenteEstado(botID int64) (string, error) {
 	switch {
 	case b.OtroNumero != "":
 		e.NumeroPrb, e.NumeroOrig = b.OtroNumero, "asistente"
-	case a.AjusteBot(botID, "lab_prueba_chat") != "": // solo se LEE el número que ya se había puesto para pruebas
-		e.NumeroPrb, e.NumeroOrig = a.AjusteBot(botID, "lab_prueba_chat"), "laboratorio"
 	}
 	return js(e, nil)
 }
@@ -198,63 +187,4 @@ func chatDePrueba(numero string) (types.JID, error) {
 		return types.JID{}, errors.New("Escribe el número completo con el código de país, solo dígitos (por ejemplo 5215512345678).")
 	}
 	return types.NewJID(d.String(), types.DefaultUserServer), nil
-}
-
-// AsistenteProbar manda la bienvenida del borrador al «otro número» (el de prueba). Es un mensaje manual con confirmación en la pantalla,
-// con tope de 3 por hora; el número se guarda solo en el borrador cifrado. Si no hay otro número, devuelve un error que lo explica.
-func AsistenteProbar(botID int64, numero string) (string, error) {
-	a, err := almacenAbierto()
-	if err != nil {
-		return "", err
-	}
-	b := asistente.Leer(a, botID)
-	if strings.TrimSpace(numero) == "" {
-		numero = b.OtroNumero
-	}
-	if strings.TrimSpace(numero) == "" {
-		numero = a.AjusteBot(botID, "lab_prueba_chat")
-	}
-	if strings.TrimSpace(numero) == "" {
-		return "", errors.New("Para probar necesitas un segundo número (otro teléfono o WhatsApp). Escríbelo aquí y el bot le manda la bienvenida; desde ese número puedes contestar para ver el menú.")
-	}
-	jid, err := chatDePrueba(numero)
-	if err != nil {
-		return "", err
-	}
-	sv, err := servicioEnvio(botID)
-	if err != nil {
-		return "", err
-	}
-	mu.Lock()
-	s := st
-	mu.Unlock()
-	if s != nil && s.cli != nil && s.esPropio(jid) {
-		return "", errors.New("Ese es el número del propio bot. Usa otro número para la prueba.")
-	}
-	pruebasAsistMu.Lock()
-	corte := time.Now().Add(-time.Hour)
-	var vivos []time.Time
-	for _, t := range pruebasAsist {
-		if t.After(corte) {
-			vivos = append(vivos, t)
-		}
-	}
-	if len(vivos) >= topePruebasAsistHora {
-		pruebasAsist = vivos
-		pruebasAsistMu.Unlock()
-		return "", errors.New("Ya mandaste 3 pruebas en la última hora. Espera un rato para no arriesgar tu número.")
-	}
-	pruebasAsist = append(vivos, time.Now())
-	pruebasAsistMu.Unlock()
-	if b.OtroNumero != strings.TrimSpace(numero) {
-		b.OtroNumero = strings.TrimSpace(numero)
-		_ = asistente.Guardar(a, botID, b)
-	}
-	ctx, cancel := ctxEnvio()
-	defer cancel()
-	r, err := sv.EnviarTexto(ctx, jid.String(), asistente.TextoDePrueba(b, "Ana"), "", nil)
-	if err == nil {
-		a.RegistrarAccion(botID, almacen.PersonaDueno, "asistente.probar", "", "", "ok", "")
-	}
-	return js(r, err)
 }

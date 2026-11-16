@@ -110,7 +110,7 @@ private fun pasoNuevo(d: AutoDef, tipo: String): PasoDef {
 
 /** Editor de una automatización: pasos en lista con sangría, cuándo y dónde se activa, y vista previa en burbujas. */
 @Composable
-fun EditorAutomatizacion(botId: Long, id: Long, alVolver: () -> Unit, alProbar: (Long) -> Unit) {
+fun EditorAutomatizacion(botId: Long, id: Long, alVolver: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val haptica = rememberHaptica()
@@ -149,7 +149,7 @@ fun EditorAutomatizacion(botId: Long, id: Long, alVolver: () -> Unit, alProbar: 
                     navigationIcon = { IconButton({ if (hayCambios) salir = true else alVolver() }, Modifier.testTag("volver_editor")) { Icon(Ico.Atras, "Volver") } },
                     title = { Text("Editar automatización") },
                     actions = {
-                        TextButton({ haptica(Toque.Suave); if (hayCambios) guarda() else alProbar(id) }, Modifier.testTag(if (hayCambios) "guardar_auto" else "probar_auto")) { Text(if (hayCambios) "Guardar" else "Probar") }
+                        if (hayCambios) TextButton({ haptica(Toque.Suave); guarda() }, Modifier.testTag("guardar_auto")) { Text("Guardar") }
                     },
                 )
                 PrimaryTabRow(pestana) {

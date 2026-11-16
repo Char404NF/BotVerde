@@ -22,9 +22,9 @@ import (
 )
 
 func TestApiLabAjustesValidanYExigenElAviso(t *testing.T) {
-	_, a := abreSolo(t)
+	abreSolo(t)
 	st := decodifica[estadoLab](t, func() (string, error) { return EstadoLab(1) })
-	if st.Activo || st.AvisoAceptado || st.Modo != "botones" || st.ModoEfectivo != "botones" || st.Grupos || st.EnMarcha || len(st.Plan) < 10 || st.EncMax != 12 {
+	if st.Activo || st.AvisoAceptado || st.Modo != "botones" || st.ModoEfectivo != "botones" || st.Grupos || st.EnMarcha || st.EncMax != 12 {
 		t.Fatalf("por defecto todo apagado: %+v", st)
 	}
 	// sin aceptar el aviso no se enciende el Laboratorio (las pruebas), pero elegir el formato de los menús no lo necesita
@@ -47,27 +47,19 @@ func TestApiLabAjustesValidanYExigenElAviso(t *testing.T) {
 		t.Fatal(err)
 	}
 	for k, v := range map[string]string{"lab_activo": "1", "lab_modo_menu": "encuesta", "lab_grupos": "1", "lab_enc_max_opc": "10", "lab_botones_tipo": "lista",
-		"lab_expira_min": "30", "lab_respaldo_enc": "1", "lab_prueba_hora": "3", "lab_prueba_dia": "9", "lab_version_wa": "2.26.1"} {
+		"lab_expira_min": "30", "lab_respaldo_enc": "1", "lab_version_wa": "2.26.1"} {
 		if err := FijarAjusteLab(1, k, v); err != nil {
 			t.Fatalf("%s=%s: %v", k, v, err)
 		}
 	}
 	for k, v := range map[string]string{"lab_activo": "2", "lab_modo_menu": "magia", "lab_enc_max_opc": "99", "lab_botones_tipo": "x",
-		"lab_expira_min": "0", "lab_prueba_hora": "0", "lab_prueba_chat": "no-es-jid@@", "lab_otro": "1", "prefijo": "!"} {
+		"lab_expira_min": "0", "lab_prueba_chat": "x", "lab_biz_activo": "1", "lab_otro": "1", "prefijo": "!"} {
 		if err := FijarAjusteLab(1, k, v); err == nil {
 			t.Fatalf("%s=%s debía rechazarse", k, v)
 		}
 	}
-	// el chat de prueba debe existir
-	if err := FijarAjusteLab(1, "lab_prueba_chat", "5215599999999@s.whatsapp.net"); err == nil {
-		t.Fatal("el chat no existe")
-	}
-	_, _ = a.ActualizarChat(1, "5215599999999@s.whatsapp.net", false, func(c *almacen.Chat) { c.Publico = "Mi otro número" })
-	if err := FijarAjusteLab(1, "lab_prueba_chat", "5215599999999@s.whatsapp.net"); err != nil {
-		t.Fatal(err)
-	}
 	st = decodifica[estadoLab](t, func() (string, error) { return EstadoLab(1) })
-	if !st.Activo || !st.AvisoAceptado || st.ModoEfectivo != "encuesta" || !st.Grupos || st.EncMax != 10 || st.PruebaChat == "" || st.VersionWA != "2.26.1" {
+	if !st.Activo || !st.AvisoAceptado || st.ModoEfectivo != "encuesta" || !st.Grupos || st.EncMax != 10 || st.VersionWA != "2.26.1" {
 		t.Fatalf("%+v", st)
 	}
 	// el interruptor del Laboratorio ya no manda sobre el formato de los menús
@@ -79,43 +71,6 @@ func TestApiLabAjustesValidanYExigenElAviso(t *testing.T) {
 	// el camino general de ajustes no deja saltarse el aviso
 	if err := FijarAjusteDePermisos(1, "lab_activo", "1"); err == nil {
 		t.Fatal("lab_* solo se cambia por FijarAjusteLab")
-	}
-	// sin el bot en marcha no se pueden mandar pruebas
-	if _, err := EnviarPruebaLab(1, "encuesta", 4); err == nil {
-		t.Fatal("hace falta el bot en marcha")
-	}
-}
-
-func TestApiLabMatrizMarcarBorrarYUsarLimite(t *testing.T) {
-	_, a := abreSolo(t)
-	now := time.Now()
-	for _, n := range []string{"8", "12", "13"} {
-		id, _ := a.NuevoResultadoLab(1, "encuesta", n, "x@s.whatsapp.net", "", "", now)
-		a.ResultadoLabEnviado(1, id, "M"+n, true, "")
-	}
-	rs := decodifica[[]almacen.ResultadoLab](t, func() (string, error) { return ListarResultadosLab(1) })
-	if len(rs) != 3 || rs[0].Variante != "13" {
-		t.Fatalf("%+v", rs)
-	}
-	if err := MarcarResultadoLab(1, rs[0].ID, "llego", 1); err == nil {
-		t.Fatal("«llegó» lo anota el bot, no la persona")
-	}
-	if _, err := UsarLimiteMedido(1); err == nil {
-		t.Fatal("sin pruebas marcadas no hay límite")
-	}
-	_ = MarcarResultadoLab(1, rs[2].ID, "visible", 1) // 8
-	_ = MarcarResultadoLab(1, rs[1].ID, "visible", 1) // 12
-	_ = MarcarResultadoLab(1, rs[0].ID, "visible", 0) // 13 no se ve
-	_ = MarcarResultadoLab(1, rs[0].ID, "tocable", 0)
-	n, err := UsarLimiteMedido(1)
-	if err != nil || n != 12 || a.AjusteBotInt(1, "lab_enc_max_opc") != 12 {
-		t.Fatal(n, err)
-	}
-	if st := decodifica[estadoLab](t, func() (string, error) { return EstadoLab(1) }); st.LimiteMedido != 12 || st.PruebasDia != 3 {
-		t.Fatalf("%+v", st)
-	}
-	if c, err := BorrarResultadosLab(1); err != nil || c != 3 {
-		t.Fatal(c, err)
 	}
 }
 
@@ -305,46 +260,5 @@ func TestVotoYToqueLlegaAlMotorComoElNumeroDeLaOpcion(t *testing.T) {
 	v = cap.espera(t, 4)
 	if v[3].Texto != "Sí" {
 		t.Fatalf("botón ajeno: %+v", v[3])
-	}
-}
-
-func TestBizExperimentalExigeAvisoYCasilla(t *testing.T) {
-	_, _ = abreSolo(t)
-	st := decodifica[estadoLab](t, func() (string, error) { return EstadoLab(1) })
-	if st.BizActivo || st.BizAck {
-		t.Fatal("apagado por defecto")
-	}
-	if err := FijarAjusteLab(1, "lab_biz_activo", "1"); err == nil {
-		t.Fatal("sin aviso ni casilla no enciende")
-	}
-	if err := AceptarAvisoLab(1); err != nil {
-		t.Fatal(err)
-	}
-	if err := FijarAjusteLab(1, "lab_biz_activo", "1"); err == nil {
-		t.Fatal("sin casilla no enciende")
-	}
-	if err := FijarAjusteLab(1, "lab_biz_ack", "1"); err != nil {
-		t.Fatal(err)
-	}
-	if err := FijarAjusteLab(1, "lab_biz_activo", "1"); err != nil {
-		t.Fatal(err)
-	}
-	st = decodifica[estadoLab](t, func() (string, error) { return EstadoLab(1) })
-	hay := false
-	for _, p := range st.Plan {
-		hay = hay || p.Tipo == "interactivo_biz"
-	}
-	if !st.BizActivo || !hay {
-		t.Fatalf("con interruptor y casilla el plan trae la prueba: %+v", st)
-	}
-	if err := FijarAjusteLab(1, "lab_biz_ack", "0"); err != nil {
-		t.Fatal(err)
-	}
-	st = decodifica[estadoLab](t, func() (string, error) { return EstadoLab(1) })
-	if st.BizActivo || st.BizAck {
-		t.Fatal("quitar la casilla apaga la prueba")
-	}
-	if _, err := EnviarPruebaLab(1, "interactivo_biz", 1); err == nil {
-		t.Fatal("apagada no envía")
 	}
 }

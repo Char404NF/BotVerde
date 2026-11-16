@@ -35,7 +35,6 @@ import com.botchat.app.datos.asistenteBase
 import com.botchat.app.datos.asistenteDeshacer
 import com.botchat.app.datos.asistenteEstado
 import com.botchat.app.datos.asistenteGuardar
-import com.botchat.app.datos.asistenteProbar
 import com.botchat.app.datos.asistenteVisto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -353,7 +352,7 @@ private fun PasoFinal(
     alCambiar: (BorradorAsistente) -> Unit, alCrear: () -> Unit, alDeshacer: () -> Unit, alEditarMenu: (Long) -> Unit, alEditarBienvenida: () -> Unit, alListo: () -> Unit,
 ) {
     val aplicado = resultado != null || estado?.aplicado == true
-    Titulo(if (aplicado) "¡Tu bot está listo!" else "Así queda tu bot", if (aplicado) "Todo lo de abajo ya está funcionando. Puedes probarlo o cambiarlo cuando quieras." else "Revisa y toca «Crear mi bot». Nada cambia hasta entonces.")
+    Titulo(if (aplicado) "¡Tu bot está listo!" else "Así queda tu bot", if (aplicado) "Todo lo de abajo ya está funcionando. Puedes cambiarlo cuando quieras." else "Revisa y toca «Crear mi bot». Nada cambia hasta entonces.")
     Card(Modifier.fillMaxWidth().testTag("asist_resumen"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(Modifier.padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
             val donde = listOfNotNull(if (b.privados) "chats privados" else null, if (b.grupos && b.gruposElegidos.isNotEmpty()) "${b.gruposElegidos.size} grupo(s)" else null).joinToString(" y ").ifBlank { "ningún lugar" }
@@ -372,7 +371,6 @@ private fun PasoFinal(
     if (!aplicado) {
         Button(alCrear, Modifier.fillMaxWidth().heightIn(min = ALTO_BOTON).testTag("asist_crear"), enabled = problemas.isEmpty() && !ocupado) { Text(if (ocupado) "Creando…" else "Crear mi bot") }
     }
-    Prueba(botId, b, estado, alCambiar)
     if (aplicado) {
         val menu = resultado?.menuId ?: 0L
         if (menu > 0) OutlinedButton({ alEditarMenu(menu) }, Modifier.fillMaxWidth().heightIn(min = ALTO_BOTON).testTag("asist_editar_menu")) { Text("Editar el menú completo (submenús y formularios)") }
@@ -388,49 +386,6 @@ private fun Linea(t: String, v: String) {
         Text(t, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(v, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
     }
-}
-
-/** «Probar mi bot»: manda la bienvenida a mi otro número. Si no hay otro número, lo explica. */
-@Composable
-private fun Prueba(botId: Long, b: BorradorAsistente, estado: EstadoAsistente?, alCambiar: (BorradorAsistente) -> Unit) {
-    val scope = rememberCoroutineScope()
-    val configurado = estado?.numeroPrueba.orEmpty()
-    var numero by remember(configurado, b.otroNumero) { mutableStateOf(b.otroNumero.ifBlank { configurado }) }
-    var confirmando by remember { mutableStateOf(false) }
-    var mensaje by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
-    var enviando by remember { mutableStateOf(false) }
-    Card(Modifier.fillMaxWidth().testTag("asist_prueba"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
-        Column(Modifier.padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
-            Text("Probar mi bot", style = MaterialTheme.typography.titleMedium)
-            if (numero.isBlank()) {
-                Text("Para probar necesitas un segundo número (otro teléfono o WhatsApp). El bot le manda la bienvenida y desde ese número puedes contestar para ver el menú. Si no tienes otro número, sáltate esta prueba.", Modifier.testTag("asist_prueba_explica"), style = MaterialTheme.typography.bodyMedium)
-            } else {
-                Text("Se manda la bienvenida a tu otro número. Es un mensaje real: sale de tu WhatsApp.", style = MaterialTheme.typography.bodyMedium)
-            }
-            OutlinedTextField(numero, { numero = it.filter { c -> c.isDigit() || c == '+' || c == ' ' }.take(20) }, Modifier.fillMaxWidth().testTag("asist_prueba_numero"), label = { Text("Otro número (con código de país)") }, singleLine = true)
-            Button({ confirmando = true }, Modifier.fillMaxWidth().heightIn(min = ALTO_BOTON).testTag("asist_probar"), enabled = numero.filter { it.isDigit() }.length >= 8 && !enviando) { Text(if (enviando) "Mandando…" else "Mandar la bienvenida") }
-            mensaje?.let { (ok, t) -> Text(t, Modifier.testTag("asist_prueba_msg"), color = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error) }
-        }
-    }
-    if (confirmando) AlertDialog(
-        onDismissRequest = { confirmando = false }, modifier = Modifier.testTag("asist_prueba_confirma"),
-        title = { Text("¿Mandar la prueba?") },
-        text = { Text("Se enviará un mensaje real al número $numero. Máximo 3 pruebas por hora.") },
-        confirmButton = {
-            TextButton({
-                confirmando = false; enviando = true; mensaje = null
-                val limpio = numero.filter { it.isDigit() }
-                alCambiar(b.copy(otroNumero = limpio))
-                scope.launch {
-                    runCatching { Repo.asistenteGuardar(botId, b.copy(otroNumero = limpio)); Repo.asistenteProbar(botId, limpio) }
-                        .onSuccess { mensaje = true to "Listo, mandé la bienvenida. Revisa el otro teléfono." }
-                        .onFailure { mensaje = false to (it.message ?: "No se pudo mandar la prueba.") }
-                    enviando = false
-                }
-            }, Modifier.testTag("asist_prueba_si")) { Text("Mandar") }
-        },
-        dismissButton = { TextButton({ confirmando = false }) { Text("Cancelar") } },
-    )
 }
 
 // ---------- invitación de la primera vez ----------

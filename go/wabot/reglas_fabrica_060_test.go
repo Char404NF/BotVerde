@@ -21,7 +21,7 @@ func TestReglasDeFabricaV060(t *testing.T) {
 		}
 	}
 	aj := a.AjustesBot(1)
-	for _, k := range []string{"lab_activo", "lab_biz_activo", "lab_biz_ack", "lab_grupos", "sil_expulsion_auto"} {
+	for _, k := range []string{"lab_activo", "lab_grupos", "sil_expulsion_auto"} {
 		if aj[k] != "0" {
 			t.Fatalf("%s debe salir apagado, vale %q", k, aj[k])
 		}

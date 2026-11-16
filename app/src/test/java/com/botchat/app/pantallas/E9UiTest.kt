@@ -243,26 +243,11 @@ class E9UiTest {
         regla.onNodeWithTag("asist_crear", useUnmergedTree = true).assertIsNotEnabledCompat()
     }
 
-    @Test fun probarSinOtroNumeroLoExplicaYConNumeroPideConfirmacion() {
+    @Test fun elResumenYaNoTrae_ProbarMiBot() {
         motor.asistGuardado = BorradorAsistente(paso = 6, bienvenidaTexto = "Hola").json()
         asistente()
-        regla.espera { hay("asist_prueba_explica") }
-        assertTrue(hay("asist_prueba_explica"))
-        escribe("asist_prueba_numero", "5215512345678")
-        toca("asist_probar")
-        regla.espera { hay("asist_prueba_confirma") }
-        assertFalse("no manda nada sin confirmar", llamo("asist_probar"))
-        toca("asist_prueba_si")
-        regla.espera { llamo("asist_probar:5215512345678") }
-        regla.esperaTexto("Listo, mandé la bienvenida", substring = true)
-    }
-
-    @Test fun siLaPruebaFallaMuestraElMotivo() {
-        motor.asistGuardado = BorradorAsistente(paso = 6, bienvenidaTexto = "Hola", otroNumero = "5215512345678").json()
-        motor.asistProbarError = "Ya mandaste 3 pruebas en la última hora."
-        asistente()
-        toca("asist_probar"); toca("asist_prueba_si")
-        regla.esperaTexto("Ya mandaste 3 pruebas", substring = true)
+        regla.esperaTexto("Así queda tu bot")
+        assertFalse(hay("asist_prueba"))
     }
 
     @Test fun elBorradorSeReanudaDondeSeDejo() {

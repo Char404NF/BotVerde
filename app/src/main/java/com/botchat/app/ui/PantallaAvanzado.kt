@@ -70,7 +70,6 @@ fun PantallaAvanzado(
     eliminando: Boolean,
     alVolver: () -> Unit,
     alAbrirEspacio: () -> Unit,
-    alMedirRendimiento: () -> Unit,
     alEliminarBot: () -> Unit,
     alFunciones: () -> Unit = {},
     alActividad: () -> Unit = {},
@@ -161,7 +160,6 @@ fun PantallaAvanzado(
             }
             Seccion("Mantenimiento") {
                 Fila("Espacio", "Qué ocupa cada chat y cómo liberarlo", Ico.Espacio) { Button(alAbrirEspacio) { Text("Abrir") } }
-                Fila("Medir rendimiento", "Pruebas de velocidad y fluidez en este teléfono", Ico.Actualizar) { OutlinedButton(alMedirRendimiento) { Text("Medir") } }
             }
             Seccion("Registro") {
                 Text("Sin textos de mensajes, nombres ni nombres de archivos. Los números van enmascarados.", Modifier.padding(horizontal = Esp.l), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

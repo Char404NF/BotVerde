@@ -82,7 +82,7 @@ class AnimacionesPantallasUiTest {
 
     @Test fun avanzadoOfreceLosTresModosYLosGuarda() {
         val ajustes = Ajustes.get(Apoyo.ctx())
-        regla.setContent { BotChatTema { PantallaAvanzado(ajustes, "Mi bot", false, {}, {}, {}, {}) } }
+        regla.setContent { BotChatTema { PantallaAvanzado(ajustes, "Mi bot", false, {}, {}, {}) } }
         regla.onNodeWithTag("anim_modo").performScrollTo()
         regla.onNodeWithTag("anim_ninguna").performScrollTo().performClick()
         assertEquals(ModoAnim.NINGUNA, ajustes.animaciones.value)

@@ -111,4 +111,3 @@ suspend fun Repo.asistenteVisto(bot: Long) = io { motor.asistenteVisto(bot) }
 suspend fun Repo.asistenteAplicar(bot: Long) = io { JsonE9.resultado(motor.asistenteAplicar(bot)) }
 suspend fun Repo.asistenteDeshacer(bot: Long) = io { motor.asistenteDeshacer(bot) }
 suspend fun Repo.asistenteDescartar(bot: Long) = io { motor.asistenteDescartar(bot) }
-suspend fun Repo.asistenteProbar(bot: Long, numero: String) = io { motor.asistenteProbar(bot, numero) }

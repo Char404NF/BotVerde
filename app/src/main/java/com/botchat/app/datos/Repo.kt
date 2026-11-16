@@ -306,15 +306,10 @@ object Repo {
     suspend fun estadoLab(bot: Long) = io { JsonLab.estado(motor.estadoLab(bot)) }
     suspend fun aceptarAvisoLab(bot: Long) = io { motor.aceptarAvisoLab(bot) }
     suspend fun fijarAjusteLab(bot: Long, clave: String, valor: String) = io { motor.fijarAjusteLab(bot, clave, valor) }
-    suspend fun enviarPruebaLab(bot: Long, tipo: String, variante: Int) = io { JsonLab.resultado(JSONObject(motor.enviarPruebaLab(bot, tipo, variante.toLong()))) }
-    suspend fun resultadosLab(bot: Long) = io { JsonLab.resultados(motor.listarResultadosLab(bot)) }
-    suspend fun marcarResultadoLab(bot: Long, id: Long, campo: String, valor: Int) = io { motor.marcarResultadoLab(bot, id, campo, valor.toLong()) }
-    suspend fun borrarResultadosLab(bot: Long) = io { motor.borrarResultadosLab(bot) }
     suspend fun estadoCaptura(bot: Long) = io { JsonLab.captura(motor.estadoCaptura(bot)) }
     suspend fun activarCaptura(bot: Long, activo: Boolean) = io { motor.activarCaptura(bot, activo) }
     suspend fun mostrarTextosCaptura(bot: Long, mostrar: Boolean) = io { motor.mostrarTextosCaptura(bot, mostrar) }
     suspend fun borrarCaptura(bot: Long) = io { motor.borrarCaptura(bot) }
-    suspend fun usarLimiteMedido(bot: Long) = io { motor.usarLimiteMedido(bot).toInt() }
     suspend fun proximoAviso(bot: Long) = io { motor.proximoAviso(bot) }
     suspend fun dispararAvisos(bot: Long) = io { JsonPersonas.disparo(motor.dispararAvisos(bot)) }
     suspend fun vistaPreviaResumen(bot: Long) = io { motor.vistaPreviaResumen(bot) }

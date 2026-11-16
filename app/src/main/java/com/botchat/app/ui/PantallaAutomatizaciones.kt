@@ -61,7 +61,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun PantallaAutomatizaciones(
     botId: Long, alVolver: () -> Unit, alEditar: (Long) -> Unit, alEnCurso: () -> Unit, alActividad: () -> Unit,
-    alEstadisticas: (Long) -> Unit, alProbar: (Long) -> Unit,
+    alEstadisticas: (Long) -> Unit,
     alFormularios: () -> Unit = {}, alNoEntendio: () -> Unit = {}, alAjustesMenus: () -> Unit = {}, alMensajesAuto: () -> Unit = {},
 ) {
     val ctx = LocalContext.current
@@ -166,7 +166,7 @@ fun PantallaAutomatizaciones(
                                     }.onFailure { avisaToast(ctx, it.message, true) }
                                 }
                             },
-                            alEstadisticas = { alEstadisticas(a.id) }, alProbar = { alProbar(a.id) }, alBorrar = { borrando = a },
+                            alEstadisticas = { alEstadisticas(a.id) }, alBorrar = { borrando = a },
                         )
                     }
                 }
@@ -276,7 +276,7 @@ private fun PanelNueva(alCero: () -> Unit, alPlantillas: () -> Unit, alImportar:
 @Composable
 private fun TarjetaAutomatizacion(
     a: AutoResumen, alEditar: () -> Unit, alActivar: (Boolean) -> Unit, alDuplicar: () -> Unit, alExportar: () -> Unit,
-    alEstadisticas: () -> Unit, alProbar: () -> Unit, alBorrar: () -> Unit,
+    alEstadisticas: () -> Unit, alBorrar: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     Card(Modifier.fillMaxWidth().clickable { alEditar() }.testTag("auto_${a.id}"), shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
@@ -291,7 +291,6 @@ private fun TarjetaAutomatizacion(
                 IconButton({ menu = true }, Modifier.testTag("mas_${a.id}")) { Icon(Ico.Mas, "Más") }
                 DropdownMenu(menu, { menu = false }) {
                     DropdownMenuItem(text = { Text("Editar") }, onClick = { menu = false; alEditar() })
-                    DropdownMenuItem(text = { Text("Probar sin enviar nada") }, onClick = { menu = false; alProbar() }, modifier = Modifier.testTag("probar_${a.id}"))
                     DropdownMenuItem(text = { Text("Estadísticas") }, onClick = { menu = false; alEstadisticas() }, modifier = Modifier.testTag("estadisticas_${a.id}"))
                     DropdownMenuItem(text = { Text("Duplicar") }, onClick = { menu = false; alDuplicar() }, modifier = Modifier.testTag("duplicar_${a.id}"))
                     DropdownMenuItem(text = { Text("Compartir (JSON)") }, onClick = { menu = false; alExportar() })

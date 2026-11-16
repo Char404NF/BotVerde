@@ -129,7 +129,7 @@ class NavegacionUiTest {
         atras()
         regla.onNodeWithTag("ajuste_avanzado").performScrollTo().performClick()
         regla.esperaTexto("Aspecto")
-        regla.onNodeWithText("Medir rendimiento").assertExists()
+        regla.onNodeWithText("Medir rendimiento").assertDoesNotExist()
         atras()
         regla.onNodeWithTag("ajuste_bot").performScrollTo().performClick()
         regla.esperaTexto("Iniciar")

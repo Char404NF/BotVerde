@@ -50,24 +50,6 @@ func TestApiAsistenteGuardarAplicarDeshacer(t *testing.T) {
 	}
 }
 
-func TestApiAsistenteProbarExplicaSiNoHayOtroNumero(t *testing.T) {
-	abreSolo(t)
-	_, err := AsistenteProbar(1, "")
-	if err == nil || !strings.Contains(err.Error(), "segundo número") {
-		t.Fatalf("debía explicar que falta otro número: %v", err)
-	}
-	if _, err := AsistenteProbar(1, "123"); err == nil || !strings.Contains(err.Error(), "código de país") {
-		t.Fatalf("número corto: %v", err)
-	}
-	if _, err := AsistenteProbar(1, "120363000000000001@g.us"); err == nil || !strings.Contains(err.Error(), "no a un grupo") {
-		t.Fatalf("grupo: %v", err)
-	}
-	// Con un número válido pero sin el bot encendido, pide encenderlo (no manda nada).
-	if _, err := AsistenteProbar(1, "5215512345678"); err == nil || !strings.Contains(err.Error(), "Enciende el bot") {
-		t.Fatalf("sin bot: %v", err)
-	}
-}
-
 func TestApiTopePendienteSeConfirmaPorLaApi(t *testing.T) {
 	abreSolo(t)
 	a, _ := almacenAbierto()

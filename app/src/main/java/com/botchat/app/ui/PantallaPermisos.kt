@@ -458,15 +458,6 @@ fun PantallaPermisosAvanzado(botId: Long, alVolver: () -> Unit, alRegistro: () -
                 CampoAjuste("Días que se guarda el registro", "registro_dias", a, "Solo guarda quién hizo qué y con qué resultado; nunca textos de mensajes.", botId, scope, numerico = true) { version++ }
                 OutlinedButton(alRegistro, Modifier.fillMaxWidth().padding(horizontal = Esp.l).testTag("abrir_registro_acciones")) { Text("Ver el registro de acciones") }
             }
-            Seccion("Probar un comando (como Dueño)") {
-                Column(Modifier.padding(horizontal = Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.s)) {
-                    OutlinedTextField(comando, { comando = it }, Modifier.fillMaxWidth().testTag("campo_comando"), label = { Text("Comando") }, singleLine = true)
-                    Button({
-                        scope.launch { runCatching { Repo.ejecutarComando(botId, comando) }.onSuccess { respuesta = if (it.manejado) it.texto.ifBlank { "(sin respuesta)" } else "Eso no es un comando." }.onFailure { respuesta = it.message ?: "No se pudo" } }
-                    }, Modifier.testTag("ejecutar_comando")) { Text("Ejecutar") }
-                    if (respuesta.isNotEmpty()) Text(respuesta, Modifier.testTag("respuesta_comando"), style = MaterialTheme.typography.bodyMedium)
-                }
-            }
         }
     }
 }

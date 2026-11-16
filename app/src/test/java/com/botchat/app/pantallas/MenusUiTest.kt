@@ -27,7 +27,6 @@ import com.botchat.app.ui.PantallaEstadisticasMenu
 import com.botchat.app.ui.PantallaFormulario
 import com.botchat.app.ui.PantallaFormularios
 import com.botchat.app.ui.PantallaNoEntendio
-import com.botchat.app.ui.PantallaSimulador
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -69,7 +68,7 @@ class MenusUiTest {
 
     private fun editor(d: AutoDef = tienda()) {
         motor.autoDetalle = detalle(d)
-        regla.setContent { BotChatTema { EditorAutomatizacion(bot, 1, {}, {}) } }
+        regla.setContent { BotChatTema { EditorAutomatizacion(bot, 1, {}) } }
     }
 
     private fun guardado(): JSONObject {
@@ -85,7 +84,7 @@ class MenusUiTest {
         val original = JSONObject(tienda().json()).put("propio", JSONObject().put("nombre", "horario")).put("futuro", 7)
         original.getJSONObject("alcance").put("todosGrupos", true)
         motor.autoDetalle = JSONObject().put("id", 1).put("activo", true).put("sistema", false).put("version", 1).put("def", original).put("avisos", JSONArray()).toString()
-        regla.setContent { BotChatTema { EditorAutomatizacion(bot, 1, {}, {}) } }
+        regla.setContent { BotChatTema { EditorAutomatizacion(bot, 1, {}) } }
         regla.esperaEtiqueta("campo_nombre_auto")
         regla.onNodeWithTag("campo_nombre_auto").performTextReplacement("Tienda 2")
         val g = guardado()
@@ -382,7 +381,7 @@ class MenusUiTest {
         motor.autos = Apoyo.arreglo(resumen(1, "Tienda"))
         motor.formulariosJson = forms()
         var f = 0; var n = 0; var a = 0
-        regla.setContent { BotChatTema { PantallaAutomatizaciones(bot, {}, {}, {}, {}, {}, {}, { f++ }, { n++ }, { a++ }) } }
+        regla.setContent { BotChatTema { PantallaAutomatizaciones(bot, {}, {}, {}, {}, {}, { f++ }, { n++ }, { a++ }) } }
         regla.esperaEtiqueta("mas_automatizaciones")
         regla.onNodeWithTag("mas_automatizaciones").performClick()
         regla.esperaEtiqueta("abrir_formularios")
@@ -397,7 +396,7 @@ class MenusUiTest {
 
     @Test fun exportarMenusPideElegirYPuedeLlevarContrasena() {
         motor.autos = Apoyo.arreglo(resumen(1, "Tienda"), resumen(2, "Citas"))
-        regla.setContent { BotChatTema { PantallaAutomatizaciones(bot, {}, {}, {}, {}, {}, {}) } }
+        regla.setContent { BotChatTema { PantallaAutomatizaciones(bot, {}, {}, {}, {}, {}) } }
         regla.esperaEtiqueta("mas_automatizaciones")
         regla.onNodeWithTag("mas_automatizaciones").performClick()
         regla.onNodeWithTag("abrir_exportar_menus").performClick()
@@ -414,7 +413,7 @@ class MenusUiTest {
     @Test fun siElExportarFallaSeAvisaYElPanelSigue() {
         motor.autos = Apoyo.arreglo(resumen(1, "Tienda"))
         motor.menusFalla = "La contraseña debe tener al menos 6 caracteres."
-        regla.setContent { BotChatTema { PantallaAutomatizaciones(bot, {}, {}, {}, {}, {}, {}) } }
+        regla.setContent { BotChatTema { PantallaAutomatizaciones(bot, {}, {}, {}, {}, {}) } }
         regla.esperaEtiqueta("mas_automatizaciones")
         regla.onNodeWithTag("mas_automatizaciones").performClick()
         regla.onNodeWithTag("abrir_exportar_menus").performClick()
@@ -430,25 +429,12 @@ class MenusUiTest {
     @Test fun alCrearSeOfrecenTodasLasPlantillas() {
         val nombres = listOf("Atención básica", "Horarios y ubicación", "Cotización", "Refacciones", "Soporte", "Citas", "Preguntas frecuentes", "Menú para grupos")
         motor.plantillas = JSONArray().also { a -> nombres.forEach { n -> a.put(JSONObject().put("nombre", n).put("descripcion", "d").put("def", JSONObject(tienda().json()))) } }.toString()
-        regla.setContent { BotChatTema { PantallaAutomatizaciones(bot, {}, {}, {}, {}, {}, {}) } }
+        regla.setContent { BotChatTema { PantallaAutomatizaciones(bot, {}, {}, {}, {}, {}) } }
         regla.esperaEtiqueta("nueva_automatizacion")
         regla.onNodeWithTag("nueva_automatizacion").performClick()
         regla.onNodeWithTag("nueva_desde_plantilla").performClick()
         regla.esperaEtiqueta("plantilla_Menú para grupos")
         nombres.forEach { assertTrue(it, hay("plantilla_$it")) }
-    }
-
-    // ---------- el simulador describe lo que no manda de verdad ----------
-
-    @Test fun elSimuladorMuestraUbicacionYContactoComoEtiquetas() {
-        motor.simulacion = mutableListOf("Aquí estamos.", "[Ubicación: Tienda]", "[Contacto: Ventas · +525512345678]")
-        regla.setContent { BotChatTema { PantallaSimulador(bot, 1, "Tienda", {}) } }
-        regla.esperaEtiqueta("campo_simulador")
-        regla.onNodeWithTag("campo_simulador").performTextInput(".menu")
-        regla.onNodeWithTag("enviar_simulador").performClick()
-        regla.esperaTexto("[Ubicación: Tienda]")
-        regla.esperaTexto("[Contacto: Ventas · +525512345678]")
-        assertFalse(llamo("enviar:"))
     }
 
     // ---------- rangos: opciones sueltas ----------

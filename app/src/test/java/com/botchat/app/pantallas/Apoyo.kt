@@ -151,7 +151,6 @@ class MotorFalso : Motor {
     var asistAplicado = false
     var asistOtroNumero = ""
     var asistGuardado: String? = null
-    var asistProbarError: String? = null
     var asistProblemas = "[]"
     override fun asistenteEstado(bot: Long): String {
         val b = asistGuardado ?: com.botchat.app.datos.JsonE9.borradorPorDefecto()
@@ -188,10 +187,6 @@ class MotorFalso : Motor {
     override fun asistenteAplicar(bot: Long): String { llamadas += "asist_aplicar"; asistAplicado = true; return "{\"menu\":7,\"autos\":[3],\"avisos\":[]}" }
     override fun asistenteDeshacer(bot: Long) { llamadas += "asist_deshacer"; asistAplicado = false }
     override fun asistenteDescartar(bot: Long) { llamadas += "asist_descartar"; asistGuardado = null }
-    override fun asistenteProbar(bot: Long, numero: String): String {
-        asistProbarError?.let { throw IllegalStateException(it) }
-        llamadas += "asist_probar:$numero"; return "{\"id\":\"X\"}"
-    }
     override fun conservarPortadaVideo(bot: Long) = true
     override fun fijarConservarPortada(bot: Long, si: Boolean) { llamadas += "portada:$si" }
     override fun configurarVerUnaVez(dias: Long) { llamadas += "verDias:$dias" }
@@ -621,25 +616,6 @@ class MotorFalso : Motor {
         llamadas += "ajusteLab:$clave:$valor"; rFalla()
         if (clave == "lab_activo" && valor == "1" && labAj["lab_aviso_ts"] == "0") throw IllegalStateException("Falta aceptar el aviso de riesgo del Laboratorio.")
         labAj[clave] = valor
-    }
-    override fun enviarPruebaLab(bot: Long, tipo: String, variante: Long): String {
-        llamadas += "pruebaLab:$tipo:$variante"; rFalla()
-        if (!labEnMarcha) throw IllegalStateException("Enciende el bot para hacer pruebas.")
-        val id = (labResultados.maxOfOrNull { it.getLong("id") } ?: 0L) + 1
-        val r = JSONObject().put("id", id).put("ts", 1700000000L + id).put("tipo", tipo).put("variante", variante.toString()).put("chat", labAj["lab_prueba_chat"]).put("msgId", "M$id")
-            .put("enviado", 1).put("llego", -1).put("visible", -1).put("tocable", -1).put("respondio", -1).put("versionWa", labAj["lab_version_wa"]).put("versionCliente", "2.3000.1").put("error", "")
-        labResultados.add(0, r)
-        return r.toString()
-    }
-    override fun listarResultadosLab(bot: Long) = JSONArray(labResultados).toString()
-    override fun marcarResultadoLab(bot: Long, id: Long, campo: String, valor: Long) { llamadas += "marcarLab:$id:$campo:$valor"; rFalla(); labResultados.first { it.getLong("id") == id }.put(campo, valor.toInt()) }
-    override fun borrarResultadosLab(bot: Long): Long { llamadas += "borrarLab"; rFalla(); val n = labResultados.size; labResultados.clear(); return n.toLong() }
-    override fun usarLimiteMedido(bot: Long): Long {
-        llamadas += "usarLimiteLab"; rFalla()
-        val n = labLimite()
-        if (n < 2) throw IllegalStateException("todavía no marcaste ninguna encuesta como «visible»")
-        labAj["lab_enc_max_opc"] = n.toString()
-        return n.toLong()
     }
     // Captura de mensajes (diagnóstico)
     var capActiva = false

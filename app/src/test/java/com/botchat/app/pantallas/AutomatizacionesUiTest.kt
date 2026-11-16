@@ -22,7 +22,6 @@ import com.botchat.app.ui.PantallaChat
 import com.botchat.app.ui.PantallaEnCurso
 import com.botchat.app.ui.PantallaEstadisticasMenu
 import com.botchat.app.ui.PantallaRecorrido
-import com.botchat.app.ui.PantallaSimulador
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -66,7 +65,7 @@ class AutomatizacionesUiTest {
 
     // ---------- lista ----------
 
-    private fun lista(editar: (Long) -> Unit = {}) = regla.setContent { BotChatTema { PantallaAutomatizaciones(bot, {}, editar, {}, {}, {}, {}) } }
+    private fun lista(editar: (Long) -> Unit = {}) = regla.setContent { BotChatTema { PantallaAutomatizaciones(bot, {}, editar, {}, {}, {}) } }
 
     @Test fun lasTarjetasMuestranNombreDisparadorInterruptorYAvisos() {
         motor.autos = Apoyo.arreglo(resumen(1, "Ventas"), resumen(2, "Rota", activo = false, avisos = 2), resumen(3, "Saludo", sistema = true))
@@ -126,9 +125,9 @@ class AutomatizacionesUiTest {
 
     // ---------- editor ----------
 
-    private fun editor(volver: () -> Unit = {}, probar: (Long) -> Unit = {}) {
+    private fun editor(volver: () -> Unit = {}) {
         motor.autoDetalle = detalle(ventas())
-        regla.setContent { BotChatTema { EditorAutomatizacion(bot, 1, volver, probar) } }
+        regla.setContent { BotChatTema { EditorAutomatizacion(bot, 1, volver) } }
     }
 
     @Test fun elEditorMuestraLosPasosConSangriaYLosSueltosAparte() {
@@ -160,7 +159,7 @@ class AutomatizacionesUiTest {
         regla.esperaEtiqueta("guardar_auto")
         regla.onNodeWithTag("guardar_auto").performClick()
         regla.espera { motor.llamadas.any { it.startsWith("guardarAuto:1:") && it.contains("El plan básico ahora cuesta 120.") } }
-        regla.espera { !hay("guardar_auto") && hay("probar_auto") }
+        regla.espera { !hay("guardar_auto") }
     }
 
     @Test fun agregarOpcionesYPasosNuevosYBorrarPasos() {
@@ -285,7 +284,7 @@ class AutomatizacionesUiTest {
         assertFalse("estos botones nunca mandan mensajes", llamo("enviar:") || llamo("medio:"))
     }
 
-    // ---------- estadísticas y simulador ----------
+    // ---------- estadísticas ----------
 
     @Test fun lasEstadisticasDelMenuMuestranContadoresBarrasYPruebas() {
         motor.estMenu = """{"iniciados":10,"completados":6,"abandonados":3,"humano":1,"expirados":2,
@@ -299,8 +298,7 @@ class AutomatizacionesUiTest {
         regla.onNodeWithText("Dónde más se equivocan").assertIsDisplayed()
         regla.onNodeWithText("¿Qué buscas? → 1 (Precios)").assertIsDisplayed()
         assertTrue(llamo("estMenu:false"))
-        regla.onNodeWithTag("incluir_pruebas").performClick()
-        regla.espera { llamo("estMenu:true") }
+        assertFalse("ya no hay interruptor de pruebas", hay("incluir_pruebas"))
         regla.onNodeWithTag("rango_7 días").performClick()
         regla.onNodeWithTag("rango_Todo").performClick()
     }
@@ -308,23 +306,6 @@ class AutomatizacionesUiTest {
     @Test fun sinDatosLasEstadisticasLoDicen() {
         regla.setContent { BotChatTema { PantallaEstadisticasMenu(bot, 1, "Ventas", {}) } }
         regla.esperaTexto("Sin datos todavía")
-    }
-
-    @Test fun elSimuladorMuestraLasRespuestasYAvisaQueNoSeEnviaNada() {
-        motor.simulacion = mutableListOf("¡Hola María! ¿Qué buscas?")
-        regla.setContent { BotChatTema { PantallaSimulador(bot, 1, "Ventas", {}) } }
-        regla.esperaTexto("Modo prueba · no se envía nada")
-        regla.onNodeWithTag("campo_simulador").performTextInput("quiero ventas")
-        regla.onNodeWithTag("enviar_simulador").performClick()
-        regla.esperaTexto("¡Hola María! ¿Qué buscas?")
-        regla.onNodeWithText("quiero ventas").assertIsDisplayed()
-        regla.esperaEtiqueta("nota_simulador")
-        regla.onNodeWithText("Este mensaje sí activaría esta automatización.").assertIsDisplayed()
-        assertTrue(llamo("simular:quiero ventas:true"))
-        assertFalse(llamo("enviar:"))
-        regla.onNodeWithTag("campo_simulador").performTextInput("1")
-        regla.onNodeWithTag("enviar_simulador").performClick()
-        regla.espera { llamo("simular:1:false") }
     }
 
     // ---------- etiqueta en el chat ----------

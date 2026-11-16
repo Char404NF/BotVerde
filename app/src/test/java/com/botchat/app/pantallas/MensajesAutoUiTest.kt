@@ -284,28 +284,6 @@ class MensajesAutoUiTest {
         assertEquals(0, regla.onAllNodesWithTextSafe("𝐇𝐨𝐥𝐚", substring = true))
     }
 
-    @Test fun probarMuestraLaConversacionYElMotivoSiNoSeMandaria() {
-        editor(tipo = "recibido")
-        regla.esperaEtiqueta("auto_texto")
-        nodo("auto_texto").performTextInput("Hola {nombre}, recibí tu mensaje")
-        nodo("probar_auto").performScrollTo().performClick()
-        regla.esperaEtiqueta("panel_probar_auto")
-        regla.esperaTexto("Modo prueba · no se envía nada")
-        nodo("probar_nombre").performScrollTo().performTextClearance()
-        nodo("probar_nombre").performTextInput("Luz")
-        nodo("probar_enviar").performScrollTo().performClick()
-        regla.esperaEtiqueta("probar_conversacion")
-        regla.esperaTexto("Hola Luz, recibí tu mensaje")
-        regla.esperaTexto("Hola") // el mensaje falso del cliente
-        assertEquals("el escenario viaja a Go", "Luz", JSONObject(motor.ultimaPrueba!!.second).getString("nombre"))
-        // en un grupo (el mensaje es solo para privados): no se mandaría
-        nodo("probar_grupo").performScrollTo().performClick()
-        nodo("probar_enviar").performScrollTo().performClick()
-        regla.esperaEtiqueta("probar_no_aplica")
-        regla.esperaTexto("El bot no mandaría este mensaje", substring = true)
-        assertTrue("la prueba nunca guarda ni manda nada", motor.llamadas.none { it.startsWith("guardarAuto") || it.startsWith("enviarTexto") })
-    }
-
     @Test fun grabarUnaNotaDeVozLaSubeYSePuedeQuitar() {
         shadowOf(Apoyo.ctx() as android.app.Application).grantPermissions(android.Manifest.permission.RECORD_AUDIO)
         Grabadores.fabrica = { GrabadorDeMentira(File(Apoyo.ctx().cacheDir, "voz_auto.ogg")) }

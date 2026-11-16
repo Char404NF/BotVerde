@@ -111,7 +111,6 @@ private fun CuerpoEditorAuto(botId: Long, ini: MensajeAuto, plantillas: List<Pla
     var texto by remember(ini) { mutableStateOf(TextFieldValue(ini.texto, TextRange(ini.texto.length))) }
     var guardando by remember { mutableStateOf(false) }
     var avanzado by remember { mutableStateOf(false) }
-    var probando by remember { mutableStateOf(false) }
     val esAtajo = m.tipo == TipoAuto.ATAJO
     fun actual() = m.copy(texto = texto.text)
 
@@ -178,12 +177,6 @@ private fun CuerpoEditorAuto(botId: Long, ini: MensajeAuto, plantillas: List<Pla
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            }
-
-            SeccionEst("Probar") {
-                Text("Mira qué pasaría con una persona y un momento de mentira. No se manda nada a WhatsApp.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton({ probando = !probando }, Modifier.testTag("probar_auto")) { Text(if (probando) "Cerrar la prueba" else "Probar") }
-                if (probando) PanelProbarAuto(botId, ::actual, m.tipo)
             }
 
             SeccionEst("Avanzado") {
@@ -353,50 +346,6 @@ private fun SeccionRepeticion(m: MensajeAuto, alCambiar: (MensajeAuto) -> Unit) 
                 }
             }
             if (m.tipo == TipoAuto.RECIBIDO) Text("Así el “ya vi tu mensaje” sale una vez por conversación, no con cada mensaje.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-// ---------- probar ----------
-
-@Composable
-private fun PanelProbarAuto(botId: Long, mensaje: () -> MensajeAuto, tipo: String) {
-    val scope = rememberCoroutineScope()
-    var nombre by remember { mutableStateOf("María") }
-    var grupo by remember { mutableStateOf(false) }
-    var conocida by remember { mutableStateOf(false) }
-    var primera by remember { mutableStateOf(true) }
-    var silencio by remember { mutableStateOf(0) }
-    var cuando by remember { mutableStateOf("") }
-    var resultado by remember { mutableStateOf<PruebaAuto?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
-    Column(verticalArrangement = Arrangement.spacedBy(Esp.s), modifier = Modifier.testTag("panel_probar_auto")) {
-        Text("Modo prueba · no se envía nada", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
-        OutlinedTextField(nombre, { nombre = it.take(30) }, Modifier.fillMaxWidth().testTag("probar_nombre"), label = { Text("Quién escribe (nombre)") }, singleLine = true)
-        Row(verticalAlignment = Alignment.CenterVertically) { Text("Escribe en un grupo", Modifier.weight(1f)); Switch(grupo, { grupo = it }, Modifier.testTag("probar_grupo")) }
-        Row(verticalAlignment = Alignment.CenterVertically) { Text("Es un contacto", Modifier.weight(1f)); Switch(conocida, { conocida = it }, Modifier.testTag("probar_contacto")) }
-        if (tipo == TipoAuto.BIENVENIDA) {
-            Row(verticalAlignment = Alignment.CenterVertically) { Text("Es la primera vez que escribe", Modifier.weight(1f)); Switch(primera, { primera = it }, Modifier.testTag("probar_primera")) }
-            if (!primera) OutlinedTextField(silencio.toString(), { silencio = it.filter(Char::isDigit).take(3).toIntOrNull() ?: 0 }, Modifier.fillMaxWidth().testTag("probar_silencio"), label = { Text("Días que lleva sin escribir") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-        }
-        OutlinedTextField(cuando, { cuando = it.take(16) }, Modifier.fillMaxWidth().testTag("probar_cuando"), label = { Text("Momento (opcional): 2026-12-25T10:30") }, singleLine = true)
-        Button({
-            error = null
-            scope.launch {
-                runCatching { Repo.probarAuto(botId, mensaje(), EscenarioAuto(nombre.ifBlank { "María" }, grupo, conocida, primera || tipo != TipoAuto.BIENVENIDA, silencio, cuando.trim())) }
-                    .onSuccess { resultado = it }.onFailure { resultado = null; error = it.message ?: "No se pudo probar" }
-            }
-        }, Modifier.testTag("probar_enviar")) { Text("Enviar mensaje de prueba") }
-        error?.let { Text(it, Modifier.testTag("probar_error"), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-        resultado?.let { r ->
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.testTag("probar_conversacion")) {
-                Text("Momento de la prueba: ${r.cuando}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                BurbujaDeTexto(false, "Hola")
-                if (r.aplica) {
-                    r.archivos.forEach { a -> BurbujaDeTexto(true, "[" + (when (a.tipo) { "imagen" -> "Foto"; "video" -> "Video"; "audio" -> "Nota de voz"; else -> "Documento" }) + (if (a.nombre.isNotBlank() && a.tipo != "audio") ": ${a.nombre}" else "") + "]") }
-                    if (r.texto.isNotBlank()) BurbujaDeTexto(true, r.texto)
-                } else Text("(El bot no mandaría este mensaje: ${r.motivo})", Modifier.testTag("probar_no_aplica"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
         }
     }
 }

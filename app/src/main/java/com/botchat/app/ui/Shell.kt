@@ -467,7 +467,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 composable("automatizaciones") {
                     PantallaAutomatizaciones(
                         bot.id, alVolver = { nav.popBackStack() }, alEditar = { nav.navigate("automatizacion/$it") }, alEnCurso = { nav.navigate("en_curso") },
-                        alActividad = { nav.navigate("actividad") }, alEstadisticas = { nav.navigate("estadisticas_menu/$it") }, alProbar = { nav.navigate("simulador/$it") },
+                        alActividad = { nav.navigate("actividad") }, alEstadisticas = { nav.navigate("estadisticas_menu/$it") },
                         alFormularios = { nav.navigate("formularios/0") }, alNoEntendio = { nav.navigate("no_entendio/0") }, alAjustesMenus = { nav.navigate("ajustes_menus") },
                         alMensajesAuto = { nav.navigate("mensajes_auto") },
                     )
@@ -489,7 +489,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 composable("mensajes_automaticos_enviados") { PantallaMensajesAutomaticos(bot.id, "", "Mensajes automáticos enviados", alVolver = { nav.popBackStack() }, alAbrirChat = { nav.navigate("chat/${enc(it)}") }) }
                 composable("automatizacion/{id}") { be ->
                     val id = be.arguments?.getString("id")?.toLongOrNull() ?: return@composable
-                    EditorAutomatizacion(bot.id, id, alVolver = { nav.popBackStack() }, alProbar = { nav.navigate("simulador/$it") })
+                    EditorAutomatizacion(bot.id, id, alVolver = { nav.popBackStack() })
                 }
                 composable("en_curso") { PantallaEnCurso(bot.id, alVolver = { nav.popBackStack() }, alAbrir = { nav.navigate("recorrido/$it") }) }
                 composable("recorrido/{id}") { be ->
@@ -514,10 +514,6 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                     PantallaNoEntendio(bot.id, menu, if (menu == 0L) "Lo que no entendió" else "No entendió: " + nombreDeAuto(bot.id, menu), alVolver = { nav.popBackStack() })
                 }
                 composable("ajustes_menus") { PantallaAjustesMenus(bot.id, alVolver = { nav.popBackStack() }) }
-                composable("simulador/{id}") { be ->
-                    val id = be.arguments?.getString("id")?.toLongOrNull() ?: return@composable
-                    PantallaSimulador(bot.id, id, nombreDeAuto(bot.id, id), alVolver = { nav.popBackStack() })
-                }
                 composable("actividad") { PantallaActividad(bot.id, alVolver = { nav.popBackStack() }) }
                 composable("funciones") { PantallaFunciones(ajustes, alVolver = { nav.popBackStack() }) }
                 composable("seguridad") { PantallaSeguridad(ajustes, alVolver = { nav.popBackStack() }) }
@@ -525,14 +521,13 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 composable("avanzado") {
                     PantallaAvanzado(
                         ajustes, bot.nombre, vm.eliminando, alVolver = { nav.popBackStack() },
-                        alAbrirEspacio = { nav.navigate("espacio") }, alMedirRendimiento = { nav.navigate("diagnostico") },
+                        alAbrirEspacio = { nav.navigate("espacio") },
                         alFunciones = { nav.navigate("funciones") }, alActividad = { nav.navigate("actividad") }, alEliminarBot = { vm.eliminar(ctx) },
                         alPermisosAvanzado = { nav.navigate("permisos_avanzado") }, alMenus = { nav.navigate("ajustes_menus") }, botId = bot.id,
                     )
                 }
                 composable("estado_bot") { PantallaBot(vm, conPermiso, alVolver = { nav.popBackStack() }, alAbrirAvanzado = { nav.navigate("avanzado") }, alAbrirAyuda = { nav.navigate("ayuda") }) }
                 composable("ayuda") { AyudaBateria(alVolver = { nav.popBackStack() }) }
-                composable("diagnostico") { PantallaDiagnostico(alVolver = { nav.popBackStack() }, alAbrirChat = { nav.navigate("chat/${enc(it)}") }) }
             }
         }
     }

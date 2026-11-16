@@ -609,107 +609,6 @@ func TestBotonDeMenuReemplazadoNoNavega(t *testing.T) {
 
 // ---------- pruebas de la matriz ----------
 
-func TestPruebasRespetanAvisoDestinoYTopes(t *testing.T) {
-	e := nuevoEntorno(t)
-	c := context.Background()
-	if _, err := e.s.EnviarPrueba(c, "encuesta", 4); err != ErrApagado {
-		t.Fatalf("apagado: %v", err)
-	}
-	e.fija("lab_activo", "1")
-	if _, err := e.s.EnviarPrueba(c, "encuesta", 4); err != ErrSinAviso {
-		t.Fatalf("sin aviso: %v", err)
-	}
-	e.fija("lab_aviso_ts", "1700000000")
-	if _, err := e.s.EnviarPrueba(c, "encuesta", 4); err != ErrSinDestino {
-		t.Fatalf("sin destino: %v", err)
-	}
-	e.fija("lab_prueba_chat", jidVotante)
-	if _, err := e.s.EnviarPrueba(c, "botones", 9999); err != ErrTipo {
-		t.Fatalf("tipo: %v", err)
-	}
-	if _, err := e.s.EnviarPrueba(c, "encuesta", 1); err != ErrTipo {
-		t.Fatalf("una opción: %v", err)
-	}
-	e.fija("lab_prueba_hora", "2")
-	e.fija("lab_version_wa", "2.26.5.1")
-	r, err := e.s.EnviarPrueba(c, "encuesta", 4)
-	if err != nil || r.Enviado != 1 || r.Variante != "4" || r.VersionWA != "2.26.5.1" || r.VersionCliente != "2.3000.test" || r.MsgID == "" {
-		t.Fatalf("prueba: %+v %v", r, err)
-	}
-	if len(e.em.enviados[0].GetPollCreationMessage().GetOptions()) != 4 {
-		t.Fatal("4 opciones")
-	}
-	if _, err := e.s.EnviarPrueba(c, "botones", 3); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := e.s.EnviarPrueba(c, "lista", 10); err != ErrTope {
-		t.Fatalf("tope por hora: %v", err)
-	}
-	e.ahora = e.ahora.Add(61 * time.Minute)
-	e.fija("lab_prueba_dia", "2")
-	if _, err := e.s.EnviarPrueba(c, "lista", 10); err != ErrTope {
-		t.Fatalf("tope por día: %v", err)
-	}
-	// un envío que falla se anota con su error
-	e.fija("lab_prueba_dia", "50")
-	e.em.falla = errors.New("no soportado")
-	r, err = e.s.EnviarPrueba(c, "interactivo", 3)
-	if err == nil || r.Enviado != 0 || r.Error != "no soportado" {
-		t.Fatalf("fallida: %+v %v", r, err)
-	}
-	if e.alm.ContarSesionesLab(1) != 2 {
-		t.Fatalf("la sesión del envío fallido no debe quedar: %d", e.alm.ContarSesionesLab(1))
-	}
-}
-
-func TestVotoEnPruebaMarcaRespondioYNoNavega(t *testing.T) {
-	e := nuevoEntorno(t)
-	e.enciende(ModoTexto)
-	e.fija("lab_prueba_chat", jidVotante)
-	c := context.Background()
-	r, err := e.s.EnviarPrueba(c, "encuesta", 3)
-	if err != nil {
-		t.Fatal(err)
-	}
-	chat, _ := types.ParseJID(jidVotante)
-	x := e.vota(c, e.voto(r.MsgID, []string{"Opción 2"}, chat, chat), resolverFijo(jidVotante, jidVotante))
-	if x == nil || x.Accion != AccionVoto || x.Navega || !x.Prueba {
-		t.Fatalf("voto de prueba: %+v", x)
-	}
-	if l := e.alm.ListarResultadosLab(1, 5); l[0].Respondio != 1 {
-		t.Fatalf("respondió: %+v", l[0])
-	}
-	// un toque en una prueba de botones
-	rb, _ := e.s.EnviarPrueba(c, "botones", 2)
-	resp := &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: chat}, ID: "T"},
-		Message: &waE2E.Message{ButtonsResponseMessage: &waE2E.ButtonsResponseMessage{SelectedButtonID: proto.String("bc|" + rb.MsgID + "|1")}}}
-	if x = e.toca(resp, resolverFijo(jidVotante, jidVotante)); x == nil || x.Navega || !x.Prueba {
-		t.Fatalf("toque de prueba: %+v", x)
-	}
-	if l := e.alm.ListarResultadosLab(1, 5); l[0].Respondio != 1 {
-		t.Fatalf("respondió botón: %+v", l[0])
-	}
-}
-
-func TestPlanYLimiteMedido(t *testing.T) {
-	if len(Plan()) < 10 {
-		t.Fatal("el plan trae las pruebas")
-	}
-	rs := []almacen.ResultadoLab{
-		{Tipo: "encuesta", Variante: "8", Visible: 1, Tocable: 1},
-		{Tipo: "encuesta", Variante: "12", Visible: 1, Tocable: -1},
-		{Tipo: "encuesta", Variante: "13", Visible: 0, Tocable: -1},
-		{Tipo: "encuesta", Variante: "16", Visible: 1, Tocable: 0}, // se ve pero no se toca: no cuenta
-		{Tipo: "botones", Variante: "3", Visible: 1, Tocable: 1},
-	}
-	if LimiteMedido(rs) != 12 {
-		t.Fatalf("límite %d", LimiteMedido(rs))
-	}
-	if LimiteMedido(nil) != 0 {
-		t.Fatal("sin datos")
-	}
-}
-
 func TestNodoBizTieneLaEstructuraDelPR1235(t *testing.T) {
 	ahora := time.Unix(1700000123, 0)
 	n := NodoBiz(ahora, bytes.NewReader(bytes.Repeat([]byte{0xab}, 20)))
@@ -738,63 +637,6 @@ func TestNodoBizTieneLaEstructuraDelPR1235(t *testing.T) {
 	a, b := NodoBiz(ahora, nil), NodoBiz(ahora, nil)
 	if a.GetChildren()[1].Attrs["decision_id"] == b.GetChildren()[1].Attrs["decision_id"] {
 		t.Fatal("decision_id debe ser al azar")
-	}
-}
-
-func TestPruebaBizSoloConInterruptorCasillaYTope(t *testing.T) {
-	e := nuevoEntorno(t)
-	c := context.Background()
-	e.enciende("texto")
-	e.fija("lab_prueba_chat", jidVotante)
-	if len(PlanBiz()) != 2 {
-		t.Fatal("plan biz: 1 y 3 botones")
-	}
-	for _, p := range Plan() {
-		if p.Tipo == almacen.LabInteractivoBiz {
-			t.Fatal("el plan normal no ofrece biz")
-		}
-	}
-	if _, err := e.s.EnviarPrueba(c, almacen.LabInteractivoBiz, 1); err != ErrBizApagado {
-		t.Fatalf("sin interruptor: %v", err)
-	}
-	e.fija("lab_biz_activo", "1")
-	if _, err := e.s.EnviarPrueba(c, almacen.LabInteractivoBiz, 1); err != ErrBizSinAck {
-		t.Fatalf("sin casilla: %v", err)
-	}
-	e.fija("lab_biz_activo", "0")
-	e.fija("lab_biz_ack", "1")
-	if _, err := e.s.EnviarPrueba(c, almacen.LabInteractivoBiz, 1); err != ErrBizApagado {
-		t.Fatalf("casilla sin interruptor: %v", err)
-	}
-	if len(e.em.enviados) != 0 || len(e.em.nodos) != 0 {
-		t.Fatal("no debe enviarse nada")
-	}
-	e.fija("lab_biz_activo", "1")
-	if _, err := e.s.EnviarPrueba(c, almacen.LabInteractivoBiz, 2); err != ErrTipo {
-		t.Fatalf("variante: %v", err)
-	}
-	e.fija("lab_prueba_hora", "1")
-	r, err := e.s.EnviarPrueba(c, almacen.LabInteractivoBiz, 3)
-	if err != nil || r.Enviado != 1 || r.Tipo != "interactivo_biz" {
-		t.Fatalf("envío: %+v %v", r, err)
-	}
-	if len(e.em.nodos) != 1 || len(e.em.nodos[0]) != 1 || e.em.nodos[0][0].Tag != "biz" {
-		t.Fatalf("nodos: %+v", e.em.nodos)
-	}
-	if im := e.em.enviados[0].GetInteractiveMessage(); im == nil || len(im.GetNativeFlowMessage().GetButtons()) != 3 {
-		t.Fatal("3 botones quick_reply")
-	}
-	if _, err := e.s.EnviarPrueba(c, almacen.LabInteractivoBiz, 1); err != ErrTope {
-		t.Fatalf("tope: %v", err)
-	}
-	// el menú real nunca usa biz, aunque el modo sea botones/interactivo
-	e.fija("lab_botones_tipo", "interactivo")
-	e.enciende("botones")
-	e.s.Modo()
-	n := len(e.em.nodos)
-	_, _, _ = e.s.EnviarMenu(c, jidVotante, jidVotante, menu(3), "", "", "")
-	if len(e.em.nodos) != n {
-		t.Fatal("el menú real no añade nodos")
 	}
 }
 
@@ -853,27 +695,6 @@ func TestRespuestaInteractivaToleranteYDeMenuReal(t *testing.T) {
 	e.ahora = e.ahora.Add(time.Second)
 	if x := e.s.Recibir(context.Background(), respInteractiva(chat, r.ID, `{"id":"bc|`+r.ID+`|1"}`, ""), res); x == nil || x.Accion != AccionExpirada || x.Navega || !x.Avisar {
 		t.Fatalf("caducada: %+v", x)
-	}
-}
-
-func TestRespuestaInteractivaDePruebaMarcaRespondio(t *testing.T) {
-	e := nuevoEntorno(t)
-	e.enciende(ModoTexto)
-	e.fija("lab_prueba_chat", jidVotante)
-	e.fija("lab_biz_activo", "1")
-	e.fija("lab_biz_ack", "1")
-	c := context.Background()
-	chat, _ := types.ParseJID(jidVotante)
-	rb, err := e.s.EnviarPrueba(c, "interactivo_biz", 3)
-	if err != nil {
-		t.Fatal(err)
-	}
-	x := e.s.Recibir(c, respInteractiva(chat, rb.MsgID, `{"display_text":"Opción 2"}`, ""), resolverFijo(jidVotante, jidVotante))
-	if x == nil || x.Navega || !x.Prueba {
-		t.Fatalf("toque de prueba: %+v", x)
-	}
-	if l := e.alm.ListarResultadosLab(1, 5); l[0].Respondio != 1 {
-		t.Fatalf("respondió: %+v", l[0])
 	}
 }
 

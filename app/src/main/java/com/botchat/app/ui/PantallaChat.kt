@@ -213,23 +213,6 @@ fun PantallaChat(
     val llegandoAlFinal by remember { derivedStateOf { val u = estadoLista.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0; u >= items.size - 6 } }
     LaunchedEffect(llegandoAlFinal, items.size) { if (llegandoAlFinal) vm.cargarMas() }
     val lejosDelFinal by remember { derivedStateOf { estadoLista.firstVisibleItemIndex > 4 } }
-    // Avanzado → Medir rendimiento → Abrir chat: esta pantalla reporta cuándo se vio el primer contenido y cuándo estuvo todo.
-    if (MedidorChat.mide(jid)) {
-        LaunchedEffect(Unit) {
-            snapshotFlow { estadoLista.layoutInfo.visibleItemsInfo.size }.first { it > 0 }
-            MedidorChat.primerContenido()
-        }
-        LaunchedEffect(vm.diferidoListo) {
-            if (!vm.diferidoListo) return@LaunchedEffect
-            snapshotFlow { estadoLista.layoutInfo.visibleItemsInfo.size }.first { it > 0 }
-            var calmas = 0
-            while (calmas < 3) { kotlinx.coroutines.delay(60); if (MedidorChat.imagenesPendientes() == 0) calmas++ else calmas = 0 }
-            MedidorChat.contenidoCompleto()
-            kotlinx.coroutines.delay(400)
-            alVolver()
-        }
-    }
-
     val elegidos = remember(msgs, seleccion) { msgs?.filter { it.id in seleccion } ?: emptyList() }
     val unico = elegidos.singleOrNull()
     fun limpiarSeleccion() { seleccion = emptySet() }
@@ -782,22 +765,20 @@ private fun MiniaturaMedia(m: Msg, vm: ChatVm, alAbrirVisor: (String) -> Unit) {
     val px = with(densidad) { 280.dp.roundToPx() }.coerceAtMost(720)
     // Primero la miniatura (llega al instante), después la imagen reducida; todo se decodifica fuera del hilo principal.
     LaunchedEffect(m.miniatura) {
-        MedidorChat.empieza()
-        try { miniatura = if (m.miniatura.isEmpty()) null else CacheImagenes.cargar(ctx, Repo.archivo(m.miniatura), 320)?.asImageBitmap() } finally { MedidorChat.termina() }
+        miniatura = if (m.miniatura.isEmpty()) null else CacheImagenes.cargar(ctx, Repo.archivo(m.miniatura), 320)?.asImageBitmap()
     }
     // La imagen más nítida se prepara solo si la burbuja sigue a la vista un instante (en un desplazamiento rápido se cancela)
     // y a lo que cabe en la burbuja, no a tamaño completo; la foto entera se abre en el visor.
     LaunchedEffect(m.ruta, m.descargado) {
         if (!m.descargado) { imagen = null; return@LaunchedEffect }
         kotlinx.coroutines.delay(if (m.miniatura.isNotEmpty()) 140L else 0L)
-        MedidorChat.empieza()
-        try {
+        run {
             imagen = when {
                 // Videos: un cuadro real del video (la miniatura de WhatsApp es diminuta y se ve borrosa al ampliarla).
                 m.categoria == "video" -> PortadaVideo.cargar(ctx, Repo.archivo(m.ruta), px, m.dur * 1000L)?.asImageBitmap()
                 else -> CacheImagenes.cargar(ctx, Repo.archivo(m.ruta), px)?.asImageBitmap()
             }
-        } finally { MedidorChat.termina() }
+        }
     }
     val ruta = if (m.descargado) m.ruta else m.miniatura
     val haptica = rememberHaptica()

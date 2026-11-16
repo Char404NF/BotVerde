@@ -50,22 +50,17 @@ private val RANGOS = listOf("Hoy" to 0L, "7 días" to 6L, "30 días" to 29L, "To
 @Composable
 fun PantallaEstadisticasMenu(botId: Long, menuId: Long, nombre: String, alVolver: () -> Unit, alFormularios: (Long) -> Unit = {}, alNoEntendio: (Long) -> Unit = {}) {
     var rango by remember { mutableStateOf("30 días") }
-    var conPruebas by remember { mutableStateOf(false) }
-    val datos by produceState<EstadMenu?>(null, rango, conPruebas) {
+    val datos by produceState<EstadMenu?>(null, rango) {
         val dias = RANGOS.first { it.first == rango }.second
         val hoy = LocalDate.now()
         val desde = if (dias < 0) "2000-01-01" else hoy.minusDays(dias).toString()
-        value = runCatching { Repo.estadisticasMenu(botId, menuId, desde, hoy.toString(), conPruebas) }.getOrNull()
+        value = runCatching { Repo.estadisticasMenu(botId, menuId, desde, hoy.toString(), false) }.getOrNull()
     }
     Scaffold(topBar = { TopAppBar(navigationIcon = { IconButton(alVolver) { Icon(Ico.Atras, "Volver") } }, title = { Text(nombre.ifBlank { "Estadísticas" }) }) }) { relleno ->
         val d = datos
         Column(Modifier.fillMaxSize().padding(relleno).verticalScroll(rememberScrollState()).padding(Esp.l), verticalArrangement = Arrangement.spacedBy(Esp.m)) {
             Row(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
                 RANGOS.forEach { (t, _) -> FilterChip(rango == t, { rango = t }, label = { Text(t) }, modifier = Modifier.testTag("rango_$t")) }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Incluir pruebas del simulador", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                Switch(conPruebas, { conPruebas = it }, Modifier.testTag("incluir_pruebas"))
             }
             if (d == null) { Box(Modifier.fillMaxWidth().padding(Esp.xl), Alignment.Center) { CircularProgressIndicator() }; return@Column }
             if (d.iniciados == 0L) {

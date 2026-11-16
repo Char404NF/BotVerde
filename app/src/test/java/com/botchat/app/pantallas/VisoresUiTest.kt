@@ -12,7 +12,6 @@ import com.botchat.app.medios.Temporales
 import com.botchat.app.seguridad.FormatoCifrado
 import com.botchat.app.ui.BotChatTema
 import com.botchat.app.ui.PantallaCompartidos
-import com.botchat.app.ui.PantallaDiagnostico
 import com.botchat.app.ui.PantallaDocumento
 import com.botchat.app.ui.PantallaVisor
 import org.junit.Assert.assertEquals
@@ -121,18 +120,4 @@ class VisoresUiTest {
         regla.esperaTexto("Nada por aquí")
     }
 
-    @Test fun medicionDeRendimientoSePuedeAbrir() {
-        regla.setContent { BotChatTema { PantallaDiagnostico(alVolver = {}) } }
-        regla.onNodeWithText("Medir rendimiento").assertIsDisplayed()
-        regla.onNodeWithText("Iniciar pruebas").assertIsDisplayed()
-        regla.onNodeWithText("Copiar resultados").assertIsDisplayed()
-    }
-
-    @Test fun medirAbrirChatEstaYLaOpcionDeCargaAnteriorEstaOculta() {
-        regla.setContent { BotChatTema { PantallaDiagnostico(alVolver = {}) } }
-        regla.onNodeWithTag("medir_abrir_chat").assertIsDisplayed()
-        assertEquals(0, regla.onAllNodesWithTag("comparar_anterior").fetchSemanticsNodes().size)
-        repeat(5) { regla.onNodeWithText("Medir rendimiento").performClick() }
-        regla.espera { regla.onAllNodesWithTag("comparar_anterior").fetchSemanticsNodes().isNotEmpty() }
-    }
 }

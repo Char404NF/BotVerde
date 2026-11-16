@@ -353,16 +353,13 @@ class PermisosUiTest {
         assertEquals("todos", JSONObject(motor.llamadas.first { it.startsWith("politicaGrupo:") }.removePrefix("politicaGrupo:")).getString("modo"))
     }
 
-    @Test fun avanzadoGuardaElPrefijoYPruebaUnComando() {
+    @Test fun avanzadoGuardaElPrefijo() {
         regla.setContent { BotChatTema { PantallaPermisosAvanzado(bot, {}, {}) } }
         regla.esperaEtiqueta("ajuste_prefijo")
         regla.onNodeWithTag("ajuste_prefijo").performTextClearance()
         regla.onNodeWithTag("ajuste_prefijo").performTextInput("#")
         regla.onNodeWithTag("guardar_prefijo").performClick()
         regla.espera { llamo("ajustePerm:prefijo:#") }
-        regla.onNodeWithTag("ejecutar_comando").performScrollTo().performClick()
-        regla.espera { llamo("comando:!ayuda") }
-        regla.esperaTexto("Esto puedes usar", substring = true)
     }
 
     @Test fun avanzadoMuestraElErrorDeUnValorMalo() {
