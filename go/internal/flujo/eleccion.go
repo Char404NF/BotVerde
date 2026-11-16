@@ -131,11 +131,12 @@ var palabrasComando = map[string]string{
 	"cancelar": CmdCancelar, "cancela": CmdCancelar,
 }
 
-// comandoSuelto devuelve el comando que dice el mensaje ("" si no es uno). Vale la palabra sola ("menú", "atrás") y con el prefijo
-// configurable ("!menu"). Solo cuenta si el mensaje es ESA palabra: una frase larga que la contiene no es un comando.
+// comandoSuelto devuelve el comando que dice el mensaje ("" si no es uno). Solo vale CON el símbolo de los comandos («!menu»,
+// «!atrás»): la palabra suelta («menú», «salir», «persona») no activa nada, para que nadie lo dispare por error al conversar. Solo cuenta
+// si el mensaje es ESA palabra: una frase larga que la contiene no es un comando.
 func (m *Motor) comandoSuelto(texto string) string {
 	t := strings.TrimSpace(texto)
-	if t == "" || len([]rune(t)) > 20 {
+	if t == "" || len([]rune(t)) > 20 || !m.conSimbolo(t) {
 		return ""
 	}
 	pref := m.prefijo()

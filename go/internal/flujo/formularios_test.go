@@ -115,7 +115,7 @@ func TestFormularioPasoAPasoConValidacionResumenYCorreccion(t *testing.T) {
 		t.Fatalf("%q", textos(d))
 	}
 	// "atrás" regresa a la pregunta anterior y se puede contestar otra vez
-	if d := e.dice(t, ana, ana, "atrás"); !strings.HasPrefix(textos(d), "(5 de 7) ¿Cuándo naciste?") {
+	if d := e.dice(t, ana, ana, "!atrás"); !strings.HasPrefix(textos(d), "(5 de 7) ¿Cuándo naciste?") {
 		t.Fatalf("%q", textos(d))
 	}
 	e.dice(t, ana, ana, "6/3/1990")
@@ -184,7 +184,7 @@ func TestFormularioCancelarEnCualquierMomentoYReintentosAgotados(t *testing.T) {
 	llenaFicha(t, e)
 	e.dice(t, ana, ana, "Ana")
 	e.dice(t, ana, ana, "40")
-	d := e.dice(t, ana, ana, "cancelar")
+	d := e.dice(t, ana, ana, "!cancelar")
 	if !strings.HasPrefix(textos(d), "Formulario cancelado.") || !strings.Contains(textos(d), "Hola Ana") {
 		t.Fatalf("cancelar vuelve al menú: %q", textos(d))
 	}
@@ -200,7 +200,7 @@ func TestFormularioCancelarEnCualquierMomentoYReintentosAgotados(t *testing.T) {
 	for _, r := range []string{"Ana", "40", "a@b.co", "5512345678", "1/1/2000", "rojo", "no"} {
 		e.dice(t, ana, ana, r)
 	}
-	if d := e.dice(t, ana, ana, "cancelar"); !strings.HasPrefix(textos(d), "Formulario cancelado.") {
+	if d := e.dice(t, ana, ana, "!cancelar"); !strings.HasPrefix(textos(d), "Formulario cancelado.") {
 		t.Fatalf("%q", textos(d))
 	}
 	// tres intentos fallidos seguidos en un campo cancelan el formulario (sin ciclos)
@@ -218,7 +218,7 @@ func TestFormularioCancelarEnCualquierMomentoYReintentosAgotados(t *testing.T) {
 		Disparadores: Disparadores{Comando: ".datos"}, Alcance: Alcance{Privados: true}}
 	e2.crea(t, solo, true)
 	e2.dice(t, ana, ana, ".datos")
-	d = e2.dice(t, ana, ana, "cancelar")
+	d = e2.dice(t, ana, ana, "!cancelar")
 	if textos(d) != "Cancelado. Cuando quieras, escribe *!menu*." || e2.sesion(t, ana, ana) != nil {
 		t.Fatalf("%q", textos(d))
 	}
@@ -262,17 +262,17 @@ func TestFormularioEnLaPracticaConOpcionYOtrosComandos(t *testing.T) {
 	e.crea(t, tienda(), true)
 	llenaFicha(t, e)
 	// "repetir" vuelve a hacer la pregunta
-	if d := e.dice(t, ana, ana, "repetir"); !strings.HasPrefix(textos(d), "(1 de 7) ¿Cómo te llamas?") {
+	if d := e.dice(t, ana, ana, "!repetir"); !strings.HasPrefix(textos(d), "(1 de 7) ¿Cómo te llamas?") {
 		t.Fatalf("%q", textos(d))
 	}
 	// en la primera pregunta, "atrás" regresa al menú de donde venía
-	if d := e.dice(t, ana, ana, "atrás"); !strings.HasPrefix(textos(d), "Hola Ana") {
+	if d := e.dice(t, ana, ana, "!atrás"); !strings.HasPrefix(textos(d), "Hola Ana") {
 		t.Fatalf("%q", textos(d))
 	}
 	e.dice(t, ana, ana, "cotizar")
 	e.dice(t, ana, ana, "Ana")
 	// "menú" a medias descarta lo contestado
-	if d := e.dice(t, ana, ana, "menú"); !strings.HasPrefix(textos(d), "Hola Ana") {
+	if d := e.dice(t, ana, ana, "!menú"); !strings.HasPrefix(textos(d), "Hola Ana") {
 		t.Fatalf("%q", textos(d))
 	}
 	if v := e.alm.Variables(e.sesion(t, ana, ana).ID); len(v) != 0 {
@@ -293,7 +293,7 @@ func TestFormularioEnLaPracticaConOpcionYOtrosComandos(t *testing.T) {
 	// salir también descarta el formulario
 	e.dice(t, ana, ana, "cotizar")
 	e.dice(t, ana, ana, "Ana")
-	if d := e.dice(t, ana, ana, "salir"); !strings.HasPrefix(textos(d), "Listo.") || e.sesion(t, ana, ana) != nil {
+	if d := e.dice(t, ana, ana, "!salir"); !strings.HasPrefix(textos(d), "Listo.") || e.sesion(t, ana, ana) != nil {
 		t.Fatalf("%q", textos(d))
 	}
 }

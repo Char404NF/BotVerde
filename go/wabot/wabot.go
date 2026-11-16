@@ -62,30 +62,32 @@ type estado struct {
 	trabajo chan func()
 	wg      sync.WaitGroup
 
-	ing           *ingesta.Ingesta
-	envio         *envio.Servicio
-	motor         *motor.Motor
-	flujo         *flujo.Motor
-	autoDec       *auto.Decisor // envuelve a flujo: bienvenida, ausencia, recibido y cierre
-	atajos        *auto.Atajos
-	sincronizando atomic.Bool // WhatsApp está entregando mensajes acumulados: no se contestan
-	descargas     *medios.Gestor
-	fotos         *fotos.Gestor
-	grupos        *colaGrupos
-	perm          *permisos.Servicio
-	cmd           *comandos.Despachador
-	pers          *personas.Servicio
-	sil           *silencio.Servicio
-	gru           *grupos.Servicio
-	eapp          *estadoapp.Servicio
-	avs           *avisos.Servicio
-	util          *utilidades.Servicio
-	lab           *lab.Servicio
-	captura       *captura.Servicio
-	mods          *modulos.Gestor
-	admins        *cacheAdmins
-	refresco      *time.Timer
-	refMu         sync.Mutex
+	ing            *ingesta.Ingesta
+	envio          *envio.Servicio
+	motor          *motor.Motor
+	flujo          *flujo.Motor
+	autoDec        *auto.Decisor // envuelve a flujo: bienvenida, ausencia, recibido y cierre
+	atajos         *auto.Atajos
+	sincronizando  atomic.Bool // WhatsApp está entregando mensajes acumulados: no se contestan
+	descargas      *medios.Gestor
+	fotos          *fotos.Gestor
+	grupos         *colaGrupos
+	perm           *permisos.Servicio
+	cmd            *comandos.Despachador
+	pers           *personas.Servicio
+	sil            *silencio.Servicio
+	gru            *grupos.Servicio
+	eapp           *estadoapp.Servicio
+	avs            *avisos.Servicio
+	util           *utilidades.Servicio
+	lab            *lab.Servicio
+	avisosViejos   map[string]time.Time // cuándo se avisó a cada chat que su menú ya no está activo
+	avisosViejosMu sync.Mutex
+	captura        *captura.Servicio
+	mods           *modulos.Gestor
+	admins         *cacheAdmins
+	refresco       *time.Timer
+	refMu          sync.Mutex
 }
 
 var (

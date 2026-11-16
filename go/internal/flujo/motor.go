@@ -363,7 +363,7 @@ func (m *Motor) maxSesiones(def *Def) int {
 // pideMenu: la persona escribió el comando del menú CON el símbolo («!menu») para abrirlo aunque ninguna regla se active. La palabra
 // «menu» suelta no abre nada: así no se activa por error en medio de una conversación normal.
 func (m *Motor) pideMenu(e entrada) bool {
-	return !e.NoTexto && m.conSimbolo(e.Texto) && m.comandoSuelto(e.Texto) == CmdMenu
+	return !e.NoTexto && m.comandoSuelto(e.Texto) == CmdMenu
 }
 
 // conSimbolo dice si el texto empieza con el símbolo de los comandos (el configurado o «!»).

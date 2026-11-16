@@ -105,7 +105,9 @@ type Servicio struct {
 
 	mu         sync.Mutex
 	fallos     int
-	envBotones []time.Time // cuándo salieron los últimos menús con botones o listas (para el tope por hora)
+	envBotones []time.Time            // cuándo salieron los últimos menús con botones o listas (para el tope por hora)
+	toques     map[string][]time.Time // toques recientes por chat (contra ráfagas)
+	usadas     map[string]time.Time   // cuándo se usó cada botón o fila (para no avisar de un doble toque)
 }
 
 // Nuevo crea el Laboratorio.

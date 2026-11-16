@@ -80,7 +80,7 @@ func TestNumeroTextoParcialYAmbiguo(t *testing.T) {
 		if !strings.Contains(textos(d), c.espera) {
 			t.Fatalf("%q debía dar %q y dio %q", c.dicho, c.espera, textos(d))
 		}
-		e.dice(t, ana, ana, "salir")
+		e.dice(t, ana, ana, "!salir")
 	}
 	// ambiguo: varias opciones encajan → pide aclarar, lista las coincidencias, no cuenta como error
 	e.dice(t, ana, ana, ".menu")
@@ -99,7 +99,7 @@ func TestNumeroTextoParcialYAmbiguo(t *testing.T) {
 	if d := e.dice(t, ana, ana, "pr"); !strings.HasPrefix(textos(d), "No entendí") {
 		t.Fatalf("muy corto: %q", textos(d))
 	}
-	if d := e.dice(t, ana, ana, "ubicacion"); !strings.Contains(textos(d), "*persona*") {
+	if d := e.dice(t, ana, ana, "ubicacion"); !strings.Contains(textos(d), "*!persona*") {
 		t.Fatalf("no existe, 2.º error: %q", textos(d))
 	}
 	// con acentos: se entiende sin ellos
@@ -115,14 +115,14 @@ func TestComandosSiempreActivosDentroDeUnMenu(t *testing.T) {
 	e.crea(t, tienda(), true)
 	e.dice(t, ana, ana, ".menu")
 	e.dice(t, ana, ana, "4") // submenú Contacto
-	if d := e.dice(t, ana, ana, "repetir"); !strings.HasPrefix(textos(d), "Contacto\n1. Teléfono") {
+	if d := e.dice(t, ana, ana, "!repetir"); !strings.HasPrefix(textos(d), "Contacto\n1. Teléfono") {
 		t.Fatalf("repetir: %q", textos(d))
 	}
-	if d := e.dice(t, ana, ana, "atrás"); !strings.HasPrefix(textos(d), "Hola Ana") || strings.Contains(textos(d), "0. ") {
+	if d := e.dice(t, ana, ana, "!atrás"); !strings.HasPrefix(textos(d), "Hola Ana") || strings.Contains(textos(d), "0. ") {
 		t.Fatalf("atrás vuelve al menú de antes: %q", textos(d))
 	}
 	e.dice(t, ana, ana, "contacto")
-	if d := e.dice(t, ana, ana, "menú"); !strings.HasPrefix(textos(d), "Hola Ana") {
+	if d := e.dice(t, ana, ana, "!menú"); !strings.HasPrefix(textos(d), "Hola Ana") {
 		t.Fatalf("menú: %q", textos(d))
 	}
 	e.dice(t, ana, ana, "4")
@@ -130,15 +130,15 @@ func TestComandosSiempreActivosDentroDeUnMenu(t *testing.T) {
 		t.Fatalf("con prefijo: %q", textos(d))
 	}
 	e.dice(t, ana, ana, "4")
-	if d := e.dice(t, ana, ana, "inicio"); !strings.HasPrefix(textos(d), "Hola Ana") {
+	if d := e.dice(t, ana, ana, "!inicio"); !strings.HasPrefix(textos(d), "Hola Ana") {
 		t.Fatalf("inicio: %q", textos(d))
 	}
 	// atrás en el menú principal no se sale ni se rompe: muestra el principal
-	if d := e.dice(t, ana, ana, "atras"); !strings.HasPrefix(textos(d), "Hola Ana") {
+	if d := e.dice(t, ana, ana, "!atras"); !strings.HasPrefix(textos(d), "Hola Ana") {
 		t.Fatalf("atrás en el principal: %q", textos(d))
 	}
 	// salir cierra la conversación con el mensaje editable
-	d := e.dice(t, ana, ana, "salir")
+	d := e.dice(t, ana, ana, "!salir")
 	if textos(d) != "Listo. Cuando necesites algo, escribe *!menu*." || e.sesion(t, ana, ana) != nil {
 		t.Fatalf("salir: %q", textos(d))
 	}
@@ -160,7 +160,7 @@ func TestComandosSiempreActivosDentroDeUnMenu(t *testing.T) {
 		t.Fatalf("frase larga: %q", textos(d))
 	}
 	// persona = hablar con una persona
-	d = e.dice(t, ana, ana, "persona")
+	d = e.dice(t, ana, ana, "!persona")
 	if !d.PasarAHumano || len(e.avisos) == 0 || e.avisos[len(e.avisos)-1].tipo != "humano" {
 		t.Fatalf("persona: %+v %+v", d, e.avisos)
 	}
@@ -353,7 +353,7 @@ func TestHablarConPersonaDentroYFueraDeHorarioConservaLosDatos(t *testing.T) {
 	e.dice(t, ana, ana, "5") // formulario
 	e.dice(t, ana, ana, "Ana López")
 	e.dice(t, ana, ana, "31")
-	d := e.dice(t, ana, ana, "persona")
+	d := e.dice(t, ana, ana, "!persona")
 	if !d.PasarAHumano || !strings.Contains(textos(d), "fuera de horario (de lunes a viernes de 09:00 a 18:00)") {
 		t.Fatalf("fuera de horario: %+v %q", d, textos(d))
 	}
@@ -380,7 +380,7 @@ func TestHablarConPersonaDentroYFueraDeHorarioConservaLosDatos(t *testing.T) {
 	e2.crea(t, conHorario(tienda()), true)
 	e2.rel.t = time.Date(2026, 11, 10, 16, 0, 0, 0, time.UTC)
 	e2.dice(t, ana, ana, ".menu")
-	d = e2.dice(t, ana, ana, "persona")
+	d = e2.dice(t, ana, ana, "!persona")
 	if textos(d) != "Gracias. Una persona te atenderá en cuanto pueda." || !d.PasarAHumano {
 		t.Fatalf("dentro de horario: %q", textos(d))
 	}
@@ -389,7 +389,7 @@ func TestHablarConPersonaDentroYFueraDeHorarioConservaLosDatos(t *testing.T) {
 	e3.crea(t, conHorario(tienda()), true)
 	e3.conf(t, "menu_humano_fuera", "Cerrado. Abrimos {horario}.")
 	e3.dice(t, ana, ana, ".menu")
-	if d := e3.dice(t, ana, ana, "persona"); textos(d) != "Cerrado. Abrimos de lunes a viernes de 09:00 a 18:00." {
+	if d := e3.dice(t, ana, ana, "!persona"); textos(d) != "Cerrado. Abrimos de lunes a viernes de 09:00 a 18:00." {
 		t.Fatalf("%q", textos(d))
 	}
 	// el horario general de atención también vale cuando el menú no trae el suyo
@@ -397,7 +397,7 @@ func TestHablarConPersonaDentroYFueraDeHorarioConservaLosDatos(t *testing.T) {
 	e4.crea(t, tienda(), true)
 	e4.conf(t, "menu_horario", `{"dias":[1,2,3,4,5],"desde":"09:00","hasta":"18:00"}`)
 	e4.dice(t, ana, ana, ".menu")
-	if d := e4.dice(t, ana, ana, "persona"); !strings.Contains(textos(d), "fuera de horario (de lunes a viernes de 09:00 a 18:00)") {
+	if d := e4.dice(t, ana, ana, "!persona"); !strings.Contains(textos(d), "fuera de horario (de lunes a viernes de 09:00 a 18:00)") {
 		t.Fatalf("%q", textos(d))
 	}
 }

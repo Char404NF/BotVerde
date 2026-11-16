@@ -118,12 +118,12 @@ func TestArrancaConMencionPrefijoOCitaYNoConCharla(t *testing.T) {
 	if !strings.HasPrefix(textos(d), "Hola Ana") {
 		t.Fatalf("prefijo: %q", textos(d))
 	}
-	e.en(t, msgG{quien: pnBen, texto: "salir"})
+	e.en(t, msgG{quien: pnBen, texto: "!salir"})
 	// mención
 	if d := e.en(t, msgG{quien: pnBen, texto: "tienda", mencion: true}); !strings.HasPrefix(textos(d), "Hola Ana") {
 		t.Fatalf("mención: %q", textos(d))
 	}
-	e.en(t, msgG{quien: pnBen, texto: "salir"})
+	e.en(t, msgG{quien: pnBen, texto: "!salir"})
 	// cita a un mensaje del bot de un menú que terminó: se puede abrir otro con el comando; citar solo no inventa uno
 	d = e.en(t, msgG{quien: pnBen, texto: "!menu"})
 	idBot := e.registra(t, d)
@@ -140,11 +140,11 @@ func TestMensajeSinCitarSoloSeTomaConSesionYOpcionOComandoValido(t *testing.T) {
 		return motor.Mensaje{Chat: grupo, Remitente: e.alm.ResolverPersona(1, quien), RemitenteWA: quien, Texto: texto, EsTexto: true, EsGrupo: true, TS: e.rel.t}
 	}
 	// sin conversación: nada
-	if e.m.AdmiteEnGrupo(msg(pnBen, "3")) || e.m.AdmiteEnGrupo(msg(pnBen, "menú")) {
+	if e.m.AdmiteEnGrupo(msg(pnBen, "3")) || e.m.AdmiteEnGrupo(msg(pnBen, "!menú")) {
 		t.Fatal("sin conversación abierta no se toma nada")
 	}
 	e.en(t, msgG{quien: lidBn, texto: "tienda", mencion: true})
-	for _, ok := range []string{"3", "horario", "hor", "contacto", "menú", "salir", "repetir", "persona", "cancelar"} {
+	for _, ok := range []string{"3", "horario", "hor", "contacto", "!menú", "!salir", "!repetir", "!persona", "!cancelar"} {
 		if !e.m.AdmiteEnGrupo(msg(lidBn, ok)) || !e.m.AdmiteEnGrupo(msg(pnBen, ok)) {
 			t.Fatalf("%q es una opción o comando válido de su conversación", ok)
 		}
@@ -173,11 +173,11 @@ func TestMensajeSinCitarSoloSeTomaConSesionYOpcionOComandoValido(t *testing.T) {
 	if e.m.AdmiteEnGrupo(msg(pnBen, "Ana López")) {
 		t.Fatal("en un formulario, el texto libre sin mención ni cita no se toma")
 	}
-	if !e.m.AdmiteEnGrupo(msg(pnBen, "cancelar")) {
+	if !e.m.AdmiteEnGrupo(msg(pnBen, "!cancelar")) {
 		t.Fatal("cancelar siempre vale")
 	}
 	// y dirigido al bot, un mensaje que cita o menciona puede recibir "no entendí"
-	e.en(t, msgG{quien: pnBen, texto: "cancelar"})
+	e.en(t, msgG{quien: pnBen, texto: "!cancelar"})
 	e.en(t, msgG{quien: pnBen, texto: "!menu"})
 	if d := e.en(t, msgG{quien: pnBen, texto: "blablabla", mencion: true}); !strings.HasPrefix(textos(d), "No entendí") {
 		t.Fatalf("dirigido: %q", textos(d))
@@ -246,7 +246,7 @@ func TestTopeDeSesionesConFilaDeEsperaYTurnoAvisadoUnaVez(t *testing.T) {
 		t.Fatalf("sigue lleno: %+v", df)
 	}
 	// Ben termina → se atiende a Dani, citando su mensaje y mencionándola; Eva sigue esperando
-	e.dice(t, grupo, pnBen, "salir")
+	e.dice(t, grupo, pnBen, "!salir")
 	df := e.m.Diferidas(e.rel.t)
 	if len(df) != 1 || df[0].Chat != grupo || df[0].MencionWA != pnDan || df[0].CitaAutorWA != pnDan || !strings.HasPrefix(textos(df[0].D), "Hola Ana") || df[0].CitaID == "" {
 		t.Fatalf("%+v", df)

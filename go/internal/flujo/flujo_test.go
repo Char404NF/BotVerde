@@ -143,7 +143,7 @@ func TestEscaleraDeErroresPrimeraReconoceSegundaOfreceHumanoTerceraParaYReinicia
 		t.Fatalf("1.ª: reconoce y ofrece las opciones: %q", textos(d))
 	}
 	d = e.dice(t, ana, ana, "xyz")
-	if !strings.Contains(textos(d), "*persona*") || !strings.Contains(textos(d), "1. Precios") {
+	if !strings.Contains(textos(d), "*!persona*") || !strings.Contains(textos(d), "1. Precios") {
 		t.Fatalf("2.ª: ofrece hablar con una persona: %q", textos(d))
 	}
 	d = e.dice(t, ana, ana, "otra cosa")

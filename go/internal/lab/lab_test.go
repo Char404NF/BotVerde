@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -161,6 +162,25 @@ func nuevoEntorno(t *testing.T) *entorno {
 	e := &entorno{t: t, s: s, alm: alm, bot: bot, votan: votan, vmem: vmem, em: em, ahora: time.Now()}
 	s.Ahora = func() time.Time { return e.ahora }
 	return e
+}
+
+// toca avanza el reloj un segundo (dos toques reales nunca llegan en el mismo instante) y recibe el evento.
+func (e *entorno) toca(ev *events.Message, res Resolver) *Entrada {
+	e.ahora = e.ahora.Add(time.Second)
+	return e.s.Recibir(context.Background(), ev, res)
+}
+
+// otra vuelve a tocar un botón de un mensaje que ya se usó (lo reactiva): sirve para probar muchas respuestas distintas sobre el mismo menú.
+func (e *entorno) otra(id string, ev *events.Message, res Resolver) *Entrada {
+	e.alm.MarcarSesionLab(1, id, almacen.LabActiva)
+	e.ahora = e.ahora.Add(time.Second)
+	return e.s.Recibir(context.Background(), ev, res)
+}
+
+// vota avanza el reloj un segundo (dos votos reales nunca llegan en el mismo instante) y recibe el voto.
+func (e *entorno) vota(c context.Context, ev *events.Message, res Resolver) *Entrada {
+	e.ahora = e.ahora.Add(time.Second)
+	return e.s.Recibir(c, ev, res)
 }
 
 func (e *entorno) fija(k, v string) {
@@ -347,40 +367,40 @@ func TestVotoCambioRetiroYDuplicados(t *testing.T) {
 	chat, _ := types.ParseJID(jidVotante)
 	res := resolverFijo(jidVotante, jidVotante)
 
-	r := e.s.Recibir(c, e.voto(id, []string{"Precios"}, chat, chat), res)
+	r := e.vota(c, e.voto(id, []string{"Precios"}, chat, chat), res)
 	if r == nil || r.Accion != AccionVoto || r.Num != 2 || r.Texto != "Precios" || !r.Navega || r.Votante != jidVotante {
 		t.Fatalf("voto: %+v", r)
 	}
 	// el mismo voto llegando otra vez (otro id de mensaje) no hace nada
 	d := e.voto(id, []string{"Precios"}, chat, chat)
 	d.Info.ID = "OTRO"
-	if r = e.s.Recibir(c, d, res); r.Accion != AccionDuplicado || r.Navega {
+	if r = e.toca(d, res); r.Accion != AccionDuplicado || r.Navega {
 		t.Fatalf("duplicado: %+v", r)
 	}
 	// cambia de opinión
-	if r = e.s.Recibir(c, e.voto(id, []string{"Horario"}, chat, chat), res); r.Accion != AccionCambio || r.Num != 1 || !r.Navega {
+	if r = e.vota(c, e.voto(id, []string{"Horario"}, chat, chat), res); r.Accion != AccionCambio || r.Num != 1 || !r.Navega {
 		t.Fatalf("cambio: %+v", r)
 	}
 	// retira el voto
-	if r = e.s.Recibir(c, e.voto(id, nil, chat, chat), res); r.Accion != AccionRetiro || r.Navega {
+	if r = e.vota(c, e.voto(id, nil, chat, chat), res); r.Accion != AccionRetiro || r.Navega {
 		t.Fatalf("retiro: %+v", r)
 	}
 	// retirarlo otra vez es duplicado
 	rr := e.voto(id, nil, chat, chat)
 	rr.Info.ID = "R2"
-	if r = e.s.Recibir(c, rr, res); r.Accion != AccionDuplicado {
+	if r = e.toca(rr, res); r.Accion != AccionDuplicado {
 		t.Fatalf("retiro repetido: %+v", r)
 	}
 	// y votar de nuevo después de retirar cuenta como voto nuevo
-	if r = e.s.Recibir(c, e.voto(id, []string{"Ubicación"}, chat, chat), res); r.Accion != AccionVoto || r.Num != 3 {
+	if r = e.vota(c, e.voto(id, []string{"Ubicación"}, chat, chat), res); r.Accion != AccionVoto || r.Num != 3 {
 		t.Fatalf("voto tras retiro: %+v", r)
 	}
 	// varias opciones en una encuesta de una sola
-	if r = e.s.Recibir(c, e.voto(id, []string{"Horario", "Precios"}, chat, chat), res); r.Accion != AccionVarias || r.Navega {
+	if r = e.vota(c, e.voto(id, []string{"Horario", "Precios"}, chat, chat), res); r.Accion != AccionVarias || r.Navega {
 		t.Fatalf("varias: %+v", r)
 	}
 	// una opción que no es nuestra
-	if r = e.s.Recibir(c, e.voto(id, []string{"Inventada"}, chat, chat), res); r.Accion != AccionSinOpcion || r.Navega {
+	if r = e.vota(c, e.voto(id, []string{"Inventada"}, chat, chat), res); r.Accion != AccionSinOpcion || r.Navega {
 		t.Fatalf("sin opción: %+v", r)
 	}
 }
@@ -399,7 +419,7 @@ func TestVotoPorChatConLIDSeRecuperaConNuestraCopiaDelSecreto(t *testing.T) {
 		t.Fatal("la librería sola no debía poder abrirlo (si puede, el caso LID ya no hace falta)")
 	}
 	// la normalización de identidades lleva el LID al chat canónico (el número)
-	r := e.s.Recibir(c, ev, resolverFijo(jidVotante, jidVotante))
+	r := e.toca(ev, resolverFijo(jidVotante, jidVotante))
 	if r == nil || r.Accion != AccionVoto || r.Num != 2 || !r.Navega {
 		t.Fatalf("voto por LID: %+v", r)
 	}
@@ -438,19 +458,19 @@ func TestVotosViejosExpiradosAjenosYDeOtrosChats(t *testing.T) {
 	if e.alm.ObtenerSesionLab(1, viejo).Estado != almacen.LabReemplazada {
 		t.Fatal("la vieja debía quedar reemplazada")
 	}
-	if r := e.s.Recibir(c, e.voto(viejo, []string{"Horario"}, chat, chat), res); r.Accion != AccionVieja || r.Navega {
+	if r := e.vota(c, e.voto(viejo, []string{"Horario"}, chat, chat), res); r.Accion != AccionVieja || r.Navega {
 		t.Fatalf("vieja: %+v", r)
 	}
-	if r := e.s.Recibir(c, e.voto(nuevo, []string{"Horario"}, chat, chat), res); r.Accion != AccionVoto || !r.Navega {
+	if r := e.vota(c, e.voto(nuevo, []string{"Horario"}, chat, chat), res); r.Accion != AccionVoto || !r.Navega {
 		t.Fatalf("nueva: %+v", r)
 	}
 	// un voto en otro chat (no es de esa conversación)
-	if r := e.s.Recibir(c, e.voto(nuevo, []string{"Precios"}, chat, chat), resolverFijo("otro@s.whatsapp.net", "otro@s.whatsapp.net")); r.Accion != AccionOtroChat || r.Navega {
+	if r := e.vota(c, e.voto(nuevo, []string{"Precios"}, chat, chat), resolverFijo("otro@s.whatsapp.net", "otro@s.whatsapp.net")); r.Accion != AccionOtroChat || r.Navega {
 		t.Fatalf("otro chat: %+v", r)
 	}
 	// caduca
 	e.ahora = e.ahora.Add(3 * time.Hour)
-	if r := e.s.Recibir(c, e.voto(nuevo, []string{"Ubicación"}, chat, chat), res); r.Accion != AccionExpirada || r.Navega {
+	if r := e.vota(c, e.voto(nuevo, []string{"Ubicación"}, chat, chat), res); r.Accion != AccionExpirada || r.Navega {
 		t.Fatalf("expirada: %+v", r)
 	}
 	if e.alm.ObtenerSesionLab(1, nuevo).Estado != almacen.LabExpirada {
@@ -459,12 +479,12 @@ func TestVotosViejosExpiradosAjenosYDeOtrosChats(t *testing.T) {
 	// una encuesta que no es nuestra, y mis propios votos desde otro teléfono
 	otro := e.voto(nuevo, []string{"Horario"}, chat, chat)
 	otro.Message.PollUpdateMessage.PollCreationMessageKey.ID = proto.String("NOESNUESTRA")
-	if r := e.s.Recibir(c, otro, res); r == nil || r.Accion != AccionDesconoce || r.Navega {
+	if r := e.toca(otro, res); r == nil || r.Accion != AccionDesconoce || r.Navega {
 		t.Fatalf("desconocida: %+v", r)
 	}
 	mio := e.voto(nuevo, []string{"Horario"}, chat, chat)
 	mio.Info.IsFromMe = true
-	if e.s.Recibir(c, mio, res) != nil {
+	if e.toca(mio, res) != nil {
 		t.Fatal("lo que yo voto no cuenta")
 	}
 }
@@ -492,11 +512,11 @@ func TestGrupoSoloVotaLaPersonaDelMenu(t *testing.T) {
 	}
 	ev := &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: gj, Sender: vot, IsGroup: true}, ID: "VG"}, Message: m}
 	// otra persona del grupo vota: no cuenta
-	if x := e.s.Recibir(c, ev, resolverFijo(grupo, "otra@s.whatsapp.net")); x.Accion != AccionAjeno || x.Navega {
+	if x := e.toca(ev, resolverFijo(grupo, "otra@s.whatsapp.net")); x.Accion != AccionAjeno || x.Navega {
 		t.Fatalf("ajeno: %+v", x)
 	}
 	// la persona del menú vota: cuenta, con el grupo como chat
-	if x := e.s.Recibir(c, ev, resolverFijo(grupo, jidVotante)); x.Accion != AccionVoto || !x.Navega || x.Num != 2 || x.Votante != jidVotante {
+	if x := e.toca(ev, resolverFijo(grupo, jidVotante)); x.Accion != AccionVoto || !x.Navega || x.Num != 2 || x.Votante != jidVotante {
 		t.Fatalf("voto en grupo: %+v", x)
 	}
 }
@@ -528,7 +548,7 @@ func TestBotonesListasEInteractivoSeArmanYRespondenPorId(t *testing.T) {
 	resp := &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: chat}, ID: "T1"},
 		Message: &waE2E.Message{ButtonsResponseMessage: &waE2E.ButtonsResponseMessage{SelectedButtonID: proto.String("bc|" + r.ID + "|2"),
 			ContextInfo: &waE2E.ContextInfo{StanzaID: proto.String(r.ID)}}}}
-	x := e.s.Recibir(c, resp, res)
+	x := e.toca(resp, res)
 	if x == nil || x.Accion != AccionToque || x.Num != 2 || x.Texto != "Precios" || !x.Navega {
 		t.Fatalf("toque: %+v", x)
 	}
@@ -544,7 +564,7 @@ func TestBotonesListasEInteractivoSeArmanYRespondenPorId(t *testing.T) {
 	resp = &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: chat}, ID: "T2"},
 		Message: &waE2E.Message{ListResponseMessage: &waE2E.ListResponseMessage{SingleSelectReply: &waE2E.ListResponseMessage_SingleSelectReply{SelectedRowID: proto.String("bc|" + r.ID + "|5")},
 			ContextInfo: &waE2E.ContextInfo{StanzaID: proto.String(r.ID)}}}}
-	if x = e.s.Recibir(c, resp, res); x == nil || x.Num != 5 || x.Texto != "Pedidos" || !x.Navega {
+	if x = e.toca(resp, res); x == nil || x.Num != 5 || x.Texto != "Pedidos" || !x.Navega {
 		t.Fatalf("fila: %+v", x)
 	}
 	// más de 10 filas: texto
@@ -564,12 +584,12 @@ func TestBotonesListasEInteractivoSeArmanYRespondenPorId(t *testing.T) {
 		Message: &waE2E.Message{InteractiveResponseMessage: &waE2E.InteractiveResponseMessage{
 			InteractiveResponseMessage: &waE2E.InteractiveResponseMessage_NativeFlowResponseMessage_{NativeFlowResponseMessage: &waE2E.InteractiveResponseMessage_NativeFlowResponseMessage{
 				Name: proto.String("quick_reply"), ParamsJSON: proto.String(`{"id":"bc|` + r.ID + `|2","display_text":"x"}`)}}}}}
-	if x = e.s.Recibir(c, resp, res); x == nil || x.Num != 2 || !x.Navega {
+	if x = e.toca(resp, res); x == nil || x.Num != 2 || !x.Navega {
 		t.Fatalf("quick_reply: %+v", x)
 	}
 	// un botón que no es nuestro no se toca
 	ajeno := &events.Message{Info: resp.Info, Message: &waE2E.Message{ButtonsResponseMessage: &waE2E.ButtonsResponseMessage{SelectedButtonID: proto.String("otro")}}}
-	if e.s.Recibir(c, ajeno, res) != nil {
+	if e.toca(ajeno, res) != nil {
 		t.Fatal("un botón ajeno se deja pasar")
 	}
 }
@@ -583,7 +603,7 @@ func TestBotonDeMenuReemplazadoNoNavega(t *testing.T) {
 	e.s.EnviarMenu(c, jidVotante, jidVotante, menu(3), "", "", "")
 	resp := &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: chat}, ID: "T1"},
 		Message: &waE2E.Message{ButtonsResponseMessage: &waE2E.ButtonsResponseMessage{SelectedButtonID: proto.String("bc|" + r1.ID + "|1")}}}
-	if x := e.s.Recibir(c, resp, resolverFijo(jidVotante, jidVotante)); x == nil || x.Accion != AccionVieja || x.Navega {
+	if x := e.toca(resp, resolverFijo(jidVotante, jidVotante)); x == nil || x.Accion != AccionVieja || x.Navega {
 		t.Fatalf("%+v", x)
 	}
 }
@@ -653,7 +673,7 @@ func TestVotoEnPruebaMarcaRespondioYNoNavega(t *testing.T) {
 		t.Fatal(err)
 	}
 	chat, _ := types.ParseJID(jidVotante)
-	x := e.s.Recibir(c, e.voto(r.MsgID, []string{"Opción 2"}, chat, chat), resolverFijo(jidVotante, jidVotante))
+	x := e.vota(c, e.voto(r.MsgID, []string{"Opción 2"}, chat, chat), resolverFijo(jidVotante, jidVotante))
 	if x == nil || x.Accion != AccionVoto || x.Navega || !x.Prueba {
 		t.Fatalf("voto de prueba: %+v", x)
 	}
@@ -664,7 +684,7 @@ func TestVotoEnPruebaMarcaRespondioYNoNavega(t *testing.T) {
 	rb, _ := e.s.EnviarPrueba(c, "botones", 2)
 	resp := &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: chat}, ID: "T"},
 		Message: &waE2E.Message{ButtonsResponseMessage: &waE2E.ButtonsResponseMessage{SelectedButtonID: proto.String("bc|" + rb.MsgID + "|1")}}}
-	if x = e.s.Recibir(c, resp, resolverFijo(jidVotante, jidVotante)); x == nil || x.Navega || !x.Prueba {
+	if x = e.toca(resp, resolverFijo(jidVotante, jidVotante)); x == nil || x.Navega || !x.Prueba {
 		t.Fatalf("toque de prueba: %+v", x)
 	}
 	if l := e.alm.ListarResultadosLab(1, 5); l[0].Respondio != 1 {
@@ -804,34 +824,35 @@ func TestRespuestaInteractivaToleranteYDeMenuReal(t *testing.T) {
 	r, _, _ := e.s.EnviarMenu(c, jidVotante, jidVotante, menu(3), "", "", "")
 
 	// con ParamsJSON válido (id nuestro)
-	if x := e.s.Recibir(c, respInteractiva(chat, r.ID, `{"id":"bc|`+r.ID+`|3","display_text":"x"}`, ""), res); x == nil || x.Num != 3 || !x.Navega {
+	if x := e.otra(r.ID, respInteractiva(chat, r.ID, `{"id":"bc|`+r.ID+`|3","display_text":"x"}`, ""), res); x == nil || x.Num != 3 || !x.Navega {
 		t.Fatalf("id válido: %+v", x)
 	}
 	// JSON inválido pero con el cuerpo igual al título de la opción 2
-	if x := e.s.Recibir(c, respInteractiva(chat, r.ID, `{no es json`, "Precios"), res); x == nil || x.Num != 2 || !x.Navega {
+	if x := e.otra(r.ID, respInteractiva(chat, r.ID, `{no es json`, "Precios"), res); x == nil || x.Num != 2 || !x.Navega {
 		t.Fatalf("json inválido + cuerpo: %+v", x)
 	}
 	// id numérico simple (como número JSON) y display_text
-	if x := e.s.Recibir(c, respInteractiva(chat, r.ID, `{"id":1}`, ""), res); x == nil || x.Num != 1 || !x.Navega {
+	if x := e.otra(r.ID, respInteractiva(chat, r.ID, `{"id":1}`, ""), res); x == nil || x.Num != 1 || !x.Navega {
 		t.Fatalf("id numérico: %+v", x)
 	}
-	if x := e.s.Recibir(c, respInteractiva(chat, r.ID, `{"display_text":"Precios"}`, ""), res); x == nil || x.Num != 2 {
+	if x := e.otra(r.ID, respInteractiva(chat, r.ID, `{"display_text":"Precios"}`, ""), res); x == nil || x.Num != 2 {
 		t.Fatalf("display_text: %+v", x)
 	}
 	// sin nada identificable: se anota, no navega
-	if x := e.s.Recibir(c, respInteractiva(chat, r.ID, ``, ""), res); x == nil || x.Accion != AccionSinOpcion || x.Navega {
+	if x := e.otra(r.ID, respInteractiva(chat, r.ID, ``, ""), res); x == nil || x.Accion != AccionSinOpcion || x.Navega {
 		t.Fatalf("sin datos: %+v", x)
 	}
 	// sesión ajena (no existe) o sin cita: no es nuestra
-	if x := e.s.Recibir(c, respInteractiva(chat, "AJENA", `{"id":"1"}`, "Precios"), res); x != nil {
+	if x := e.otra(r.ID, respInteractiva(chat, "AJENA", `{"id":"1"}`, "Precios"), res); x != nil {
 		t.Fatalf("ajena: %+v", x)
 	}
-	if x := e.s.Recibir(c, respInteractiva(chat, "", `{}`, "Precios"), res); x != nil {
+	if x := e.otra(r.ID, respInteractiva(chat, "", `{}`, "Precios"), res); x != nil {
 		t.Fatalf("sin cita: %+v", x)
 	}
 	// caducada: se anota y no navega
 	e.alm.MarcarSesionLab(1, r.ID, almacen.LabExpirada)
-	if x := e.s.Recibir(c, respInteractiva(chat, r.ID, `{"id":"bc|`+r.ID+`|1"}`, ""), res); x == nil || x.Accion != AccionExpirada || x.Navega {
+	e.ahora = e.ahora.Add(time.Second)
+	if x := e.s.Recibir(context.Background(), respInteractiva(chat, r.ID, `{"id":"bc|`+r.ID+`|1"}`, ""), res); x == nil || x.Accion != AccionExpirada || x.Navega || !x.Avisar {
 		t.Fatalf("caducada: %+v", x)
 	}
 }
@@ -875,20 +896,20 @@ func TestTemplateButtonReplyYEnvolturasSeAtienden(t *testing.T) {
 	if !EsRespuesta(tpl("x", "y")) {
 		t.Fatal("TemplateButtonReply es una respuesta")
 	}
-	if x := e.s.Recibir(c, ev(tpl("bc|"+r.ID+"|3", "z")), res); x == nil || x.Num != 3 || !x.Navega {
+	if x := e.otra(r.ID, ev(tpl("bc|"+r.ID+"|3", "z")), res); x == nil || x.Num != 3 || !x.Navega {
 		t.Fatalf("id nuestro: %+v", x)
 	}
 	// sin id nuestro: por número simple o por el título
-	if x := e.s.Recibir(c, ev(tpl("1", "")), res); x == nil || x.Num != 1 || !x.Navega {
+	if x := e.otra(r.ID, ev(tpl("1", "")), res); x == nil || x.Num != 1 || !x.Navega {
 		t.Fatalf("número: %+v", x)
 	}
-	if x := e.s.Recibir(c, ev(tpl("", "Precios")), res); x == nil || x.Num != 2 {
+	if x := e.otra(r.ID, ev(tpl("", "Precios")), res); x == nil || x.Num != 2 {
 		t.Fatalf("título: %+v", x)
 	}
 	// dentro de envolturas anidadas (efímero dentro de enviado desde otro dispositivo)
 	env := &waE2E.Message{EphemeralMessage: &waE2E.FutureProofMessage{Message: tpl("bc|"+r.ID+"|2", "")}}
 	env = &waE2E.Message{DeviceSentMessage: &waE2E.DeviceSentMessage{Message: env}}
-	if x := e.s.Recibir(c, ev(env), res); x == nil || x.Num != 2 || !x.Navega {
+	if x := e.otra(r.ID, ev(env), res); x == nil || x.Num != 2 || !x.Navega {
 		t.Fatalf("envuelto: %+v", x)
 	}
 }
@@ -982,7 +1003,7 @@ func TestTopePorHoraDeBotonesYBotonesDeModulos(t *testing.T) {
 			InteractiveResponseMessage: &waE2E.InteractiveResponseMessage_NativeFlowResponseMessage_{NativeFlowResponseMessage: &waE2E.InteractiveResponseMessage_NativeFlowResponseMessage{
 				Name: proto.String("quick_reply"), ParamsJSON: proto.String(`{"id":"` + ses.Opciones[0].ID + `","display_text":"Reclamar premio"}`)}},
 			ContextInfo: &waE2E.ContextInfo{StanzaID: proto.String(ses.ID)}}}}
-	x := e.s.Recibir(c, resp, resolverFijo(jidVotante, jidVotante))
+	x := e.toca(resp, resolverFijo(jidVotante, jidVotante))
 	if x == nil || x.Comando != "!reclamar" || !x.Navega {
 		t.Fatalf("toque de módulo: %+v", x)
 	}
@@ -990,5 +1011,104 @@ func TestTopePorHoraDeBotonesYBotonesDeModulos(t *testing.T) {
 	e.fija("lab_modo_menu", ModoTexto)
 	if ok, _ := e.s.EnviarBotones(c, jidVotante, jidVotante, "x", []BotonCmd{{"A", "!a"}}); ok {
 		t.Fatal("sin el formato Botones no salen botones de módulos")
+	}
+}
+
+// ---------- ráfagas, dobles toques y menús viejos ----------
+
+func TestUnBotonSirveUnaVezYLosDemasDelMismoMensajeNoNavegan(t *testing.T) {
+	e := nuevoEntorno(t)
+	e.fija("lab_modo_menu", ModoBotones)
+	c := context.Background()
+	chat, _ := types.ParseJID(jidVotante)
+	res := resolverFijo(jidVotante, jidVotante)
+	r, _, _ := e.s.EnviarMenu(c, jidVotante, jidVotante, menu(3), "", "", "")
+	toque := func(num int, id string) *events.Message {
+		return &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: chat}, ID: id},
+			Message: &waE2E.Message{ButtonsResponseMessage: &waE2E.ButtonsResponseMessage{SelectedButtonID: proto.String(fmt.Sprintf("bc|%s|%d", r.ID, num)),
+				ContextInfo: &waE2E.ContextInfo{StanzaID: proto.String(r.ID)}}}}
+	}
+	if x := e.toca(toque(1, "T1"), res); x == nil || x.Accion != AccionToque || !x.Navega {
+		t.Fatalf("el primero navega: %+v", x)
+	}
+	// apretar todos los demás botones del mismo mensaje (o el mismo otra vez): nada navega y, siendo un doble toque, no se avisa
+	for i, n := range []int{1, 2, 3, 2} {
+		if x := e.toca(toque(n, fmt.Sprintf("T%d", i+2)), res); x == nil || x.Accion != AccionUsada || x.Navega || x.Avisar {
+			t.Fatalf("toque %d sobre un mensaje ya usado: %+v", n, x)
+		}
+	}
+	// pasado un rato, tocar un botón viejo sí merece un aviso (una vez; el límite lo pone quien manda el aviso)
+	e.ahora = e.ahora.Add(time.Minute)
+	if x := e.s.Recibir(c, toque(2, "T9"), res); x == nil || x.Accion != AccionUsada || x.Navega || !x.Avisar {
+		t.Fatalf("botón viejo: %+v", x)
+	}
+}
+
+func TestRafagaDeToquesDelMismoChatSeIgnora(t *testing.T) {
+	e := nuevoEntorno(t)
+	e.fija("lab_modo_menu", ModoBotones)
+	c := context.Background()
+	chat, _ := types.ParseJID(jidVotante)
+	res := resolverFijo(jidVotante, jidVotante)
+	var ids []string
+	for i := 0; i < 5; i++ { // cinco menús distintos (cada uno reemplaza al anterior) y un toque a cada uno al mismo tiempo
+		r, _, _ := e.s.EnviarMenu(c, jidVotante, jidVotante, menu(3), "", "", "")
+		ids = append(ids, r.ID)
+	}
+	navegan, rapidos := 0, 0
+	for i, id := range ids { // sin avanzar el reloj: todos llegan «a la vez»
+		ev := &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: chat}, ID: fmt.Sprintf("R%d", i)},
+			Message: &waE2E.Message{ButtonsResponseMessage: &waE2E.ButtonsResponseMessage{SelectedButtonID: proto.String("bc|" + id + "|1"),
+				ContextInfo: &waE2E.ContextInfo{StanzaID: proto.String(id)}}}}
+		switch x := e.s.Recibir(c, ev, res); x.Accion {
+		case AccionRapido:
+			rapidos++
+		case AccionToque, AccionVieja:
+			if x.Navega {
+				navegan++
+			}
+		}
+	}
+	if navegan > 1 || rapidos < 3 {
+		t.Fatalf("una ráfaga no debe navegar varias veces: navegan=%d rápidos=%d", navegan, rapidos)
+	}
+	// y no pasan de 20 por minuto aunque vengan despacio
+	llegaron := 0
+	for i := 0; i < 40; i++ {
+		e.ahora = e.ahora.Add(time.Second)
+		r, _, _ := e.s.EnviarMenu(c, jidVotante, jidVotante, menu(3), "", "", "")
+		if r.ID == "" {
+			continue
+		}
+		ev := &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: chat}, ID: fmt.Sprintf("L%d", i)},
+			Message: &waE2E.Message{ButtonsResponseMessage: &waE2E.ButtonsResponseMessage{SelectedButtonID: proto.String("bc|" + r.ID + "|1"),
+				ContextInfo: &waE2E.ContextInfo{StanzaID: proto.String(r.ID)}}}}
+		if x := e.s.Recibir(c, ev, res); x.Navega {
+			llegaron++
+		}
+	}
+	if llegaron > toquesPorMinuto {
+		t.Fatalf("más de %d toques en un minuto: %d", toquesPorMinuto, llegaron)
+	}
+}
+
+func TestToqueSobreMenuReemplazadoYTextoSueltoNoRompenNada(t *testing.T) {
+	e := nuevoEntorno(t)
+	e.fija("lab_modo_menu", ModoBotones)
+	c := context.Background()
+	chat, _ := types.ParseJID(jidVotante)
+	res := resolverFijo(jidVotante, jidVotante)
+	viejo, _, _ := e.s.EnviarMenu(c, jidVotante, jidVotante, menu(3), "", "", "")
+	e.s.EnviarMenu(c, jidVotante, jidVotante, menu(3), "", "", "")
+	ev := &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat, Sender: chat}, ID: "V1"},
+		Message: &waE2E.Message{ButtonsResponseMessage: &waE2E.ButtonsResponseMessage{SelectedButtonID: proto.String("bc|" + viejo.ID + "|2"),
+			ContextInfo: &waE2E.ContextInfo{StanzaID: proto.String(viejo.ID)}}}}
+	if x := e.toca(ev, res); x == nil || x.Accion != AccionVieja || x.Navega || !x.Avisar {
+		t.Fatalf("un menú reemplazado no navega y avisa: %+v", x)
+	}
+	// un toque con un id que no existe, o de una opción que no está: no navega ni revienta
+	ev2 := &events.Message{Info: ev.Info, Message: &waE2E.Message{ButtonsResponseMessage: &waE2E.ButtonsResponseMessage{SelectedButtonID: proto.String("bc|NOEXISTE|1")}}}
+	if x := e.toca(ev2, res); x != nil && x.Navega {
+		t.Fatalf("un id inventado no navega: %+v", x)
 	}
 }

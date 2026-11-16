@@ -208,7 +208,7 @@ private fun PestanaPasos(botId: Long, d: AutoDef, avisos: List<AvisoVal>, sistem
                 }
             }
         }
-        Text("Puedes usar {nombre}, {hora}, {dia}, {fecha}, {horario} y los datos que pidas ({dato1}, {dato2}…), y estilos de WhatsApp (*negrita*, _cursiva_). La gente puede escribir el número o parte del texto de la opción; “menú”, “atrás”, “inicio”, “salir”, “persona” y “repetir” siempre funcionan.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Puedes usar {nombre}, {hora}, {dia}, {fecha}, {horario} y los datos que pidas ({dato1}, {dato2}…), y estilos de WhatsApp (*negrita*, _cursiva_). La gente puede escribir el número o parte del texto de la opción; los comandos “!menu”, “!atras”, “!inicio”, “!salir”, “!persona” y “!repetir” siempre funcionan (siempre con el símbolo, para que nadie los active por error).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         orden.forEach { (p, nivel) -> TarjetaPaso(botId, d, p, nivel, p.id == abierto, { abierto = if (abierto == p.id) null else p.id }, ::cambiaPaso, ::borra, ::agrega, { alCambiar(d.copy(inicio = p.id)) }) }
         if (sueltos.isNotEmpty()) {
             Text("Pasos sueltos (nadie llega a ellos todavía)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.tertiary)

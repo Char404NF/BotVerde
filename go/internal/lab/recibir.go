@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -32,6 +33,8 @@ const (
 	AccionNoDescifra = "no_descifra" // no se pudo abrir el voto
 	AccionDesconoce  = "desconocida" // una encuesta que no es nuestra
 	AccionSinOpcion  = "sin_opcion"  // el voto no coincide con ninguna opción
+	AccionUsada      = "usada"       // ese botón o fila ya se tocó antes: no vuelve a navegar
+	AccionRapido     = "muy_rapido"  // demasiados toques seguidos de ese chat: se ignora
 )
 
 // Entrada es lo que resultó de un voto o un toque. Si Navega es true, quien llama debe pasar Num al menú como si la persona
@@ -46,7 +49,10 @@ type Entrada struct {
 	// menú: se pasa Num.
 	Comando string
 	Navega  bool
-	Prueba  bool // era una prueba de la matriz: ya se anotó "respondió"
+	// Avisar: el toque era de un menú que ya no sirve (viejo, caducado o ya usado hace rato): conviene decirle a la persona, una vez, que
+	// escriba !menu para ver las opciones.
+	Avisar bool
+	Prueba bool // era una prueba de la matriz: ya se anotó "respondió"
 }
 
 // Resolver lleva el origen de un mensaje a su chat y su persona canónicos (número aunque llegue con LID). ok=false si no se conoce.
@@ -124,6 +130,10 @@ func (s *Servicio) recibirVoto(ctx context.Context, evt *events.Message, res Res
 	e := &Entrada{Sesion: ses, Votante: votante, Prueba: ses.Origen == almacen.LabOrigenPrueba}
 	if esGrupo(chat) && persona != ses.Persona && s.aj("grupo_cualquiera") != "1" {
 		e.Accion = AccionAjeno
+		return e
+	}
+	if !e.Prueba && s.tocaDemasiado(chat) {
+		e.Accion = AccionRapido // votos en ráfaga (cambiar de opinión diez veces seguidas) no sobrecargan al bot
 		return e
 	}
 	vote, err := s.descifra(ctx, evt, ses)
@@ -379,11 +389,74 @@ func (s *Servicio) recibirToque(ctx context.Context, evt *events.Message, res Re
 		e.Accion = AccionSinOpcion
 		return e
 	}
+	if !e.Prueba && s.tocaDemasiado(chat) {
+		e.Accion = AccionRapido // una ráfaga de toques no sobrecarga al bot: lo que sobra se ignora
+		return e
+	}
+	if ses.Estado == almacen.LabUsada {
+		e.Accion = AccionUsada
+		e.Avisar = s.usadaHaceMucho(ses.ID)
+		return e
+	}
 	s.cierra(ses, e)
+	if e.Navega {
+		// un botón o una fila sirve UNA vez: el segundo toque (o el de otro botón del mismo mensaje) ya no navega
+		s.Alm.MarcarSesionLab(s.BotID, ses.ID, almacen.LabUsada)
+		s.marcaUsada(ses.ID)
+	}
+	e.Avisar = e.Accion == AccionVieja || e.Accion == AccionExpirada
 	for _, o := range ses.Opciones {
 		if o.Num == num && o.Cmd != "" {
 			e.Comando = o.Cmd
 		}
 	}
 	return e
+}
+
+const (
+	toqueSeparacion = 600 * time.Millisecond // dos toques del mismo chat más juntos que esto: el segundo se ignora
+	toquesPorMinuto = 20                     // más toques que estos en un minuto desde un chat: el resto se ignora
+	usadaReciente   = 10 * time.Second       // un toque repetido dentro de este tiempo es un doble toque: no hace falta avisar
+)
+
+// tocaDemasiado dice si este chat está tocando demasiado rápido o demasiado seguido (y anota el toque si no).
+func (s *Servicio) tocaDemasiado(chat string) bool {
+	ahora := s.ahora()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.toques == nil {
+		s.toques = map[string][]time.Time{}
+	}
+	if len(s.toques) > 500 {
+		s.toques = map[string][]time.Time{} // no crece sin límite
+	}
+	l := s.toques[chat][:0]
+	for _, t := range s.toques[chat] {
+		if ahora.Sub(t) < time.Minute {
+			l = append(l, t)
+		}
+	}
+	if n := len(l); n > 0 && (ahora.Sub(l[n-1]) < toqueSeparacion || n >= toquesPorMinuto) {
+		s.toques[chat] = l
+		return true
+	}
+	s.toques[chat] = append(l, ahora)
+	return false
+}
+
+func (s *Servicio) marcaUsada(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.usadas == nil || len(s.usadas) > 500 {
+		s.usadas = map[string]time.Time{}
+	}
+	s.usadas[id] = s.ahora()
+}
+
+// usadaHaceMucho dice si ese mensaje se usó hace más que un doble toque (o si no se sabe).
+func (s *Servicio) usadaHaceMucho(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, ok := s.usadas[id]
+	return !ok || s.ahora().Sub(t) > usadaReciente
 }

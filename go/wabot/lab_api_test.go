@@ -271,7 +271,9 @@ func TestVotoYToqueLlegaAlMotorComoElNumeroDeLaOpcion(t *testing.T) {
 	}
 	// el mismo voto repetido (otro id) no vuelve a llegar; cambiar a «Horario» sí
 	dup := &events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: anaJ, Sender: anaJ}, ID: "VOTO2", Timestamp: time.Now()}, Message: vm, RawMessage: vm}
+	time.Sleep(700 * time.Millisecond) // dos votos seguidos del mismo chat: el segundo llega unos instantes después
 	s.evento(dup)
+	time.Sleep(700 * time.Millisecond)
 	vm2, _ := votan.BuildPollVote(context.Background(), &types.MessageInfo{MessageSource: types.MessageSource{Chat: yo, Sender: yo}, ID: "POLL1"}, []string{"Horario"})
 	s.evento(&events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: anaJ, Sender: anaJ}, ID: "VOTO3", Timestamp: time.Now()}, Message: vm2, RawMessage: vm2})
 	v = cap.espera(t, 2)
@@ -290,6 +292,7 @@ func TestVotoYToqueLlegaAlMotorComoElNumeroDeLaOpcion(t *testing.T) {
 	_ = a.GuardarSesionLab(1, ses2)
 	tq := &waE2E.Message{ButtonsResponseMessage: &waE2E.ButtonsResponseMessage{SelectedButtonID: proto.String("bc|BTN1|5"), Response: &waE2E.ButtonsResponseMessage_SelectedDisplayText{SelectedDisplayText: "Pedidos"},
 		ContextInfo: &waE2E.ContextInfo{StanzaID: proto.String("BTN1")}}}
+	time.Sleep(700 * time.Millisecond)
 	s.evento(&events.Message{Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: anaJ, Sender: anaJ}, ID: "TOQUE1", Timestamp: time.Now(), PushName: "Ana"}, Message: tq, RawMessage: tq})
 	v = cap.espera(t, 3)
 	if v[2].Texto != "5" || v[2].ID != "TOQUE1" {

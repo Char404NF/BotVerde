@@ -27,6 +27,7 @@ const (
 	LabActiva      = "activa"
 	LabReemplazada = "reemplazada" // salió un menú más nuevo para esa persona
 	LabExpirada    = "expirada"
+	LabUsada       = "usada" // un botón o fila ya se tocó: ese mensaje no vuelve a navegar el menú (evita dobles toques y toques en cadena)
 )
 
 // Orígenes de una sesión.

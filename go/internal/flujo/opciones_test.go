@@ -41,7 +41,7 @@ func TestVisibilidadDeOpcionesPorRangoAmbitoYHorario(t *testing.T) {
 	}
 	// por rango: al rango sin permiso se le oculta "vip" y los números se acomodan; lo oculto no se puede elegir ni escribiendo
 	e.m.c.OpcionVisible = func(sender string, menuID int64, opcionID string) bool { return opcionID != "vip" }
-	e.dice(t, ana, ana, "salir")
+	e.dice(t, ana, ana, "!salir")
 	d = e.dice(t, ana, ana, ".menu")
 	if textos(d) != "Menú\n1. Información\n2. Mis pedidos" {
 		t.Fatalf("sin la de mayoreo: %q", textos(d))
@@ -64,7 +64,7 @@ ok:
 	// por horario: a las 10:30 sí aparece
 	e.m.c.OpcionVisible = nil
 	e.rel.t = time.Date(2026, 11, 10, 16, 30, 0, 0, time.UTC)
-	e.dice(t, ana, ana, "salir")
+	e.dice(t, ana, ana, "!salir")
 	if d := e.dice(t, ana, ana, ".menu"); !strings.Contains(textos(d), "4. Promoción de la mañana") {
 		t.Fatalf("dentro del horario de la opción: %q", textos(d))
 	}
@@ -307,7 +307,7 @@ func TestLoQueNoEntendioSeGuardaCifradoConRetencionYBorrado(t *testing.T) {
 	e.dice(t, ana, ana, ".menu")
 	e.dice(t, ana, ana, "precios")
 	e.dice(t, ana, ana, "hola")
-	e.dice(t, ana, ana, "menú")
+	e.dice(t, ana, ana, "!menú")
 	if e.alm.ContarNoEntendio(1, 1) != 2 {
 		t.Fatalf("solo lo que de verdad no se entendió: %d", e.alm.ContarNoEntendio(1, 1))
 	}
@@ -359,7 +359,7 @@ func TestEstadisticasDeAbandonoPorPasoYPorErrores(t *testing.T) {
 	// sale del submenú
 	e.dice(t, ana, ana, ".menu")
 	e.dice(t, ana, ana, "contacto")
-	e.dice(t, ana, ana, "salir")
+	e.dice(t, ana, ana, "!salir")
 	est, _ := e.alm.EstadisticasMenu(1, 1, "2026-01-01", "2026-12-31", false)
 	c := map[string]int64{}
 	for _, f := range est {

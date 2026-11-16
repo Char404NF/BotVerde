@@ -54,6 +54,9 @@ func (s *estado) alLab(v *events.Message, sincronizando bool) bool {
 	s.avisaCambio("lab")
 	s.log("Menú interactivo: " + e.Accion + ".")
 	if !e.Navega {
+		if e.Avisar && !sincronizando {
+			s.avisaMenuViejo(e.Sesion.Chat)
+		}
 		return true
 	}
 	if sincronizando {
@@ -333,4 +336,29 @@ func UsarLimiteMedido(botID int64) (int, error) {
 	}
 	accionDueno(botID, "lab.limite", "", "n="+strconv.Itoa(n))
 	return n, nil
+}
+
+// avisaMenuViejo le dice a quien tocó un botón de un menú que ya no sirve que escriba !menu. A lo más una vez cada 2 minutos por chat, y
+// nunca a un grupo: así una ráfaga de toques viejos no llena el chat de avisos.
+func (s *estado) avisaMenuViejo(chat string) {
+	if esGrupoChat(chat) || s.envio == nil {
+		return
+	}
+	s.avisosViejosMu.Lock()
+	if s.avisosViejos == nil || len(s.avisosViejos) > 500 {
+		s.avisosViejos = map[string]time.Time{}
+	}
+	if t, ok := s.avisosViejos[chat]; ok && time.Since(t) < 2*time.Minute {
+		s.avisosViejosMu.Unlock()
+		return
+	}
+	s.avisosViejos[chat] = time.Now()
+	s.avisosViejosMu.Unlock()
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
+		defer cancel()
+		_, _ = s.envio.EnviarAuto(ctx, chat, "Ese menú ya no está activo. Escribe *!menu* para ver las opciones.", "", nil)
+	}()
 }

@@ -142,7 +142,7 @@ var ajustesBotDefecto = map[string]string{
 	// Menús ampliados (bloque C). Cada menú puede traer los suyos; estos son los generales.
 	"menu_err_max":       "3", // errores seguidos para que el menú se detenga y reinicie la conversación
 	"menu_txt_n1":        "No entendí esa opción. Estas son las opciones:",
-	"menu_txt_n2":        "Sigo sin entender. Puedes escribir *persona* para hablar con alguien, o elegir una opción:",
+	"menu_txt_n2":        "Sigo sin entender. Puedes escribir *!persona* para hablar con alguien, o elegir una opción:",
 	"menu_txt_n3":        "Parece que no nos estamos entendiendo, así que dejo la conversación aquí. Cuando quieras empezar de nuevo, escribe *!menu*.",
 	"menu_txt_notexto":   "Por ahora solo entiendo mensajes escritos. Escríbeme el número de la opción, por favor.",
 	"menu_txt_ambiguo":   "Encontré varias opciones parecidas. ¿Cuál quieres? Escribe el número:",

@@ -326,7 +326,7 @@ func TestFilaDeEsperaSeAtiendeAlLiberarseUnLugarCitandoSuMensaje(t *testing.T) {
 		t.Fatal("el lugar sigue ocupado")
 	}
 	// Ben se despide → se libera el lugar → a Clara se le responde el mensaje que escribió antes, mencionándola
-	m3 := it.grupoMsg(pnBen, "salir")
+	m3 := it.grupoMsg(pnBen, "!salir")
 	it.m.Entrar(m3)
 	it.espera(t, 3)
 	it.m.ProcesarDiferidas()
