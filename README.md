@@ -18,6 +18,7 @@
   <img alt="Kotlin" src="https://img.shields.io/badge/app-Kotlin%20%2B%20Compose-F59E28?style=flat-square">
   <img alt="Go" src="https://img.shields.io/badge/motor-Go-2EC4CB?style=flat-square">
   <img alt="Local" src="https://img.shields.io/badge/datos-100%25%20en%20el%20tel%C3%A9fono-F59E28?style=flat-square">
+  <img alt="Licencia" src="https://img.shields.io/badge/licencia-GPL--3.0-2EC4CB?style=flat-square">
 </p>
 
 ---
@@ -130,8 +131,14 @@ pruebas_cruzadas/   archivos cifrados que Go y Kotlin deben leer igual
 CLAUDE.md           notas de diseño, formato de cifrado y decisiones
 ```
 
+## Licencia
+
+Bot Chat es software libre bajo la licencia [GNU GPL-3.0](LICENSE). Puedes usarlo, estudiarlo, modificarlo y compartirlo; si distribuyes una versión modificada, debe seguir siendo libre con la misma licencia.
+
+Copyright (C) 2026 Char404NF
+
 ---
 
 <p align="center">
-  <sub>Proyecto independiente, sin relación con WhatsApp ni con Meta. Todos los derechos reservados.</sub>
+  <sub>Proyecto independiente, sin relación con WhatsApp ni con Meta. Software libre bajo GPL-3.0.</sub>
 </p>
