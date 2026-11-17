@@ -67,6 +67,7 @@ func init() {
 		Def{"extras.qr_linea", gExt, "Texto bajo el código QR.", "Escanéalo con la cámara.", nil},
 		Def{"extras.t_buscar", gExt, "Título de !buscar.", "Esto encontré de «{texto}»", []string{"texto"}},
 		Def{"cmd.pie_menu", gGen, "Pie de la lista de comandos (!ayuda).", "Escribe {prefijo}menu para verlo con botones", []string{"prefijo"}},
+		Def{"cmd.pie_menu_grupo", gGen, "Pie de la lista de comandos (!ayuda) cuando se pide en un grupo, donde no hay botones.", "Escribe {prefijo}menu para ver el menú", []string{"prefijo"}},
 		// ---- grupos
 		Def{"grupo.cerrado", gGrup, "Se cierra el grupo (!cerrar).", "Listo: el grupo quedó cerrado, solo los administradores pueden escribir.", nil},
 		Def{"grupo.abierto", gGrup, "Se abre el grupo (!abrir).", "Listo: el grupo quedó abierto, todos pueden escribir.", nil},

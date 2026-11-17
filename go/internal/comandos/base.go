@@ -40,7 +40,7 @@ func cmdAyuda(cx *Contexto) (string, error) {
 	if cx.D.Extra != nil {
 		lineas = append(lineas, cx.D.Extra(cx)...)
 	}
-	return estilo.Tarjeta("🤖", titulo, lineas, cx.D.R("cmd.pie_menu", "prefijo", pref)), nil
+	return estilo.Tarjeta("🤖", titulo, lineas, cx.D.R(map[bool]string{false: "cmd.pie_menu", true: "cmd.pie_menu_grupo"}[cx.EsGrupo], "prefijo", pref)), nil
 }
 
 func textoCaduca(as *almacen.Asignacion, ahora time.Time) string {
