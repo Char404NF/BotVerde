@@ -226,7 +226,7 @@ type Info struct {
 func (g *Gestor) info(m Modulo, conEsquema bool) Info {
 	f := g.fila(m.ID())
 	dh, dd := m.Limites()
-	th, td := g.TopesModulo(m.ID())
+	th, td := g.topesConfigurados(m.ID())
 	x := Info{ID: m.ID(), Nombre: m.Nombre(), Descripcion: m.Descripcion(), Icono: m.Icono(), Riesgo: m.Riesgo(), Iniciativa: m.Iniciativa(),
 		Activo: f.Activo, ConEsquema: len(m.Esquema()) > 0, TopeHora: th, TopeDia: td, DefHora: dh, DefDia: dd, ActivadoTS: f.ActivadoTS}
 	x.Bloqueo = g.bloqueoDe(m)
@@ -462,6 +462,14 @@ func (g *Gestor) FijarTopesModulo(id string, hora, dia int) error {
 
 // TopesModulo son los topes por hora y por día de un módulo: los suyos si los fijó, o los que trae el módulo (0 = sin tope).
 func (g *Gestor) TopesModulo(id string) (hora, dia int) {
+	if g.SinLimites() {
+		return 0, 0
+	}
+	return g.topesConfigurados(id)
+}
+
+// topesConfigurados son los topes del módulo como están guardados (los que se ven en su pantalla), valgan o no.
+func (g *Gestor) topesConfigurados(id string) (hora, dia int) {
 	f := g.fila(id)
 	hora, dia = f.TopeHora, f.TopeDia
 	if m, ok := Obtener(id); ok {
@@ -497,8 +505,15 @@ func (g *Gestor) FijarMaestro(si bool) error {
 	return nil
 }
 
-// TopesGlobales son los topes de iniciativas por hora y por día entre todos los módulos.
+// SinLimites dice si el bot manda cuando quiera: sin topes por hora ni por día, sin pausa nocturna y sin esperas entre mensajes.
+// Viene encendido de fábrica; apagarlo vuelve a valer lo que se fije en Límites.
+func (g *Gestor) SinLimites() bool { return g.Alm.SinLimites(g.BotID) }
+
+// TopesGlobales son los topes de iniciativas por hora y por día entre todos los módulos (0 = sin tope).
 func (g *Gestor) TopesGlobales() (hora, dia int) {
+	if g.SinLimites() {
+		return 0, 0
+	}
 	return g.Alm.AjusteIniInt(g.BotID, "ini_tope_hora"), g.Alm.AjusteIniInt(g.BotID, "ini_tope_dia")
 }
 
@@ -527,7 +542,7 @@ func (g *Gestor) FijarAjuste(clave, valor string) error {
 		if err := num(1, 10000); err != nil {
 			return err
 		}
-	case "ini_noche_on":
+	case "ini_noche_on", "ini_sin_limites":
 		if valor != "0" && valor != "1" {
 			return errors.New("el valor debe ser 0 o 1")
 		}
@@ -605,7 +620,7 @@ func (g *Gestor) zona() *time.Location {
 
 // enPausaNocturna dice si `t` cae dentro de la pausa nocturna y, si es así, cuándo termina.
 func (g *Gestor) enPausaNocturna(t time.Time) (bool, time.Time) {
-	if g.Alm.AjusteIni(g.BotID, "ini_noche_on") != "1" {
+	if g.SinLimites() || g.Alm.AjusteIni(g.BotID, "ini_noche_on") != "1" {
 		return false, time.Time{}
 	}
 	desde, hasta := minutosDe(g.Alm.AjusteIni(g.BotID, "ini_noche_desde")), minutosDe(g.Alm.AjusteIni(g.BotID, "ini_noche_hasta"))

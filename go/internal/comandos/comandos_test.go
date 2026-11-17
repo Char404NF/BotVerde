@@ -39,6 +39,7 @@ func nuevoEntorno(t *testing.T) *entorno {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = alm.Cerrar() })
+	_ = alm.FijarAjusteIni(1, "ini_sin_limites", "0") // estas pruebas miden los límites: se apaga «sin límites»
 	p, err := permisos.Nuevo(alm, 1)
 	if err != nil {
 		t.Fatal(err)

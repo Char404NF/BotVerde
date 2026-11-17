@@ -113,6 +113,7 @@ func nuevo(t *testing.T) *ent {
 	}
 	t.Cleanup(func() { _ = alm.Cerrar() })
 	_ = alm.FijarZona("America/Mexico_City")
+	_ = alm.FijarAjusteIni(1, "ini_sin_limites", "0") // estas pruebas miden los límites: se apaga «sin límites»
 	zona, _ := time.LoadLocation("America/Mexico_City")
 	e := &ent{alm: alm, env: &envFalso{fallaMedio: map[string]bool{}}, conocido: map[string]bool{},
 		rel: &reloj{t: time.Date(2026, 11, 10, 16, 0, 0, 0, time.UTC)}} // martes 10:00 en Ciudad de México

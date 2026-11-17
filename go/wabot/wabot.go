@@ -217,6 +217,7 @@ func (s *estado) armar() {
 		AlHumano: func(chat, aviso string) { s.avisaCambio("humano:" + chat) },
 		// Menús en grupos: tope de mensajes por minuto en un grupo y a qué conversación pertenece cada mensaje del menú que sale.
 		LimiteGrupo: func() int { return alm.AjusteBotInt(s.botID, "grupo_msgs_min") },
+		SinLimite:   func() bool { return alm.SinLimites(s.botID) },
 		// Mensajes automáticos: lo que salió se anota (repetición por persona y registro sin textos); y los "/atajo" que escribo yo.
 		AlAuto: s.autoDec.AlAuto,
 		Atajos: s.atajos,

@@ -308,7 +308,7 @@ class MotorFalso : Motor {
         Apoyo.moduloJson("propio_demo", "Con ventana propia", "Trae su propia ventana.", "reloj", "bajo", iniciativa = false),
     )
     var configModulos = mutableMapOf<String, JSONObject>()
-    var ajustesIni = mutableMapOf("maestro" to "0", "tope_hora" to "10", "tope_dia" to "60", "noche_on" to "1", "noche_desde" to "23:00", "noche_hasta" to "07:00", "retraso_min" to "3", "retraso_max" to "12", "errores" to "5", "espera_max" to "30", "baja_texto" to "Listo.")
+    var ajustesIni = mutableMapOf("maestro" to "0", "sin_limites" to "1", "tope_hora" to "10", "tope_dia" to "60", "noche_on" to "1", "noche_desde" to "23:00", "noche_hasta" to "07:00", "retraso_min" to "3", "retraso_max" to "12", "errores" to "5", "espera_max" to "30", "baja_texto" to "Listo.")
     var noMolestar = "[]"
     var registroIni = "[]"
     var seguro = """{"activo":false,"ts":0,"motivo":"","texto":"","errores":0}"""

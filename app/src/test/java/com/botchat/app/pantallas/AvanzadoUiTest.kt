@@ -33,7 +33,7 @@ class AvanzadoUiTest {
     @Before fun antes() { Apoyo.reinicia(); ajustes = Ajustes.get(Apoyo.ctx()) }
 
     private fun pantalla(eliminar: () -> Unit = {}) =
-        regla.setContent { BotChatTema { PantallaAvanzado(ajustes, "Mi bot", false, {}, {}, eliminar) } }
+        regla.setContent { BotChatTema { PantallaAvanzado(ajustes, "Mi bot", false, {}, eliminar) } }
 
     @Test fun valoresPorDefectoCumplenLoPedido() {
         assertFalse("evitar capturas viene apagado", ajustes.secure.value)
@@ -69,11 +69,10 @@ class AvanzadoUiTest {
         assertEquals(ModoTema.OSCURO, otra.modoTema.value); assertEquals(ModoAnim.REDUCIDAS, otra.animaciones.value)
     }
 
-    @Test fun pausaTrasEscribirYoEs0PorDefectoYVivaEnOpcionesOcultas() {
+    @Test fun pausaTrasEscribirYoEs0PorDefectoYSeVeSinOpcionesOcultas() {
         assertEquals("v0.5.0: el bot no calla por mí", 0, ajustes.pausaBotMin.value)
         pantalla()
-        regla.onNodeWithText("Pausa del bot cuando escribo yo").assertDoesNotExist()
-        regla.onNodeWithTag("sw_ocultas").performScrollTo().performClick()
+        regla.onNodeWithTag("sw_ocultas").assertDoesNotExist()
         regla.onNodeWithText("Pausa del bot cuando escribo yo").performScrollTo().assertIsDisplayed()
         ajustes.fijarPausaBotMin(30)
         Ajustes.reiniciarParaPruebas()
@@ -112,9 +111,11 @@ class AvanzadoUiTest {
         assertTrue(eliminado)
     }
 
-    @Test fun elRegistroNoTraeTextosYYaNoHayMedicion() {
+    @Test fun yaNoHayConsolaDeRegistroNiMedicionNiOpcionesOcultas() {
         pantalla()
-        regla.onNodeWithText("Sin textos de mensajes, nombres ni nombres de archivos. Los números van enmascarados.").performScrollTo().assertIsDisplayed()
+        assertEquals(0, regla.onAllNodesWithText("Copiar registro").fetchSemanticsNodes().size)
+        assertEquals(0, regla.onAllNodesWithText("Sin textos de mensajes, nombres ni nombres de archivos. Los números van enmascarados.").fetchSemanticsNodes().size)
         assertEquals(0, regla.onAllNodesWithText("Medir rendimiento").fetchSemanticsNodes().size)
+        assertEquals(0, regla.onAllNodesWithText("Opciones ocultas").fetchSemanticsNodes().size)
     }
 }

@@ -88,6 +88,9 @@ func TestApiModulosDeExtremoAExtremo(t *testing.T) {
 	}
 	// Ajustes de iniciativa: el maestro nace apagado.
 	aj := decodifica[map[string]string](t, func() (string, error) { return AjustesIniciativa(1) })
+	if aj["sin_limites"] != "1" {
+		t.Fatalf("de fábrica el bot no tiene límites: %v", aj)
+	}
 	if aj["maestro"] != "0" || aj["tope_hora"] != "10" || aj["noche_on"] != "1" || aj["noche_desde"] != "23:00" || aj["noche_hasta"] != "07:00" {
 		t.Fatalf("ajustes: %v", aj)
 	}

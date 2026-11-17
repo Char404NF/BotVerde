@@ -34,6 +34,7 @@ func nuevoEntorno(t *testing.T) *entorno {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = alm.Cerrar() })
+	_ = alm.FijarAjusteIni(1, "ini_sin_limites", "0") // estas pruebas miden los límites: se apaga «sin límites»
 	s, err := Nuevo(alm, 1)
 	if err != nil {
 		t.Fatal(err)
@@ -456,5 +457,17 @@ func TestQuienYaEscribioAntesCuentaComoConocido(t *testing.T) {
 	}
 	if e.s.Compuerta(Entrada{Persona: pnAna, Chat: pnAna}).Pasa {
 		t.Fatal("alguien nuevo es desconocido")
+	}
+}
+
+func TestSinLimitesNoCuentaComandosPorMinuto(t *testing.T) {
+	e := nuevoEntorno(t)
+	if err := e.alm.FijarAjusteIni(1, "ini_sin_limites", "1"); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 100; i++ {
+		if ok, aviso := e.s.Limitar("5215500000001@s.whatsapp.net"); !ok || aviso {
+			t.Fatalf("sin límites no se frena a nadie: intento %d ok=%v aviso=%v", i+1, ok, aviso)
+		}
 	}
 }

@@ -521,8 +521,7 @@ fun Shell(nav: NavHostController, vm: AppVm, ajustes: Ajustes, conPermiso: (() -
                 composable("avanzado") {
                     PantallaAvanzado(
                         ajustes, bot.nombre, vm.eliminando, alVolver = { nav.popBackStack() },
-                        alAbrirEspacio = { nav.navigate("espacio") },
-                        alFunciones = { nav.navigate("funciones") }, alActividad = { nav.navigate("actividad") }, alEliminarBot = { vm.eliminar(ctx) },
+                        alFunciones = { nav.navigate("funciones") }, alEliminarBot = { vm.eliminar(ctx) },
                         alPermisosAvanzado = { nav.navigate("permisos_avanzado") }, alMenus = { nav.navigate("ajustes_menus") }, botId = bot.id,
                     )
                 }

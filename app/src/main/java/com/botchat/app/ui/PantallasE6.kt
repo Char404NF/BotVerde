@@ -250,7 +250,7 @@ fun PantallaCentroBot(
             TituloSeccion("Más herramientas", Modifier.testTag("titulo_mas_herramientas"))
             BotonGrande(Ico.Responder, "Comandos propios", "Tus comandos: !horario, !precios…", "hub_comandos", alComandos)
             BotonGrande(Ico.Agregar, "Módulos", "Extras opcionales, apagados hasta que los enciendas", "hub_modulos", alModulos)
-            BotonGrande(Ico.Reloj, "Límites e iniciativa", "Lo que el bot escribe solo, topes y No molestar", "hub_limites", alLimites)
+            BotonGrande(Ico.Reloj, "Límites e iniciativa", "Sin límites, lo que escribe solo y No molestar", "hub_limites", alLimites)
             BotonGrande(Ico.Estadisticas, "Actividad del bot", "Qué llegó, qué respondió y por qué no", "hub_actividad", alActividad)
         }
     }

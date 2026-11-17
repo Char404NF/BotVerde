@@ -266,6 +266,8 @@ type Config struct {
 	EsAdminGrupo func(chat, persona string) bool
 	// LimiteGrupo son los mensajes del bot por minuto en un mismo grupo (0 o nil = LimiteChat).
 	LimiteGrupo func() int
+	// SinLimite dice si no se aplica ningún límite por minuto (global, por chat ni por grupo); el freno por fallos seguidos sigue. nil = con límites.
+	SinLimite func() bool
 	// AlEnviado se llama con el id del mensaje que acaba de salir cuando pertenece a una conversación de menú (así, en un grupo, se
 	// sabe a qué conversación y de quién es un mensaje del bot que citan).
 	AlEnviado func(chat, id string, ref *RefSesion)
@@ -979,6 +981,9 @@ func (m *Motor) permiso(chat string) error {
 	now := m.c.Ahora()
 	if now.Before(m.frenoHasta) {
 		return ErrFreno
+	}
+	if m.c.SinLimite != nil && m.c.SinLimite() {
+		return nil
 	}
 	corta := func(l []time.Time) []time.Time {
 		i := 0

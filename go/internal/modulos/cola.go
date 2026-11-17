@@ -210,6 +210,9 @@ func (c *Cola) Encolar(i Iniciativa) (string, error) {
 
 // retraso es la espera al azar antes de mandar (entre el mínimo y el máximo, de la iniciativa o los generales).
 func (c *Cola) retraso(i Iniciativa) time.Duration {
+	if c.g.SinLimites() {
+		return 0
+	}
 	mn, mx := i.RetrasoMin, i.RetrasoMax
 	if mn <= 0 && mx <= 0 {
 		mn = time.Duration(c.g.Alm.AjusteIniInt(c.g.BotID, "ini_retraso_min")) * time.Second

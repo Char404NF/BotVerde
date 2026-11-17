@@ -300,6 +300,7 @@ func (a *Almacen) ListarNoMolestar(botID int64) ([]NoMolestarItem, error) {
 // Claves de iniciativa y sus valores por defecto. El maestro nace APAGADO.
 var ajustesIniDefecto = map[string]string{
 	"ini_maestro":     "0",     // interruptor general "Iniciativa propia"
+	"ini_sin_limites": "1",     // 1 = sin topes, sin pausa nocturna y sin esperas: el bot manda cuando quiera; 0 = valen los ajustes de abajo
 	"ini_tope_hora":   "10",    // iniciativas por hora, en total
 	"ini_tope_dia":    "60",    // iniciativas por día, en total
 	"ini_noche_on":    "1",     // pausa nocturna
@@ -312,6 +313,10 @@ var ajustesIniDefecto = map[string]string{
 	"ini_seguro":      "",   // "" = normal; "<ts>|<motivo>" = modo seguro activo
 	"ini_baja_texto":  "Listo, ya no te escribiré por iniciativa propia. Si cambias de idea, escríbeme tú primero.",
 }
+
+// SinLimites dice si el bot está en «sin límites» (de fábrica sí): no se aplican topes por hora ni por día, pausa nocturna, esperas
+// ni límites por minuto. Lo consultan el motor, los comandos, las respuestas automáticas, los stickers y la cola de iniciativa.
+func (a *Almacen) SinLimites(botID int64) bool { return a.AjusteIni(botID, "ini_sin_limites") != "0" }
 
 // ClaveIniValida dice si es un ajuste de iniciativa conocido.
 func ClaveIniValida(clave string) bool { _, ok := ajustesIniDefecto[clave]; return ok }

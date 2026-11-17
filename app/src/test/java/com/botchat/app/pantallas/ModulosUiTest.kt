@@ -160,7 +160,22 @@ class ModulosUiTest {
         assertFalse(hay("reanudar_seguro"))
     }
 
+    @Test fun sinLimitesVieneEncendidoYEscondeLosTopesYLaPausaNocturna() {
+        regla.setContent { BotChatTema { PantallaIniciativa(bot, {}) } }
+        regla.esperaEtiqueta("tarjeta_sin_limites")
+        regla.onNodeWithTag("sin_limites", useUnmergedTree = true).performScrollTo().assertIsOn()
+        regla.onNodeWithText("sin topes por hora ni por día", substring = true, useUnmergedTree = true).assertIsDisplayed()
+        regla.esperaSinEtiqueta("tope_hora")
+        regla.esperaSinEtiqueta("noche_on")
+        // Al apagarlo vuelven los topes y la pausa nocturna guardados.
+        regla.onNodeWithTag("sin_limites", useUnmergedTree = true).performClick()
+        regla.espera { llamo("ajusteIni:sin_limites:0") }
+        regla.esperaEtiqueta("tope_hora")
+        regla.esperaEtiqueta("noche_on")
+    }
+
     @Test fun topesYPausaNocturnaSeGuardanConSuValidacion() {
+        motor.ajustesIni["sin_limites"] = "0"
         regla.setContent { BotChatTema { PantallaIniciativa(bot, {}) } }
         regla.esperaEtiqueta("tope_hora")
         regla.onNodeWithTag("tope_hora", useUnmergedTree = true).performScrollTo().performTextClearance()
@@ -181,6 +196,7 @@ class ModulosUiTest {
     }
 
     @Test fun unTopeRechazadoPorElMotorNoSeQuedaEnSilencio() {
+        motor.ajustesIni["sin_limites"] = "0"
         motor.moduloFalla = "el valor debe estar entre 1 y 1000"
         regla.setContent { BotChatTema { PantallaIniciativa(bot, {}) } }
         regla.esperaEtiqueta("tope_hora")

@@ -2,9 +2,6 @@
 
 package com.botchat.app.ui
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -49,12 +46,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.botchat.app.BotState
 import com.botchat.app.datos.Ajustes
 import android.os.Build
 import androidx.compose.material3.SegmentedButton
@@ -62,22 +55,19 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import kotlin.math.roundToInt
 
-/** Avanzado: aspecto, mantenimiento, registro y eliminar el bot (lo técnico, escondido aquí). */
+/** Avanzado: aspecto, funciones, pausa del bot y eliminar el bot (lo técnico, escondido aquí). */
 @Composable
 fun PantallaAvanzado(
     ajustes: Ajustes,
     nombreBot: String,
     eliminando: Boolean,
     alVolver: () -> Unit,
-    alAbrirEspacio: () -> Unit,
     alEliminarBot: () -> Unit,
     alFunciones: () -> Unit = {},
-    alActividad: () -> Unit = {},
     alPermisosAvanzado: () -> Unit = {},
     alMenus: () -> Unit = {},
     botId: Long = 0,
 ) {
-    val ctx = LocalContext.current
     val barra = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val haptica = rememberHaptica()
     val modoTema by ajustes.modoTema.collectAsState()
@@ -86,8 +76,6 @@ fun PantallaAvanzado(
     val pausa by ajustes.pausaBotMin.collectAsState()
     val estiloLetra by ajustes.estiloLetra.collectAsState()
     val completo by ajustes.modoCompleto.collectAsState()
-    var ocultas by remember { mutableStateOf(false) }
-    val registro by BotState.registro.collectAsState()
     var confirmaEliminar by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -141,7 +129,6 @@ fun PantallaAvanzado(
             }
             Seccion("Funciones") {
                 Fila("Funciones", "Apagar motor, escritura, avisos y más sin reinstalar", Ico.Ajustes) { Button(alFunciones, Modifier.testTag("abrir_funciones")) { Text("Abrir") } }
-                if (completo) Fila("Actividad del bot", "Qué llegó, qué respondió y por qué no", Ico.Estadisticas) { OutlinedButton(alActividad, Modifier.testTag("abrir_actividad")) { Text("Ver") } }
                 if (completo) Fila("Permisos y comandos", "Prefijo, topes, códigos y registro de acciones", Ico.Candado) { OutlinedButton(alPermisosAvanzado, Modifier.testTag("abrir_permisos_avanzado")) { Text("Abrir") } }
                 Fila("Menús", "Escalera de errores, saludos, grupos y lo que no entendió", Ico.Chats) { OutlinedButton(alMenus, Modifier.testTag("abrir_ajustes_menus_avanzado")) { Text("Abrir") } }
                 Fila("Aa Estilo de letra", "Botón para escribir con letras especiales (𝗡𝗲𝗴𝗿𝗶𝘁𝗮, 𝒮𝒸𝓇𝒾𝓅𝓉…). Puede verse distinto en otros teléfonos, no se puede buscar y los lectores de pantalla lo leen mal", Ico.Editar) {
@@ -149,30 +136,11 @@ fun PantallaAvanzado(
                 }
             }
             if (botId != 0L) SeccionMiWhatsApp(botId)
-            Seccion("Opciones ocultas") {
-                Fila("Mostrar opciones ocultas", "Ajustes finos que casi nadie necesita", Ico.Ajustes) { Switch(ocultas, { haptica(Toque.Suave); ocultas = it }, Modifier.testTag("sw_ocultas")) }
-                if (ocultas) {
-                    Deslizador(
-                        "Pausa del bot cuando escribo yo", if (pausa == 0) "Ninguna" else "$pausa min", pausa.toFloat(), 0f..120f, 11,
-                        "Normalmente 0: si contesto yo a un mensaje, el bot solo cancela su respuesta pendiente a ese mensaje y sigue atendiendo al resto. Con un valor mayor, el bot calla en ese chat este tiempo.",
-                    ) { ajustes.fijarPausaBotMin((it / 10f).toInt() * 10) }
-                }
-            }
-            Seccion("Mantenimiento") {
-                Fila("Espacio", "Qué ocupa cada chat y cómo liberarlo", Ico.Espacio) { Button(alAbrirEspacio) { Text("Abrir") } }
-            }
-            Seccion("Registro") {
-                Text("Sin textos de mensajes, nombres ni nombres de archivos. Los números van enmascarados.", Modifier.padding(horizontal = Esp.l), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Surface(Modifier.fillMaxWidth().padding(horizontal = Esp.l, vertical = Esp.s).height(200.dp), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                    val desplazamiento = rememberScrollState()
-                    LaunchedEffect(registro.size) { desplazamiento.scrollTo(desplazamiento.maxValue) }
-                    Text(if (registro.isEmpty()) "Todavía no hay mensajes." else registro.joinToString("\n"), Modifier.verticalScroll(desplazamiento).padding(10.dp), fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 16.sp)
-                }
-                OutlinedButton({
-                    val cm = ctx.getSystemService(ClipboardManager::class.java)
-                    cm.setPrimaryClip(ClipData.newPlainText("registro", BotState.textoRegistro()))
-                    Toast.makeText(ctx, "Registro copiado", Toast.LENGTH_SHORT).show()
-                }, Modifier.fillMaxWidth().padding(horizontal = Esp.l)) { Icon(Ico.Copiar, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Copiar registro") }
+            Seccion("Cuando escribo yo") {
+                Deslizador(
+                    "Pausa del bot cuando escribo yo", if (pausa == 0) "Ninguna" else "$pausa min", pausa.toFloat(), 0f..120f, 11,
+                    "Normalmente 0: si contesto yo a un mensaje, el bot solo cancela su respuesta pendiente a ese mensaje y sigue atendiendo al resto. Con un valor mayor, el bot calla en ese chat este tiempo.",
+                ) { ajustes.fijarPausaBotMin((it / 10f).toInt() * 10) }
             }
             Seccion("Zona delicada") {
                 Button(

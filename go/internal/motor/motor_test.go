@@ -368,6 +368,23 @@ func TestLimitesPorMinutoGlobalYPorChat(t *testing.T) {
 	e.espera(t, func() bool { return len(e.env.lista()) == 7 })
 }
 
+func TestSinLimiteNoCortaPorMinuto(t *testing.T) {
+	e := nuevoEntorno(t, func(c *Config) {
+		c.Repetido = time.Nanosecond
+		c.SinLimite = func() bool { return true }
+	})
+	for c := 0; c < 5; c++ {
+		for i := 0; i < 6; i++ {
+			e.m.Entrar(grupoM(fmt.Sprintf("1203630000000000%02d@g.us", c), fmt.Sprintf("c%d-%d", c, i), "5215500000001@s.whatsapp.net", fmt.Sprintf("hola %d", i)))
+		}
+	}
+	e.espera(t, func() bool { return len(e.env.lista()) >= 30 })
+	e.quieto()
+	if len(e.env.lista()) != 30 || e.motivos()[almacen.MotLimite] != 0 {
+		t.Fatalf("sin límite salen las 30 en un minuto: %d, %v", len(e.env.lista()), e.motivos())
+	}
+}
+
 func TestElLimiteGlobalDe20PorMinuto(t *testing.T) {
 	e := nuevoEntorno(t, func(c *Config) { c.Repetido = time.Nanosecond })
 	for c := 0; c < 5; c++ {

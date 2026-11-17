@@ -103,6 +103,7 @@ func nuevoEnt(t *testing.T) *ent {
 	e.g.Aviso = func(titulo, det string) { e.avisos = append(e.avisos, titulo) }
 	e.g.Cambio = func(ev string) { e.camb = append(e.camb, ev) }
 	e.alm.Cambio = func(ev string) { e.camb = append(e.camb, ev) }
+	e.fija("sin_limites", "0") // estas pruebas miden los límites: se apaga «sin límites»
 	e.retraso(0, 0)
 	return e
 }
@@ -1139,5 +1140,46 @@ func TestTiempoDeEscribirSeAcomodaAlTexto(t *testing.T) {
 	}
 	if enorme > 9*time.Second {
 		t.Errorf("tiene tope: %v", enorme)
+	}
+}
+
+// ---------- sin límites ----------
+
+func TestSinLimitesNoAplicaTopesNiNocheNiEsperas(t *testing.T) {
+	e := nuevoEnt(t)
+	e.enciende()
+	e.fija("tope_hora", "1")
+	e.fija("tope_dia", "1")
+	e.retraso(20, 30)
+	e.hora = time.Date(2026, 11, 10, 23, 30, 0, 0, time.UTC) // dentro de la pausa nocturna
+	e.fija("sin_limites", "1")
+	for i := 0; i < 5; i++ {
+		e.encola(pnAna, "m")
+	}
+	e.corre()
+	if e.env.cuantos() != 5 {
+		t.Fatalf("sin límites salen todos, de noche y sin esperar: salieron %d de 5 (%v)", e.env.cuantos(), e.resultados())
+	}
+	if tiene(e.resultados(), "diferido") || tiene(e.resultados(), "descartado:tope") || tiene(e.resultados(), "descartado:noche") {
+		t.Fatalf("nada debe diferirse ni descartarse: %v", e.resultados())
+	}
+	// Al volver a encender los límites, el tope de 1 por hora vale otra vez.
+	e.fija("sin_limites", "0")
+	if h, d := e.g.TopesGlobales(); h != 1 || d != 1 {
+		t.Fatalf("con límites valen los topes guardados: %d/%d", h, d)
+	}
+}
+
+func TestSinLimitesEstaEncendidoDeFabricaYNoBorraLosTopesGuardados(t *testing.T) {
+	alm, err := almacen.Abrir(t.TempDir(), make([]byte, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = alm.Cerrar() })
+	if !alm.SinLimites(1) {
+		t.Fatal("de fábrica el bot no tiene límites")
+	}
+	if h, d := alm.AjusteIniInt(1, "ini_tope_hora"), alm.AjusteIniInt(1, "ini_tope_dia"); h != 10 || d != 60 {
+		t.Fatalf("los topes guardados siguen ahí por si se vuelven a encender: %d/%d", h, d)
 	}
 }

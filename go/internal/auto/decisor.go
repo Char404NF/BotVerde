@@ -244,7 +244,7 @@ func (d *Decisor) leToca(m almacen.AutoMensaje, cfg Config, e evento, ignorarRep
 // salidasDe arma lo que se manda de un mensaje: el texto con las variables puestas y hasta 3 archivos. Aplica el tope por hora.
 func (d *Decisor) salidasDe(m almacen.AutoMensaje, cfg Config, e evento, probar bool) []motor.Salida {
 	soloTexto := false
-	if tope := d.c.Alm.AjusteBotInt(d.c.BotID, "auto_tope_hora"); tope > 0 && !probar {
+	if tope := d.c.Alm.AjusteBotInt(d.c.BotID, "auto_tope_hora"); tope > 0 && !probar && !d.c.Alm.SinLimites(d.c.BotID) {
 		usados := d.c.Alm.ContarAutoEnvios(d.c.BotID, e.Ahora.Add(-time.Hour))
 		if usados >= tope*3 {
 			// muy por encima del tope: no se manda nada (se anota para que se vea)

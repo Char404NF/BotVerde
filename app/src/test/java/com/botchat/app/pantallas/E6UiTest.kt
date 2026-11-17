@@ -85,12 +85,12 @@ class E6UiTest {
 
     @Test fun enCompletoSeVeTodoYElCambioSeHaceEnAvanzado() {
         val a = Ajustes.get(Apoyo.ctx()); a.aceptarAviso()
-        regla.setContent { BotChatTema { PantallaAvanzado(a, "Mi bot", false, {}, {}, {}) } }
+        regla.setContent { BotChatTema { PantallaAvanzado(a, "Mi bot", false, {}, {}) } }
         regla.esperaEtiqueta("modo_completo")
-        assertFalse(hay("abrir_actividad"))
+        assertFalse(hay("abrir_permisos_avanzado"))
         regla.onNodeWithTag("modo_completo").performClick()
         regla.espera { a.modoCompleto.value }
-        regla.esperaEtiqueta("abrir_actividad")
+        regla.esperaEtiqueta("abrir_permisos_avanzado")
         regla.onNodeWithTag("modo_simple").performClick()
         regla.espera { !a.modoCompleto.value }
         regla.esperaSinTexto("Laboratorio")

@@ -164,7 +164,7 @@ class AutomaticosChatUiTest {
     @Test fun elInterruptorDeEstiloDeLetraEstaEnAvanzadoYApagadoPorDefecto() {
         val a = Ajustes.get(Apoyo.ctx())
         assertFalse(a.estiloLetra.value)
-        regla.setContent { BotChatTema { PantallaAvanzado(a, "Mi bot", false, {}, {}, {}) } }
+        regla.setContent { BotChatTema { PantallaAvanzado(a, "Mi bot", false, {}, {}) } }
         regla.esperaEtiqueta("sw_estilo_letra")
         regla.onNodeWithTag("sw_estilo_letra", useUnmergedTree = true).performScrollTo().performClick()
         regla.espera { a.estiloLetra.value }

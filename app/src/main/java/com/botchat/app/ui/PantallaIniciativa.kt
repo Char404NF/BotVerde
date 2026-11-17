@@ -117,7 +117,7 @@ fun PantallaIniciativa(botId: Long, alVolver: () -> Unit, alRegistro: () -> Unit
                 Row(Modifier.padding(Esp.l), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Iniciativa propia", style = MaterialTheme.typography.titleMedium)
-                        Text(if (maestro) "Encendida: los módulos pueden escribir dentro de sus límites." else "Apagada: nada se envía por iniciativa propia.", Modifier.testTag("maestro_texto"), style = MaterialTheme.typography.bodySmall)
+                        Text(if (maestro) "Encendida: los módulos pueden escribir solos." else "Apagada: nada se envía por iniciativa propia.", Modifier.testTag("maestro_texto"), style = MaterialTheme.typography.bodySmall)
                     }
                     Switch(maestro, { haptica(Toque.Fuerte); scope.launch { runCatching { Repo.fijarIniciativaMaestro(botId, it) }.onFailure { e -> avisaToast(ctx, e.message ?: "No se pudo cambiar", true) }; version++ } }, Modifier.testTag("iniciativa_maestro"))
                 }
@@ -134,10 +134,27 @@ fun PantallaIniciativa(botId: Long, alVolver: () -> Unit, alRegistro: () -> Unit
                     if (seguro.activo) Button({ haptica(Toque.Confirmar); scope.launch { runCatching { Repo.reanudarModoSeguro(botId) }.onFailure { e -> avisaToast(ctx, e.message ?: "No se pudo reanudar", true) }; version++ } }, Modifier.fillMaxWidth().testTag("reanudar_seguro")) { Text("Reanudar") }
                 }
             }
-            // Topes
-            Topes(a, ::fijar)
-            // Pausa nocturna
-            PausaNocturna(a, ::fijar)
+            // Sin límites (de fábrica encendido): sin topes, sin pausa nocturna y sin esperas
+            val sinLimites = a["sin_limites"] != "0"
+            Card(Modifier.fillMaxWidth().testTag("tarjeta_sin_limites"), colors = CardDefaults.cardColors(containerColor = if (sinLimites) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer)) {
+                Row(Modifier.padding(Esp.l), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Sin límites", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            if (sinLimites) "El bot manda cuando quiera: sin topes por hora ni por día, sin pausa nocturna y sin esperas. WhatsApp puede bloquear los números que mandan muchísimo seguido."
+                            else "Valen los topes, las esperas y la pausa nocturna de abajo.",
+                            Modifier.testTag("sin_limites_texto"), style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Switch(sinLimites, { haptica(Toque.Fuerte); fijar("sin_limites", if (it) "1" else "0") {} }, Modifier.testTag("sin_limites"))
+                }
+            }
+            if (!sinLimites) {
+                // Topes
+                Topes(a, ::fijar)
+                // Pausa nocturna
+                PausaNocturna(a, ::fijar)
+            }
             // No molestar
             NoMolestar(lista, alAgregar = { n -> scope.launch { runCatching { Repo.agregarNoMolestar(botId, n) }.onFailure { e -> avisaToast(ctx, e.message ?: "No se pudo agregar", true) }; version++ } },
                 alQuitar = { p -> scope.launch { runCatching { Repo.quitarNoMolestar(botId, p) }.onFailure { e -> avisaToast(ctx, e.message ?: "No se pudo quitar", true) }; version++ } })

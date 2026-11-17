@@ -39,6 +39,9 @@ func (s *Servicio) ahora() time.Time {
 // toma anota un sticker más en la última hora; false si ya se llegó al tope por hora (ajuste `sticker_tope_hora`, 0 = sin tope).
 func (s *Servicio) toma() bool {
 	tope := s.Alm.AjusteBotInt(s.BotID, "sticker_tope_hora")
+	if s.Alm.SinLimites(s.BotID) {
+		tope = 0
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	ahora := s.ahora()

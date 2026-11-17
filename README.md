@@ -33,6 +33,7 @@
 | **Grupos** | Bienvenida con reglas, filtros (enlaces, palabras, repetidos, flood, stickers, audios, reenviados), advertencias, silencios, baneos y horario de cierre. |
 | **Contador de infracciones** | Cada filtro cuenta lo que lleva cada persona, puede cambiar de acción cuando repite y se reinicia cuando quieras. |
 | **Todo editable** | Menús, respuestas, títulos de cada tarjeta, listas de palabras (hasta miles), imágenes del avatar y rangos con permisos. |
+| **Sin límites** | De fábrica el bot manda cuando quiera: sin topes por hora ni por día, sin pausa nocturna y sin esperas. Si prefieres frenarlo, se activan en *Límites e iniciativa*. |
 | **Privado por diseño** | Sin servidores propios. Los mensajes y archivos se guardan cifrados (AES-256-GCM) en el teléfono. |
 
 ## Instalación

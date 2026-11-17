@@ -76,7 +76,7 @@ func (s *Servicio) Prefijo() string {
 // (entonces se le avisa una vez; el resto se ignora sin contestar). El Dueño no tiene límite.
 func (s *Servicio) Limitar(persona string) (ok bool, primerExceso bool) {
 	persona = s.Persona(persona)
-	if persona == almacen.PersonaDueno {
+	if persona == almacen.PersonaDueno || s.Alm.SinLimites(s.BotID) {
 		return true, false
 	}
 	r := s.RolDe(persona)

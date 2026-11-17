@@ -137,7 +137,7 @@ fun PantallaMensajesAuto(botId: Long, alVolver: () -> Unit, alEditar: (Long, Str
                         val topeTxt = tope ?: d.topeHora.toString()
                         OutlinedTextField(topeTxt, { t -> tope = t.filter(Char::isDigit).take(4); if (!tope.isNullOrEmpty()) ajusta("auto_tope_hora", tope!!) }, Modifier.fillMaxWidth().testTag("auto_tope"),
                             label = { Text("Tope de mensajes automáticos por hora (0 = sin tope)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            supportingText = { Text("Esta hora van ${d.usadosHora}. Pasado el tope, los mensajes salen solo con texto, sin archivos; muy por encima del tope ya no sale ninguno.") })
+                            supportingText = { Text("Esta hora van ${d.usadosHora}. Pasado el tope, los mensajes salen solo con texto, sin archivos; muy por encima del tope ya no sale ninguno. Con «Sin límites» encendido (de fábrica) este tope no se aplica.") })
                         Text("Zona horaria: ${if (d.zona.isBlank()) "la del bot (${d.zonaBot})" else d.zona}. Cada mensaje puede traer la suya.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) { Text("Respuestas rápidas (/atajo)"); Text("Si lo apagas, escribir /atajo no hace nada.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
