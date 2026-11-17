@@ -109,21 +109,63 @@ private fun Paso(titulo: String, valor: Int, minimo: Int, maximo: Int, paso: Int
     }
 }
 
+/** Cuántos elementos de una lista se dibujan de una vez (el resto se ve con «Mostrar más» o buscando). */
+private const val POR_PAGINA = 30
+
+/** Separa lo que escribió o pegó la persona en elementos sueltos (por coma, punto y coma o salto de línea), sin repetir ni vacíos. */
+internal fun separaElementos(texto: String, existentes: List<String>): List<String> {
+    val vistos = existentes.map { it.lowercase() }.toMutableSet()
+    val out = mutableListOf<String>()
+    texto.split('\n', ',', ';').map { it.trim() }.filter { it.isNotEmpty() }.forEach { if (vistos.add(it.lowercase())) out += it }
+    return out
+}
+
+/**
+ * Lista editable que aguanta miles de elementos: se pueden pegar varios de golpe (uno por línea o separados por coma), se buscan, se ven por
+ * páginas (los más nuevos primero) y se pueden quitar todos de una vez. Tocar un elemento lo quita.
+ */
 @Composable
 private fun ListaEditable(titulo: String, ayuda: String, items: List<String>, etiqueta: String, alCambiar: (List<String>) -> Unit) {
     var nuevo by remember { mutableStateOf("") }
-    Column(verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
-        Text(titulo, style = MaterialTheme.typography.labelLarge)
-        Text(ayuda, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (items.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.xs), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
-            items.forEach { x -> InputChip(false, { alCambiar(items - x) }, { Text(x) }, modifier = Modifier.testTag("${etiqueta}_item_$x"), trailingIcon = { Icon(Ico.Cerrar, "Quitar $x", Modifier.size(16.dp)) }) }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(nuevo, { nuevo = it }, Modifier.weight(1f).testTag("${etiqueta}_campo"), singleLine = true, label = { Text("Agregar") })
-            Spacer(Modifier.width(Esp.s))
-            Button({ val t = nuevo.trim(); if (t.isNotEmpty()) { alCambiar(items + t); nuevo = "" } }, Modifier.testTag("${etiqueta}_agregar"), enabled = nuevo.isNotBlank()) { Text("Agregar") }
-        }
+    var busca by remember { mutableStateOf("") }
+    var visibles by remember { mutableStateOf(POR_PAGINA) }
+    var confirmando by remember { mutableStateOf(false) }
+    val coincide = remember(items, busca) {
+        val q = busca.trim()
+        if (q.isEmpty()) items.asReversed() else items.asReversed().filter { it.contains(q, ignoreCase = true) }
     }
+    val porAgregar = separaElementos(nuevo, items)
+    Column(verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(titulo, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+            Text(plural(items.size.toLong(), "elemento", "elementos"), Modifier.testTag("${etiqueta}_cuenta"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(ayuda, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(nuevo, { nuevo = it }, Modifier.weight(1f).testTag("${etiqueta}_campo"), singleLine = false, maxLines = 4, label = { Text("Agregar (varias, separadas por coma o línea)") })
+            Spacer(Modifier.width(Esp.s))
+            Button({ if (porAgregar.isNotEmpty()) { alCambiar(items + porAgregar); nuevo = ""; visibles = POR_PAGINA } }, Modifier.testTag("${etiqueta}_agregar"), enabled = porAgregar.isNotEmpty()) {
+                Text(if (porAgregar.size > 1) "Agregar ${porAgregar.size}" else "Agregar")
+            }
+        }
+        if (items.size > 8) OutlinedTextField(busca, { busca = it; visibles = POR_PAGINA }, Modifier.fillMaxWidth().testTag("${etiqueta}_buscar"), singleLine = true, label = { Text("Buscar en la lista") }, leadingIcon = { Icon(Ico.Buscar, null) })
+        if (items.isNotEmpty() && coincide.isEmpty()) Text("Nada coincide con «${busca.trim()}».", Modifier.testTag("${etiqueta}_sin_coincidencias"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (coincide.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.xs), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
+            coincide.take(visibles).forEach { x -> InputChip(false, { alCambiar(items - x) }, { Text(x) }, modifier = Modifier.testTag("${etiqueta}_item_$x"), trailingIcon = { Icon(Ico.Cerrar, "Quitar $x", Modifier.size(16.dp)) }) }
+        }
+        if (coincide.size > visibles) {
+            Text("Mostrando $visibles de ${coincide.size}", Modifier.testTag("${etiqueta}_mostrando"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton({ visibles += POR_PAGINA * 3 }, Modifier.testTag("${etiqueta}_ver_mas")) { Text("Mostrar más") }
+        }
+        if (items.isNotEmpty()) TextButton({ confirmando = true }, Modifier.testTag("${etiqueta}_quitar_todas")) { Text("Quitar todas") }
+    }
+    if (confirmando) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { confirmando = false },
+        title = { Text("¿Quitar las ${items.size}?") },
+        text = { Text("Se vacía «${titulo.lowercase()}». No se puede deshacer, aunque puedes volver a pegarlas.") },
+        confirmButton = { TextButton({ confirmando = false; busca = ""; alCambiar(emptyList()) }, Modifier.testTag("${etiqueta}_confirmar_quitar")) { Text("Quitar todas") } },
+        dismissButton = { TextButton({ confirmando = false }) { Text("Cancelar") } },
+    )
 }
 
 @Composable

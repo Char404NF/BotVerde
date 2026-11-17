@@ -174,7 +174,7 @@ func TestMencionDeLIDMuestraNombreONumeroNoElAvisoDeNoDisponible(t *testing.T) {
 	a := nuevo(t)
 	g := "120363000000000001@g.us"
 	chatBasico(t, a, g, "", "Grupo", true)
-	const lid, pn = "171373624348814@lid", "5215500000002@s.whatsapp.net"
+	const lid, pn = "171373624348814@lid", "5215599990001@s.whatsapp.net"
 	// el LID tiene un «chat» con el aviso guardado como nombre (así lo dejaba la ingesta)
 	chatBasico(t, a, lid, "", "", false) // sin nombre ni número: queda «Número no disponible»
 	if c, _ := a.ObtenerChat(1, lid); c == nil || c.Mostrado != "Número no disponible" {
@@ -185,7 +185,7 @@ func TestMencionDeLIDMuestraNombreONumeroNoElAvisoDeNoDisponible(t *testing.T) {
 	// 1) se conoce su número por el alias: se muestra el número
 	a.AprenderAlias(1, pn, lid)
 	v := a.vista(m, nil)
-	if got := v.Menciones[0].Nombre; got != "+5215500000002" {
+	if got := v.Menciones[0].Nombre; got != "+5215599990001" {
 		t.Fatalf("debía ser su número: %q", got)
 	}
 	// 2) además escribió en el grupo con su nombre: se muestra el nombre
@@ -206,11 +206,11 @@ func TestMencionDeLIDSeResuelvePorLaListaDeMiembros(t *testing.T) {
 	a := nuevo(t)
 	g := "120363000000000002@g.us"
 	chatBasico(t, a, g, "", "Grupo", true)
-	const lid, pn = "171373624348814@lid", "5215500000002@s.whatsapp.net"
+	const lid, pn = "171373624348814@lid", "5215599990001@s.whatsapp.net"
 	_, _ = a.ActualizarMiembros(1, g, []MiembroGrupo{{Persona: pn, JID: lid, Rol: RolGrupoMiembro}}, time.Now())
 	m := msg(g, "1", time.Now().Unix(), "hola")
 	m.Menciones = []string{lid}
-	if got := a.vista(m, nil).Menciones[0].Nombre; got != "+5215500000002" {
+	if got := a.vista(m, nil).Menciones[0].Nombre; got != "+5215599990001" {
 		t.Fatalf("debía ser su número: %q", got)
 	}
 	// y si escribió con su número y nombre (clave canónica), se muestra el nombre
@@ -228,17 +228,17 @@ func TestElAvisoGuardadoComoNombreDelRemitenteNoSeUsaEnMenciones(t *testing.T) {
 	a := nuevo(t)
 	g := "120363000000000003@g.us"
 	chatBasico(t, a, g, "", "Grupo", true)
-	const lid, pn = "171373624348814@lid", "5215500000002@s.whatsapp.net"
+	const lid, pn = "171373624348814@lid", "5215599990001@s.whatsapp.net"
 	_, _ = a.ActualizarMiembros(1, g, []MiembroGrupo{{Persona: pn, JID: lid, Rol: RolGrupoMiembro}}, time.Now())
 	o := msg(g, "1", time.Now().Unix(), "yo")
 	o.RemitenteJID, o.RemitenteNombre = lid, "Número no disponible"
 	_, _ = a.GuardarMensaje(o)
 	m := msg(g, "2", time.Now().Unix(), "hola")
 	m.Menciones = []string{lid}
-	if got := a.vista(m, nil).Menciones[0].Nombre; got != "+5215500000002" {
+	if got := a.vista(m, nil).Menciones[0].Nombre; got != "+5215599990001" {
 		t.Fatalf("no debía usar el aviso como nombre: %q", got)
 	}
-	if got := a.nombreParaMostrar(1, g, lid); got != "+5215500000002" {
+	if got := a.nombreParaMostrar(1, g, lid); got != "+5215599990001" {
 		t.Fatalf("nombreParaMostrar: %q", got)
 	}
 }

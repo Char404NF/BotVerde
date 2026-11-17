@@ -99,7 +99,8 @@ class ModulosUiTest {
             regla.esperaEtiqueta("modulo_interruptor_$id")
             regla.onNodeWithTag("modulo_interruptor_$id", useUnmergedTree = true).performScrollTo().performClick()
             regla.espera { llamo("activarModulo:$id") }
-            regla.onNodeWithTag("modulo_interruptor_$id", useUnmergedTree = true).assertIsOn()
+            // el interruptor se enciende cuando termina de recargarse la lista: se espera en vez de mirar al instante
+            regla.espera { runCatching { regla.onNodeWithTag("modulo_interruptor_$id", useUnmergedTree = true).assertIsOn() }.isSuccess }
         }
         assertFalse(hay("aviso_entiendo"))
     }

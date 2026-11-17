@@ -242,6 +242,47 @@ class GruposUiTest {
         regla.espera { motor.llamadas.any { it.contains("\"palabras\":[\"estafa\"]") } }
     }
 
+    private fun palabrasMuchas(n: Int) {
+        val a = JSONArray(motor.filtrosGrupoJson)
+        for (i in 0 until a.length()) a.getJSONObject(i).takeIf { it.getString("filtro") == "palabras" }?.also { o ->
+            o.put("activo", true)
+            o.getJSONObject("config").put("palabras", JSONArray((0 until n).map { "palabra$it" }))
+        }
+        motor.filtrosGrupoJson = a.toString()
+    }
+
+    @Test fun conMuchasPalabrasLaListaSeVeEnPaginasSeBuscaYNoSaturaLaPantalla() {
+        palabrasMuchas(150)
+        filtros()
+        regla.esperaEtiqueta("palabra_cuenta")
+        regla.esperaTexto("150 elementos")
+        regla.esperaEtiqueta("palabra_mostrando")
+        regla.esperaTexto("Mostrando 30 de 150")
+        assertTrue(hay("palabra_item_palabra149")) // los más nuevos primero
+        assertFalse(hay("palabra_item_palabra0")) // el resto no se dibuja
+        nodo("palabra_ver_mas").performScrollTo().performClick()
+        regla.esperaTexto("Mostrando 120 de 150")
+        nodo("palabra_buscar").performScrollTo().performTextInput("palabra14")
+        regla.espera { hay("palabra_item_palabra149") && !hay("palabra_item_palabra99") && !hay("palabra_mostrando") }
+    }
+
+    @Test fun sePuedenPegarVariasPalabrasDeGolpeYQuitarlasTodas() {
+        palabrasMuchas(10)
+        filtros()
+        regla.esperaEtiqueta("palabra_campo")
+        nodo("palabra_agregar").performScrollTo().assertIsNotEnabled()
+        nodo("palabra_campo").performScrollTo().performTextInput("uno, dos; tres,  palabra3 , UNO")
+        regla.esperaTexto("Agregar 3") // sin repetir: palabra3 ya estaba y UNO es igual a uno
+        nodo("palabra_agregar").performClick()
+        regla.espera { motor.llamadas.last { it.startsWith("grupoFiltro:") }.contains("\"uno\",\"dos\",\"tres\"]") }
+        regla.esperaTexto("13 elementos")
+        nodo("palabra_quitar_todas").performScrollTo().performClick()
+        regla.esperaEtiqueta("palabra_confirmar_quitar")
+        nodo("palabra_confirmar_quitar").performClick()
+        regla.espera { motor.llamadas.last { it.startsWith("grupoFiltro:") }.contains("\"palabras\":[]") }
+        regla.esperaTexto("0 elementos")
+    }
+
     @Test fun cadaFiltroTieneEscaladoPorContadorYListaDeInfractores() {
         filtros()
         regla.esperaEtiqueta("sw_filtro_enlaces")

@@ -132,3 +132,63 @@ var PalabrasAdultasDeFabrica = []string{
 	"porno", "pornografia", "xxx", "desnudos", "nudes", "onlyfans", "hentai", "cogiendo", "tetas", "orgia",
 	"masturbacion", "escort", "videos xxx", "pack de fotos", "contenido para adultos",
 }
+
+// ContieneAlguna dice si el texto trae alguna de las palabras o frases de la lista. Da lo mismo que llamar a ContienePalabra con cada una,
+// pero revisa el texto una sola vez: con miles de palabras sigue siendo rápido.
+func ContieneAlguna(texto string, lista []string) bool {
+	if len(lista) == 0 {
+		return false
+	}
+	ws := palabrasDe(texto)
+	claves := make(map[string]struct{}, len(ws)*3)
+	for _, w := range ws {
+		t := strings.TrimFunc(w, func(r rune) bool { _, ok := sustituciones[r]; return ok && !unicode.IsDigit(r) && r != '@' && r != '$' })
+		claves[colapsa(w, true)] = struct{}{}
+		claves[colapsa(t, true)] = struct{}{}
+		claves[colapsa(w, false)] = struct{}{}
+	}
+	// letras sueltas: cada racha de palabras de una sola letra ("p u t o") se junta en una.
+	rachas := map[string]struct{}{}
+	var racha strings.Builder
+	cierra := func() {
+		if racha.Len() >= 3 {
+			rachas[colapsa(racha.String(), true)] = struct{}{}
+		}
+		racha.Reset()
+	}
+	for _, w := range ws {
+		if len([]rune(w)) == 1 {
+			racha.WriteString(w)
+			continue
+		}
+		cierra()
+	}
+	cierra()
+	frase := ""
+	for _, prohibida := range lista {
+		p := strings.TrimSpace(prohibida)
+		if p == "" {
+			continue
+		}
+		clave := colapsa(p, false)
+		if clave == "" {
+			continue
+		}
+		if len(strings.Fields(p)) > 1 {
+			if frase == "" {
+				frase = " " + strings.Join(palabrasLimpias(texto), " ") + " "
+			}
+			if strings.Contains(frase, " "+strings.Join(palabrasLimpias(p), " ")+" ") {
+				return true
+			}
+			continue
+		}
+		if _, ok := claves[clave]; ok {
+			return true
+		}
+		if _, ok := rachas[clave]; ok {
+			return true
+		}
+	}
+	return false
+}

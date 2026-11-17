@@ -210,6 +210,7 @@ fun PantallaChat(
     }
     // Al abrir con mensajes sin leer, se empieza en el primero.
     val inicioHecho = remember(jid) { booleanArrayOf(false) }
+    val ultimoSinLeer = remember(jid) { intArrayOf(-1) } // índice donde se colocó la lista en «N sin leer» (-1 = todavía no)
     val llegandoAlFinal by remember { derivedStateOf { val u = estadoLista.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0; u >= items.size - 6 } }
     LaunchedEffect(llegandoAlFinal, items.size) { if (llegandoAlFinal) vm.cargarMas() }
     val lejosDelFinal by remember { derivedStateOf { estadoLista.firstVisibleItemIndex > 4 } }
@@ -427,11 +428,20 @@ fun PantallaChat(
                             inicioHecho[0] = true
                             if (irA.isEmpty()) {
                                 val idx = items.indexOfFirst { it is Elem.SinLeer }
-                                if (idx >= 0) estadoLista.scrollToItem(idx)
+                                if (idx >= 0) { ultimoSinLeer[0] = idx; estadoLista.scrollToItem(idx) }
                             }
                         }
                         // Hasta que llega la lectura de la base la lista no se deja ver (así no se ve el salto al primer mensaje sin leer).
                         if (vm.primeraCargaLista) colocada = true
+                    }
+                    // Con más sin leer que una página, la línea «N mensajes sin leer» se corre hacia arriba cada vez que se cargan más mensajes
+                    // viejos: mientras nadie haya movido la lista, se vuelve a colocar en esa línea.
+                    val idxSinLeer = items.indexOfFirst { it is Elem.SinLeer }
+                    LaunchedEffect(idxSinLeer, vm.primeraCargaLista) {
+                        if (idxSinLeer >= 0 && vm.primeraCargaLista && irA.isEmpty() && idxSinLeer != ultimoSinLeer[0] && !estadoLista.isScrollInProgress) {
+                            val quieta = if (ultimoSinLeer[0] < 0) estadoLista.firstVisibleItemIndex <= 2 else kotlin.math.abs(estadoLista.firstVisibleItemIndex - ultimoSinLeer[0]) <= 1
+                            if (quieta) { ultimoSinLeer[0] = idxSinLeer; estadoLista.scrollToItem(idxSinLeer) }
+                        }
                     }
                     LaunchedEffect(Unit) { kotlinx.coroutines.delay(350); colocada = true }
                     // Mientras el chat termina de armarse (separadores, tarjetas) los mensajes no se acomodan con animación:

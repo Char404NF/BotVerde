@@ -277,9 +277,9 @@ func TestEventoDeMensajeSeGuarda(t *testing.T) {
 
 func TestEnmascaraTexto(t *testing.T) {
 	casos := map[string]string{
-		"Successfully paired 5215500000002:16@s.whatsapp.net": "Successfully paired …2121:16@s.whatsapp.net",
+		"Successfully paired 5215599990001:16@s.whatsapp.net": "Successfully paired …0001:16@s.whatsapp.net",
 		"sin números largos 123":                              "sin números largos 123",
-		"dos 521241132212 y 34600000001":                      "dos …2212 y …0001",
+		"dos 521559999000 y 34600000001":                      "dos …9000 y …0001",
 	}
 	for in, want := range casos {
 		if got := enmascaraTexto(in); got != want {

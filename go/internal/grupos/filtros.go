@@ -32,6 +32,12 @@ const (
 // Filtros en el orden en que se muestran y evalúan.
 var Filtros = []string{FiltroEnlaces, FiltroPalabras, FiltroRepetidos, FiltroFlood, FiltroStickers, FiltroAudios, FiltroReenviados}
 
+// Tope de elementos por lista de un filtro (palabras prohibidas y dominios permitidos o bloqueados).
+const (
+	MaxPalabras = 5000
+	MaxDominios = 2000
+)
+
 // Acciones de un filtro.
 const (
 	AccAvisarme    = "avisarme"        // solo una notificación en mi teléfono
@@ -234,12 +240,12 @@ func (s *Servicio) GuardarFiltro(actor string, f Filtro) error {
 		return ErrAccionNoHay
 	}
 	c := f.Config
-	c.Permitidos = limpiaLista(c.Permitidos, 100, 100, normalizaDominio)
-	c.Bloqueados = limpiaLista(c.Bloqueados, 100, 100, normalizaDominio)
+	c.Permitidos = limpiaLista(c.Permitidos, MaxDominios, 100, normalizaDominio)
+	c.Bloqueados = limpiaLista(c.Bloqueados, MaxDominios, 100, normalizaDominio)
 	if c.Modo != "adultos" {
 		c.Modo = "todos"
 	}
-	c.Palabras = limpiaLista(c.Palabras, 300, 80, func(p string) string { return strings.TrimSpace(p) })
+	c.Palabras = limpiaLista(c.Palabras, MaxPalabras, 80, func(p string) string { return strings.TrimSpace(p) })
 	switch f.Filtro {
 	case FiltroRepetidos:
 		if c.Max < 2 || c.Max > 50 {
@@ -277,7 +283,7 @@ func (s *Servicio) GuardarFiltro(actor string, f Filtro) error {
 	if c.EscalaDesde > 0 && !EsAccionFiltro(c.EscalaAccion) {
 		return ErrAccionNoHay
 	}
-	c.ExentoPersonas = limpiaLista(c.ExentoPersonas, 100, 120, func(p string) string { return strings.TrimSpace(p) })
+	c.ExentoPersonas = limpiaLista(c.ExentoPersonas, 500, 120, func(p string) string { return strings.TrimSpace(p) })
 	if c.ExentoRangos == nil {
 		c.ExentoRangos = []int64{}
 	}
@@ -468,11 +474,8 @@ func (s *Servicio) Evaluar(e Entrada) *Infraccion {
 				}
 			}
 		case FiltroPalabras:
-			for _, p := range f.Config.Palabras {
-				if ContienePalabra(e.Texto, p) {
-					motivo = "palabra"
-					break
-				}
+			if ContieneAlguna(e.Texto, f.Config.Palabras) {
+				motivo = "palabra"
 			}
 		case FiltroRepetidos:
 			motivo = s.cuentaRepetido(e, f, ahora)

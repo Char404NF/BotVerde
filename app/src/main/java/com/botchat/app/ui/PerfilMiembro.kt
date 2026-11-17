@@ -175,6 +175,7 @@ private fun PestanaResumenPerfil(botId: Long, jid: String, p: PerfilMiembroAdmin
             }
             if (p.silenciado) Text("Silenciada ${textoDuracionFin(p.silencioHasta)}: el bot borra lo que escriba.", Modifier.testTag("perfil_silencio"), style = MaterialTheme.typography.bodyMedium, color = ROJO_SILENCIO)
             if (p.miembro.baneado) Text("Baneada" + (if (p.motivoBan.isNotBlank()) ": ${p.motivoBan}" else ""), Modifier.testTag("perfil_motivo_ban"), style = MaterialTheme.typography.bodyMedium, color = ROJO_SILENCIO)
+            if (p.ignorada) Text("El bot no le contesta ${textoDuracionFin(p.ignoradaHasta)}.", Modifier.testTag("perfil_ignorada"), style = MaterialTheme.typography.bodyMedium, color = ROJO_SILENCIO)
             if (p.infracciones.isNotEmpty()) InfraccionesPerfil(botId, jid, p)
         }
         TituloSeccion("Rango en el bot")

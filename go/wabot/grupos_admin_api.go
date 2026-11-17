@@ -40,6 +40,9 @@ type PerfilMiembro struct {
 	Desde         int64                 `json:"desde"` // primer mensaje que el bot guardó del grupo
 	// Infracciones: cuántas lleva la persona en cada filtro del grupo.
 	Infracciones []almacen.InfraccionesPersona `json:"infracciones"`
+	// Ignorada: el bot no le contesta (acción «Ignorarla» de un filtro o «Ignorar»); IgnoradaHasta 0 = sin fecha de fin.
+	Ignorada      bool  `json:"ignorada"`
+	IgnoradaHasta int64 `json:"ignoradaHasta"`
 }
 
 func presenciaDePersona(persona, jid string) (bool, int64) {
@@ -203,6 +206,9 @@ func GrupoPerfilMiembro(botID int64, grupo, persona string) (string, error) {
 	}
 	p.Historial, _ = a.HistorialGrupo(botID, grupo, canon, 0, 50)
 	p.Infracciones = a.InfraccionesDePersona(botID, grupo, canon)
+	if ig := a.SilencioDe(botID, canon, ahora); ig != nil {
+		p.Ignorada, p.IgnoradaHasta = true, ig.HastaTS
+	}
 	return js(p, nil)
 }
 

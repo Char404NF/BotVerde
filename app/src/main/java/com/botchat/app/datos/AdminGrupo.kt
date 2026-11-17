@@ -44,6 +44,8 @@ data class PerfilMiembroAdmin(
     val puesto: Int, val activos: Int, val motivoBan: String, val silenciado: Boolean, val silencioHasta: Long, val historial: List<EventoGrupo>, val desde: Long,
     /** Cuántas infracciones lleva en cada filtro del grupo. */
     val infracciones: List<InfraccionPersona> = emptyList(),
+    /** El bot no le contesta (acción «Ignorarla» de un filtro o «Ignorar»); [ignoradaHasta] 0 = sin fecha de fin. */
+    val ignorada: Boolean = false, val ignoradaHasta: Long = 0,
 )
 
 data class InfraccionPersona(val filtro: String, val total: Int, val ultima: Long)
@@ -109,6 +111,7 @@ object JsonAdminGrupo {
             o.optDouble("promedioDia"), o.optDouble("mediaGrupo"), o.optInt("puesto"), o.optInt("activos"), o.optString("motivoBan"),
             o.optBoolean("silenciado"), o.optLong("silencioHasta"), lista(o.optJSONArray("historial")) { evento(it) }, o.optLong("desde"),
             lista(o.optJSONArray("infracciones")) { InfraccionPersona(it.optString("filtro"), it.optInt("total"), it.optLong("ultima")) },
+            o.optBoolean("ignorada"), o.optLong("ignoradaHasta"),
         )
     }
 
