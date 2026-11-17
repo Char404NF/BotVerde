@@ -409,6 +409,7 @@ type Ficha struct {
 	Persona      string     `json:"persona"`
 	Alias        []string   `json:"alias"`
 	Nombre       string     `json:"nombre"`
+	NombrePropio string     `json:"nombrePropio"` // el que le puso el dueño en la app ("" = ninguno)
 	Telefono     string     `json:"telefono"`
 	Silencio     *Silencio  `json:"silencio"`
 	Bloqueada    bool       `json:"bloqueada"`
@@ -446,6 +447,9 @@ func (a *Almacen) FichaDe(botID int64, persona string, ahora time.Time) (*Ficha,
 		if c, _ := a.ObtenerChat(botID, x); c != nil && !c.EsGrupo {
 			if f.Nombre == "" {
 				f.Nombre = c.Mostrado
+			}
+			if f.NombrePropio == "" {
+				f.NombrePropio = c.Propio
 			}
 			if f.Telefono == "" {
 				f.Telefono = c.TelMostrado
@@ -871,4 +875,39 @@ func (a *Almacen) LimpiarExportes(botID int64, horas int, ahora time.Time) {
 			_ = os.Remove(filepath.Join(abs, e.Name()))
 		}
 	}
+}
+
+// FijarNombrePropio le pone a la persona el nombre que se verá en toda la app y en los mensajes del bot ({nombre}). Con "" vuelve al nombre
+// de la agenda o al público. Vale para todas las formas de la persona (teléfono y LID).
+func (a *Almacen) FijarNombrePropio(botID int64, persona, nombre string) error {
+	nombre = strings.Join(strings.Fields(nombre), " ")
+	if len([]rune(nombre)) > 40 {
+		return errors.New("el nombre es muy largo (máximo 40 letras)")
+	}
+	canon := a.ResolverPersona(botID, persona)
+	if canon == "" || canon == PersonaDueno {
+		return errors.New("falta la persona")
+	}
+	hecho := false
+	for _, x := range a.formas(botID, canon) {
+		c, _ := a.ObtenerChat(botID, x)
+		if c == nil || c.EsGrupo {
+			continue
+		}
+		hecho = true
+		if _, err := a.ActualizarChat(botID, x, false, func(c *Chat) { c.Propio = nombre }); err != nil {
+			return err
+		}
+		if nombre == "" { // la escritura normal no borra un nombre propio ya guardado: se quita aparte
+			if _, err := a.db.Exec(`UPDATE chats SET nombre_propio='' WHERE bot_id=? AND jid=?`, botID, x); err != nil {
+				return err
+			}
+		}
+	}
+	if !hecho {
+		return errors.New("todavía no hay un chat con esa persona")
+	}
+	a.avisa("personas")
+	a.avisa("persona:" + canon)
+	return nil
 }

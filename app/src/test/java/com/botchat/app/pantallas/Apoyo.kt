@@ -390,6 +390,10 @@ class MotorFalso : Motor {
     var personaFalla: String? = null
     private fun pFalla() { personaFalla?.let { throw IllegalStateException(it) } }
     override fun fichaPersona(bot: Long, persona: String) = fichaJson
+    override fun personaNombrePropio(bot: Long, persona: String, nombre: String) {
+        llamadas += "nombrePropio:$persona:$nombre"; pFalla()
+        fichaJson = JSONObject(fichaJson).put("nombrePropio", nombre).also { if (nombre.isNotBlank()) it.put("nombre", nombre) }.toString()
+    }
     override fun estadisticasPersona(bot: Long, persona: String, dias: Long) = estadisticasPersonaJson
     override fun silenciarPersona(bot: Long, persona: String, minutos: Long, motivo: String) {
         llamadas += "silenciar:$persona:$minutos:$motivo"; pFalla()

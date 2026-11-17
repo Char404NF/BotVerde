@@ -97,3 +97,16 @@ func EstadosDePersonas(botID int64, personasJSON string) (string, error) {
 	}
 	return js(a.EstadosDePersonas(botID, ps, time.Now()), nil)
 }
+
+// PersonaNombrePropio le pone a la persona el nombre que se verá en la app y en los mensajes del bot ({nombre}). Con "" vuelve al de la agenda.
+func PersonaNombrePropio(botID int64, persona, nombre string) error {
+	a, err := almacenAbierto()
+	if err != nil {
+		return err
+	}
+	if err := a.FijarNombrePropio(botID, persona, nombre); err != nil {
+		return err
+	}
+	a.RegistrarAccion(botID, almacen.PersonaDueno, "persona.nombre", persona, "", "ok", "")
+	return nil
+}

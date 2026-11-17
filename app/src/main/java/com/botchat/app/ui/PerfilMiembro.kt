@@ -261,6 +261,7 @@ private fun BarraAccionesMiembro(botId: Long, jid: String, p: PerfilMiembroAdmin
     }
     Surface(tonalElevation = 3.dp, modifier = Modifier.testTag("barra_acciones_miembro")) {
         Row(Modifier.horizontalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = Esp.s, vertical = Esp.s), horizontalArrangement = Arrangement.spacedBy(Esp.s), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton({ haptica(Toque.Suave); pedir("nombre") }, Modifier.testTag("accion_nombre")) { Text("Cambiar nombre") }
             OutlinedButton({ haptica(Toque.Suave); pedir("advertir") }, Modifier.testTag("accion_advertir")) { Icon(Ico.Aviso, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Advertir") }
             Box {
                 OutlinedButton({ haptica(Toque.Suave); if (p.silenciado) pedir("quitar_silencio") else menuSilencio = true }, Modifier.testTag("accion_silenciar")) {
@@ -297,6 +298,7 @@ private fun DialogosMiembro(botId: Long, jid: String, p: PerfilMiembroAdmin, dia
     }
     val dialogoActual = dialogo
     when (dialogoActual) {
+        "nombre" -> DialogoNombrePropio(m.titulo, "", cerrar) { nuevo -> cerrar(); hacer(if (nuevo.isBlank()) "Listo: vuelve su nombre de siempre" else "Listo: ahora se llama $nuevo") { Repo.nombrePropio(botId, m.persona, nuevo) } }
         "advertir" -> HojaTexto(
             "Advertir a ${m.titulo}", "", "motivo_advertir", { cerrar() },
             { t -> cerrar(); hacer("Advertencia puesta") { Repo.advertir(botId, m.persona, t, jid) } },

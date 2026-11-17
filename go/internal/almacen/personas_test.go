@@ -594,3 +594,40 @@ func TestEliminarBotLimpiaLasTablasNuevas(t *testing.T) {
 		}
 	}
 }
+
+func TestNombrePropioGanaAlDeLaAgendaYSeQuita(t *testing.T) {
+	a := nuevo(t)
+	const p = "5215500001111@s.whatsapp.net"
+	if _, err := a.ActualizarChat(1, p, false, func(c *Chat) { c.Guardado, c.TelE164 = "Bot VPS", "+5215500001111" }); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.FijarNombrePropio(1, p, "  Usuario  "); err != nil {
+		t.Fatal(err)
+	}
+	if c, _ := a.ObtenerChat(1, p); c.Mostrado != "Usuario" || c.Propio != "Usuario" || a.NombreDePersona(1, p) != "Usuario" {
+		t.Fatalf("debía mostrar el nombre propio: %+v", c)
+	}
+	// un cambio de nombre en la agenda o el público no lo pisa
+	if _, err := a.ActualizarChat(1, p, false, func(c *Chat) { c.Guardado, c.Publico = "Otro nombre", "Otro público" }); err != nil {
+		t.Fatal(err)
+	}
+	if c, _ := a.ObtenerChat(1, p); c.Mostrado != "Usuario" || c.Guardado != "Otro nombre" {
+		t.Fatalf("el nombre propio se conserva: %+v", c)
+	}
+	if f, _ := a.FichaDe(1, p, time.Now()); f.NombrePropio != "Usuario" || f.Nombre != "Usuario" {
+		t.Fatalf("la ficha lo trae: %+v", f)
+	}
+	// se encuentra buscando por el nombre nuevo
+	if err := a.FijarNombrePropio(1, p, ""); err != nil {
+		t.Fatal(err)
+	}
+	if c, _ := a.ObtenerChat(1, p); c.Mostrado != "Otro nombre" || c.Propio != "" {
+		t.Fatalf("al quitarlo vuelve el de la agenda: %+v", c)
+	}
+	if err := a.FijarNombrePropio(1, p, strings.Repeat("x", 41)); err == nil {
+		t.Fatal("un nombre muy largo debe rechazarse")
+	}
+	if err := a.FijarNombrePropio(1, "5215509998888@s.whatsapp.net", "Nadie"); err == nil {
+		t.Fatal("sin chat no hay a quién ponerle nombre")
+	}
+}

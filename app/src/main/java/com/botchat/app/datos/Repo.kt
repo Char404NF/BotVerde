@@ -253,6 +253,8 @@ object Repo {
 
     // Personas, chat y avisos para mí (bloque B)
     suspend fun ficha(bot: Long, persona: String) = io { JsonPersonas.ficha(motor.fichaPersona(bot, persona)) }
+    /** nombre "" = quitar el nombre propio y volver al de la agenda. */
+    suspend fun nombrePropio(bot: Long, persona: String, nombre: String) = io { motor.personaNombrePropio(bot, persona, nombre) }
     suspend fun estadisticasPersona(bot: Long, persona: String, dias: Int = 30) = io { JsonPersonas.estadisticas(motor.estadisticasPersona(bot, persona, dias.toLong())) }
     /** minutos 0 = para siempre. */
     suspend fun silenciarPersona(bot: Long, persona: String, minutos: Int, motivo: String = "") = io { motor.silenciarPersona(bot, persona, minutos.toLong(), motivo) }

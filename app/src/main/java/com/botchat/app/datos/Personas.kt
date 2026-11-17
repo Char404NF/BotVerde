@@ -19,6 +19,8 @@ data class FichaPersona(
     val advertencias: Int, val notas: Int, val etiquetas: List<EtiquetaItem>,
     val primeraTs: Long, val ultimaTs: Long, val recibidos: Int, val enviados: Int, val grupos: Int,
     val rango: String, val rangoColor: String,
+    /** El nombre que el dueño le puso en la app ("" = ninguno). */
+    val nombrePropio: String = "",
 )
 
 data class AdvertenciaItem(val id: Long, val persona: String, val chat: String, val motivo: String, val ts: Long, val por: String, val tipoId: Long = 0, val caducaTs: Long = 0, val vigente: Boolean = true)
@@ -85,7 +87,7 @@ object JsonPersonas {
             silencio(o.optJSONObject("silencio")), o.optBoolean("bloqueada"), o.optBoolean("noMolestar"),
             o.optInt("advertencias"), o.optInt("notas"), List(et?.length() ?: 0) { etiqueta(et!!.getJSONObject(it)) },
             o.optLong("primeraTs"), o.optLong("ultimaTs"), o.optInt("recibidos"), o.optInt("enviados"), o.optInt("grupos"),
-            o.optString("rango"), o.optString("rangoColor"),
+            o.optString("rango"), o.optString("rangoColor"), o.optString("nombrePropio"),
         )
     }
 

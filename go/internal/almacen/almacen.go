@@ -272,6 +272,7 @@ type Chat struct {
 	Publico     string
 	Negocio     string
 	Mostrado    string
+	Propio      string // nombre que el dueño le puso en la app ("" = el de la agenda o el público)
 	TelE164     string
 	TelMostrado string
 	PaisISO     string
@@ -291,19 +292,22 @@ func (c *Chat) Recalcular() {
 	c.Mostrado = identidad.NombreMostrado(identidad.Datos{
 		EsGrupo: c.EsGrupo, Asunto: c.Guardado, Guardado: c.Guardado, Publico: c.Publico, Negocio: c.Negocio, Telefono: tel.Mostrado,
 	})
+	if !c.EsGrupo && strings.TrimSpace(c.Propio) != "" {
+		c.Mostrado = strings.TrimSpace(c.Propio)
+	}
 }
 
 func (c *Chat) busqueda() string {
 	return identidad.TextoBusqueda(c.Mostrado, identidad.Telefono{E164: c.TelE164})
 }
 
-const colsChat = "jid,bot_id,es_grupo,nombre_guardado,nombre_publico,nombre_negocio,nombre_mostrado,telefono_e164,telefono_mostrado,pais_iso,foto_ruta,foto_id,foto_ts,ultimo_ts"
+const colsChat = "jid,bot_id,es_grupo,nombre_guardado,nombre_publico,nombre_negocio,nombre_mostrado,telefono_e164,telefono_mostrado,pais_iso,foto_ruta,foto_id,foto_ts,ultimo_ts,nombre_propio"
 
 func escanearChat(s interface{ Scan(...any) error }) (*Chat, error) {
 	var c Chat
 	var g int
 	if err := s.Scan(&c.JID, &c.BotID, &g, &c.Guardado, &c.Publico, &c.Negocio, &c.Mostrado, &c.TelE164, &c.TelMostrado, &c.PaisISO,
-		&c.FotoRuta, &c.FotoID, &c.FotoTS, &c.UltimoTS); err != nil {
+		&c.FotoRuta, &c.FotoID, &c.FotoTS, &c.UltimoTS, &c.Propio); err != nil {
 		return nil, err
 	}
 	c.EsGrupo = g == 1
@@ -327,14 +331,15 @@ func b2i(b bool) int {
 }
 
 func (a *Almacen) escribirChat(ex execer, c *Chat) error {
-	_, err := ex.Exec(`INSERT INTO chats(`+colsChat+`,busqueda,creado_ts) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+	_, err := ex.Exec(`INSERT INTO chats(`+colsChat+`,busqueda,creado_ts) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 		ON CONFLICT(jid,bot_id) DO UPDATE SET es_grupo=excluded.es_grupo, nombre_guardado=excluded.nombre_guardado,
 		nombre_publico=excluded.nombre_publico, nombre_negocio=excluded.nombre_negocio, nombre_mostrado=excluded.nombre_mostrado,
 		telefono_e164=excluded.telefono_e164, telefono_mostrado=excluded.telefono_mostrado, pais_iso=excluded.pais_iso,
 		foto_ruta=excluded.foto_ruta, foto_id=excluded.foto_id, foto_ts=excluded.foto_ts,
-		ultimo_ts=MAX(chats.ultimo_ts, excluded.ultimo_ts), busqueda=excluded.busqueda`,
+		ultimo_ts=MAX(chats.ultimo_ts, excluded.ultimo_ts), busqueda=excluded.busqueda,
+		nombre_propio=CASE WHEN excluded.nombre_propio<>'' THEN excluded.nombre_propio ELSE chats.nombre_propio END`,
 		c.JID, c.BotID, b2i(c.EsGrupo), c.Guardado, c.Publico, c.Negocio, c.Mostrado, c.TelE164, c.TelMostrado, c.PaisISO,
-		c.FotoRuta, c.FotoID, c.FotoTS, c.UltimoTS, c.busqueda(), time.Now().Unix())
+		c.FotoRuta, c.FotoID, c.FotoTS, c.UltimoTS, c.Propio, c.busqueda(), time.Now().Unix())
 	if err == nil {
 		a.nombres.invalidaContacto(c.BotID, c.JID) // cambió el contacto o su nombre
 	}
@@ -400,6 +405,9 @@ func (a *Almacen) FusionarChat(botID int64, desde, hasta string) error {
 	}
 	if dest.FotoRuta == "" {
 		dest.FotoRuta, dest.FotoID, dest.FotoTS = origen.FotoRuta, origen.FotoID, origen.FotoTS
+	}
+	if dest.Propio == "" {
+		dest.Propio = origen.Propio
 	}
 	if origen.UltimoTS > dest.UltimoTS {
 		dest.UltimoTS = origen.UltimoTS

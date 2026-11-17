@@ -234,7 +234,7 @@ class GruposUiTest {
         regla.espera { motor.llamadas.any { it.contains("\"permitidos\":[\"youtube.com\"]") } }
         regla.esperaEtiqueta("permitido_item_youtube.com")
         nodo("permitido_item_youtube.com").performClick() // tocar el chip lo quita
-        regla.espera { motor.llamadas.last { it.startsWith("grupoFiltro:") }.contains("\"permitidos\":[]") }
+        regla.espera { motor.llamadas.lastOrNull { it.startsWith("grupoFiltro:") }?.contains("\"permitidos\":[]") == true }
         nodo("sw_filtro_palabras").performClick()
         regla.esperaEtiqueta("palabra_campo")
         nodo("palabra_campo").performTextInput("estafa")
@@ -274,12 +274,12 @@ class GruposUiTest {
         nodo("palabra_campo").performScrollTo().performTextInput("uno, dos; tres,  palabra3 , UNO")
         regla.esperaTexto("Agregar 3") // sin repetir: palabra3 ya estaba y UNO es igual a uno
         nodo("palabra_agregar").performClick()
-        regla.espera { motor.llamadas.last { it.startsWith("grupoFiltro:") }.contains("\"uno\",\"dos\",\"tres\"]") }
+        regla.espera { motor.llamadas.lastOrNull { it.startsWith("grupoFiltro:") }?.contains("\"uno\",\"dos\",\"tres\"]") == true }
         regla.esperaTexto("13 elementos")
         nodo("palabra_quitar_todas").performScrollTo().performClick()
         regla.esperaEtiqueta("palabra_confirmar_quitar")
         nodo("palabra_confirmar_quitar").performClick()
-        regla.espera { motor.llamadas.last { it.startsWith("grupoFiltro:") }.contains("\"palabras\":[]") }
+        regla.espera { motor.llamadas.lastOrNull { it.startsWith("grupoFiltro:") }?.contains("\"palabras\":[]") == true }
         regla.esperaTexto("0 elementos")
     }
 
@@ -297,7 +297,7 @@ class GruposUiTest {
         nodo("escala_dias_enlaces_30").performScrollTo().performClick()
         regla.espera { motor.llamadas.any { it.contains("\"escalaDias\":30") } }
         nodo("escala_desde_enlaces_menos").performScrollTo().performClick() // de 2 vuelve a 0
-        regla.espera { motor.llamadas.last { it.startsWith("grupoFiltro:") }.contains("\"escalaDesde\":0") }
+        regla.espera { motor.llamadas.lastOrNull { it.startsWith("grupoFiltro:") }?.contains("\"escalaDesde\":0") == true }
     }
 
     @Test fun lasInfraccionesSeVenSeReiniciaYSePuedeEximirAUnaPersona() {

@@ -289,7 +289,11 @@ func TestActualizarDesdeLa19DejaLaRetencionPendiente(t *testing.T) {
 		migraciones = completas
 		t.Fatalf("versión %d", a.Version())
 	}
-	chatBasico(t, a, chatA, "5215512345678", "Ana", false)
+	// el chat con el esquema viejo (sin las columnas que llegaron después, como nombre_propio)
+	if _, err := a.db.Exec(`INSERT INTO chats(jid,bot_id,es_grupo,nombre_publico,nombre_mostrado,telefono_e164,creado_ts) VALUES(?,1,0,'Ana','Ana','+5215512345678',1)`, chatA); err != nil {
+		migraciones = completas
+		t.Fatal(err)
+	}
 	// un mensaje con el esquema viejo (sin las columnas nuevas)
 	if _, err := a.db.Exec(`INSERT INTO messages(id,chat_jid,bot_id,remitente_jid,tipo,ts) VALUES('1',?,1,?, 'texto', 5)`, chatA, chatA); err != nil {
 		migraciones = completas

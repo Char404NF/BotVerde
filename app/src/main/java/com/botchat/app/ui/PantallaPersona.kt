@@ -116,6 +116,7 @@ fun TarjetaPersona(botId: Long, jid: String, nombre: String, alAbrirDetalle: () 
                 else OutlinedButton({ haptica(Toque.Suave); dialogo = "silenciar" }, Modifier.testTag("silenciar_persona")) { Text("Ignorar") }
                 if (f.bloqueada) OutlinedButton({ haptica(Toque.Suave); hacer("El bot vuelve a atenderla") { Repo.desbloquearPersona(botId, jid) } }, Modifier.testTag("desbloquear_persona")) { Text("Desbloquear") }
                 else OutlinedButton({ haptica(Toque.Fuerte); dialogo = "bloquear" }, Modifier.testTag("bloquear_persona")) { Text("Bloquear en el bot") }
+                OutlinedButton({ haptica(Toque.Suave); dialogo = "nombre" }, Modifier.testTag("cambiar_nombre_persona")) { Text("Cambiar nombre") }
                 OutlinedButton({ haptica(Toque.Suave); dialogo = "advertir" }, Modifier.testTag("advertir_persona")) { Text("Advertir") }
                 OutlinedButton({ haptica(Toque.Suave); alAbrirDetalle() }, Modifier.testTag("abrir_advertencias_notas")) { Text("Notas y advertencias") }
                 OutlinedButton({ haptica(Toque.Suave); dialogo = "exportar" }, Modifier.testTag("exportar_persona")) { Text("Exportar datos") }
@@ -131,6 +132,7 @@ fun TarjetaPersona(botId: Long, jid: String, nombre: String, alAbrirDetalle: () 
             confirmButton = { TextButton({ dialogo = null; hacer("Listo: el bot la ignora") { Repo.bloquearPersona(botId, jid) } }, Modifier.testTag("confirmar_bloquear")) { Text("Bloquear", color = MaterialTheme.colorScheme.error) } },
             dismissButton = { TextButton({ dialogo = null }) { Text("Cancelar") } },
         )
+        "nombre" -> DialogoNombrePropio(nombre, f?.nombrePropio.orEmpty(), { dialogo = null }) { nuevo -> dialogo = null; hacer(if (nuevo.isBlank()) "Listo: vuelve su nombre de siempre" else "Listo: ahora se llama $nuevo") { Repo.nombrePropio(botId, jid, nuevo) } }
         "advertir" -> DialogoAdvertir(botId, jid, nombre) { dialogo = null; version++ }
         "exportar" -> DialogoExportar(botId, jid, nombre) { dialogo = null }
         "olvidar" -> DialogoOlvidar(botId, jid, nombre, { dialogo = null }, alOlvidada)
@@ -303,5 +305,15 @@ private fun DialogoOlvidar(botId: Long, persona: String, nombre: String, alCerra
             }, Modifier.testTag("confirmar_olvidar"), enabled = entiendo && !trabajando) { Text("Olvidar", color = if (entiendo) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) }
         },
         dismissButton = { TextButton(alCerrar, enabled = !trabajando) { Text("Cancelar") } },
+    )
+}
+
+/** Ponerle a una persona el nombre que se verá en toda la app y en los mensajes del bot. Vacío o «Quitar mi nombre» = el de la agenda. */
+@Composable
+internal fun DialogoNombrePropio(nombreActual: String, propio: String, alCerrar: () -> Unit, alGuardar: (String) -> Unit) {
+    HojaTexto(
+        titulo = "Cambiar nombre", inicial = propio, etiqueta = "nombre_propio", alCerrar = alCerrar, alAceptar = alGuardar,
+        ayuda = "Se verá así en la app y en los mensajes del bot ({nombre}). Ahora se ve como «$nombreActual». Déjalo vacío para volver al nombre de siempre.",
+        permiteVacio = true, maximo = 40, lineas = 1, botonRestaurar = if (propio.isNotBlank()) "Quitar mi nombre" else null,
     )
 }

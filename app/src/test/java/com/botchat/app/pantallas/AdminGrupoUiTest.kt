@@ -242,6 +242,16 @@ class AdminGrupoUiTest {
         regla.esperaTexto("Tú baneaste a Rosa")
     }
 
+    @Test fun desdeElPerfilDelMiembroSePuedeCambiarSuNombre() {
+        perfil(luis)
+        regla.esperaEtiqueta("accion_nombre")
+        toca("accion_nombre")
+        regla.esperaEtiqueta("nombre_propio_campo")
+        nodo("nombre_propio_campo").performTextInput("Usuario")
+        nodo("nombre_propio_aceptar").performClick()
+        regla.espera { llamo("nombrePropio:$luis:Usuario") }
+    }
+
     @Test fun advertirSilenciarYHacerAdminLlamanALaAPI() {
         perfil(luis)
         regla.esperaEtiqueta("accion_advertir")

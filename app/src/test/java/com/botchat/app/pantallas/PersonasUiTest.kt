@@ -55,6 +55,23 @@ class PersonasUiTest {
         regla.esperaTexto("Primera vez:", substring = true)
     }
 
+    @Test fun sePuedeCambiarElNombreDeUnaPersonaYQuitarlo() {
+        tarjeta()
+        regla.esperaEtiqueta("cambiar_nombre_persona")
+        regla.onNodeWithTag("cambiar_nombre_persona", useUnmergedTree = true).performClick()
+        regla.esperaEtiqueta("nombre_propio_campo")
+        assertFalse(hay("nombre_propio_fabrica")) // todavía no tiene nombre propio
+        regla.onNodeWithTag("nombre_propio_campo", useUnmergedTree = true).performTextInput("Usuario")
+        regla.onNodeWithTag("nombre_propio_aceptar", useUnmergedTree = true).assertIsEnabled().performClick()
+        regla.espera { llamo("nombrePropio:$ana:Usuario") }
+        // al volver a abrirlo trae el que ya tiene y deja quitarlo
+        regla.esperaEtiqueta("cambiar_nombre_persona")
+        regla.onNodeWithTag("cambiar_nombre_persona", useUnmergedTree = true).performClick()
+        regla.esperaEtiqueta("nombre_propio_fabrica")
+        regla.onNodeWithTag("nombre_propio_fabrica", useUnmergedTree = true).performClick()
+        regla.espera { llamo("nombrePropio:$ana:") && motor.llamadas.last { it.startsWith("nombrePropio:") } == "nombrePropio:$ana:" }
+    }
+
     @Test fun silenciarConDuracionYQuitarElSilencio() {
         tarjeta()
         regla.esperaEtiqueta("silenciar_persona")

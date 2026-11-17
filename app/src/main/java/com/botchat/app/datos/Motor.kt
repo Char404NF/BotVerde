@@ -227,6 +227,7 @@ interface Motor {
 
     // Perfil de persona, actividad, lista de lo que envió, búsqueda en un chat, puntitos y exportar chat (0.6.0, E4).
     fun perfilPersona(bot: Long, persona: String): String
+    fun personaNombrePropio(bot: Long, persona: String, nombre: String) {}
     fun actividadPersona(bot: Long, persona: String): String
     fun mensajesDePersona(bot: Long, filtroJson: String, antesTs: Long, antesId: String, limite: Long): String
     fun buscarEnChat(bot: Long, chat: String, palabra: String, desde: Long, hasta: Long, antesTs: Long, antesId: String, limite: Long): String
@@ -598,6 +599,7 @@ object MotorGo : Motor {
     override fun pedirFotoPersona(bot: Long, persona: String, grupo: String, forzar: Boolean) = Wabot.pedirFotoPersona(bot, persona, grupo, forzar)
     override fun fotoPersona(bot: Long, persona: String) = Wabot.fotoPersona(bot, persona)
     override fun perfilPersona(bot: Long, persona: String) = Wabot.perfilPersona(bot, persona)
+    override fun personaNombrePropio(bot: Long, persona: String, nombre: String) = Wabot.personaNombrePropio(bot, persona, nombre)
     override fun actividadPersona(bot: Long, persona: String) = Wabot.actividadPersona(bot, persona)
     override fun mensajesDePersona(bot: Long, filtroJson: String, antesTs: Long, antesId: String, limite: Long) = Wabot.mensajesDePersona(bot, filtroJson, antesTs, antesId, limite)
     override fun buscarEnChat(bot: Long, chat: String, palabra: String, desde: Long, hasta: Long, antesTs: Long, antesId: String, limite: Long) = Wabot.buscarEnChat(bot, chat, palabra, desde, hasta, antesTs, antesId, limite)

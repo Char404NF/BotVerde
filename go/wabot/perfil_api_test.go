@@ -62,3 +62,25 @@ func TestApiPerfilActividadBusquedaYExportar(t *testing.T) {
 		t.Fatalf("%s %v", j, err)
 	}
 }
+
+func TestApiNombrePropioSeVeEnLaFichaYAlQuitarloVuelve(t *testing.T) {
+	_, a := abreSolo(t)
+	const p = "5215500002222@s.whatsapp.net"
+	if _, err := a.ActualizarChat(1, p, false, func(c *almacen.Chat) { c.Guardado, c.TelE164 = "Bot VPS", "+5215500002222" }); err != nil {
+		t.Fatal(err)
+	}
+	if err := PersonaNombrePropio(1, p, "Usuario"); err != nil {
+		t.Fatal(err)
+	}
+	f := decodifica[almacen.Ficha](t, func() (string, error) { return FichaPersona(1, p) })
+	if f.Nombre != "Usuario" || f.NombrePropio != "Usuario" {
+		t.Fatalf("ficha: %+v", f)
+	}
+	if err := PersonaNombrePropio(1, p, ""); err != nil {
+		t.Fatal(err)
+	}
+	f = decodifica[almacen.Ficha](t, func() (string, error) { return FichaPersona(1, p) })
+	if f.Nombre != "Bot VPS" || f.NombrePropio != "" {
+		t.Fatalf("al quitarlo: %+v", f)
+	}
+}

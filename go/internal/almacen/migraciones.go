@@ -971,6 +971,10 @@ var migraciones = [][]string{
 		`CREATE INDEX idx_filtro_inf_persona ON filtro_infracciones(bot_id, grupo, persona, filtro, ts)`,
 		`CREATE INDEX idx_filtro_inf_ts ON filtro_infracciones(bot_id, ts)`,
 	},
+	// Nombre propio: el que el dueño le pone a una persona en la app (gana al de la agenda y al público).
+	{
+		`ALTER TABLE chats ADD COLUMN nombre_propio TEXT NOT NULL DEFAULT ''`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {
