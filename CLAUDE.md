@@ -14,9 +14,8 @@
 3. Verifica todo antes de usarlo: versiones, URLs y nombres de paquetes. Nada de inventar. Si algo no existe, busca la alternativa correcta y avisa.
 4. Usa instalaciones sin root dentro del espacio nuevo siempre que sea posible. Solo usa root para paquetes del sistema y para crear el usuario.
 
-## Entorno (probado el 2026-11-09)
-Compilación en Linux x86_64 con JDK 17, Android SDK, Go y gomobile.
-El entorno se carga solo al entrar como wabot (`~/.wabot_env`, enlazado desde `~/.bashrc` y `~/.profile`).
+## Entorno
+Compilación en Linux x86_64 con JDK 17, Android SDK, Go y gomobile (ver README, «Cómo compilar»).
 
 | Pieza | Versión | Ruta |
 |---|---|---|
@@ -140,10 +139,8 @@ No verificado sin teléfono: cómo se ve el ícono en el lanzador (adaptable y t
 - Splash con el logo (< 1 s, no tapa toques; no sale con "Reducir animaciones"), transición entre pantallas y elemento compartido avatar/nombre, entrada escalonada de la lista (solo la primera vez), burbujas nuevas que se deslizan, miniaturas con desvanecido, punto de estado que pulsa o gira, escala al tocar chats, palomita animada al vincular. Respeta "quitar animaciones" de Android (escala 0) y el interruptor "Reducir animaciones" de Avanzado (`LocalReducirMovimiento`).
 
 ### GitHub
-- Repositorio privado `Char404NF/BotVerde`, rama `main`, etiquetas `v0.2.0` y `v0.2.1`. No se suben APK (`salida/` está ignorada), bases de datos, archivos `.enc`, llaves ni `.env`.
-- Excepción a la regla global "No subas código a GitHub" (confirmada por Charly el 2026-11-10): vale SOLO para este repositorio y SOLO con su deploy key. El `CLAUDE.md global` global no se modifica.
-- Llave de despliegue: `~/.ssh/<llave>` (usuario `wabot`, sin contraseña, con permiso de escritura solo en BotVerde); alias SSH `github.com` en `~/.ssh/config`; la huella de github.com en `known_hosts` se verificó contra la documentación oficial de GitHub. Nunca copiar la llave privada fuera del servidor.
-- Subir cambios: `su - wabot -c 'cd ~/wabot-app && git push'`; versión nueva: `git tag -a vX.Y.Z -m "..." && git push origin vX.Y.Z`. Antes de subir: `git ls-files` y buscar secretos (keystore, password, token, .pem) en archivos e historial.
+- Repositorio `Char404NF/BotVerde`, rama `main`. No se suben APK (`salida/` está ignorada), bases de datos, archivos `.enc`, llaves ni `.env`; los APK van en la sección Releases.
+- Antes de subir: `git ls-files` y buscar secretos (keystore, password, token, .pem) y datos personales en archivos e historial.
 
 ## Estado: 0.3.0 "Info del chat" (2026-11-10) — versionCode 6
 - **Estadísticas solo con datos sin cifrar.** Tabla `daily_stats(bot_id, chat, sender, day, hora, tipo, count, bytes)` en `messages.db` (migración 2; `hora` se añadió a la clave del plan original para poder graficar por hora). `sender` = JID del remitente o `"yo"` si lo envió el bot. Nunca se lee el texto de los mensajes. Se actualiza en la misma transacción que guarda cada mensaje (`GuardarMensajes`); `FusionarChat` fusiona contadores, `BorrarChat`/`EliminarBot` los borran.
@@ -155,7 +152,7 @@ No verificado sin teléfono: cómo se ve el ícono en el lanzador (adaptable y t
 - Trampa: la palabra "clave" en el esquema SQL rompe `TestVerUnaVezNoDejaNadaEnDisco` (busca "clave" en el archivo de la base); por eso `stats_info` usa la columna `campo`.
 
 ## Estado: 0.4.0 "Todo en uno" (2026-11-10) — versionCode 7
-Una sola entrega con cinco bloques (A–E). `PROGRESO.md` tiene la lista de ítems. Migraciones de `messages.db`: 3 (eliminados), 4 (envío/citas/acuses/reacciones/estado por chat), 5 (ver una vez), 6 (dedupe y actividad), 7 (automatizaciones). Siempre hacia adelante.
+Una sola entrega con cinco bloques (A–E). Migraciones de `messages.db`: 3 (eliminados), 4 (envío/citas/acuses/reacciones/estado por chat), 5 (ver una vez), 6 (dedupe y actividad), 7 (automatizaciones). Siempre hacia adelante.
 
 ### Reglas que se mantienen
 - **El bot automático SOLO RESPONDE**: nunca escribe primero ni hace nada programado. Lo que Charly escribe a mano desde la app es un cliente normal: sale por `envio.Servicio.EnviarTexto/EnviarMedio…` (sin retardos, con tope de 30 seguidos y luego 1/s), se registra como "manual" en la actividad y pausa al bot en ese chat (30 min, ajustable). Los mensajes que Charly escribe desde el teléfono (`IsFromMe` cuyo ID no salió de la app) pausan igual; los de la app o el motor se reconocen por su ID (`EsEnvioPropio`).
