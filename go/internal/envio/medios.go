@@ -33,6 +33,8 @@ type Adjunto struct {
 	TopeBytes int64
 	// SinCopia: al terminar de enviarlo se borra también la copia cifrada que se guarda para el chat (el mensaje queda sin archivo).
 	SinCopia bool
+	// Menciones son los JID que se mencionan en el pie de foto (salen resaltados y reciben aviso).
+	Menciones []string
 }
 
 const (

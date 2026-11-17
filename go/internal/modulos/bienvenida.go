@@ -10,6 +10,9 @@ import (
 	"time"
 
 	"botchat/internal/almacen"
+	"botchat/internal/avatar"
+	"botchat/internal/envio"
+	"botchat/internal/estilo"
 	"botchat/internal/permisos"
 )
 
@@ -40,8 +43,9 @@ func bienvenida() Modulo {
 			{ID: "bienvenida.exento", Nombre: "Sin verificación de bienvenida", Descripcion: "Las personas con esta casilla no tienen que responder la verificación ni se les expulsa por no hacerlo.", Grupo: "Bienvenida", Grupos: true, Riesgo: permisos.RiesgoMedio},
 		},
 		Esquema: []Campo{
-			{Clave: "mensaje", Titulo: "Mensaje de bienvenida", Ayuda: "Variables: {nombre} (menciona a quien entró), {grupo} y {reglas}.", Tipo: CampoTexto, Varias: true, Largo: 900,
-				Defecto: "¡Hola {nombre}! 👋 Bienvenido a *{grupo}*.\n\n{reglas}", Obligatorio: true},
+			{Clave: "mensaje", Titulo: "Mensaje de bienvenida", Ayuda: "Variables: {nombre} (menciona a quien entró), {grupo}, {reglas} (las reglas tal cual) y {bloque_reglas} (las reglas con su título; no sale nada si el grupo no tiene).", Tipo: CampoTexto, Varias: true, Largo: 900,
+				Defecto: mensajeBienvenidaNuevo, Obligatorio: true},
+			{Clave: "imagen", Titulo: "Mandar la imagen del avatar", Ayuda: "El mensaje sale como pie de la imagen del bot (la cara, o la tuya en «Avatar del bot»). Se respeta lo que elijas allí para «Bienvenida».", Tipo: CampoInterruptor, Defecto: true},
 			{Clave: "reglas", Titulo: "Reglas por defecto", Ayuda: "Se usan en {reglas} cuando el grupo no tiene las suyas (Grupos → Reglas).", Tipo: CampoTexto, Varias: true, Largo: 900, Defecto: ""},
 			{Clave: "grupos_modo", Titulo: "En qué grupos", Ayuda: "«Solo los elegidos» y «todos menos» usan la lista de abajo.", Tipo: CampoLista, Defecto: "elegidos",
 				Opciones: []Opcion{{"elegidos", "Solo los elegidos"}, {"todos", "Todos los grupos"}, {"todos_menos", "Todos menos los elegidos"}}},
@@ -200,8 +204,17 @@ func bienvenidaEntra(g *Gestor, cfg Config, e Evento) {
 	if reglas == "" {
 		reglas = strings.TrimSpace(cfg.Texto("reglas"))
 	}
+	reglas = reglasEnLineas(reglas)
 	grupo := g.nombreChat(e.Chat)
-	texto := sustituir(cfg.Texto("mensaje"), map[string]string{"nombre": strings.Join(nombres, ", "), "grupo": grupo, "reglas": reglas})
+	bloque := ""
+	if reglas != "" {
+		bloque = "📜 *Reglas del grupo*\n" + reglas
+	}
+	plantilla := cfg.Texto("mensaje")
+	if plantilla == mensajeBienvenidaAntiguo { // quien nunca lo cambió pasa al diseño nuevo
+		plantilla = mensajeBienvenidaNuevo
+	}
+	texto := sustituir(plantilla, map[string]string{"nombre": strings.Join(nombres, ", "), "grupo": grupo, "reglas": reglas, "bloque_reglas": bloque})
 	texto = limpiaLineasVacias(texto)
 	ver := cfg.Bool("verificar")
 	var esperada string
@@ -227,8 +240,12 @@ func bienvenidaEntra(g *Gestor, cfg Config, e Evento) {
 		}
 	}
 	if texto != "" {
-		_, _ = g.Enviar(Iniciativa{Modulo: IDBienvenida, Que: qBienvenida, Chat: e.Chat, Personas: personas, Texto: texto, Menciones: menciones,
-			RetrasoMin: segundos(cfg.Num("retraso_min")), RetrasoMax: segundos(cfg.Num("retraso_max")), Noche: NocheDiferir})
+		ini := Iniciativa{Modulo: IDBienvenida, Que: qBienvenida, Chat: e.Chat, Personas: personas, Texto: texto, Menciones: menciones,
+			RetrasoMin: segundos(cfg.Num("retraso_min")), RetrasoMax: segundos(cfg.Num("retraso_max")), Noche: NocheDiferir}
+		if cfg.Bool("imagen") {
+			ini.Medio = g.imagenBienvenida(e.Chat, texto, menciones)
+		}
+		_, _ = g.Enviar(ini)
 	}
 	if cfg.Bool("privado") {
 		bienvenidaPrivada(g, cfg, e, personas, grupo)
@@ -339,3 +356,32 @@ func bienvenidaVencidos(g *Gestor, cfg Config, e Evento) {
 			}})
 	}
 }
+
+// imagenBienvenida arma la imagen del avatar con el mensaje de pie, o nil si el avatar está apagado para la bienvenida o el texto no cabe.
+func (g *Gestor) imagenBienvenida(chat, texto string, menciones []string) *envio.Adjunto {
+	av := avatar.Nuevo(g.Alm, g.BotID)
+	if !av.Corresponde(avatar.Bienvenida, chat, texto) {
+		return nil
+	}
+	ref, mime, nombre, ok := av.Imagen(avatar.Bienvenida)
+	if !ok {
+		return nil
+	}
+	return &envio.Adjunto{Tipo: almacen.TipoImagen, Ruta: PrefijoAdj + ref, Mime: mime, Nombre: nombre, Pie: texto, Menciones: menciones}
+}
+
+var reNumeroRegla = regexp.MustCompile(`(\S)[ \t]+(\d{1,2}[.)][ \t])`)
+
+// reglasEnLineas pone cada regla numerada en su línea cuando se escribieron seguidas («1. Respeto 2. Sin spam»).
+func reglasEnLineas(r string) string {
+	if strings.Contains(r, "\n") {
+		return r
+	}
+	return reNumeroRegla.ReplaceAllString(r, "$1\n$2")
+}
+
+// El texto de fábrica de antes y el de ahora (tarjeta con título, reglas en lista y una ayuda al final).
+const (
+	mensajeBienvenidaAntiguo = "¡Hola {nombre}! 👋 Bienvenido a *{grupo}*.\n\n{reglas}"
+	mensajeBienvenidaNuevo   = "👋 *¡Bienvenido a {grupo}!*\n" + estilo.Raya + "\nHola {nombre}, qué gusto tenerte aquí.\n\n{bloque_reglas}\n\n💡 _Escribe !menu para ver lo que puedo hacer_"
+)

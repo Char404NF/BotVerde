@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"botchat/internal/modulos"
 )
 
 func TestApiAsistenteGuardarAplicarDeshacer(t *testing.T) {
@@ -102,6 +104,9 @@ func TestApiBotParaTodosSeAplicaConAvatarMenuYRangoDeTodos(t *testing.T) {
 	}
 	if a.AjusteBot(1, "lab_modo_menu") != "botones" {
 		t.Fatal("los botones van encendidos por defecto (solo en privado)")
+	}
+	if g, err := gestorDe(1); err != nil || !g.Activo(modulos.IDBienvenida) || modulos.Config(g.Config(modulos.IDBienvenida)).Texto("grupos_modo") != "todos" {
+		t.Fatalf("la bienvenida sale encendida en todos los grupos: %v", err)
 	}
 }
 

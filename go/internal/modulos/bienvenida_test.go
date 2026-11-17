@@ -58,7 +58,7 @@ func TestBienvenidaEnElGrupoConMencionYReglas(t *testing.T) {
 		t.Fatalf("enviados: %v", e.enviados())
 	}
 	s := e.enviados()[0]
-	if !strings.HasPrefix(s, grupo+"|") || !strings.Contains(s, "@5215533333333") || !strings.Contains(s, "*Vecinos*") || !strings.Contains(s, "1. Respeto") {
+	if !strings.HasPrefix(s, grupo+"|") || !strings.Contains(s, "@5215533333333") || !strings.Contains(s, "[medio:imagen]") || !strings.Contains(s, "*¡Bienvenido a Vecinos!*") || !strings.Contains(s, "📜 *Reglas del grupo*\n1. Respeto") || !strings.Contains(s, "1. Respeto") {
 		t.Fatalf("mensaje: %q", s)
 	}
 	// el registro dice qué pasó pero nunca el texto
@@ -258,4 +258,43 @@ func TestBienvenidaValidaEspera(t *testing.T) {
 	esperaErr(t, e.g.GuardarConfig(IDBienvenida, b), "espera máxima")
 	b, _ = jsonDe(map[string]any{"expulsar": true, "verificar": false})
 	esperaErr(t, e.g.GuardarConfig(IDBienvenida, b), "verificación")
+}
+
+func TestBienvenidaSinReglasNoDejaTituloVacioYSinImagenSaleComoTexto(t *testing.T) {
+	e, _ := bienvenidaLista(t)
+	e.config(IDBienvenida, map[string]any{"imagen": false, "grupos_modo": "todos"})
+	entra(e, grupo, nuevoJID)
+	e.avanza(time.Minute)
+	if len(e.enviados()) != 1 {
+		t.Fatalf("enviados: %v", e.enviados())
+	}
+	s := e.enviados()[0]
+	if strings.Contains(s, "[medio:") || strings.Contains(s, "📜") || strings.Contains(s, "{") || !strings.Contains(s, "Hola @5215533333333") {
+		t.Fatalf("sin reglas ni imagen: %q", s)
+	}
+}
+
+func TestReglasSeparadasEnLineas(t *testing.T) {
+	if got := reglasEnLineas("1. Respeto 2. Sin spam 3) Nada de cadenas"); got != "1. Respeto\n2. Sin spam\n3) Nada de cadenas" {
+		t.Fatalf("%q", got)
+	}
+	if got := reglasEnLineas("Sé amable\n2. Respeto"); got != "Sé amable\n2. Respeto" {
+		t.Fatalf("ya venían en líneas: %q", got)
+	}
+}
+
+func TestBienvenidaConElTextoDeFabricaViejoUsaElDiseñoNuevo(t *testing.T) {
+	e, _ := bienvenidaLista(t)
+	e.config(IDBienvenida, map[string]any{"mensaje": mensajeBienvenidaAntiguo, "grupos_modo": "todos"})
+	entra(e, grupo, nuevoJID)
+	e.avanza(time.Minute)
+	if s := e.enviados()[0]; !strings.Contains(s, "*¡Bienvenido a Vecinos!*") {
+		t.Fatalf("debía usar el diseño nuevo: %q", s)
+	}
+	e.config(IDBienvenida, map[string]any{"mensaje": "Hola {nombre}", "grupos_modo": "todos"})
+	entra(e, grupo, nuevoJID)
+	e.avanza(time.Minute)
+	if s := e.enviados(); len(s) < 2 || strings.Contains(s[1], "Bienvenido a Vecinos") {
+		t.Fatalf("un texto propio se respeta: %v", s)
+	}
 }

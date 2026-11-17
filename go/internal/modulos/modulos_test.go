@@ -49,7 +49,9 @@ func (f *falsoEnv) Medio(_ context.Context, chat string, a envio.Adjunto, _ stri
 	if f.falla != nil {
 		return f.falla
 	}
-	f.enviados = append(f.enviados, chat+"|[medio:"+a.Tipo+"]")
+	f.citas = append(f.citas, "")
+	f.menc = append(f.menc, a.Menciones)
+	f.enviados = append(f.enviados, chat+"|[medio:"+a.Tipo+"]"+map[bool]string{true: " " + a.Pie}[a.Pie != ""])
 	return nil
 }
 func (f *falsoEnv) Conectado() bool { return f.conectado }

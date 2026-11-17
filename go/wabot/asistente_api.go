@@ -69,6 +69,11 @@ func AsistenteBase(botID int64) (string, error) {
 				_ = g.Activar(id)
 			}
 		}
+		// La bienvenida a miembros nuevos también sale encendida, en todos los grupos (es lo que se espera de un bot para todos).
+		if !g.Activo(modulos.IDBienvenida) {
+			_ = g.GuardarConfig(modulos.IDBienvenida, `{"grupos_modo":"todos"}`)
+			_ = g.Activar(modulos.IDBienvenida)
+		}
 	}
 	return AsistenteEstado(botID)
 }

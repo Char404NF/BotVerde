@@ -42,7 +42,13 @@ func (e enviadorModulos) Medio(ctx context.Context, chat string, a envio.Adjunto
 		}
 		a.Ruta = ruta
 	}
-	r, err := e.s.envio.EnviarMedioAuto(almacen.ConEtiqueta(ctx, "modulo"), chat, a, citaID)
+	var r envio.Resultado
+	var err error
+	if len(a.Menciones) > 0 {
+		r, err = e.s.envio.EnviarMedioAutoCita(almacen.ConEtiqueta(ctx, "modulo"), chat, a, citaID, "", a.Menciones)
+	} else {
+		r, err = e.s.envio.EnviarMedioAuto(almacen.ConEtiqueta(ctx, "modulo"), chat, a, citaID)
+	}
 	if err != nil {
 		return err
 	}
