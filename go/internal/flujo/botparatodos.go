@@ -32,7 +32,7 @@ func PlantillaBotParaTodos() *Def {
 				{Texto: "🧮 Calculadora", Destino: "r_calc"},
 				{Texto: "🕒 Hora en el mundo", Destino: "r_hora"},
 				{Texto: "💵 Dólar", Destino: "r_dolar"},
-				{Texto: "📚 Qué significa algo", Destino: "r_definir"},
+				{Texto: "📚 Buscar y definir", Destino: "r_definir"},
 				{Texto: "🔗 Acortar y QR", Destino: "r_enlaces"},
 			}},
 			{ID: "j", Tipo: PasoMenu, Titulo: "🎮 *Juegos y diversión*\n¿Qué se te antoja?", Opciones: []Opcion{
@@ -66,7 +66,7 @@ func PlantillaBotParaTodos() *Def {
 			{ID: "r_calc", Tipo: PasoRespuesta, Texto: resp("🧮", "Calculadora", "• *!calc 12*(3+4)* resuelve la cuenta.", "• Entiende + − × ÷ ^ % paréntesis, pi y sqrt().")},
 			{ID: "r_hora", Tipo: PasoRespuesta, Texto: resp("🕒", "Hora en el mundo", "• *!hora* muestra la hora aquí y en otras ciudades.", "• *!hora Tokio* o *!hora Bogotá* la de esa ciudad.")},
 			{ID: "r_dolar", Tipo: PasoRespuesta, Texto: resp("💵", "Dólar", "• *!dolar* muestra cuánto vale hoy.", "• *!dolar 100* convierte 100 dólares a pesos y euros.")},
-			{ID: "r_definir", Tipo: PasoRespuesta, Texto: resp("📚", "Qué significa algo", "• *!definir fotosíntesis* te explica el tema (de Wikipedia).")},
+			{ID: "r_definir", Tipo: PasoRespuesta, Texto: resp("📚", "Buscar y definir", "• *!definir fotosíntesis* te explica el tema (de Wikipedia).", "• *!buscar historia de México* trae los mejores resultados con su enlace.")},
 			{ID: "r_enlaces", Tipo: PasoRespuesta, Texto: resp("🔗", "Acortar y QR", "• *!acortar https://…* te da un enlace corto.", "• *!qr https://…* te manda el código QR en una imagen.")},
 			{ID: "r_juegos", Tipo: PasoRespuesta, Texto: resp("🎲", "Juegos", "• *!juegos* muestra los disponibles: dado, piedra papel o tijera, ruleta, adivina el número, tres en raya y trivia.", "• *!rendirse* termina tu partida.")},
 			{ID: "r_diversion", Tipo: PasoRespuesta, Texto: resp("😄", "Para pasar el rato", "• *!chiste* un chiste.", "• *!dato* un dato curioso.", "• *!frase* una frase para el día.")},
