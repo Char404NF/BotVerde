@@ -34,6 +34,10 @@ data class ConfigFiltroGrupo(
     val exentoAdmins: Boolean = true, val exentoRangos: List<Long> = emptyList(), val permitidos: List<String> = emptyList(),
     val palabras: List<String> = emptyList(), val max: Int = 0, val segundos: Int = 0, val silencioMin: Int = 60, val aviso: String = "",
     val modo: String = "todos", val bloqueados: List<String> = emptyList(), val acortadores: Boolean = false,
+    /** Escalado: desde la infracción número [escalaDesde] de una persona (en los últimos [escalaDias] días; 0 = siempre) se usa [escalaAccion]. 0 = sin escalado. */
+    val escalaDesde: Int = 0, val escalaDias: Int = 0, val escalaAccion: String = "borrar_advertir",
+    /** Personas concretas (su clave) que este filtro nunca cuenta. */
+    val exentoPersonas: List<String> = emptyList(),
 )
 
 data class FiltroGrupo(
@@ -42,7 +46,8 @@ data class FiltroGrupo(
     fun json(): String = JSONObject().put("chat", chat).put("filtro", filtro).put("activo", activo).put("accion", accion)
         .put("config", JSONObject().put("exentoAdmins", config.exentoAdmins).put("exentoRangos", JSONArray(config.exentoRangos)).put("permitidos", JSONArray(config.permitidos))
             .put("palabras", JSONArray(config.palabras)).put("max", config.max).put("segundos", config.segundos).put("silencioMin", config.silencioMin).put("aviso", config.aviso)
-            .put("modo", config.modo).put("bloqueados", JSONArray(config.bloqueados)).put("acortadores", config.acortadores)).toString()
+            .put("modo", config.modo).put("bloqueados", JSONArray(config.bloqueados)).put("acortadores", config.acortadores)
+            .put("escalaDesde", config.escalaDesde).put("escalaDias", config.escalaDias).put("escalaAccion", config.escalaAccion).put("exentoPersonas", JSONArray(config.exentoPersonas))).toString()
 }
 
 /** Si se puede silenciar, fijar y archivar en MI WhatsApp (hacen falta las llaves que comparte el teléfono principal). */
@@ -60,6 +65,12 @@ val ACCIONES_FILTRO = listOf(
     AccionFiltro("silenciar", "Ignorarla (el bot no le contesta)", "El bot deja de contestarle un rato.", false),
     AccionFiltro("expulsar", "Expulsar", "La saca del grupo.", true),
 )
+
+/** Nombre corto de cada filtro (para listas y contadores). */
+fun nombreFiltroGrupo(id: String) = when (id) {
+    "enlaces" -> "Enlaces"; "palabras" -> "Palabras prohibidas"; "repetidos" -> "Mensajes repetidos"; "flood" -> "Flood"
+    "stickers" -> "Stickers"; "audios" -> "Audios y notas de voz"; "reenviados" -> "Reenviados"; else -> id
+}
 
 fun textoAccionFiltro(id: String) = ACCIONES_FILTRO.firstOrNull { it.id == id }?.texto ?: id
 
@@ -121,7 +132,8 @@ object JsonGrupos {
             o.optString("chat"), o.optString("filtro"), o.optString("nombre"), o.optString("descripcion"), o.optBoolean("activo"), o.optString("accion", "avisarme"),
             ConfigFiltroGrupo(c.optBoolean("exentoAdmins", true), longs(c.optJSONArray("exentoRangos")), strs(c.optJSONArray("permitidos")), strs(c.optJSONArray("palabras")),
                 c.optInt("max"), c.optInt("segundos"), c.optInt("silencioMin", 60), c.optString("aviso"),
-                c.optString("modo", "todos"), strs(c.optJSONArray("bloqueados")), c.optBoolean("acortadores")),
+                c.optString("modo", "todos"), strs(c.optJSONArray("bloqueados")), c.optBoolean("acortadores"),
+                c.optInt("escalaDesde"), c.optInt("escalaDias"), c.optString("escalaAccion", "borrar_advertir"), strs(c.optJSONArray("exentoPersonas"))),
         )
     }
     fun filtros(json: String) = lista(json) { filtro(it) }

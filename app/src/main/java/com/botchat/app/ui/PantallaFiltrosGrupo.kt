@@ -49,6 +49,9 @@ import com.botchat.app.datos.ACCIONES_FILTRO
 import com.botchat.app.datos.ConfigFiltroGrupo
 import com.botchat.app.datos.EstadoGrupo
 import com.botchat.app.datos.FiltroGrupo
+import com.botchat.app.datos.InfractorFiltro
+import com.botchat.app.datos.infractoresGrupo
+import com.botchat.app.datos.reiniciarInfracciones
 import com.botchat.app.datos.Rango
 import com.botchat.app.datos.Repo
 import kotlinx.coroutines.launch
@@ -90,7 +93,7 @@ fun PantallaFiltrosGrupo(botId: Long, jid: String, alVolver: () -> Unit) {
             when {
                 error != null -> Text(error!!, Modifier.testTag("filtros_error"), color = MaterialTheme.colorScheme.error)
                 lista == null -> CircularProgressIndicator(Modifier.size(24.dp))
-                else -> lista.forEach { f -> TarjetaFiltro(f, admin, estado != null, rangos, ::guardar) { scope.launch { runCatching { Repo.restaurarFiltroGrupo(botId, jid, f.filtro) }.onFailure { avisaToast(ctx, textoError(it), true) }; cargar() } } }
+                else -> lista.forEach { f -> TarjetaFiltro(f, admin, estado != null, rangos, botId, jid, ::guardar) { scope.launch { runCatching { Repo.restaurarFiltroGrupo(botId, jid, f.filtro) }.onFailure { avisaToast(ctx, textoError(it), true) }; cargar() } } }
             }
         }
     }
@@ -124,7 +127,7 @@ private fun ListaEditable(titulo: String, ayuda: String, items: List<String>, et
 }
 
 @Composable
-private fun TarjetaFiltro(f: FiltroGrupo, admin: Boolean, estadoConocido: Boolean, rangos: List<Rango>, alGuardar: (FiltroGrupo) -> Unit, alRestaurar: () -> Unit) {
+private fun TarjetaFiltro(f: FiltroGrupo, admin: Boolean, estadoConocido: Boolean, rangos: List<Rango>, botId: Long, jid: String, alGuardar: (FiltroGrupo) -> Unit, alRestaurar: () -> Unit) {
     val c = f.config
     fun cfg(n: ConfigFiltroGrupo) = alGuardar(f.copy(config = n))
     val haptica = rememberHaptica()
@@ -190,6 +193,8 @@ private fun TarjetaFiltro(f: FiltroGrupo, admin: Boolean, estadoConocido: Boolea
             if (f.accion == "silenciar") Paso("Minutos de silencio", c.silencioMin, 5, 10080, 5, "silencio") { cfg(c.copy(silencioMin = it)) }
             if (f.accion == "avisar_grupo") OutlinedTextField(c.aviso, { cfg(c.copy(aviso = it)) }, Modifier.fillMaxWidth().testTag("aviso_${f.filtro}"), label = { Text("Texto del aviso (vacío = el de siempre)") }, minLines = 1)
 
+            SeccionContador(f, c, admin, estadoConocido, botId, jid) { cfg(it) }
+
             Text("A quién no se le aplica", style = MaterialTheme.typography.labelLarge)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Los administradores del grupo", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
@@ -204,7 +209,79 @@ private fun TarjetaFiltro(f: FiltroGrupo, admin: Boolean, estadoConocido: Boolea
                     }
                 }
             }
+            if (c.exentoPersonas.isNotEmpty()) {
+                Text("Personas que este filtro no cuenta (toca para quitar):", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
+                    c.exentoPersonas.forEach { p ->
+                        InputChip(false, { cfg(c.copy(exentoPersonas = c.exentoPersonas - p)) }, { Text("+" + p.substringBefore('@')) }, modifier = Modifier.testTag("exento_persona_${f.filtro}_${p.substringBefore('@')}"),
+                            trailingIcon = { Icon(Ico.Cerrar, "Quitar", Modifier.size(16.dp)) })
+                    }
+                }
+            }
             TextButton(alRestaurar, Modifier.testTag("restaurar_${f.filtro}")) { Text("Volver a los valores de fábrica") }
+        }
+    }
+}
+
+/** Contador de infracciones del filtro: quién lleva cuántas, escalado de la acción cuando repiten y reinicio del contador. */
+@Composable
+private fun SeccionContador(f: FiltroGrupo, c: ConfigFiltroGrupo, admin: Boolean, estadoConocido: Boolean, botId: Long, jid: String, cfg: (ConfigFiltroGrupo) -> Unit) {
+    val haptica = rememberHaptica()
+    val scope = rememberCoroutineScope()
+    val ctx = LocalContext.current
+    var ver by remember { mutableStateOf(false) }
+    var lista by remember { mutableStateOf<List<InfractorFiltro>?>(null) }
+    fun cargar() { scope.launch { lista = runCatching { Repo.infractoresGrupo(botId, jid, f.filtro) }.getOrElse { avisaToast(ctx, textoError(it), true); emptyList() } } }
+    fun reiniciar(persona: String) {
+        scope.launch {
+            runCatching { Repo.reiniciarInfracciones(botId, jid, persona, f.filtro) }.onFailure { avisaToast(ctx, textoError(it), true) }
+            cargar()
+        }
+    }
+    Text("Si repite", style = MaterialTheme.typography.labelLarge)
+    Text(
+        "Cada vez que alguien rompe este filtro se anota en su contador (solo el número, nunca el mensaje). Puedes cambiar lo que hago desde cierta infracción.",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Paso("Desde la infracción número (0 = sin cambio)", c.escalaDesde, 0, 50, 1, "escala_desde_${f.filtro}") { v ->
+        cfg(c.copy(escalaDesde = when { v == 1 && c.escalaDesde == 0 -> 2; v == 1 -> 0; else -> v }))
+    }
+    if (c.escalaDesde > 0) {
+        Text("Desde la ${c.escalaDesde}.ª hago esto:", style = MaterialTheme.typography.bodyMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
+            ACCIONES_FILTRO.forEach { a ->
+                val bloqueada = a.requiereAdmin && !admin && estadoConocido
+                FilterChip(c.escalaAccion == a.id, { haptica(Toque.Suave); cfg(c.copy(escalaAccion = a.id)) }, { Text(a.texto) }, enabled = !bloqueada || c.escalaAccion == a.id, modifier = Modifier.testTag("escala_accion_${f.filtro}_${a.id}"))
+            }
+        }
+        Text("Contar las infracciones de:", style = MaterialTheme.typography.bodyMedium)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Esp.s)) {
+            listOf(0 to "Siempre", 1 to "Hoy", 7 to "7 días", 30 to "30 días", 90 to "90 días").forEach { (d, t) ->
+                FilterChip(c.escalaDias == d, { haptica(Toque.Suave); cfg(c.copy(escalaDias = d)) }, { Text(t) }, modifier = Modifier.testTag("escala_dias_${f.filtro}_$d"))
+            }
+        }
+    }
+    OutlinedButton({ haptica(Toque.Suave); ver = !ver; if (ver) cargar() }, Modifier.fillMaxWidth().testTag("ver_infracciones_${f.filtro}")) {
+        Text(if (ver) "Ocultar quién lleva infracciones" else "Ver quién lleva infracciones")
+    }
+    if (ver) {
+        val l = lista
+        when {
+            l == null -> CircularProgressIndicator(Modifier.size(20.dp))
+            l.isEmpty() -> Text("Nadie lleva infracciones en este filtro.", Modifier.testTag("infractores_vacio_${f.filtro}"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else -> Column(verticalArrangement = Arrangement.spacedBy(Esp.s)) {
+                l.forEach { x ->
+                    Row(Modifier.fillMaxWidth().testTag("infractor_${f.filtro}_${x.persona.substringBefore('@')}"), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(x.titulo, style = MaterialTheme.typography.bodyMedium)
+                            Text(plural(x.total.toLong(), "infracción", "infracciones"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        TextButton({ reiniciar(x.persona) }, Modifier.testTag("reiniciar_${f.filtro}_${x.persona.substringBefore('@')}")) { Text("Reiniciar") }
+                        if (x.persona !in c.exentoPersonas) TextButton({ cfg(c.copy(exentoPersonas = c.exentoPersonas + x.persona)); reiniciar(x.persona) }, Modifier.testTag("eximir_${f.filtro}_${x.persona.substringBefore('@')}")) { Text("No contar") }
+                    }
+                }
+                TextButton({ reiniciar("") }, Modifier.testTag("reiniciar_todos_${f.filtro}")) { Text("Reiniciar a todos") }
+            }
         }
     }
 }

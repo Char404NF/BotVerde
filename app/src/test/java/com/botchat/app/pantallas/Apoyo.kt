@@ -848,6 +848,7 @@ class MotorFalso : Motor {
     override fun respuestasRestaurar(bot: Long): Long { llamadas += "respuestas_restaurar"; val o = JSONObject(respuestasJson); val f = o.getJSONArray("filas"); for (i in 0 until f.length()) f.getJSONObject(i).put("propio", ""); respuestasJson = o.put("reemplazos", JSONArray()).toString(); return 1 }
     override fun reemplazosFijar(bot: Long, listaJson: String) { llamadas += "reemplazos:$listaJson"; respuestasJson = JSONObject(respuestasJson).put("reemplazos", JSONArray(listaJson)).toString() }
     var perfilBaneado = false
+    var perfilInfracciones = "[]"
     override fun grupoMiembrosAdmin(bot: Long, grupo: String): String { defectosAdmin(); llamadas += "miembrosAdmin:$grupo"; return miembrosAdminJson }
     override fun grupoSuscribirPresencias(bot: Long, grupo: String) { llamadas += "suscribirPresencias:$grupo" }
     override fun grupoPerfilMiembro(bot: Long, grupo: String, persona: String): String {
@@ -856,10 +857,23 @@ class MotorFalso : Motor {
         val ms = JSONObject(miembrosAdminJson).getJSONArray("miembros")
         for (i in 0 until ms.length()) if (ms.getJSONObject(i).getString("persona") == persona) o.put("miembro", ms.getJSONObject(i))
         if (perfilBaneado) { o.getJSONObject("miembro").put("baneado", true); o.put("motivoBan", "vendía cosas") }
+        o.put("infracciones", JSONArray(perfilInfracciones))
         return o.toString()
     }
     override fun grupoHistorial(bot: Long, grupo: String, antes: Long, limite: Long): String { defectosAdmin(); llamadas += "historial:$antes"; return if (antes > 0) "[]" else historialJson }
     override fun grupoBaneados(bot: Long, grupo: String): String { defectosAdmin(); return baneadosJson }
+    /** Quién lleva infracciones (persona, nombre, total); el mismo contador para cualquier filtro. */
+    var infractores = mutableListOf("5215511111111@s.whatsapp.net|Ana|3", "5215522222222@s.whatsapp.net|Luis|1")
+    override fun grupoInfractores(bot: Long, grupo: String, filtro: String, limite: Long): String {
+        llamadas += "infractores:$filtro"
+        return JSONArray(infractores.map { val (p, n, t) = it.split("|"); JSONObject().put("persona", p).put("nombre", n).put("total", t.toInt()).put("ultima", 1763000000L) }).toString()
+    }
+    override fun grupoReiniciarInfracciones(bot: Long, grupo: String, persona: String, filtro: String): Long {
+        llamadas += "reiniciarInfracciones:$persona:$filtro"
+        val antes = infractores.size
+        infractores = if (persona.isEmpty()) mutableListOf() else infractores.filterNot { it.startsWith("$persona|") }.toMutableList()
+        return (antes - infractores.size).toLong()
+    }
     override fun grupoBanear(bot: Long, grupo: String, persona: String, motivo: String) { llamadas += "grupoBanear:$persona:$motivo"; gFalla() }
     override fun grupoDesbanear(bot: Long, grupo: String, persona: String) { llamadas += "grupoDesbanear:$persona"; gFalla(); baneadosJson = "[]" }
     override fun grupoHorario(bot: Long, grupo: String) = horarioJson

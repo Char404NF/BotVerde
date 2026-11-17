@@ -433,3 +433,115 @@ func TestComandoFiltros(t *testing.T) {
 		t.Fatalf("%q", r.Texto)
 	}
 }
+
+func (e *entorno) rompe(quien, texto string) *Infraccion {
+	e.hora = e.hora.Add(time.Minute)
+	inf := e.s.Evaluar(e.msg(quien, texto))
+	e.s.Aplicar(ctx(), inf)
+	return inf
+}
+
+func TestElContadorDeInfraccionesEsPorPersonaYPorFiltro(t *testing.T) {
+	e := nuevo(t, true)
+	e.filtro(FiltroEnlaces, true, AccAvisarme, nil)
+	e.filtro(FiltroPalabras, true, AccAvisarme, func(c *ConfigFiltro) { c.Palabras = []string{"spamazo"} })
+	e.rompe(pnLuis, "https://a.com")
+	e.rompe(pnLuis, "https://b.com")
+	e.rompe(pnLuis, "https://c.com")
+	e.rompe(pnLuis, "spamazo total")
+	e.rompe(pnRosa, "https://d.com")
+	cuenta := func(p, f string) int { return e.alm.ContarInfraccionesFiltro(1, grupoJID, p, f, e.hora, 0) }
+	if cuenta(pnLuis, FiltroEnlaces) != 3 || cuenta(pnLuis, FiltroPalabras) != 1 || cuenta(pnRosa, FiltroEnlaces) != 1 || cuenta(pnRosa, FiltroPalabras) != 0 {
+		t.Fatalf("luis enlaces=%d palabras=%d, ana enlaces=%d", cuenta(pnLuis, FiltroEnlaces), cuenta(pnLuis, FiltroPalabras), cuenta(pnRosa, FiltroEnlaces))
+	}
+	top := e.alm.InfractoresDeFiltro(1, grupoJID, FiltroEnlaces, 10)
+	if len(top) != 2 || top[0].Persona != pnLuis || top[0].Total != 3 || top[1].Total != 1 {
+		t.Fatalf("top: %+v", top)
+	}
+	if per := e.alm.InfraccionesDePersona(1, grupoJID, pnLuis); len(per) != 2 || per[0].Filtro != FiltroEnlaces || per[0].Total != 3 {
+		t.Fatalf("persona: %+v", per)
+	}
+	// reiniciar solo uno de los contadores
+	if n, err := e.alm.BorrarInfraccionesFiltro(1, grupoJID, pnLuis, FiltroEnlaces); err != nil || n != 3 || cuenta(pnLuis, FiltroPalabras) != 1 {
+		t.Fatalf("reiniciar: %d %v", n, err)
+	}
+	// el texto del mensaje nunca queda guardado
+	acs, _ := e.alm.ListarAcciones(1, 100, 0)
+	for _, a := range acs {
+		if strings.Contains(a.Detalle, "a.com") || strings.Contains(a.Detalle, "spamazo") {
+			t.Fatalf("texto en el registro: %+v", a)
+		}
+	}
+}
+
+func TestEscaladoPorContadorCambiaLaAccionDesdeLaInfraccionN(t *testing.T) {
+	e := nuevo(t, true)
+	e.filtro(FiltroEnlaces, true, AccAvisarme, func(c *ConfigFiltro) { c.EscalaDesde, c.EscalaAccion, c.EscalaDias = 3, AccBorrar, 1 })
+	e.rompe(pnLuis, "https://a.com")
+	e.rompe(pnLuis, "https://b.com")
+	if len(e.borr) != 0 {
+		t.Fatalf("antes de la tercera solo avisa: %v", e.borr)
+	}
+	if inf := e.rompe(pnLuis, "https://c.com"); inf == nil || inf.Numero != 3 || !inf.Escalada || len(e.borr) != 1 {
+		t.Fatalf("la tercera borra: %+v %v", inf, e.borr)
+	}
+	// otra persona empieza de cero
+	if inf := e.rompe(pnRosa, "https://d.com"); inf.Numero != 1 || inf.Escalada || len(e.borr) != 1 {
+		t.Fatalf("Ana: %+v %v", inf, e.borr)
+	}
+	// la ventana de 1 día: dos días después Luis vuelve a empezar
+	e.hora = e.hora.Add(48 * time.Hour)
+	if inf := e.rompe(pnLuis, "https://e.com"); inf.Numero != 1 || inf.Escalada {
+		t.Fatalf("fuera de la ventana: %+v", inf)
+	}
+}
+
+func TestExentoPorPersonaNoCuentaNiActua(t *testing.T) {
+	e := nuevo(t, true)
+	e.filtro(FiltroEnlaces, true, AccBorrar, func(c *ConfigFiltro) { c.ExentoPersonas = []string{pnLuis} })
+	e.rompe(pnLuis, "https://a.com")
+	if len(e.borr) != 0 || e.alm.ContarInfraccionesFiltro(1, grupoJID, pnLuis, FiltroEnlaces, e.hora, 0) != 0 {
+		t.Fatalf("la persona exenta no cuenta: %v", e.borr)
+	}
+	e.rompe(pnRosa, "https://b.com")
+	if len(e.borr) != 1 {
+		t.Fatalf("las demás sí: %v", e.borr)
+	}
+}
+
+func TestGuardarFiltroValidaElEscalado(t *testing.T) {
+	e := nuevo(t, true)
+	for _, c := range []ConfigFiltro{{EscalaDesde: 1}, {EscalaDesde: 99}, {EscalaDesde: 3, EscalaAccion: "inventada"}, {EscalaDias: 400}} {
+		x := filtroDefecto(grupoJID, FiltroEnlaces)
+		cc := x.Config
+		cc.EscalaDesde, cc.EscalaDias, cc.EscalaAccion = c.EscalaDesde, c.EscalaDias, c.EscalaAccion
+		x.Config = cc
+		if err := e.s.GuardarFiltro("yo", x); err == nil {
+			t.Errorf("debía rechazar %+v", c)
+		}
+	}
+}
+
+func TestComandoInfracciones(t *testing.T) {
+	e := nuevo(t, true)
+	e.rol("Mod", "grupos.filtros")
+	e.rol("Raso")
+	e.da(pnAna, "Mod")
+	e.da(pnLuis, "Raso")
+	if r := e.en(pnLuis, "!infracciones"); !strings.Contains(r.Texto, "No tienes permiso") {
+		t.Fatalf("%q", r.Texto)
+	}
+	if r := e.en(pnAna, "!infracciones"); !strings.Contains(r.Texto, "Nadie lleva infracciones") {
+		t.Fatalf("%q", r.Texto)
+	}
+	e.filtro(FiltroEnlaces, true, AccAvisarme, nil)
+	e.filtro(FiltroPalabras, true, AccAvisarme, func(c *ConfigFiltro) { c.Palabras = []string{"spamazo"} })
+	e.rompe(pnLuis, "https://a.com")
+	e.rompe(pnLuis, "https://b.com")
+	e.rompe(pnLuis, "spamazo total")
+	e.rompe(pnRosa, "https://c.com")
+	r := e.en(pnAna, "!infracciones")
+	if !strings.Contains(r.Texto, "Quién lleva más infracciones") || !strings.Contains(r.Texto, "1. ") || !strings.Contains(r.Texto, "*3*") {
+		t.Fatalf("ranking: %q", r.Texto)
+	}
+}

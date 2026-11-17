@@ -242,6 +242,43 @@ class GruposUiTest {
         regla.espera { motor.llamadas.any { it.contains("\"palabras\":[\"estafa\"]") } }
     }
 
+    @Test fun cadaFiltroTieneEscaladoPorContadorYListaDeInfractores() {
+        filtros()
+        regla.esperaEtiqueta("sw_filtro_enlaces")
+        nodo("sw_filtro_enlaces").performClick()
+        regla.esperaEtiqueta("escala_desde_enlaces_valor")
+        assertFalse(hay("escala_accion_enlaces_borrar")) // sin escalado no hay más opciones
+        nodo("escala_desde_enlaces_mas").performScrollTo().performClick() // de 0 salta a 2 (la primera infracción es la acción de siempre)
+        regla.espera { motor.llamadas.any { it.contains("\"filtro\":\"enlaces\"") && it.contains("\"escalaDesde\":2") } }
+        regla.esperaEtiqueta("escala_accion_enlaces_expulsar")
+        nodo("escala_accion_enlaces_expulsar").performScrollTo().performClick()
+        regla.espera { motor.llamadas.any { it.contains("\"escalaAccion\":\"expulsar\"") } }
+        nodo("escala_dias_enlaces_30").performScrollTo().performClick()
+        regla.espera { motor.llamadas.any { it.contains("\"escalaDias\":30") } }
+        nodo("escala_desde_enlaces_menos").performScrollTo().performClick() // de 2 vuelve a 0
+        regla.espera { motor.llamadas.last { it.startsWith("grupoFiltro:") }.contains("\"escalaDesde\":0") }
+    }
+
+    @Test fun lasInfraccionesSeVenSeReiniciaYSePuedeEximirAUnaPersona() {
+        filtros()
+        regla.esperaEtiqueta("sw_filtro_palabras")
+        nodo("sw_filtro_palabras").performClick()
+        regla.esperaEtiqueta("ver_infracciones_palabras")
+        nodo("ver_infracciones_palabras").performScrollTo().performClick()
+        regla.esperaEtiqueta("infractor_palabras_5215511111111")
+        regla.esperaTexto("3 infracciones")
+        regla.esperaTexto("1 infracción")
+        assertTrue(llamo("infractores:palabras"))
+        nodo("reiniciar_palabras_5215522222222").performScrollTo().performClick() // Luis
+        regla.espera { llamo("reiniciarInfracciones:5215522222222@s.whatsapp.net:palabras") }
+        regla.espera { !hay("infractor_palabras_5215522222222") }
+        nodo("eximir_palabras_5215511111111").performScrollTo().performClick() // Ana no se cuenta más
+        regla.espera { motor.llamadas.any { it.contains("\"exentoPersonas\":[\"5215511111111@s.whatsapp.net\"]") } }
+        regla.esperaEtiqueta("exento_persona_palabras_5215511111111")
+        regla.espera { !hay("infractor_palabras_5215511111111") }
+        regla.esperaEtiqueta("infractores_vacio_palabras")
+    }
+
     @Test fun repetidosYFloodTienenLimitesAjustables() {
         filtros()
         regla.esperaEtiqueta("sw_filtro_flood")

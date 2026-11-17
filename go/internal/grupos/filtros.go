@@ -79,6 +79,13 @@ type ConfigFiltro struct {
 	Modo         string   `json:"modo"`         // enlaces: "todos" (cualquier enlace, menos los permitidos) o "adultos" (solo adultos, bloqueados y acortadores si se pide)
 	Bloqueados   []string `json:"bloqueados"`   // enlaces: dominios que nunca se permiten (modo adultos)
 	Acortadores  bool     `json:"acortadores"`  // enlaces: bloquear también los acortadores (bit.ly…)
+	// Escalado por contador: desde la infracción número EscalaDesde de una misma persona en este filtro (dentro de EscalaDias días; 0 =
+	// sin límite de días) se usa EscalaAccion en lugar de la acción de siempre. EscalaDesde 0 = sin escalado.
+	EscalaDesde  int    `json:"escalaDesde"`
+	EscalaDias   int    `json:"escalaDias"`
+	EscalaAccion string `json:"escalaAccion"`
+	// ExentoPersonas son personas concretas que este filtro nunca cuenta (su clave canónica).
+	ExentoPersonas []string `json:"exentoPersonas"`
 }
 
 // Filtro es un filtro de un grupo, con sus valores de fábrica si nunca se tocó.
@@ -115,7 +122,7 @@ func nombreFiltro(f string) (nombre, desc string) {
 func filtroDefecto(chat, f string) Filtro {
 	n, d := nombreFiltro(f)
 	x := Filtro{Chat: chat, Filtro: f, Nombre: n, Descripcion: d, Accion: AccAvisarme,
-		Config: ConfigFiltro{ExentoAdmins: true, ExentoRangos: []int64{}, Permitidos: []string{}, Palabras: []string{}, Bloqueados: []string{}, Modo: "todos", SilencioMin: 60}}
+		Config: ConfigFiltro{ExentoAdmins: true, ExentoRangos: []int64{}, Permitidos: []string{}, Palabras: []string{}, Bloqueados: []string{}, ExentoPersonas: []string{}, Modo: "todos", SilencioMin: 60, EscalaAccion: AccBorrarAdv}}
 	switch f {
 	case FiltroEnlaces:
 		x.Config.Modo = "todos"
@@ -255,6 +262,22 @@ func (s *Servicio) GuardarFiltro(actor string, f Filtro) error {
 		return fallo("el aviso es demasiado largo (máximo 300 letras)", nil)
 	}
 	c.Aviso = strings.TrimSpace(c.Aviso)
+	if c.EscalaDesde < 0 || c.EscalaDesde > 50 {
+		return fallo("el escalado va de la infracción 2 a la 50 (0 lo apaga)", nil)
+	}
+	if c.EscalaDesde == 1 {
+		return fallo("el escalado empieza en la infracción 2 o más; para cambiar la acción desde la primera usa «Qué hace»", nil)
+	}
+	if c.EscalaDias < 0 || c.EscalaDias > 365 {
+		return fallo("los días del contador deben estar entre 1 y 365 (0 = siempre)", nil)
+	}
+	if c.EscalaAccion == "" {
+		c.EscalaAccion = AccBorrarAdv
+	}
+	if c.EscalaDesde > 0 && !EsAccionFiltro(c.EscalaAccion) {
+		return ErrAccionNoHay
+	}
+	c.ExentoPersonas = limpiaLista(c.ExentoPersonas, 100, 120, func(p string) string { return strings.TrimSpace(p) })
 	if c.ExentoRangos == nil {
 		c.ExentoRangos = []int64{}
 	}
@@ -386,6 +409,9 @@ type Infraccion struct {
 	Entrada
 	Filtro Filtro
 	Motivo string // "enlace", "palabra", "repetido", "flood" (sin textos)
+	// Numero es cuántas infracciones lleva ya esa persona en este filtro (con esta); Escalada dice si por eso se usó la acción de escalado.
+	Numero   int
+	Escalada bool
 }
 
 type marcaTexto struct {
@@ -575,6 +601,11 @@ func (s *Servicio) Exento(ctx context.Context, chat, persona string, c ConfigFil
 	if p == almacen.PersonaDueno {
 		return true
 	}
+	for _, x := range c.ExentoPersonas {
+		if x != "" && (x == p || x == persona) {
+			return true
+		}
+	}
 	if s.Perm != nil {
 		if r := s.Perm.RolDe(p); r != nil {
 			if r.EsDueno {
@@ -628,7 +659,7 @@ func (s *Servicio) alerta(inf *Infraccion, detalle string) {
 		nombre = "Alguien"
 	}
 	titulo := "Filtro de " + strings.ToLower(inf.Filtro.Nombre)
-	cuerpo := fmt.Sprintf("%s rompió el filtro en %s.", nombre, s.nombreGrupo(inf.Chat))
+	cuerpo := fmt.Sprintf("%s rompió el filtro en %s (infracción %d).", nombre, s.nombreGrupo(inf.Chat), inf.Numero)
 	if detalle != "" {
 		cuerpo += " " + detalle
 	}
@@ -645,11 +676,18 @@ func (s *Servicio) Aplicar(ctx context.Context, inf *Infraccion) {
 	}
 	ctx = almacen.ConEtiqueta(ctx, "filtro")
 	f := inf.Filtro
-	reg := func(res, det string) {
-		s.registra(almacen.PersonaDueno, "filtro."+f.Filtro, inf.Persona, inf.Chat, res, "accion="+f.Accion+det)
-	}
 	if s.Exento(ctx, inf.Chat, inf.Persona, f.Config) {
 		return
+	}
+	// contador: cada infracción queda anotada (sin el texto) y, si el filtro tiene escalado, a partir de la número N se usa otra acción
+	n, _ := s.Alm.RegistrarInfraccionFiltro(s.BotID, inf.Chat, inf.Persona, f.Filtro, s.ahora(), f.Config.EscalaDias)
+	inf.Numero = n
+	if f.Config.EscalaDesde > 0 && n >= f.Config.EscalaDesde && EsAccionFiltro(f.Config.EscalaAccion) {
+		f.Accion = f.Config.EscalaAccion
+		inf.Escalada = true
+	}
+	reg := func(res, det string) {
+		s.registra(almacen.PersonaDueno, "filtro."+f.Filtro, inf.Persona, inf.Chat, res, fmt.Sprintf("accion=%s,n=%d%s", f.Accion, n, det))
 	}
 	soloAlerta := func(motivo string) {
 		s.alerta(inf, "No hice la acción ("+motivo+"): decide tú.")

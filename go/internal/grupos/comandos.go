@@ -11,6 +11,7 @@ import (
 
 	"botchat/internal/almacen"
 	"botchat/internal/comandos"
+	"botchat/internal/estilo"
 )
 
 func ctxCmd() (context.Context, context.CancelFunc) {
@@ -542,6 +543,42 @@ func (s *Servicio) RegistrarComandos(d *comandos.Despachador) {
 				return "", err
 			}
 			return s.r("grupo.mensaje_borrado"), nil
+		}})
+	reg(comandos.Comando{Nombre: "infracciones", Alias: []string{"infracc"}, Resumen: "Ver cuántas infracciones de filtros lleva una persona (o quién lleva más)", Uso: "infracciones [persona]",
+		Casilla: "grupos.filtros", Ambito: comandos.Grupo,
+		Ejecutar: func(cx *comandos.Contexto) (string, error) {
+			chat, _, err := s.grupoDe(cx)
+			if err != nil {
+				return "", err
+			}
+			nombreDe := func(f string) string {
+				n, _ := nombreFiltro(f)
+				return n
+			}
+			if p, _, ok := cx.Objetivo(); ok {
+				l := s.Alm.InfraccionesDePersona(s.BotID, chat, p)
+				if len(l) == 0 {
+					return "Esa persona no lleva infracciones en este grupo.", nil
+				}
+				var lineas []string
+				for _, x := range l {
+					lineas = append(lineas, fmt.Sprintf("• %s: *%d*", nombreDe(x.Filtro), x.Total))
+				}
+				return estilo.Tarjeta("🚦", "Infracciones de "+s.Alm.NombreDePersona(s.BotID, p), lineas, ""), nil
+			}
+			top := s.Alm.InfractoresDeFiltro(s.BotID, chat, "", 10)
+			if len(top) == 0 {
+				return "Nadie lleva infracciones en este grupo.", nil
+			}
+			var lineas []string
+			for i, x := range top {
+				n := x.Nombre
+				if n == "" {
+					n = x.Telefono
+				}
+				lineas = append(lineas, fmt.Sprintf("%d. %s — *%d*", i+1, n, x.Total))
+			}
+			return estilo.Tarjeta("🚦", "Quién lleva más infracciones", lineas, "Escribe "+cx.D.Prefijo()+"infracciones @persona para ver el detalle"), nil
 		}})
 	reg(comandos.Comando{Nombre: "filtros", Resumen: "Ver y cambiar los filtros del grupo", Casilla: "grupos.filtros", Ambito: comandos.Grupo,
 		Uso: "filtros | filtros <enlaces|palabras|repetidos|flood> on|off | accion <acción> | agregar/quitar <texto> | permitir <dominio> | limite <n> <segundos>",

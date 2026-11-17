@@ -958,6 +958,19 @@ var migraciones = [][]string{
 			PRIMARY KEY (bot_id, grupo)
 		) WITHOUT ROWID`,
 	},
+	// Contador de infracciones: cada vez que alguien rompe un filtro de un grupo queda una fila (sin el texto del mensaje).
+	{
+		`CREATE TABLE filtro_infracciones (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			bot_id INTEGER NOT NULL,
+			grupo TEXT NOT NULL,
+			persona TEXT NOT NULL,
+			filtro TEXT NOT NULL,
+			ts INTEGER NOT NULL
+		)`,
+		`CREATE INDEX idx_filtro_inf_persona ON filtro_infracciones(bot_id, grupo, persona, filtro, ts)`,
+		`CREATE INDEX idx_filtro_inf_ts ON filtro_infracciones(bot_id, ts)`,
+	},
 }
 
 func (a *Almacen) migrar(ctx context.Context) error {

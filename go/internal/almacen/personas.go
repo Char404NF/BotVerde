@@ -689,6 +689,7 @@ func (a *Almacen) OlvidarPersona(botID int64, persona string) (*ResultadoOlvidar
 	a.olvidarModulosPersona(botID, lista, fs)
 	res.Advertencias = del(`DELETE FROM advertencias WHERE bot_id=? AND persona IN ` + lista)
 	del(`DELETE FROM persona_silencio WHERE bot_id=? AND persona IN ` + lista)
+	del(`DELETE FROM filtro_infracciones WHERE bot_id=? AND persona IN ` + lista)
 	a.limpiaSilencioDe(botID, lista, fs)
 	a.OlvidarAutoPersona(botID, fs)
 	del(`DELETE FROM persona_rol WHERE bot_id=? AND persona IN ` + lista)

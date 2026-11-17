@@ -42,7 +42,7 @@ func TestMigracion22ConservaAdvertenciasSinCaducidad(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer b.Cerrar()
-	if b.Version() != 24 {
+	if b.Version() != len(migraciones) {
 		t.Fatalf("versión %d", b.Version())
 	}
 	// ts = 100 (1970) y aun así vale: caduca_ts = 0 = no caduca

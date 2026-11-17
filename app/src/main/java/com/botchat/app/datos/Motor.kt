@@ -357,6 +357,8 @@ interface Motor {
     fun grupoPerfilMiembro(bot: Long, grupo: String, persona: String): String = "{}"
     fun grupoHistorial(bot: Long, grupo: String, antes: Long, limite: Long): String = "[]"
     fun grupoBaneados(bot: Long, grupo: String): String = "[]"
+    fun grupoInfractores(bot: Long, grupo: String, filtro: String, limite: Long): String = "[]"
+    fun grupoReiniciarInfracciones(bot: Long, grupo: String, persona: String, filtro: String): Long = 0
     fun grupoBanear(bot: Long, grupo: String, persona: String, motivo: String) {}
     fun grupoDesbanear(bot: Long, grupo: String, persona: String) {}
     fun grupoHorario(bot: Long, grupo: String): String = "{}"
@@ -715,6 +717,8 @@ object MotorGo : Motor {
     override fun grupoPerfilMiembro(bot: Long, grupo: String, persona: String) = Wabot.grupoPerfilMiembro(bot, grupo, persona)
     override fun grupoHistorial(bot: Long, grupo: String, antes: Long, limite: Long) = Wabot.grupoHistorial(bot, grupo, antes, limite)
     override fun grupoBaneados(bot: Long, grupo: String) = Wabot.grupoBaneados(bot, grupo)
+    override fun grupoInfractores(bot: Long, grupo: String, filtro: String, limite: Long) = Wabot.grupoInfractores(bot, grupo, filtro, limite)
+    override fun grupoReiniciarInfracciones(bot: Long, grupo: String, persona: String, filtro: String) = Wabot.grupoReiniciarInfracciones(bot, grupo, persona, filtro)
     override fun grupoBanear(bot: Long, grupo: String, persona: String, motivo: String) = Wabot.grupoBanear(bot, grupo, persona, motivo)
     override fun grupoDesbanear(bot: Long, grupo: String, persona: String) = Wabot.grupoDesbanear(bot, grupo, persona)
     override fun grupoHorario(bot: Long, grupo: String) = Wabot.grupoHorario(bot, grupo)

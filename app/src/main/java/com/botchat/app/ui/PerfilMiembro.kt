@@ -52,6 +52,8 @@ import androidx.compose.ui.unit.dp
 import com.botchat.app.datos.EstadoGrupo
 import com.botchat.app.datos.PerfilMiembroAdmin
 import com.botchat.app.datos.Repo
+import com.botchat.app.datos.nombreFiltroGrupo
+import com.botchat.app.datos.reiniciarInfracciones
 import com.botchat.app.datos.banear
 import com.botchat.app.datos.desbanear
 import com.botchat.app.datos.perfilMiembro
@@ -173,6 +175,7 @@ private fun PestanaResumenPerfil(botId: Long, jid: String, p: PerfilMiembroAdmin
             }
             if (p.silenciado) Text("Silenciada ${textoDuracionFin(p.silencioHasta)}: el bot borra lo que escriba.", Modifier.testTag("perfil_silencio"), style = MaterialTheme.typography.bodyMedium, color = ROJO_SILENCIO)
             if (p.miembro.baneado) Text("Baneada" + (if (p.motivoBan.isNotBlank()) ": ${p.motivoBan}" else ""), Modifier.testTag("perfil_motivo_ban"), style = MaterialTheme.typography.bodyMedium, color = ROJO_SILENCIO)
+            if (p.infracciones.isNotEmpty()) InfraccionesPerfil(botId, jid, p)
         }
         TituloSeccion("Rango en el bot")
         TarjetaRango(botId, p.miembro.persona, p.miembro.titulo)
@@ -327,5 +330,26 @@ private fun DialogosMiembro(botId: Long, jid: String, p: PerfilMiembroAdmin, dia
             confirmButton = { TextButton({ cerrar(); hacer("Listo: ya puede volver") { Repo.desbanear(botId, jid, m.persona) } }, Modifier.testTag("confirmar_desbanear_perfil")) { Text("Quitar baneo") } },
             dismissButton = { TextButton({ cerrar() }) { Text("Cancelar") } },
         )
+    }
+}
+
+/** Cuántas infracciones lleva la persona en cada filtro del grupo, con botón para ponerle el contador en cero. */
+@Composable
+private fun InfraccionesPerfil(botId: Long, jid: String, p: PerfilMiembroAdmin) {
+    val scope = rememberCoroutineScope()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var lista by remember(p.infracciones) { mutableStateOf(p.infracciones) }
+    if (lista.isEmpty()) return
+    Column(Modifier.fillMaxWidth().testTag("perfil_infracciones"), verticalArrangement = Arrangement.spacedBy(Esp.xs)) {
+        Text("Infracciones de filtros", style = MaterialTheme.typography.titleSmall)
+        lista.forEach { x ->
+            Text("${nombreFiltroGrupo(x.filtro)}: ${plural(x.total.toLong(), "infracción", "infracciones")}", Modifier.testTag("perfil_infraccion_${x.filtro}"), style = MaterialTheme.typography.bodyMedium)
+        }
+        TextButton({
+            scope.launch {
+                runCatching { Repo.reiniciarInfracciones(botId, jid, p.miembro.persona) }
+                    .onSuccess { lista = emptyList() }.onFailure { avisaToast(ctx, textoError(it), true) }
+            }
+        }, Modifier.testTag("perfil_reiniciar_infracciones")) { Text("Reiniciar el contador") }
     }
 }

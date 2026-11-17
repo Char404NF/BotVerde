@@ -198,6 +198,23 @@ class AdminGrupoUiTest {
 
     // ---------- Perfil ----------
 
+    @Test fun elPerfilMuestraLasInfraccionesDeFiltrosYPermiteReiniciarlas() {
+        motor.perfilInfracciones = """[{"filtro":"enlaces","total":3,"ultima":1763000000},{"filtro":"palabras","total":1,"ultima":1763000000}]"""
+        perfil()
+        regla.esperaEtiqueta("perfil_infracciones")
+        regla.esperaTexto("Enlaces: 3 infracciones")
+        regla.esperaTexto("Palabras prohibidas: 1 infracción")
+        toca("perfil_reiniciar_infracciones")
+        regla.espera { llamo("reiniciarInfracciones:$ana:") }
+        regla.espera { !hay("perfil_infracciones") }
+    }
+
+    @Test fun sinInfraccionesElPerfilNoMuestraLaSeccion() {
+        perfil()
+        regla.esperaEtiqueta("perfil_nombre")
+        assertFalse(hay("perfil_infracciones"))
+    }
+
     @Test fun elPerfilMuestraCabeceraDatosYComparacion() {
         perfil()
         regla.esperaEtiqueta("perfil_nombre")

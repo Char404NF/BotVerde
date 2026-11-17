@@ -138,7 +138,7 @@ func TestLabAjustesPorDefectoApagados(t *testing.T) {
 	if a.AjusteBot(1, "lab_activo") != "0" || a.AjusteBot(1, "lab_modo_menu") != "botones" || a.AjusteBot(1, "lab_grupos") != "0" {
 		t.Fatal("el Laboratorio nace apagado, con los menús en botones (solo privado) y sin grupos")
 	}
-	if a.Version() != len(migraciones) || len(migraciones) != 24 {
+	if a.Version() != len(migraciones) || len(migraciones) != 25 {
 		t.Fatalf("versión %d", a.Version())
 	}
 }

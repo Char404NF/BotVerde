@@ -38,6 +38,8 @@ type PerfilMiembro struct {
 	Silenciado    bool                  `json:"silenciado"`
 	Historial     []almacen.EventoGrupo `json:"historial"`
 	Desde         int64                 `json:"desde"` // primer mensaje que el bot guardó del grupo
+	// Infracciones: cuántas lleva la persona en cada filtro del grupo.
+	Infracciones []almacen.InfraccionesPersona `json:"infracciones"`
 }
 
 func presenciaDePersona(persona, jid string) (bool, int64) {
@@ -200,6 +202,7 @@ func GrupoPerfilMiembro(botID int64, grupo, persona string) (string, error) {
 		}
 	}
 	p.Historial, _ = a.HistorialGrupo(botID, grupo, canon, 0, 50)
+	p.Infracciones = a.InfraccionesDePersona(botID, grupo, canon)
 	return js(p, nil)
 }
 
@@ -428,4 +431,34 @@ func GrupoFijar(botID int64, chat, msgID string, dias int, fijar bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 	return g.FijarMensaje(ctx, dueno(), chat, msgID, dias, fijar)
+}
+
+// GrupoInfractores devuelve (JSON) quién lleva más infracciones en un filtro del grupo (filtro vacío = todos los filtros juntos).
+func GrupoInfractores(botID int64, grupo, filtro string, limite int) (string, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return "", err
+	}
+	if filtro != "" && !grupos.EsFiltro(filtro) {
+		return "", errors.New("Ese filtro no existe.")
+	}
+	return js(a.InfractoresDeFiltro(botID, grupo, filtro, limite), nil)
+}
+
+// GrupoReiniciarInfracciones pone en cero el contador de una persona (o de todas si persona va vacía) en un filtro (o en todos si va vacío).
+// Devuelve cuántas infracciones borró.
+func GrupoReiniciarInfracciones(botID int64, grupo, persona, filtro string) (int64, error) {
+	a, err := almacenAbierto()
+	if err != nil {
+		return 0, err
+	}
+	if filtro != "" && !grupos.EsFiltro(filtro) {
+		return 0, errors.New("Ese filtro no existe.")
+	}
+	n, err := a.BorrarInfraccionesFiltro(botID, grupo, persona, filtro)
+	if err != nil {
+		return 0, err
+	}
+	a.RegistrarAccion(botID, almacen.PersonaDueno, "grupo.infracciones_reiniciar", persona, grupo, "ok", filtro)
+	return int64(n), nil
 }

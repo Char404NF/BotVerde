@@ -42,7 +42,16 @@ data class EventoGrupo(
 data class PerfilMiembroAdmin(
     val miembro: MiembroAdmin, val serie: List<PuntoDia>, val horas: List<Int>, val promedioDia: Double, val mediaGrupo: Double,
     val puesto: Int, val activos: Int, val motivoBan: String, val silenciado: Boolean, val silencioHasta: Long, val historial: List<EventoGrupo>, val desde: Long,
+    /** Cuántas infracciones lleva en cada filtro del grupo. */
+    val infracciones: List<InfraccionPersona> = emptyList(),
 )
+
+data class InfraccionPersona(val filtro: String, val total: Int, val ultima: Long)
+
+/** Alguien con lo que lleva en un filtro. */
+data class InfractorFiltro(val persona: String, val nombre: String, val telefono: String, val total: Int, val ultima: Long) {
+    val titulo: String get() = nombre.ifBlank { telefono.ifBlank { persona.substringBefore('@') } }
+}
 
 data class BaneadoGrupo(val persona: String, val nombre: String, val telefono: String, val ts: Long, val por: String, val porNombre: String, val motivo: String) {
     val titulo: String get() = nombre.ifBlank { telefono.ifBlank { persona.substringBefore('@') } }
@@ -99,7 +108,12 @@ object JsonAdminGrupo {
             miembro(o.getJSONObject("miembro")), puntos(o.optJSONArray("serie")), List(h?.length() ?: 0) { h!!.getInt(it) },
             o.optDouble("promedioDia"), o.optDouble("mediaGrupo"), o.optInt("puesto"), o.optInt("activos"), o.optString("motivoBan"),
             o.optBoolean("silenciado"), o.optLong("silencioHasta"), lista(o.optJSONArray("historial")) { evento(it) }, o.optLong("desde"),
+            lista(o.optJSONArray("infracciones")) { InfraccionPersona(it.optString("filtro"), it.optInt("total"), it.optLong("ultima")) },
         )
+    }
+
+    fun infractores(json: String): List<InfractorFiltro> = lista(JSONArray(json.ifBlank { "[]" })) {
+        InfractorFiltro(it.optString("persona"), it.optString("nombre"), it.optString("telefono"), it.optInt("total"), it.optLong("ultima"))
     }
 
     fun baneados(json: String): List<BaneadoGrupo> = lista(JSONArray(json.ifBlank { "[]" })) {
@@ -142,3 +156,5 @@ suspend fun Repo.guardarHorarioGrupo(bot: Long, grupo: String, h: HorarioGrupo) 
 suspend fun Repo.resumenAdmin(bot: Long, grupo: String) = io { JsonAdminGrupo.resumen(motor.grupoResumenAdmin(bot, grupo)) }
 suspend fun Repo.entradaGrupo(bot: Long, grupo: String) = io { JsonAdminGrupo.entrada(motor.grupoEntrada(bot, grupo)) }
 suspend fun Repo.guardarEntradaGrupo(bot: Long, grupo: String, e: ProteccionEntrada) = io { motor.grupoGuardarEntrada(bot, grupo, e.json()) }
+suspend fun Repo.infractoresGrupo(bot: Long, grupo: String, filtro: String = "", limite: Int = 50) = io { JsonAdminGrupo.infractores(motor.grupoInfractores(bot, grupo, filtro, limite.toLong())) }
+suspend fun Repo.reiniciarInfracciones(bot: Long, grupo: String, persona: String = "", filtro: String = "") = io { motor.grupoReiniciarInfracciones(bot, grupo, persona, filtro) }
