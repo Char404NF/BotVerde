@@ -108,6 +108,9 @@ func TestApiBotParaTodosSeAplicaConAvatarMenuYRangoDeTodos(t *testing.T) {
 	if g, err := gestorDe(1); err != nil || !g.Activo(modulos.IDBienvenida) || modulos.Config(g.Config(modulos.IDBienvenida)).Texto("grupos_modo") != "todos" {
 		t.Fatalf("la bienvenida sale encendida en todos los grupos: %v", err)
 	}
+	if g, _ := gestorDe(1); !g.Maestro() {
+		t.Fatal("sin la «Iniciativa propia» la bienvenida no escribiría: debe quedar encendida")
+	}
 }
 
 func TestApiCambiarLasOpcionesDelMenuQuitaElMenuDeFabrica(t *testing.T) {
